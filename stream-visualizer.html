@@ -1319,7 +1319,7 @@ function drawWater(){
   bars.forEach((b,i)=>{
     const x = L+cw*i+cw*.18, bw = cw*.64, pos = b.d >= 0;
     ctx.fillStyle = pos ? COL.buy : COL.sell; ctx.fillRect(x, Y(Math.max(b.a,b.b)), bw, Math.max(1, Math.abs(Y(b.a)-Y(b.b))));
-    if (i < bars.length-1 || true){ ctx.setLineDash([2,2]); ctx.strokeStyle="#7d8a99"; ctx.beginPath(); ctx.moveTo(x+bw, Y(b.b)); ctx.lineTo(x+cw, Y(b.b)); ctx.stroke(); ctx.setLineDash([]); }
+    ctx.setLineDash([2,2]); ctx.strokeStyle="#7d8a99"; ctx.beginPath(); ctx.moveTo(x+bw, Y(b.b)); ctx.lineTo(x+cw, Y(b.b)); ctx.stroke(); ctx.setLineDash([]);   // connector to the next bar (also to "net")
     const short = v => { const a=Math.abs(v); return a>=1e6 ? (a/1e6).toFixed(1)+"M" : a>=1e3 ? Math.round(a/1e3)+"k" : a.toFixed(0); };
     let vt = (pos?"+":"−")+fmtK(Math.abs(b.d)); if (ctx.measureText(vt).width > cw+6) vt = (pos?"+":"−")+short(b.d);
     if (Math.abs(b.d) > 0 && ctx.measureText(vt).width <= cw+6) label(ctx, vt, x+bw/2, pos ? Y(b.b)-4 : Y(b.b)+12, pos?COL.buy:COL.sell, "center");
@@ -1371,8 +1371,10 @@ function drawFan(){
   label(ctx, `${(100-above/totN*100).toFixed(0)}% at/below`, dx1, h-B-4, COL.sell, "right", true);
 }
 
+const VIZ = [[drawStream,"cvStream"],[drawSwarm,"cvSwarm"],[drawProfile,"cvProf"],[drawAnomaly,"cvAnom"],[drawBell,"cvBell"],[drawRadial,"cvRad"],[drawTree,"cvTree"],[drawWater,"cvWater"],[drawFan,"cvFan"]];
 function renderViz(){
-  for (const f of [drawStream, drawSwarm, drawProfile, drawAnomaly, drawBell, drawRadial, drawTree, drawWater, drawFan]){
+  for (const [f, id] of VIZ){
+    if (!$(id).clientWidth) continue;                              // panel is on a hidden tab: nothing to draw (and a 0-size canvas makes arc() throw)
     try{ f(); }catch(e){ console.error(f.name, e); }               // one broken panel must not blank the rest
   }
 }
@@ -1433,9 +1435,11 @@ const roundTick = (v, tick) => (Math.round(v/tick)*tick).toFixed(decOf(tick));
 
 // ---- simulated paper broker ----
 let SIM = null;
-function simReset(start){ SIM = {start, cash:start, pos:{symbol:accSym(), qty:0, entry:0}, orders:[], fills:[], nextId:1}; }
+function simReset(start){ SIM = {start, cash:start, positions:{}, orders:[], fills:[], nextId:1}; }
+// one position per asset: the header lets you switch asset while the paper account is live
+const simPos = (sym=accSym()) => (SIM.positions[sym] ||= {symbol:sym, qty:0, entry:0, mark:null});
 function simFill(side, qty, price, maker){
-  const fee = qty*price*(maker ? 0.0002 : 0.0005), p = SIM.pos, signed = side==="BUY" ? qty : -qty; let pnl = 0;
+  const fee = qty*price*(maker ? 0.0002 : 0.0005), p = simPos(), signed = side==="BUY" ? qty : -qty; let pnl = 0;
   SIM.cash -= fee;
   if (p.qty===0 || Math.sign(p.qty)===Math.sign(signed)){ p.entry = (p.entry*Math.abs(p.qty) + price*qty)/(Math.abs(p.qty)+qty); p.qty += signed; }
   else {
@@ -1443,11 +1447,11 @@ function simFill(side, qty, price, maker){
     const wasSign = Math.sign(p.qty); p.qty += signed;
     if (Math.abs(p.qty) < 1e-12){ p.qty = 0; p.entry = 0; } else if (Math.sign(p.qty)!==wasSign) p.entry = price;
   }
-  p.symbol = accSym();
-  SIM.fills.unshift({t:Date.now(), side, qty, price, fee, pnl}); if (SIM.fills.length > 50) SIM.fills.pop();
+  p.qty = +p.qty.toFixed(10);                                  // drop float dust (0.12 - 0.05 = 0.06999999999999999)
+  SIM.fills.unshift({t:Date.now(), side, qty, price, fee, pnl, symbol:p.symbol}); if (SIM.fills.length > 50) SIM.fills.pop();
 }
 function simCapReduce(o){                                      // reduce-only: never grow or flip the position
-  const p = SIM.pos.qty, opp = (o.side==="SELL" && p>0) || (o.side==="BUY" && p<0);
+  const p = simPos().qty, opp = (o.side==="SELL" && p>0) || (o.side==="BUY" && p<0);
   if (!opp) return 0; return Math.min(o.qty, Math.abs(p));
 }
 function simPlace(o){
@@ -1458,23 +1462,27 @@ function simPlace(o){
   }
   const cross = o.side==="BUY" ? (M.bnAsk && o.price >= M.bnAsk) : (M.bnBid && o.price <= M.bnBid);
   if (cross){ const px = o.side==="BUY" ? M.bnAsk : M.bnBid, q = o.reduce ? simCapReduce(o) : o.qty; if (!q) throw new Error("reduce-only: no position to reduce"); simFill(o.side, q, px, false); return {msg:`filled ${q} @ ${fmt(px,1)} (crossed)`}; }
-  SIM.orders.push({id:SIM.nextId++, side:o.side, type:"LIMIT", qty:o.qty, filled:0, price:+o.price, reduce:o.reduce, t:Date.now()});
+  SIM.orders.push({id:SIM.nextId++, symbol:accSym(), side:o.side, type:"LIMIT", qty:o.qty, filled:0, price:+o.price, reduce:o.reduce, t:Date.now()});
   return {msg:`limit resting @ ${o.price}`};
 }
 function simOnTrade(t){
   if (!SIM || !SIM.orders.length) return;
   SIM.orders = SIM.orders.filter(o=>{
-    const hit = (o.side==="BUY" && t.px <= o.price) || (o.side==="SELL" && t.px >= o.price);
+    if (o.symbol !== accSym()) return true;                    // trades on this feed only touch this asset's orders
+    const hit =(o.side==="BUY" && t.px <= o.price) || (o.side==="SELL" && t.px >= o.price);
     if (!hit) return true;
     const q = o.reduce ? simCapReduce(o) : o.qty; if (q) simFill(o.side, q, o.price, true);
     return false;
   });
 }
 function simSnapshot(){
-  const mark = M.bnMark || (M.bnBid && M.bnAsk ? (M.bnBid+M.bnAsk)/2 : SIM.pos.entry), p = SIM.pos, upnl = p.qty ? p.qty*(mark-p.entry) : 0;
-  return {balance:{wallet:SIM.cash, available:SIM.cash+upnl-Math.abs(p.qty)*mark/10, upnl},
-    positions: p.qty ? [{symbol:p.symbol, qty:p.qty, entry:p.entry, mark, upnl, liq:null, lev:"10 (sim)"}] : [],
-    orders: SIM.orders.map(o=>({...o})), fills: SIM.fills};
+  const sym = accSym(), cur = simPos(sym);
+  cur.mark = M.bnMark || (M.bnBid && M.bnAsk ? (M.bnBid+M.bnAsk)/2 : cur.mark || cur.entry);   // other assets keep their last known mark
+  const open = Object.values(SIM.positions).filter(p=>p.qty).map(p => { const mark = p.mark || p.entry;
+    return {symbol:p.symbol, qty:p.qty, entry:p.entry, mark, upnl:p.qty*(mark-p.entry), liq:null, lev:"10 (sim)"}; });
+  const upnl = open.reduce((a,p)=>a+p.upnl, 0), margin = open.reduce((a,p)=>a+Math.abs(p.qty)*p.mark/10, 0);
+  return {balance:{wallet:SIM.cash, available:SIM.cash+upnl-margin, upnl}, positions:open,
+    orders: SIM.orders.filter(o=>o.symbol===sym).map(o=>({...o})), fills: SIM.fills};
 }
 
 // ---- Binance (demo / live) broker ----
@@ -1524,7 +1532,7 @@ async function cancelOrder(id){
   accRefresh(); refreshSoon();
 }
 async function cancelAll(){
-  if (ACC.mode==="sim") SIM.orders = [];
+  if (ACC.mode==="sim") SIM.orders = SIM.orders.filter(o=>o.symbol!==accSym());   // same scope as live: this asset only
   else await bnSigned("DELETE","/fapi/v1/allOpenOrders",{symbol:accSym()});
   accRefresh(); refreshSoon();
 }
@@ -1673,7 +1681,7 @@ function renderTrading(){
   if ((el = body("t-pos"))){
     if (!ACC.mode || !d) noAcc(el); else el.innerHTML = d.positions.length ? `<table class="tt"><tr><th>symbol</th><th>size</th><th>entry</th><th>mark</th><th>uPnL</th><th>liq</th><th></th></tr>` +
       d.positions.map(p=>`<tr><td>${p.symbol}</td><td class="${p.qty>0?"ok":"err"}">${p.qty>0?"+":""}${p.qty}</td><td>${fmt(p.entry,1)}</td><td>${fmt(p.mark,1)}</td>
-        <td class="${p.upnl>=0?"ok":"err"}">${p.upnl>=0?"+":""}${fmt(p.upnl,2)}</td><td>${p.liq?fmt(p.liq,1):"–"}</td><td><button data-close="${p.qty}">close</button></td></tr>`).join("") + `</table>${stMsg}` : `<div class="note">No open position on ${accSym()}.</div>${stMsg}`;
+        <td class="${p.upnl>=0?"ok":"err"}">${p.upnl>=0?"+":""}${fmt(p.upnl,2)}</td><td>${p.liq?fmt(p.liq,1):"–"}</td><td>${p.symbol===accSym() ? `<button data-close="${p.qty}">close</button>` : `<span class="note" title="switch the asset in the header to close it">switch asset</span>`}</td></tr>`).join("") + `</table>${stMsg}` : `<div class="note">No open position on ${accSym()}.</div>${stMsg}`;
   }
   if ((el = body("t-orders"))){
     if (!ACC.mode || !d) noAcc(el); else el.innerHTML = d.orders.length ? `<table class="tt"><tr><th>side</th><th>type</th><th>price</th><th>qty</th><th>filled</th><th></th></tr>` +
