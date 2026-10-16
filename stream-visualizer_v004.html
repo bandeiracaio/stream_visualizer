@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Live Stream Visualizer</title>
 <style>
 :root{
@@ -25,7 +25,6 @@ nav button.act{background:var(--accent);color:#0d1014;border-color:var(--accent)
 #alerts{width:100%;font-family:var(--mono);font-size:11.5px;color:var(--warn)}
 #alerts:empty{display:none}
 main{padding:10px 12px;display:grid;gap:10px;grid-template-columns:minmax(0,1fr)}
-@media(min-width:1100px){main.all{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr)}}
 section{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;min-width:0}
 section.hide{display:none}
 section h2{font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--dim);margin:0 0 8px;font-weight:600;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
@@ -63,7 +62,7 @@ canvas.chart{width:100%;display:block;background:#0a0d10;border-radius:6px}
 #cvBub{height:340px}#cvCvd{height:200px}#cvHeat{height:400px}.mchart{height:170px}#cvHist{height:190px}
 #cvStream{height:260px}#cvSwarm{height:290px}#cvProf{height:400px}#cvAnom{height:230px}#cvBell{height:250px}#cvRad{height:360px}#cvTree{height:300px}#cvWater{height:300px}#cvFan{height:340px}
 .vleg{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:2px 10px;font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:6px}.vleg i{display:inline-block;width:10px;height:10px;margin-right:5px;vertical-align:-1px}
-#tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:10px}
+#tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr));gap:10px}
 #tgrid > section{grid-column:auto}#tgrid > section.full{grid-column:1/-1}
 section.tcontainer{background:none;border:none;padding:0}
 .rm{margin-left:auto;padding:1px 8px;font-size:12px;color:var(--dim)}
@@ -91,31 +90,141 @@ section.tcontainer{background:none;border:none;padding:0}
 .fsub{grid-column:2;color:var(--dim);font-size:11px;margin-top:-2px}
 .health td:first-child,.health th:first-child{text-align:left}
 .hk{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;margin-bottom:8px}
+.rd-strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px}
+.rd-card{background:var(--panel2);border-radius:8px;padding:8px}.rd-card span{display:block;color:var(--dim);font-size:11px}
+.rd-card b{font-family:var(--mono);font-size:14px;font-weight:500}.rd-card.buy b{color:var(--buy)}.rd-card.sell b{color:var(--sell)}
+.rd-feed td{padding:3px 6px;text-align:left}.rd-feed th{text-align:left}
+.rd-feed tr.bull td:first-child{border-left:3px solid var(--buy)}.rd-feed tr.bear td:first-child{border-left:3px solid var(--sell)}.rd-feed tr.neutral td:first-child{border-left:3px solid var(--warn)}
+.rd-str{display:inline-block;height:6px;border-radius:3px;background:var(--accent);vertical-align:middle}
+.rd-det{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px}.rd-det label{display:flex;gap:6px;align-items:center;font-size:12px}
+.chip{padding:2px 8px;font-size:11px}.chip.on{border-color:var(--accent);color:var(--accent)}
+/* ---- navigation: groups (top on PC, bottom bar on phone) + sub-views ---- */
+#groups button{padding:6px 14px;font-size:13px}
+#views{padding-top:0}
+#views[hidden],#sheet[hidden]{display:none}
+#views button{padding:3px 11px;font-size:12px;border-radius:999px;background:transparent;color:var(--dim)}
+#views button.act{background:var(--panel2);color:var(--accent);border-color:var(--accent);font-weight:600}
+/* ---- header: always-visible essentials, the rest in the settings sheet ---- */
+.pill{display:inline-flex;gap:4px;align-items:center;max-width:40vw;white-space:nowrap}
+.pill b{overflow:hidden;text-overflow:ellipsis}
+#cog{margin-left:auto}
+#sheet{position:absolute;top:100%;left:0;right:0;z-index:6;background:var(--panel);border-bottom:1px solid var(--line);box-shadow:0 10px 24px #000a;padding:10px 12px;display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+#sheet label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--dim)}
+#sheet input[type=text],#sheet select{width:100%}
+.sheetstats{grid-column:1/-1;display:flex;gap:6px 16px;flex-wrap:wrap}
+/* ---- collapsible panels ---- */
+section.cx > h2{cursor:pointer;justify-content:flex-start;user-select:none}
+section.cx > h2::before{content:"";flex:none;width:6px;height:6px;margin:0 6px 3px 3px;border-right:2px solid var(--dim);border-bottom:2px solid var(--dim);transform:rotate(45deg)}
+section.cx.collapsed > h2::before{margin:0 8px 0 1px;transform:rotate(-45deg)}
+section.cx > h2 .ctl,section.cx > h2 .rm{margin-left:auto;cursor:auto}
+section.cx > h2 .ctl{user-select:auto}
+/* collapsed bodies keep their width so hidden canvases still measure correctly */
+section.collapsed > h2{margin-bottom:0}
+section.collapsed > .pbody{height:0;overflow:hidden;visibility:hidden}
+/* ---- touch / phone ---- */
+@media(pointer:coarse){input,select{font-size:16px}button{min-height:36px}}
+@media(max-width:700px){
+  h1{display:none}
+  header{padding:6px 10px;gap:6px}
+  #groups{position:fixed;left:0;right:0;bottom:0;z-index:7;width:auto;gap:4px;padding:6px 6px calc(6px + env(safe-area-inset-bottom));background:var(--panel);border-top:1px solid var(--line)}
+  #groups button{flex:1;padding:10px 2px;font-size:12px;min-height:40px}
+  main{padding:8px 8px calc(78px + env(safe-area-inset-bottom))}
+  .books{grid-template-columns:1fr}
+  #tgrid{grid-template-columns:minmax(0,1fr)}
+  .rd-det{grid-template-columns:1fr}
+}
+
+/* ---- Overview ---- */
+.ovhero{padding:12px}
+.ovtop{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.ovtop .ctl{margin-left:auto;display:flex;gap:6px;align-items:center;color:var(--dim);font-size:12px}
+.ovrow{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:6px 0 4px}
+.ovpx{font-family:var(--mono);font-size:34px;font-weight:600;letter-spacing:-.5px}
+.ovchgs{display:flex;gap:6px;flex-wrap:wrap}
+.chg{font-family:var(--mono);font-size:12px;padding:2px 8px;border-radius:6px;background:var(--panel2);color:var(--dim)}
+.chg.up{color:var(--buy)}.chg.dn{color:var(--sell)}.chg.part{opacity:.6}
+.ovspark{width:100%;height:70px;display:block}
+.metric small{display:block;color:var(--dim);font-size:10.5px;margin-top:1px}
+.metric b.up{color:var(--buy)}.metric b.dn{color:var(--sell)}
+.ovev{border-left:3px solid var(--warn);padding:3px 8px;margin-bottom:6px;background:var(--panel2);border-radius:0 6px 6px 0}
+.ovev.bull{border-left-color:var(--buy)}.ovev.bear{border-left-color:var(--sell)}
+.ovevd{color:var(--dim);font-size:11px;margin-top:1px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+td.up{color:var(--buy)}td.dn{color:var(--sell)}
+@media(min-width:1100px){main{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){.ovpx{font-size:30px}}
+
+/* ---- Reader episodes ---- */
+.eplist{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(min(380px,100%),1fr))}
+.ep{background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;padding:8px 10px;cursor:pointer;min-width:0}
+.ep.forming{border-left-color:var(--dim);opacity:.75}.ep.fading{border-left-color:var(--warn)}.ep.ended{border-left-color:#4a5563;opacity:.8}
+.eph{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.stg{font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--accent)}.ep.forming .stg{color:var(--dim)}.ep.fading .stg{color:var(--warn)}.ep.ended .stg{color:var(--dim)}
+.who{font-size:11.5px;color:var(--dim)}.who i{font-style:normal;font-weight:600}.who i.buy{color:var(--buy)}.who i.sell{color:var(--sell)}
+.epbar{height:4px;border-radius:2px;background:var(--line);margin:6px 0 4px;overflow:hidden}.epbar i{display:block;height:100%;background:var(--accent)}.ep.fading .epbar i{background:var(--warn)}
+.epread{font-size:12.5px;margin-top:4px}.epmeta{margin-top:3px;font-size:11px}
+.evid{margin-top:6px;font-size:11.5px}.evid td{padding:2px 4px;text-align:left}.evid td:last-child{text-align:right;font-family:var(--mono)}
+.evid tr.na{opacity:.45}.tick{display:inline-block;width:9px;height:9px;border-radius:50%;border:1.5px solid var(--dim)}.evid tr.ok .tick{background:var(--buy);border-color:var(--buy)}
+.gate{font-size:9.5px;text-transform:uppercase;color:var(--dim);border:1px solid var(--line);border-radius:3px;padding:0 3px}
+.ovev.active{border-left-color:var(--accent)}.ovev.fading{border-left-color:var(--warn)}.ovev.forming{border-left-color:var(--dim)}
+
 </style>
 </head>
 <body>
 <header>
   <h1>Live Stream Visualizer</h1>
-  <input id="sym" type="text" value="BTC" title="asset">
-  <select id="route" title="Binance routing">
-    <option value="routed">BN routed</option>
-    <option value="legacy">BN legacy /stream</option>
-  </select>
-  <select id="bnSrc" title="Which Binance stream feeds the tape, bubbles and CVD">
-    <option value="bn.trade">BN trades: @trade</option>
-    <option value="bn.aggTrade">BN trades: @aggTrade</option>
-  </select>
   <button id="go" class="primary">Connect</button>
   <button id="pause">Pause</button>
-  <span class="stat">BN <b id="bnState">off</b> · <b id="bnRate">0</b>/s · <b id="bnBytes">0</b>KB/s</span>
-  <span class="stat">HL <b id="hlState">off</b> · <b id="hlRate">0</b>/s · <b id="hlBytes">0</b>KB/s</span>
-  <span class="stat">clock <b id="clk">–</b></span>
+  <span class="stat pill">BN <b id="bnState">off</b></span>
+  <span class="stat pill">HL <b id="hlState">off</b></span>
   <span id="accBadge"></span>
+  <button id="cog" title="Settings" aria-expanded="false">⚙ <span id="symLbl">BTC</span></button>
   <div id="alerts"></div>
-  <nav id="tabs"></nav>
+  <nav id="groups"></nav>
+  <nav id="views" hidden></nav>
+  <div id="sheet" hidden>
+    <label>Symbol <input id="sym" type="text" value="BTC" title="asset"></label>
+    <label>Binance routing
+      <select id="route" title="Binance routing">
+        <option value="routed">BN routed</option>
+        <option value="legacy">BN legacy /stream</option>
+      </select>
+    </label>
+    <label>Trade source
+      <select id="bnSrc" title="Which Binance stream feeds the tape, bubbles and CVD">
+        <option value="bn.trade">BN trades: @trade</option>
+        <option value="bn.aggTrade">BN trades: @aggTrade</option>
+      </select>
+    </label>
+    <div class="sheetstats stat">
+      <div>BN <b id="bnRate">0</b>/s · <b id="bnBytes">0</b> KB/s</div>
+      <div>HL <b id="hlRate">0</b>/s · <b id="hlBytes">0</b> KB/s</div>
+      <div>clock <b id="clk">–</b></div>
+    </div>
+  </div>
 </header>
 
 <main id="main">
+  <section data-tab="overview" class="full ovhero">
+    <div class="ovtop"><span class="venue v-bn">BN</span><b id="ovSym">BTC perp</b><span id="ovStatus" class="stat"></span>
+      <label class="ctl">window <select id="ovWin"><option value="60000">1m</option><option value="300000" selected>5m</option><option value="900000">15m</option></select></label></div>
+    <div class="ovrow"><b id="ovPx" class="ovpx">–</b><div id="ovChg" class="ovchgs"></div></div>
+    <canvas id="ovSpark" class="ovspark"></canvas>
+  </section>
+
+  <section data-tab="overview" class="full">
+    <h2>Market now</h2>
+    <div class="metrics" id="ovMetrics"></div>
+  </section>
+
+  <section data-tab="overview">
+    <h2>Reader: right now <span class="ctl"><button id="ovOpenReader">open</button></span></h2>
+    <div id="ovReader"></div>
+  </section>
+
+  <section data-tab="overview">
+    <h2>Account <span class="ctl"><button id="ovOpenAcc">manage</button></span></h2>
+    <div id="ovAcc"></div>
+  </section>
+
   <section data-tab="charts" class="full">
     <h2>Trade bubbles <span class="ctl">window
       <select id="win"><option value="60000">1m</option><option value="180000" selected>3m</option><option value="300000">5m</option></select>
@@ -264,6 +373,42 @@ section.tcontainer{background:none;border:none;padding:0}
     <div class="note">Last 30s. Each curve runs from the mid to the price a trade printed at, in bps of its own venue's mid; thickness and opacity grow with size. Right: $-weighted distribution.</div>
   </section>
 
+  <section data-tab="reader" class="full">
+    <h2>Market reader <span class="ctl"><span id="rdStatus" class="stat">calibrating...</span>
+      <label>sensitivity <select id="rdSens"><option value="0.75">low</option><option value="1" selected>medium</option><option value="1.25">high</option></select></label></span></h2>
+    <div id="rdStrip" class="rd-strip"></div>
+    <div class="note">Read-only. Windows use normal-market activity: they shrink when the market is fast and stretch when it is slow. Detectors arm after about two minutes. Evidence describes order-flow behaviour; it is not advice.</div>
+  </section>
+
+  <section data-tab="reader" class="full">
+    <h2>Episodes now <span class="ctl"><span id="epChips"></span></span></h2>
+    <div id="epActive" class="eplist"></div>
+    <div class="note">An episode is one phenomenon with a lifecycle: forming, active, fading, ended, and it can resume. "Began" is back-dated to when the evidence started building; "detected" is when it held long enough to count. Tap a card to see its evidence checklist. Evidence describes order-flow behaviour; it is not advice.</div>
+  </section>
+
+  <section data-tab="reader" class="full">
+    <h2>Finished episodes</h2>
+    <div id="epDone" class="eplist"></div>
+  </section>
+
+  <section data-tab="reader" class="full">
+    <h2>Raw events (one-off detectors) <span class="ctl"><span id="rdChips"></span> min strength <input id="rdMin" type="range" min="0" max="1" step="0.05" value="0" style="width:90px"></span></h2>
+    <div class="tape" style="height:420px"><table id="rdFeed" class="rd-feed"></table></div>
+  </section>
+
+  <section data-tab="reader">
+    <h2>Detectors</h2>
+    <div class="note" style="margin:0 0 6px">Episode families</div>
+    <div id="epFamilies" class="rd-det" style="margin-bottom:10px"></div>
+    <div class="note" style="margin:0 0 6px">Raw event detectors</div>
+    <div id="rdDetectors" class="rd-det"></div>
+  </section>
+
+  <section data-tab="reader">
+    <h2>Engine health</h2>
+    <div class="metrics" id="rdHealth"></div>
+  </section>
+
   <section data-tab="trading" class="full tcontainer">
     <h2>Trading <span class="ctl"><select id="addMod"><option value="">+ add module…</option></select></span></h2>
     <div id="tEmpty" class="note" style="margin:0 0 10px">This tab starts empty. Add trading modules, or any panel from the other tabs. A panel you add moves here and goes back to its tab when you remove it (✕).</div>
@@ -346,6 +491,532 @@ section.tcontainer{background:none;border:none;padding:0}
   </section>
 </main>
 
+<script id="reader-episodes">
+"use strict";
+// Market Reader episodes: pure logic, no DOM, no timers. Driven by the engine's one-second tick.
+//
+// An episode is one phenomenon with a lifecycle: forming -> active -> fading -> ended, and it can resume.
+// Each family scores a weighted evidence checklist (several variables, never one). Gate items must all hold.
+// Hysteresis: it starts when gate+score >= enterScore for enterHoldMs, fades when it drops under exitScore,
+// and ends after endHoldMs under it. The start time is back-dated to the first moment the evidence was building
+// (formScore), so "when it began" is not just "when it was confirmed". If the same thing returns within
+// resumeMs of ending, it is the same episode, resumed (pulses + 1).
+// Language is neutral: who is the aggressor, who is passive, what price did. No bull/bear.
+const READER_EPISODES = (() => {
+  const DEFAULTS = {
+    enterScore:.7, formScore:.5, exitScore:.45, enterHoldMs:2000, endHoldMs:4000, resumeMs:20000,
+    keepEpisodes:300, wallFadeFrac:.6, wallStaleMs:30000, wallEpisodeMs:15000, wallMaxActive:2, minTradesFast:5, minTradesMid:12, refreshMs:10000, pokeMs:30000, traceCap:240,
+    horizons:["fast","mid"], families:{absorption:true, exhaustion:true, burst:true, wall:true},
+  };
+  const FAMILY_LABEL = {absorption:"Absorption", exhaustion:"Exhaustion", burst:"Aggression burst", wall:"Wall"};
+  const clamp = (x,lo,hi) => Math.min(hi, Math.max(lo,x));
+  const clamp01 = x => clamp(x,0,1);
+  const money = x => x>=1e6 ? (x/1e6).toFixed(1)+"M" : x>=1e3 ? Math.round(x/1e3)+"k" : x.toFixed(0);
+  const pct = x => Math.round(x*100)+"%";
+  const zf = z => (Math.round(z*10)/10+0).toFixed(1);
+  const sgn = (x,d) => (x>=0?"+":"-")+Math.abs(x).toFixed(d==null?1:d);
+  const other = vn => vn==="bn" ? "hl" : "bn";
+  const opp = s => s==="buy" ? "sell" : "buy";
+  const who = s => s==="buy" ? "buyers" : "sellers";
+  const moved = (side, p) => ((side==="buy") === (p >= 0) ? "up " : "down ")+Math.abs(p).toFixed(1)+"σ";   // progress is signed relative to the aggressor
+
+  function create(ctx){
+    const cfg = ctx.cfg, E = () => cfg.ep;
+    let episodes = [], tracks = new Map(), walls = new Map(), seq = 0, refresh = {bn:{buy:0,sell:0}, hl:{buy:0,sell:0}};
+    const listeners = [];
+    const notify = (ep, change) => { for (const fn of listeners) try{ fn(ep, change); }catch(err){} };
+
+    // Aggregate ring buckets [len-offset-count, len-offset): the same sums horizon() makes, for a window that ended earlier.
+    function agg(vn, count, offset){
+      const r = ctx.venue(vn).ring, end = r.length-offset, start = end-count;
+      if (count < 1 || start < 0) return null;
+      const a = {buy:0, sell:0, n:0, hi:-Infinity, lo:Infinity, open:null, close:null, liqBuyN:0, liqSellN:0, sweepBuyN:0, sweepSellN:0};
+      for (let i = start; i < end; i++){
+        const b = r[i]; a.buy += b.buy; a.sell += b.sell; a.n += b.n; a.liqBuyN += b.liqBuyN; a.liqSellN += b.liqSellN; a.sweepBuyN += b.sweepBuyN; a.sweepSellN += b.sweepSellN;
+        if (b.hi != null){ if (b.hi > a.hi) a.hi = b.hi; if (b.lo < a.lo) a.lo = b.lo; if (a.open == null) a.open = b.open; a.close = b.close; }
+      }
+      return a.open == null ? null : a;
+    }
+    const minTrades = hz => hz==="fast" ? E().minTradesFast : E().minTradesMid;
+    // price progress in the aggressor's direction, in units of normal movement over the window (negative: price went the other way)
+    const progress = (vn, h, side) => (side==="buy"?1:-1) * (h.close/h.open-1) * 1e4 / (ctx.sigmaBps(vn)*Math.sqrt(h.ms/1000));
+    // Is it still going on? Looks only at the latest quarter of the window, so a stretched window (slow market) cannot keep an old surge alive.
+    function recent(vn, h, side, rate){
+      const q = clamp(Math.round(h.ms/cfg.bucketMs/4), 4, 32), r = agg(vn, q, 0);   // at most the last 8 s if (!r || !(r.buy+r.sell > 0)) return {ok:false, val:"no trades"};
+      const share = (side==="buy" ? r.buy : r.sell)/(r.buy+r.sell), now = (side==="buy" ? r.buy : r.sell)/(q*cfg.bucketMs/1000);
+      return {ok: share >= .55 && now >= .5*rate, val: pct(share)+", "+(rate > 0 ? pct(now/rate) : "-")+" of pace"};
+    }
+    const item = (k, label, ok, w, val, gate) => ({k, label, ok:!!ok, w, val, gate:!!gate});
+    const na = (k, label) => ({k, label, ok:false, w:0, val:"n/a", na:true});
+
+    function scoreOf(items){
+      let w = 0, s = 0, gate = true;
+      for (const it of items){ if (it.na) continue; w += it.w; if (it.ok) s += it.w; if (it.gate && !it.ok) gate = false; }
+      return {score: w ? s/w : 0, gate};
+    }
+
+    // ---- absorption: aggressors keep hitting one side, price makes no progress, the passive side holds or refills ----
+    function evalAbsorption(vn, hz, side, t){
+      const h = ctx.horizon(vn, hz);
+      if (!h || h.n < minTrades(hz) || !(h.open > 0) || !(h.buy+h.sell > 0)) return null;
+      const v = ctx.venue(vn), secs = h.ms/1000, share = side==="buy" ? h.share : 1-h.share, rate = (side==="buy" ? h.buy : h.sell)/secs;
+      const z = ctx.robustZ(rate, vn, side, 1), prog = progress(vn, h, side), count = Math.round(h.ms/cfg.bucketMs), r = v.ring.slice(-count);
+      let path = 0; for (let i = 1; i < r.length; i++) if (r[i-1].close > 0 && r[i].close > 0) path += Math.abs(r[i].close/r[i-1].close-1);
+      const eff = path > 0 ? Math.abs(h.close/h.open-1)/path : 0;
+      const dSide = side==="sell" ? "bid" : "ask", start = r.length ? r[0][dSide+"Depth"] : 0, refill = start > 0 ? v.depth[dSide]/start : null;
+      const w = ctx.walletEvidence(vn, side, t-h.ms), oh = ctx.horizon(other(vn), hz);
+      const oShare = oh ? (side==="buy" ? oh.share : 1-oh.share) : null, oProg = oh && oh.open > 0 ? progress(other(vn), oh, side) : null;
+      const rc = recent(vn, h, side, rate);
+      const items = [
+        item("flow", "aggressor share of taker flow", share >= cfg.absorbShare, 2, pct(share), true),
+        item("stalled", "price progress with the aggressor", prog <= cfg.absorbSigma, 2, sgn(prog)+"σ", true),
+        item("recent", "still happening in the latest seconds", rc.ok, 1.5, rc.val, true),
+        item("intensity", "flow intensity vs normal", z >= ctx.th("absorbZ"), 1.5, "z "+z.toFixed(1)),
+        item("efficiency", "price path efficiency (low = chop)", eff <= cfg.absorbEfficiency, 1, eff.toFixed(2)),
+        refill == null ? na("refill", "passive depth refilled") : item("refill", "passive depth refilled", refill >= cfg.absorbRefill, 1.5, pct(refill)),
+        item("level", "repeated fills at one level", t-refresh[vn][side] <= E().refreshMs, 1, t-refresh[vn][side] <= E().refreshMs ? "yes" : "no"),
+        vn==="hl" ? item("wallet", "one wallet dominates", !!w, 1, w ? pct(w.share) : "no") : na("wallet", "one wallet dominates"),
+        oShare == null || oProg == null ? na("cross", "other venue agrees") : item("cross", "other venue agrees", oShare >= .6 && oProg <= cfg.absorbSigma, 1, pct(oShare)),
+      ];
+      return {items, ...scoreOf(items), px:h.close, facts:{share, z, prog, eff, refill, dSide, open:h.open, secs, rate$:rate*secs}};
+    }
+
+    // ---- exhaustion: one side's aggression, strong a moment ago, has faded, near an extreme, price stops progressing ----
+    function evalExhaustion(vn, hz, side, t){
+      const h = ctx.horizon(vn, hz); if (!h || !(h.open > 0)) return null;
+      const count = Math.round(h.ms/cfg.bucketMs), prev = agg(vn, count, count);
+      if (!prev || prev.n < minTrades(hz)) return null;
+      const v = ctx.venue(vn), secs = h.ms/1000, sig = ctx.sigmaBps(vn)*Math.sqrt(secs);
+      const rate = (side==="buy" ? h.buy : h.sell)/secs, was = (side==="buy" ? prev.buy : prev.sell)/secs, zWas = ctx.robustZ(was, vn, side, 1);
+      const ratio = was > 0 ? rate/was : 1, prog = progress(vn, h, side), wasShare = prev.buy+prev.sell > 0 ? (side==="buy" ? prev.buy : prev.sell)/(prev.buy+prev.sell) : 0;
+      const ext = side==="buy" ? Math.max(h.hi, prev.hi) : Math.min(h.lo, prev.lo), prior = side==="buy" ? ctx.priorHigh(vn, 2*count) : ctx.priorLow(vn, 2*count);
+      const gap = Number.isFinite(prior) ? (side==="buy" ? prior-ext : ext-prior)/ext*1e4/sig : 0;
+      const sizeNow = h.n ? (h.buy+h.sell)/h.n : 0, sizeWas = prev.n ? (prev.buy+prev.sell)/prev.n : 0, poke = v.lastPokeFail && v.lastPokeFail.side===(side==="buy" ? "high" : "low") && t-v.lastPokeFail.t <= E().pokeMs;
+      const items = [
+        item("decay", "aggression vs the window before", ratio <= .5, 2.5, pct(ratio), true),
+        item("was", "it was elevated before", zWas >= 1.5, 1.5, "z "+zWas.toFixed(1), true),
+        item("dominant", "it was the dominant side before", wasShare >= .55, 1, pct(wasShare), true),
+        item("extreme", "near the 5-minute extreme", gap <= 1, 1.5, gap <= 0 ? "new extreme" : gap.toFixed(1)+"σ away"),
+        item("stalled", "price progress with the aggressor", prog <= cfg.absorbSigma, 1.5, sgn(prog)+"σ"),
+        item("poke", "recent failed poke", !!poke, 1.5, poke ? "yes" : "no"),
+        item("size", "average trade size shrinking", sizeWas > 0 && sizeNow <= .75*sizeWas, 1, sizeWas > 0 ? pct(sizeNow/sizeWas) : "-"),
+      ];
+      return {items, ...scoreOf(items), px:h.close, facts:{ratio, zWas, gap, prog, poke:!!poke, side, open:h.open, secs}};
+    }
+
+    // ---- aggression burst: a surge of one side's flow, with price movement and supporting signs ----
+    function evalBurst(vn, hz, side, t){
+      const h = ctx.horizon(vn, hz);
+      if (!h || h.n < minTrades(hz) || !(h.open > 0) || !(h.buy+h.sell > 0)) return null;
+      const secs = h.ms/1000, share = side==="buy" ? h.share : 1-h.share, rate = (side==="buy" ? h.buy : h.sell)/secs;
+      const z = ctx.robustZ(rate, vn, side, 1), prog = progress(vn, h, side), count = Math.round(h.ms/cfg.bucketMs);
+      const liq = side==="buy" ? h.liqBuyN : h.liqSellN, sweeps = side==="buy" ? h.sweepBuyN : h.sweepSellN;
+      const brk = side==="buy" ? h.hi > ctx.priorHigh(vn, count) : h.lo < ctx.priorLow(vn, count);
+      const oh = ctx.horizon(other(vn), hz), oZ = oh && oh.n >= minTrades(hz) ? ctx.robustZ((side==="buy" ? oh.buy : oh.sell)/(oh.ms/1000), other(vn), side, 1) : null;
+      const rc = recent(vn, h, side, rate);
+      const items = [
+        item("rate", "flow rate vs normal", z >= ctx.th("burstZ"), 2, "z "+z.toFixed(1), true),
+        item("share", "aggressor share of taker flow", share >= cfg.burstShare, 2, pct(share), true),
+        item("recent", "still happening in the latest seconds", rc.ok, 1.5, rc.val, true),
+        item("move", "price moved with the aggressor", prog >= ctx.th("burstSigma"), 2, sgn(prog)+"σ"),
+        item("liq", "liquidations", liq >= 2, 1, String(liq)),
+        item("sweeps", "multi-level sweeps", sweeps >= 3, 1, String(sweeps)),
+        item("thin", "far side of the book thinned", ctx.depthThinned(vn, side==="buy" ? "ask" : "bid"), 1, ctx.depthThinned(vn, side==="buy" ? "ask" : "bid") ? "yes" : "no"),
+        item("break", "through the 5-minute extreme", brk, 1, brk ? "yes" : "no"),
+        oZ == null ? na("cross", "other venue agrees") : item("cross", "other venue agrees", oZ >= 2, 1, "z "+oZ.toFixed(1)),
+      ];
+      return {items, ...scoreOf(items), px:h.close, facts:{z, share, prog, liq, sweeps, secs, notional:(side==="buy" ? h.buy : h.sell), open:h.open}};
+    }
+
+    const EVAL = {absorption:evalAbsorption, exhaustion:evalExhaustion, burst:evalBurst};
+
+    function reading(ep){
+      const f = ep.facts, a = ep.aggressor;
+      if (ep.family==="absorption") return `Aggressive ${who(a)} (${pct(f.share)} of taker flow, z ${zf(f.z)}) are being absorbed by passive ${who(opp(a))}: price ${moved(a, f.prog)}${f.refill != null ? `, ${f.dSide} depth ${pct(f.refill)} refilled` : ""}.`;
+      if (ep.family==="exhaustion") return `Aggressive ${who(a)} have faded to ${pct(f.ratio)} of the previous window's pace${f.gap <= 1 ? `, near the 5-minute ${a==="buy" ? "high" : "low"}` : ""}${f.poke ? ", after a failed poke" : ""}; price ${moved(a, f.prog)}.`;
+      if (ep.family==="burst") return `Aggressive ${who(a)}: $${money(f.notional)} in ${f.secs.toFixed(0)} s (z ${zf(f.z)}), price ${moved(a, f.prog)}${f.liq ? `, ${f.liq} liquidations` : ""}${f.sweeps ? `, ${f.sweeps} sweeps` : ""}.`;
+      const w = ep.wall; return `${w.side==="bid" ? "Bid" : "Ask"} wall at ${w.px}, ${w.ratio.toFixed(1)}x the median level, ${Math.round((ep.tUpdate-ep.tStart)/1000)} s old, ${pct(w.size/w.peak)} of its peak left${w.tradedFrac != null ? `; ${pct(w.tradedFrac)} of the size that left was traded through (the rest was pulled)` : ""}.`;
+    }
+
+    // ---- lifecycle ----
+    function refreshEp(ep, ev, t){
+      ep.intensity = ev.score;
+      ep.evidence = ev.items; ep.facts = ev.facts; ep.px = ev.px; ep.tUpdate = t; ep.reading = reading(ep);
+      if (ev.score >= ep.peak){ ep.peak = ev.score; ep.peakReading = ep.reading; ep.peakEvidence = ev.items; }   // an ended episode is described as it was at its peak, not as it was when it ended
+      ep.trace.push([t, ev.score]); if (ep.trace.length > E().traceCap) ep.trace.shift();
+    }
+    function trim(){
+      const keep = E().keepEpisodes;
+      for (let i = 0; episodes.length > keep && i < episodes.length; ){ if (episodes[i].stage==="ended") episodes.splice(i, 1); else i++; }
+    }
+    function openEp(tr, ev, t){
+      const prev = tr.lastEnded;
+      if (prev && t-prev.tEnd <= E().resumeMs){
+        prev.stage = "active"; prev.tEnd = null; prev.outcome = null; prev.pulses++; prev.resumedAt.push(t); prev.fadingSince = null;
+        tr.lastEnded = null; tr.ep = prev; tr.onSince = null; tr.lowSince = null; refreshEp(prev, ev, t); notify(prev, "resumed"); return;
+      }
+      const ep = {id:++seq, family:tr.fam, kind:tr.fam, venue:tr.vn, horizon:tr.hz, aggressor:tr.side, passive:tr.fam==="absorption" ? opp(tr.side) : null,
+        stage:"active", pulses:1, tStart:Math.min(tr.runSince==null ? t : tr.runSince, t), tDetected:t, tEnd:null, peak:0, intensity:0, evidence:[], facts:{}, reading:"",
+        outcome:null, resumedAt:[], trace:[], px:null, pxStart:ev.facts.open, tUpdate:t, fadingSince:null};
+      tr.ep = ep; tr.onSince = null; tr.lowSince = null; episodes.push(ep); refreshEp(ep, ev, t); trim(); notify(ep, "started");
+    }
+    function endEp(tr, tEnd, outcome){
+      const ep = tr.ep; ep.stage = "ended"; ep.tEnd = tEnd; ep.outcome = outcome; ep.fadingSince = null;
+      tr.lastEnded = ep; tr.ep = null; tr.onSince = null; tr.runSince = null; tr.lowSince = null; notify(ep, "ended");
+    }
+    function step(fam, vn, hz, side, ev, t){
+      const key = fam+"|"+vn+"|"+hz+"|"+side; let tr = tracks.get(key);
+      if (!tr){ if (!ev) return; tr = {key, fam, vn, hz, side, ep:null, lastEnded:null, runSince:null, lastNear:0, onSince:null, lowSince:null}; tracks.set(key, tr); }
+      tr.last = ev; tr.lastT = t;
+      const c = E(), has = !!(ev && ev.gate), sc = has ? ev.score : 0, on = has && sc >= c.enterScore, near = has && sc >= c.formScore;
+      if (!tr.ep){
+        if (near){ if (tr.runSince == null) tr.runSince = t; tr.lastNear = t; } else if (tr.runSince != null && t-tr.lastNear > 2000) tr.runSince = null;
+        if (on){ if (tr.onSince == null) tr.onSince = t; if (t-tr.onSince >= c.enterHoldMs) openEp(tr, ev, t); } else tr.onSince = null;
+        return;
+      }
+      const ep = tr.ep, holds = has && sc >= c.exitScore;
+      if (ev) refreshEp(ep, ev, t);
+      if (ep.stage==="active"){
+        if (!holds){ ep.stage = "fading"; ep.fadingSince = t; tr.lowSince = t; notify(ep, "fading"); }
+      } else if (on){ ep.stage = "active"; ep.fadingSince = null; tr.lowSince = null; notify(ep, "active"); }
+      else if (holds) tr.lowSince = null;
+      else {
+        if (tr.lowSince == null){ tr.lowSince = t; ep.fadingSince = t; }
+        if (t-tr.lowSince >= c.endHoldMs) endEp(tr, ep.fadingSince || t, "faded");
+      }
+    }
+    function tick(t){
+      const c = E();
+      for (const vn of ["bn","hl"]) for (const hz of c.horizons) for (const fam of ["absorption","exhaustion","burst"]){
+        if (!c.families[fam]) continue;
+        for (const side of ["buy","sell"]) step(fam, vn, hz, side, EVAL[fam](vn, hz, side, t), t);
+      }
+      for (const [k, ep] of walls) if (t-ep.tSeen > c.wallStaleMs) closeWall(k, ep, t, "left", null);
+    }
+
+    // ---- wall episodes: fed by the engine's wall tracker (a confirmed wall opens one; its resolution ends it) ----
+    const wallKey = (vn, w) => vn+"|"+w.side+"|"+w.px;
+    function wallItems(ep, ratio, distBps){
+      const w = ep.wall, th = ctx.th("wallRatio");
+      return [item("size", "size vs median level", ratio >= th, 2, ratio.toFixed(1)+"x", true), item("held", "held without being hit", ep.tUpdate-ep.tStart >= cfg.wallConfirmMs, 1.5, Math.round((ep.tUpdate-ep.tStart)/1000)+" s"),
+        item("intact", "still near its peak size", w.size >= w.peak*E().wallFadeFrac, 2, pct(w.size/w.peak)), item("near", "distance from mid", true, 0, distBps.toFixed(1)+" bps")];
+    }
+    // A confirmed wall becomes an episode only once it has stood long enough (flickering liquidity is noise), after calibration, and within a per-side cap.
+    function wallUpdate(vn, t, w, ratio, mid){
+      let ep = walls.get(wallKey(vn, w)), fresh = false;
+      if (!ep){
+        const c = E(); if (!c.families.wall || !ctx.isCalibrated() || t-w.born < c.wallEpisodeMs) return;
+        let n = 0; for (const o of walls.values()) if (o.venue===vn && o.wall.side===w.side) n++;
+        if (n >= c.wallMaxActive) return;
+        ep = wallOpen(vn, t, w, ratio, mid); fresh = true;
+      }
+      const x = ep.wall; x.size = w.size; x.peak = w.peak; x.ratio = ratio; ep.tSeen = t; ep.tUpdate = t;
+      ep.intensity = clamp01(Math.log2(Math.max(ratio, 1)/ctx.th("wallRatio"))/4); if (ep.intensity > ep.peak) ep.peak = ep.intensity;
+      const fading = w.size <= w.peak*E().wallFadeFrac;
+      if (fading && ep.stage==="active"){ ep.stage = "fading"; ep.fadingSince = t; ep.evidence = wallItems(ep, ratio, Math.abs(w.px-mid)/mid*1e4); ep.reading = reading(ep); notify(ep, "fading"); }
+      else if (!fading && ep.stage==="fading"){ ep.stage = "active"; ep.fadingSince = null; notify(ep, "active"); }
+      ep.evidence = wallItems(ep, ratio, Math.abs(w.px-mid)/mid*1e4); ep.reading = reading(ep);
+      if (fresh) notify(ep, "started");
+    }
+    function wallOpen(vn, t, w, ratio, mid){
+      const key = wallKey(vn, w);
+      const ep = {id:++seq, family:"wall", kind:w.side+" wall", venue:vn, horizon:"book", aggressor:null, passive:w.side==="bid" ? "buy" : "sell", stage:"active", pulses:1,
+        tStart:w.born, tDetected:t, tEnd:null, peak:0, intensity:0, evidence:[], facts:{}, reading:"", outcome:null, resumedAt:[], trace:[], px:w.px, pxStart:w.px, tUpdate:t, tSeen:t, fadingSince:null,
+        wall:{side:w.side, px:w.px, size:w.size, peak:w.peak, ratio, tradedFrac:null}};
+      walls.set(key, ep); episodes.push(ep); trim(); return ep;
+    }
+    function closeWall(key, ep, t, outcome, frac){
+      ep.stage = "ended"; ep.tEnd = t; ep.outcome = outcome; ep.fadingSince = null; ep.wall.tradedFrac = frac; ep.tUpdate = t; ep.reading = reading(ep);
+      walls.delete(key); notify(ep, "ended");
+    }
+    function wallClose(vn, t, w, outcome, frac){ const key = wallKey(vn, w), ep = walls.get(key); if (ep) closeWall(key, ep, t, outcome, frac); }
+
+    // Evidence that is building but has not yet held long enough to count: stage "forming".
+    function forming(t){
+      const out = [];
+      for (const tr of tracks.values()){
+        if (tr.ep || tr.runSince == null || !tr.last || t-tr.lastT > 2000 || !tr.last.gate || tr.last.score < E().formScore) continue;
+        const ev = tr.last, ep = {family:tr.fam, venue:tr.vn, horizon:tr.hz, aggressor:tr.side, passive:tr.fam==="absorption" ? opp(tr.side) : null, stage:"forming", facts:ev.facts};
+        out.push({id:"f|"+tr.key, family:tr.fam, kind:tr.fam, venue:tr.vn, horizon:tr.hz, aggressor:tr.side, passive:ep.passive, stage:"forming", pulses:0, tStart:tr.runSince, tDetected:null, tEnd:null,
+          peak:ev.score, intensity:ev.score, evidence:ev.items, facts:ev.facts, reading:reading(ep), outcome:null, px:ev.px, tUpdate:tr.lastT});
+      }
+      return out;
+    }
+    function closeAll(t, reason){
+      for (const tr of tracks.values()) if (tr.ep) endEp(tr, t, reason);
+      for (const [k, ep] of Array.from(walls)) closeWall(k, ep, t, reason, null);
+      tracks.clear();
+    }
+    function setFamily(name, on){ if (!Object.prototype.hasOwnProperty.call(E().families, name)) return; E().families[name] = !!on; if (!on) for (const tr of tracks.values()) if (tr.fam===name && tr.ep) endEp(tr, tr.ep.tUpdate, "disabled"); }
+    return {
+      reset(){ episodes = []; tracks = new Map(); walls = new Map(); seq = 0; refresh = {bn:{buy:0,sell:0}, hl:{buy:0,sell:0}}; },
+      tick, closeAll, setFamily, forming, wallUpdate, wallClose,
+      noteRefresh(vn, side, t){ refresh[vn][side] = t; },
+      list: () => episodes, active: () => episodes.filter(e => e.stage !== "ended"),
+      subscribe(fn){ listeners.push(fn); return () => { const i = listeners.indexOf(fn); if (i >= 0) listeners.splice(i, 1); }; },
+    };
+  }
+  return {create, DEFAULTS, FAMILY_LABEL};
+})();
+
+</script>
+<script id="reader-engine">
+"use strict";
+// Market Reader engine: pure logic, no DOM and no timers. Exchange timestamps drive its clock.
+const READER_ENGINE = (() => {
+  const DEFAULTS = {
+    bucketMs:250, keepMs:1800000, warmupMs:120000, baseTauMs:1800000,
+    horizons:{fast:15000,mid:60000,slow:300000}, minWindowMs:3000, maxWindowMs:600000,
+    gapResetMs:30000, cooldownMs:5000, maxEventsPerMin:20, keepEvents:500, sens:1,
+    detectors:{wall_appears:true,wall_pulled:true,wall_eaten:true,book_thin:true,imbalance_flip:true,spoof_like:true,capitulation:true,selling_exhausted:true,squeeze:true,breakout:true,passive_absorption:true,refreshing_level:true,failed_poke:true,buyer_exhaustion:true,seller_exhaustion:true},
+    wallRatio:8, wallMinLevels:10, wallBps:30, wallConfirmMs:2000, wallDropFrac:.7, wallEatFrac:.6, wallPulledFrac:.2,
+    thinFrac:.6, thinBps:10, imbTop:10, imbEnter:.35, imbExit:.15, imbHoldMs:3000, spoofCount:3, spoofSpanMs:5000,
+    burstZ:3, burstShare:.7, burstSigma:1.5, burstSupports:2, endFrac:.4, endHoldMs:3000, endBookRecover:1.3, endExpireMs:120000,
+    absorbZ:2, absorbShare:.65, absorbSigma:.5, absorbEfficiency:.25, absorbRefill:.8,
+    refreshTrades:4, refreshVisibleMult:5, refreshSpanMs:10000, walletShare:.4, walletTrades:6, pokeReturnMs:5000, pokeSigma:.5,
+  };
+  const VENUES=["bn","hl"];
+  const clamp=(x,lo,hi)=>Math.min(hi,Math.max(lo,x));
+  const clamp01=x=>clamp(x,0,1);
+  const push=(a,x,n)=>{a.push(x);if(a.length>n)a.shift();};
+  const money=x=>x>=1e6?(x/1e6).toFixed(1)+"M":x>=1e3?Math.round(x/1e3)+"k":x.toFixed(0);
+
+  function create(userCfg){
+    const cfg=Object.assign({},DEFAULTS,userCfg||{});
+    cfg.detectors=Object.assign({},DEFAULTS.detectors,(userCfg&&userCfg.detectors)||{});
+    cfg.horizons=Object.assign({},DEFAULTS.horizons,(userCfg&&userCfg.horizons)||{});
+    cfg.ep=Object.assign({},READER_EPISODES.DEFAULTS,(userCfg&&userCfg.ep)||{});
+    cfg.ep.horizons=((userCfg&&userCfg.ep&&userCfg.ep.horizons)||READER_EPISODES.DEFAULTS.horizons).slice();
+    cfg.ep.families=Object.assign({},READER_EPISODES.DEFAULTS.families,(userCfg&&userCfg.ep&&userCfg.ep.families)||{});
+    const listeners=[],dbg={};
+    let events,seq,now,firstT,curStart,venues,lastEmit,rec=null,eps=null;
+    function mkVenue(){return {px:null,mid:null,spread:null,cur:null,ring:[],base:0,baseN:0,samples:{buy:[],sell:[],ret:[]},stats:{},depth:{bid:0,ask:0},depthRing:{bid:[],ask:[]},imb:0,bookMid:null,bids:[],asks:[],bookT:0,recent:[],walls:new Map(),vanished:[],imbState:0,imbPending:0,imbPendingSince:0,lastImbLean:0,cap:null,sqLockUntil:0,levelFlow:new Map(),pokes:{high:null,low:null},lastFailed:null,lastPokeFail:null};}
+    function reset(){if(rec)rec.push(["x"]);if(eps)eps.reset();events=[];seq=0;now=0;firstT=null;curStart=null;lastEmit=new Map();venues={bn:mkVenue(),hl:mkVenue()};}
+    function subscribe(fn){listeners.push(fn);return()=>{const i=listeners.indexOf(fn);if(i>=0)listeners.splice(i,1);};}
+    function openBucket(v,t0){const p=v.px;v.cur={t0,buy:0,sell:0,n:0,maxTrade:0,open:p,hi:p,lo:p,close:p,liqBuyN:0,liqSellN:0,sweepBuyN:0,sweepSellN:0,bidDepth:v.depth.bid,askDepth:v.depth.ask,spread:v.spread};}
+    function touch(v,p){if(!(p>0))return;v.px=p;const c=v.cur;if(c.open==null)c.open=c.hi=c.lo=p;else{if(p>c.hi)c.hi=p;if(p<c.lo)c.lo=p;}c.close=p;}
+    function isCalibrated(){return firstT!=null&&now-firstT>=cfg.warmupMs&&venues.bn.baseN>0;}
+    function sample(vn){const v=venues[vn],r=v.ring;if(r.length<8)return;const h=horizon(vn,"fast");if(h){const s=h.ms/1000;push(v.samples.buy,h.buy/s,1800);push(v.samples.sell,h.sell/s,1800);}const n=r.length;if(n>4&&r[n-5].close>0)push(v.samples.ret,(r[n-1].close/r[n-5].close-1)*1e4,1800);push(v.depthRing.bid,v.depth.bid,30);push(v.depthRing.ask,v.depth.ask,30);}
+    function stat(v,key){const arr=v.samples[key],c=v.stats[key];if(arr.length<30)return {n:arr.length,med:0,mad:0,at:now};if(c&&now-c.at<5000)return c;const s=arr.slice().sort((a,b)=>a-b),med=s[s.length>>1],dev=s.map(x=>Math.abs(x-med)).sort((a,b)=>a-b);return(v.stats[key]={n:arr.length,med,mad:1.4826*dev[dev.length>>1],at:now});}
+    function robustZ(x,vn,key,floor){const st=stat(venues[vn],key);if(st.n<60)return 0;return(x-st.med)/Math.max(st.mad,.1*Math.abs(st.med),floor);}
+    function sigmaBps(vn){return Math.max(stat(venues[vn],"ret").mad,.05);}
+    function rateRatio(){const v=venues.bn,r=v.ring,n=Math.min(r.length,20);if(n<4||!(v.base>0))return 1;let s=0;for(let i=r.length-n;i<r.length;i++)s+=r[i].buy+r[i].sell;return clamp((s/(n*cfg.bucketMs/1000))/v.base,.25,4);}
+    function windowMs(name){const nominal=cfg.horizons[name];return nominal>0?clamp(nominal/rateRatio(),cfg.minWindowMs,cfg.maxWindowMs):NaN;}
+    function horizon(vn,name){const v=venues[vn],r=v&&v.ring;if(!r||!r.length)return null;const ms=windowMs(name);if(!(ms>0))return null;const count=clamp(Math.round(ms/cfg.bucketMs),1,r.length),h={ms:count*cfg.bucketMs,buy:0,sell:0,n:0,maxTrade:0,hi:-Infinity,lo:Infinity,open:null,close:null,liqBuyN:0,liqSellN:0,sweepBuyN:0,sweepSellN:0};for(let i=r.length-count;i<r.length;i++){const b=r[i];h.buy+=b.buy;h.sell+=b.sell;h.n+=b.n;if(b.maxTrade>h.maxTrade)h.maxTrade=b.maxTrade;if(b.hi!=null){if(b.hi>h.hi)h.hi=b.hi;if(b.lo<h.lo)h.lo=b.lo;if(h.open==null)h.open=b.open;h.close=b.close;}h.liqBuyN+=b.liqBuyN;h.liqSellN+=b.liqSellN;h.sweepBuyN+=b.sweepBuyN;h.sweepSellN+=b.sweepSellN;}if(h.open==null)return null;const total=h.buy+h.sell;h.share=total>0?h.buy/total:.5;h.delta=h.buy-h.sell;return h;}
+    function state(){const bn=venues.bn,hl=venues.hl,ratio=rateRatio(),out={calibrated:isCalibrated(),calibratingPct:firstT==null?0:clamp01((now-firstT)/cfg.warmupMs),now,ratio,regime:ratio<.7?"calm":ratio<1.8?"active":"hot",horizons:{},eventsPerMin:events.filter(x=>x.t>now-60000).length,episodesActive:eps.active().length,last:events.length?events[events.length-1]:null,bookAgeMs:{bn:bn.bookT?now-bn.bookT:null,hl:hl.bookT?now-hl.bookT:null}};for(const k of Object.keys(cfg.horizons)){const h=horizon("bn",k);out.horizons[k]=h?{ms:h.ms,share:h.share,delta:h.delta,side:h.share>=.6?"buyers":h.share<=.4?"sellers":"balanced"}:null;}return out;}
+    function emit(e){if(!e||!isCalibrated()||!cfg.detectors[e.type])return null;e.strength=clamp01(Number(e.strength)||0);if(!(e.t>0))e.t=now;const zone=e.px>0?Math.round(Math.log(e.px)/2e-4):0,key=e.type+"|"+e.venue+"|"+e.dir+"|"+zone,last=lastEmit.get(key);if(last!=null&&e.t-last<cfg.cooldownMs)return null;const recent=events.filter(x=>x.t>e.t-60000);if(recent.length>=cfg.maxEventsPerMin){let weakest=recent[0];for(const x of recent)if(x.strength<weakest.strength)weakest=x;if(e.strength<=weakest.strength)return null;events.splice(events.indexOf(weakest),1);}lastEmit.set(key,e.t);e.id=++seq;events.push(e);if(events.length>cfg.keepEvents)events.shift();for(const fn of listeners)try{fn(e);}catch(err){}return e;}
+    function setSensitivity(x){cfg.sens=clamp(Number(x)>0?Number(x):1,.5,2);}
+    function setDetector(name,on){if(Object.prototype.hasOwnProperty.call(cfg.detectors,name))cfg.detectors[name]=!!on;}
+    const th=k=>cfg[k]/cfg.sens;
+    function depthThinned(vn,side){const ring=venues[vn].depthRing[side];if(ring.length<15)return false;const s=ring.slice().sort((a,b)=>a-b),med=s[s.length>>1];return med>0&&venues[vn].depth[side]<cfg.thinFrac*med;}
+    function priorHigh(vn,skipBuckets){const r=venues[vn].ring;let hi=-Infinity;for(let i=Math.max(0,r.length-skipBuckets-1200);i<r.length-skipBuckets;i++)if(r[i].hi!=null&&r[i].hi>hi)hi=r[i].hi;return hi;}
+    function priorLow(vn,skipBuckets){const r=venues[vn].ring;let lo=Infinity;for(let i=Math.max(0,r.length-skipBuckets-1200);i<r.length-skipBuckets;i++)if(r[i].lo!=null&&r[i].lo<lo)lo=r[i].lo;return lo;}
+    const burstStrength=(z,sup,dz)=>.4+.1*(z-th("burstZ"))+.15*(sup-cfg.burstSupports)+.02*(Math.abs(dz)-th("burstSigma"));
+    function bursts(t){const vn="bn",v=venues.bn,h=horizon(vn,"fast");if(!h||h.n<5||!(h.open>0)||!(h.buy+h.sell>0))return;const secs=h.ms/1000,sellRate=h.sell/secs,buyRate=h.buy/secs,px=h.close,zS=robustZ(sellRate,vn,"sell",1),zB=robustZ(buyRate,vn,"buy",1),dz=((h.close/h.open-1)*1e4)/(sigmaBps(vn)*Math.sqrt(secs));if(v.cap){const c=v.cap;c.peak=Math.max(c.peak,sellRate);c.bidTrough=Math.min(c.bidTrough,v.depth.bid);if(px<c.low){c.low=px;c.lowT=t;}if(sellRate<cfg.endFrac*c.peak){if(!c.calmSince)c.calmSince=t;}else c.calmSince=0;if(c.calmSince&&t-c.calmSince>=cfg.endHoldMs&&t-c.lowT>=cfg.endHoldMs&&v.depth.bid>=c.bidTrough*cfg.endBookRecover){emit({t,type:"selling_exhausted",family:"burst",dir:"bull",venue:vn,px,horizon:"fast",strength:.6,refs:{},evidence:`sell flow fell to ${(100*sellRate/c.peak).toFixed(0)}% of its peak, no new low for ${((t-c.lowT)/1000).toFixed(0)} s, bid depth recovered to ${(100*v.depth.bid/Math.max(c.bidTrough,1e-9)).toFixed(0)}% of its trough`});v.cap=null;}else if(t-c.t>cfg.endExpireMs)v.cap=null;}else if(zS>=th("burstZ")&&1-h.share>=cfg.burstShare&&dz<=-th("burstSigma")){const sup=Number(h.liqSellN>=2)+Number(h.sweepSellN>=3)+Number(depthThinned(vn,"bid"));if(sup>=cfg.burstSupports){const e=emit({t,type:"capitulation",family:"burst",dir:"bear",venue:vn,px,horizon:"fast",strength:burstStrength(zS,sup,dz),refs:{zS,dz,sup},evidence:`sellers hit $${money(h.sell)} in ${secs.toFixed(1)} s (z ${zS.toFixed(1)}), price ${dz.toFixed(1)} sigma, ${h.liqSellN} sell liquidations, ${h.sweepSellN} sell sweeps`});if(e)v.cap={t,peak:sellRate,low:h.lo,lowT:t,bidTrough:v.depth.bid,calmSince:0};}}if(t>=v.sqLockUntil&&zB>=th("burstZ")&&h.share>=cfg.burstShare&&dz>=th("burstSigma")){const sup=Number(h.liqBuyN>=2)+Number(h.sweepBuyN>=3)+Number(depthThinned(vn,"ask"));if(sup>=cfg.burstSupports){const brk=h.hi>priorHigh(vn,Math.round(h.ms/cfg.bucketMs)),e=emit({t,type:brk?"breakout":"squeeze",family:"burst",dir:"bull",venue:vn,px,horizon:"fast",strength:burstStrength(zB,sup,dz),refs:{zB,dz,sup},evidence:`buyers lifted $${money(h.buy)} in ${secs.toFixed(1)} s (z ${zB.toFixed(1)}), price +${dz.toFixed(1)} sigma, ${h.liqBuyN} buy liquidations, ${h.sweepBuyN} buy sweeps${brk?", through the 5-minute high":""}`});if(e)v.sqLockUntil=t+15000;}}}
+    function walletEvidence(vn,side,since){if(vn!=="hl")return null;const sums=new Map(),counts=new Map();let total=0;for(const x of venues[vn].recent){if(x.t<since||x.side!==side||!x.user)continue;sums.set(x.user,(sums.get(x.user)||0)+x.ntl);counts.set(x.user,(counts.get(x.user)||0)+1);total+=x.ntl;}let who=null,value=0;for(const [k,n] of sums)if(n>value){who=k;value=n;}if(!who||total<=0||value/total<cfg.walletShare||(counts.get(who)||0)<cfg.walletTrades)return null;return {who:who.slice(0,6)+"..."+who.slice(-4),share:value/total,count:counts.get(who)};}
+    function absorption(vn,t){const v=venues[vn],h=horizon(vn,"fast");if(!h||h.n<5||!(h.buy+h.sell>0)||!(h.open>0))return;const secs=h.ms/1000,side=h.share>=cfg.absorbShare?"buy":h.share<=1-cfg.absorbShare?"sell":null;if(!side)return;const rate=(side==="buy"?h.buy:h.sell)/secs,z=robustZ(rate,vn,side,1),move=Math.abs((h.close/h.open-1)*1e4)/(sigmaBps(vn)*Math.sqrt(secs)),count=Math.round(h.ms/cfg.bucketMs),r=v.ring.slice(-count);let path=0;for(let i=1;i<r.length;i++)if(r[i-1].close>0&&r[i].close>0)path+=Math.abs(r[i].close/r[i-1].close-1);const eff=path>0?Math.abs(h.close/h.open-1)/path:0,depthSide=side==="sell"?"bid":"ask",start=r.length?r[0][depthSide+"Depth"]:0,refill=start>0?v.depth[depthSide]/start:1;if(z<th("absorbZ")||move>cfg.absorbSigma||eff>cfg.absorbEfficiency||refill<cfg.absorbRefill)return;const w=walletEvidence(vn,side,t-h.ms),passive=side==="sell"?"sellers":"buyers",dir=side==="sell"?"bull":"bear",wallet=w?`, wallet ${w.who} ${Math.round(w.share*100)}% (${w.count} trades)`:"";emit({t,type:"passive_absorption",family:"absorption",dir,venue:vn,px:h.close,horizon:"fast",strength:.45+.12*(z-th("absorbZ")),refs:{z,move,eff,refill,wallet:w},evidence:`${passive} were absorbed: z ${z.toFixed(1)}, price ${move.toFixed(1)} sigma, efficiency ${eff.toFixed(2)}, depth refilled ${Math.round(refill*100)}%${wallet}`});}
+    function exhaustion(vn,t){const v=venues[vn],h=horizon(vn,"fast");if(!h||!h.open)return;const skip=Math.round(h.ms/cfg.bucketMs),hi=priorHigh(vn,skip),lo=priorLow(vn,skip),threshold=h.close*sigmaBps(vn)*Math.sqrt(h.ms/1000)/1e4*cfg.pokeSigma,buyRate=h.buy/(h.ms/1000),sellRate=h.sell/(h.ms/1000);if(v.lastFailed){const f=v.lastFailed,flow=f.side==="high"?buyRate:sellRate;if(flow<.5*f.peak){const kind=f.side==="high"?"buyer_exhaustion":"seller_exhaustion",dir=f.side==="high"?"bear":"bull";emit({t,type:kind,family:"exhaustion",dir,venue:vn,px:h.close,horizon:"fast",strength:.65,refs:{peak:f.peak,flow},evidence:`${f.side==="high"?"buy":"sell"} intensity fell ${Math.round((1-flow/f.peak)*100)}% after a failed poke`});v.lastFailed=null;}else if(t-f.t>30000)v.lastFailed=null;}if(!v.pokes.high&&Number.isFinite(hi)&&h.hi>hi+threshold)v.pokes.high={t,level:hi,peak:buyRate,px:h.hi};if(!v.pokes.low&&Number.isFinite(lo)&&h.lo<lo-threshold)v.pokes.low={t,level:lo,peak:sellRate,px:h.lo};for(const side of ["high","low"]){const p=v.pokes[side];if(!p)continue;p.peak=Math.max(p.peak,side==="high"?buyRate:sellRate);if(t-p.t>cfg.pokeReturnMs){v.pokes[side]=null;continue;}const returned=side==="high"?h.close<p.level:h.close>p.level;if(!returned)continue;const dir=side==="high"?"bear":"bull";emit({t,type:"failed_poke",family:"exhaustion",dir,venue:vn,px:h.close,horizon:"fast",strength:.55,refs:{level:p.level,extreme:p.px},evidence:`price poked ${side==="high"?"above":"below"} ${p.level.toFixed(1)} and returned within ${((t-p.t)/1000).toFixed(1)} s`});v.lastFailed={t,side,peak:p.peak};v.lastPokeFail={t,side};v.pokes[side]=null;}}
+    function trackRefreshing(tr,v){const key=tr.side+"|"+tr.px;let x=v.levelFlow.get(key);if(!x||tr.t-x.t0>cfg.refreshSpanMs){const book=tr.side==="buy"?v.asks:v.bids,level=book.find(l=>l[0]===tr.px);x={t0:tr.t,count:0,q:0,ntl:0,visible:level?level[1]:0,emitted:false};v.levelFlow.set(key,x);}x.count++;x.q+=tr.q;x.ntl+=tr.ntl;if(!x.emitted&&x.visible>0&&x.count>=cfg.refreshTrades&&x.q>=cfg.refreshVisibleMult*x.visible){x.emitted=true;eps.noteRefresh(tr.v,tr.side,tr.t);const w=walletEvidence(tr.v,tr.side,tr.t-cfg.refreshSpanMs),wallet=w?`, wallet ${w.who} ${Math.round(w.share*100)}%`:"";emit({t:tr.t,type:"refreshing_level",family:"absorption",dir:tr.side==="sell"?"bull":"bear",venue:tr.v,px:tr.px,horizon:"book",strength:.6,refs:{trades:x.count,traded:x.q,visible:x.visible,wallet:w},evidence:`${x.count} ${tr.side} trades moved ${x.q.toFixed(3)} against ${x.visible.toFixed(3)} initially visible (${(x.q/x.visible).toFixed(1)}x)${wallet}`});}for(const [k,y] of v.levelFlow)if(tr.t-y.t0>cfg.refreshSpanMs)v.levelFlow.delete(k);}
+    function onSecond(t){for(const k of VENUES)sample(k);if(!isCalibrated())return;for(const k of VENUES){detectThinning(k,t);absorption(k,t);exhaustion(k,t);}bursts(t);eps.tick(t);}
+    function closeBucket(){const endT=curStart+cfg.bucketMs;for(const k of VENUES){const v=venues[k],c=v.cur;if(v.px!=null)c.close=v.px;c.bidDepth=v.depth.bid;c.askDepth=v.depth.ask;c.spread=v.spread;v.ring.push(c);const keep=Math.ceil(cfg.keepMs/cfg.bucketMs);if(v.ring.length>keep)v.ring.splice(0,v.ring.length-keep);const rate=(c.buy+c.sell)/(cfg.bucketMs/1000);v.baseN++;const a=Math.max(1/v.baseN,1-Math.exp(-cfg.bucketMs/cfg.baseTauMs));v.base+=a*(rate-v.base);}if(Math.floor(endT/1000)!==Math.floor((endT-cfg.bucketMs)/1000))onSecond(endT);}
+    function softReset(t){eps.closeAll(t,"gap");for(const k of VENUES)Object.assign(venues[k],{ring:[],base:0,baseN:0,samples:{buy:[],sell:[],ret:[]},stats:{},depthRing:{bid:[],ask:[]},recent:[],walls:new Map(),vanished:[],cap:null,imbState:0,imbPending:0,imbPendingSince:0,sqLockUntil:0,levelFlow:new Map(),pokes:{high:null,low:null},lastFailed:null});firstT=t;curStart=Math.floor(t/cfg.bucketMs)*cfg.bucketMs;for(const k of VENUES)openBucket(venues[k],curStart);}
+    function tick(t){if(!(t>0))return;if(curStart==null){firstT=t;now=t;curStart=Math.floor(t/cfg.bucketMs)*cfg.bucketMs;for(const k of VENUES)openBucket(venues[k],curStart);return;}if(t<=now)return;now=t;if(t-(curStart+cfg.bucketMs)>cfg.gapResetMs){softReset(t);return;}while(t>=curStart+cfg.bucketMs){closeBucket();curStart+=cfg.bucketMs;for(const k of VENUES)openBucket(venues[k],curStart);}}
+    function onTrade(tr){if(rec)rec.push(["t",tr?{t:tr.t,v:tr.v,side:tr.side,px:tr.px,q:tr.q,ntl:tr.ntl,liq:!!tr.liq,users:tr.users}:tr]);if(!tr||!VENUES.includes(tr.v)||!(tr.ntl>0)||!(tr.px>0)||!(tr.t>0))return;tick(tr.t);const v=venues[tr.v],c=v.cur;if(tr.liq){if(tr.side==="buy")c.liqBuyN++;else c.liqSellN++;return;}if(tr.side==="buy")c.buy+=tr.ntl;else c.sell+=tr.ntl;c.n++;if(tr.ntl>c.maxTrade)c.maxTrade=tr.ntl;if(v.mid==null)touch(v,tr.px);const user=tr.users&&(tr.side==="buy"?tr.users[0]:tr.users[1]);v.recent.push({t:tr.t,px:tr.px,q:tr.q,ntl:tr.ntl,side:tr.side,user});while(v.recent.length&&v.recent[0].t<now-60000)v.recent.shift();trackRefreshing(tr,v);}
+    function onQuote(vn,t,bid,ask){if(rec)rec.push(["q",vn,t,bid,ask]);if(!VENUES.includes(vn)||!(bid>0)||!(ask>0)||ask<bid||!(t>0))return;tick(t);const v=venues[vn];v.mid=(bid+ask)/2;v.spread=ask-bid;touch(v,v.mid);}
+    function onSweep(vn,t,side,ntl,levels){if(rec)rec.push(["s",vn,t,side,ntl,levels]);if(!VENUES.includes(vn)||!(t>0))return;tick(t);const c=venues[vn].cur;if(side==="buy")c.sweepBuyN++;else c.sweepSellN++;}
+    function advance(t){if(rec)rec.push(["a",t]);tick(t);}
+    function clean(levels,desc){const out=[];for(const l of levels){if(!l)continue;const p=+l[0],q=+l[1];if(Number.isFinite(p)&&Number.isFinite(q)&&p>0&&q>0)out.push([p,q]);}out.sort((a,b)=>desc?b[0]-a[0]:a[0]-b[0]);return out;}
+    function onBook(vn,t,bids,asks){if(rec)rec.push(["b",vn,t,bids,asks]);if(!VENUES.includes(vn)||!Array.isArray(bids)||!Array.isArray(asks)||!(t>0))return;const b=clean(bids,true),a=clean(asks,false);if(!b.length||!a.length||a[0][0]<=b[0][0])return;tick(t);const v=venues[vn],mid=(b[0][0]+a[0][0])/2,lim=mid*cfg.thinBps/1e4;v.bids=b;v.asks=a;v.bookT=t;v.bookMid=mid;let bd=0,ad=0,sb=0,sa=0;for(const l of b){if(mid-l[0]>lim)break;bd+=l[1];}for(const l of a){if(l[0]-mid>lim)break;ad+=l[1];}for(let i=0;i<cfg.imbTop;i++){if(b[i])sb+=b[i][1];if(a[i])sa+=a[i][1];}v.depth={bid:bd,ask:ad};v.imb=sb+sa>0?(sb-sa)/(sb+sa):0;trackWalls(vn,t,mid);trackImbalance(vn,t);}
+    const wallStrength=ratio=>clamp01(.3+.7*clamp01((ratio-th("wallRatio"))/(2*th("wallRatio"))));
+    function tradedThrough(v,w,t,ms){let s=0;for(const x of v.recent)if(x.t>=t-ms&&(w.side==="bid"?(x.side==="sell"&&x.px<=w.px):(x.side==="buy"&&x.px>=w.px)))s+=x.q;return s;}
+    function wallEvent(vn,t,w,type,dir,evidence){return emit({t,type,family:"wall",dir,venue:vn,px:w.px,horizon:"book",strength:wallStrength(w.ratio),evidence,refs:{side:w.side,size:w.size,ratio:w.ratio}});}
+    function noteVanished(vn,w,t){const v=venues[vn];v.vanished.push({t,side:w.side});v.vanished=v.vanished.filter(x=>t-x.t<=cfg.spoofSpanMs);const same=v.vanished.filter(x=>x.side===w.side);if(same.length<cfg.spoofCount)return;v.vanished=v.vanished.filter(x=>x.side!==w.side);emit({t,type:"spoof_like",family:"wall",dir:"neutral",venue:vn,px:w.px,horizon:"book",strength:.5,evidence:`${same.length} ${w.side}-side walls appeared and vanished within ${cfg.spoofSpanMs/1000} s with no trades`,refs:{}});}
+    function resolveWall(vn,w,size,t){const v=venues[vn],lost=Math.max(0,w.peak-size),frac=lost>0?tradedThrough(v,w,t,1500)/lost:0;if(!w.confirmed){if(frac<cfg.wallPulledFrac)noteVanished(vn,w,t);return;}const where=`${w.side} wall at ${w.px} (${w.ratio.toFixed(1)}x median)`,dir=w.side==="bid"?"bear":"bull";eps.wallClose(vn,t,w,frac>=cfg.wallEatFrac?"eaten":frac<cfg.wallPulledFrac?"pulled":"faded",frac);if(frac>=cfg.wallEatFrac)wallEvent(vn,t,w,"wall_eaten",dir,`${where} was eaten: ${(frac*100).toFixed(0)}% of its size traded through`);else if(frac<cfg.wallPulledFrac)wallEvent(vn,t,w,"wall_pulled",dir,`${where} vanished with only ${(frac*100).toFixed(0)}% of its size traded`);}
+    function trackWalls(vn,t,mid){const v=venues[vn],limit=mid*cfg.wallBps/1e4;for(const side of ["bid","ask"]){const lv=side==="bid"?v.bids:v.asks;if(lv.length<cfg.wallMinLevels)continue;const sizes=lv.slice(0,20).map(l=>l[1]).sort((a,b)=>a-b),med=sizes[sizes.length>>1];if(!(med>0))continue;const seen=new Set();for(const [px,sz] of lv){if(Math.abs(px-mid)>limit)break;if(sz<th("wallRatio")*med)continue;const key=side+"|"+px;seen.add(key);let w=v.walls.get(key);if(!w){w={side,px,born:t,peak:sz,size:sz,ratio:sz/med,confirmed:false};v.walls.set(key,w);}else{w.size=sz;if(sz>w.peak)w.peak=sz;w.ratio=Math.max(w.ratio,sz/med);}if(w.confirmed)eps.wallUpdate(vn,t,w,sz/med,mid);if(!w.confirmed&&t-w.born>=cfg.wallConfirmMs){w.confirmed=true;wallEvent(vn,t,w,"wall_appears",side==="bid"?"bull":"bear",`${side} wall ${w.ratio.toFixed(1)}x the median level at ${w.px}, held ${((t-w.born)/1000).toFixed(1)} s`);}}const far=lv[lv.length-1][0];for(const [key,w] of v.walls){if(w.side!==side)continue;const cur=lv.find(l=>l[0]===w.px);if(!cur&&(side==="bid"?w.px<far:w.px>far))continue;const size=cur?cur[1]:0;if(size<=w.peak*(1-cfg.wallDropFrac)){resolveWall(vn,w,size,t);v.walls.delete(key);}else if(!seen.has(key))w.size=size;}}}
+    function trackImbalance(vn,t){const v=venues[vn],imb=v.imb,target=imb>=th("imbEnter")?1:imb<=-th("imbEnter")?-1:Math.abs(imb)<cfg.imbExit?0:v.imbState;if(target!==v.imbPending){v.imbPending=target;v.imbPendingSince=t;}if(target===v.imbState||t-v.imbPendingSince<cfg.imbHoldMs)return;v.imbState=target;if(target===0)return;const flipped=v.lastImbLean!==0&&v.lastImbLean!==target;v.lastImbLean=target;if(flipped)emit({t,type:"imbalance_flip",family:"book",dir:target>0?"bull":"bear",venue:vn,px:v.bookMid,horizon:"book",strength:.3+Math.abs(imb),refs:{imb},evidence:`top-${cfg.imbTop} book imbalance flipped to ${(imb*100).toFixed(0)}% (${target>0?"bids":"asks"} heavier), held ${cfg.imbHoldMs/1000} s`});}
+    function detectThinning(vn,t){const v=venues[vn];for(const side of ["bid","ask"]){const ring=v.depthRing[side];if(ring.length<15)continue;const s=ring.slice().sort((a,b)=>a-b),med=s[s.length>>1],cur=v.depth[side];if(med>0&&cur<cfg.thinFrac*med)emit({t,type:"book_thin",family:"book",dir:side==="bid"?"bear":"bull",venue:vn,px:v.bookMid||v.px,horizon:"book",strength:.3+(1-cur/(cfg.thinFrac*med)),refs:{cur,med},evidence:`${side} depth within ${cfg.thinBps} bps fell to ${(100*cur/med).toFixed(0)}% of its 30 s median`});}}
+    eps=READER_EPISODES.create({cfg,th,isCalibrated,venue:vn=>venues[vn],horizon,robustZ,sigmaBps,priorHigh,priorLow,depthThinned,walletEvidence});
+    reset();
+    const api={cfg,reset,subscribe,debug:()=>Object.assign({venues,now,firstT,curStart,events},dbg)};
+    Object.defineProperty(api,"events",{get:()=>events});
+    Object.defineProperty(api,"episodes",{get:()=>eps.list()});
+    Object.assign(api,{formingEpisodes:()=>eps.forming(now),activeEpisodes:()=>eps.active(),subscribeEpisodes:eps.subscribe,setFamily:eps.setFamily,closeEpisodes:t=>eps.closeAll(t==null?now:t,"closed")});
+    Object.assign(dbg,{isCalibrated,stat:(vn,k)=>stat(venues[vn],k),robustZ,sigmaBps,emit});
+    Object.assign(api,{onTrade,onQuote,onSweep,onBook,advance,windowMs,horizon,state,setSensitivity,setDetector});
+    Object.assign(api,{startRecording:()=>{rec=[];},stopRecording:()=>{const r=rec||[];rec=null;return r;}});
+    return api;
+  }
+  function replay(inputs,userCfg){const e=create(userCfg);for(const r of inputs)switch(r[0]){case"t":e.onTrade(r[1]);break;case"q":e.onQuote(r[1],r[2],r[3],r[4]);break;case"b":e.onBook(r[1],r[2],r[3],r[4]);break;case"s":e.onSweep(r[1],r[2],r[3],r[4],r[5]);break;case"a":e.advance(r[1]);break;case"x":e.reset();break;}return e.events;}
+  function replayEngine(inputs,userCfg){const e=create(userCfg);for(const r of inputs)switch(r[0]){case"t":e.onTrade(r[1]);break;case"q":e.onQuote(r[1],r[2],r[3],r[4]);break;case"b":e.onBook(r[1],r[2],r[3],r[4]);break;case"s":e.onSweep(r[1],r[2],r[3],r[4],r[5]);break;case"a":e.advance(r[1]);break;case"x":e.reset();break;}return e;}
+  return {create,replay,replayEngine,DEFAULTS};
+})();
+</script>
+<script id="reader-selftest">
+"use strict";
+const READER_SELFTEST=(()=>{
+  const T0=1700000000000;
+  function rng(seed){let s=seed>>>0;return()=>((s=(Math.imul(s,1664525)+1013904223)>>>0)/4294967296);}
+  function poisson(rand,lam){if(lam<=0)return 0;if(lam>30)return Math.max(0,Math.round(lam+Math.sqrt(lam)*(rand()+rand()+rand()-1.5)*2));const L=Math.exp(-lam);let k=0,p=1;do{k++;p*=rand();}while(p>L);return k-1;}
+  function levels(mid,dir,mult,walls,t){const out=[];for(let i=0;i<30;i++)out.push([+(mid+dir*(.05+.1*i)).toFixed(2),.5*mult*(1+.1*Math.sin(i*1.7+t/1000))]);for(const w of walls)if(w.idx>=0&&w.idx<30)out[w.idx][1]=w.size;return out;}
+  function sim(engine,opts){const o=Object.assign({t0:T0,mid0:82000,seed:7,seconds:150,stepMs:250,venue:"bn",params:()=>({})},opts),rand=rng(o.seed),dt=o.stepMs/1000,steps=Math.round(o.seconds*1000/o.stepMs);let t=o.t0,mid=o.mid0;for(let i=0;i<steps;i++){t+=o.stepMs;const p=Object.assign({rate:20,buyP:.5,driftBps:0,vol:.3,size:.02,bidMult:1,askMult:1,bidWalls:[],askWalls:[],liqSell:0,liqBuy:0,sweepSell:0,sweepBuy:0,trades:[]},o.params((t-o.t0)/1000,mid));mid*=1+(p.driftBps*dt+(rand()-.5)*2*p.vol)/1e4;engine.onQuote(o.venue,t,mid-.05,mid+.05);for(let k=poisson(rand,p.rate*dt);k>0;k--){const b=rand()<p.buyP,q=p.size*(.5+rand()),px=b?mid+.05:mid-.05;engine.onTrade({t,v:o.venue,side:b?"buy":"sell",px,q,ntl:px*q});}for(const tr of p.trades)engine.onTrade(Object.assign({t,v:o.venue},tr));for(let k=poisson(rand,p.liqSell*dt);k>0;k--)engine.onTrade({t,v:o.venue,side:"sell",px:mid-.05,q:.5,ntl:(mid-.05)*.5,liq:true});for(let k=poisson(rand,p.liqBuy*dt);k>0;k--)engine.onTrade({t,v:o.venue,side:"buy",px:mid+.05,q:.5,ntl:(mid+.05)*.5,liq:true});for(let k=poisson(rand,p.sweepSell*dt);k>0;k--)engine.onSweep(o.venue,t,"sell",50000,3);for(let k=poisson(rand,p.sweepBuy*dt);k>0;k--)engine.onSweep(o.venue,t,"buy",50000,3);engine.onBook(o.venue,t,levels(mid,-1,p.bidMult,p.bidWalls,t),levels(mid,1,p.askMult,p.askWalls,t));}return {t,mid};}
+  const scenarios=[];
+  const add=(name,run)=>scenarios.push({name,run});
+  const calm=(e,seconds)=>sim(e,{seconds:seconds||150,seed:3});
+  const has=(e,type,dir)=>e.events.some(x=>x.type===type&&(!dir||x.dir===dir));
+  const result=(ok,e,want)=>({ok,detail:ok?"ok":`wanted ${want}; got [${Array.from(e.events,x=>x.type+":"+x.dir).join(", ")}]`});
+  add("bid wall appears, then is pulled",E=>{const e=E.create(),a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:5,seed:11,params:()=>({vol:0,bidWalls:[{idx:12,size:6}]})});sim(e,{t0:b.t,mid0:b.mid,seconds:4,seed:12,params:()=>({vol:0})});const ok=has(e,"wall_appears","bull")&&has(e,"wall_pulled","bear");return result(ok,e,"wall_appears:bull then wall_pulled:bear");});
+  add("bid wall is eaten by sellers",E=>{const e=E.create(),a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:5,seed:11,params:()=>({vol:0,bidWalls:[{idx:12,size:6}]})}),px=b.mid-1.3;sim(e,{t0:b.t,mid0:b.mid,seconds:3,seed:12,params:sec=>({vol:0,trades:sec<.3?[{side:"sell",px,q:5,ntl:px*5}]:[]})});return result(has(e,"wall_eaten","bear")&&!has(e,"wall_pulled"),e,"wall_eaten:bear and no wall_pulled");});
+  add("thin bid depth is flagged",E=>{const e=E.create(),a=calm(e);sim(e,{t0:a.t,mid0:a.mid,seconds:6,seed:13,params:()=>({bidMult:.3})});return result(has(e,"book_thin","bear"),e,"book_thin:bear");});
+  add("book imbalance flips from bids to asks",E=>{const e=E.create(),a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:6,seed:14,params:()=>({bidMult:3})}),before=e.events.filter(x=>x.type==="imbalance_flip").length;sim(e,{t0:b.t,mid0:b.mid,seconds:6,seed:15,params:()=>({askMult:3})});return result(before===0&&has(e,"imbalance_flip","bear"),e,"imbalance_flip:bear");});
+  add("spoof-like walls are flagged",E=>{const e=E.create(),a=calm(e);sim(e,{t0:a.t,mid0:a.mid,seconds:6,seed:16,params:sec=>({vol:0,bidWalls:sec<1?[{idx:10,size:6}]:sec>=1.5&&sec<2.5?[{idx:14,size:6}]:sec>=3&&sec<4?[{idx:18,size:6}]:[]})});return result(has(e,"spoof_like")&&!has(e,"wall_appears"),e,"spoof_like and no confirmed wall");});
+  add("malformed books are ignored",E=>{const e=E.create(),a=calm(e,130),before=e.events.length;try{e.onBook("bn",a.t+250,[],[[100,1]]);e.onBook("bn",a.t+500,[[101,1]],[[100,1]]);e.onBook("bn",a.t+750,[[100,0],[99,NaN],null],[[101,-1],"x"]);e.onBook("bn",a.t+1000,[[100,1],[99,50]],[[101,1],[102,1]]);e.onBook("zz",a.t+1250,[[100,1]],[[101,1]]);e.onBook("bn",a.t+1500,null,undefined);}catch(err){return{ok:false,detail:"threw: "+err.message};}return result(e.events.length===before&&e.debug().venues.bn.walls.size===0,e,"no events and no walls");});
+  add("capitulation, then selling exhausted",E=>{const e=E.create(),a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:21,params:()=>({rate:200,buyP:.1,driftBps:-6,liqSell:3,sweepSell:2,bidMult:.4})});sim(e,{t0:b.t,mid0:b.mid,seconds:24,seed:22,params:()=>({driftBps:.2})});const i=e.events.findIndex(x=>x.type==="capitulation"&&x.dir==="bear"),j=e.events.findIndex(x=>x.type==="selling_exhausted"&&x.dir==="bull");return result(i>=0&&j>i,e,"capitulation:bear followed by selling_exhausted:bull");});
+  add("squeeze that stays inside the 5-minute range",E=>{const e=E.create(),a=sim(e,{seconds:150,seed:3,params:sec=>({driftBps:sec<50?3:sec<110?-2.5:0})});sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:31,params:()=>({rate:200,buyP:.9,driftBps:6,liqBuy:3,sweepBuy:2,askMult:.4})});return result(has(e,"squeeze","bull")&&!has(e,"breakout"),e,"squeeze:bull and no breakout");});
+  add("breakout through the 5-minute high",E=>{const e=E.create(),a=calm(e);sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:32,params:()=>({rate:200,buyP:.9,driftBps:6,liqBuy:3,sweepBuy:2,askMult:.4})});return result(has(e,"breakout","bull")&&!has(e,"squeeze"),e,"breakout:bull and no squeeze");});
+  add("quiet market produces no events",E=>{const e=E.create();sim(e,{seconds:300,seed:5});return result(e.events.length===0,e,"no events at all");});
+  // ---- episodes: lifecycle (forming -> active -> fading -> ended, resumable), several variables, neutral language ----
+  const eps=(e,family,pred)=>e.episodes.filter(x=>x.family===family&&(!pred||pred(x)));
+  const epResult=(ok,e,want)=>({ok,detail:ok?"ok":`wanted ${want}; got [${Array.from(e.episodes,x=>`${x.family}/${x.venue}/${x.horizon}:${x.aggressor}:${x.stage}:${x.outcome}`).join(", ")}]`});
+  const burstSell={rate:200,buyP:.1,driftBps:-6,liqSell:3,sweepSell:2,bidMult:.4};
+  const heavySell={rate:120,buyP:.08,vol:.02};
+  add("absorption episode: back-dated start, resumes after a short lull, ends when the flow stops",E=>{
+    const e=E.create(),a=calm(e),h1=sim(e,{t0:a.t,mid0:a.mid,seconds:20,seed:41,params:()=>heavySell}),l=sim(e,{t0:h1.t,mid0:h1.mid,seconds:6,seed:42,params:()=>({rate:20})});
+    const h2=sim(e,{t0:l.t,mid0:l.mid,seconds:12,seed:43,params:()=>heavySell});sim(e,{t0:h2.t,mid0:h2.mid,seconds:40,seed:44});
+    const x=eps(e,"absorption",p=>p.venue==="bn"&&p.horizon==="fast"&&p.aggressor==="sell")[0];
+    return epResult(!!x&&x.passive==="buy"&&x.tStart<x.tDetected&&x.pulses>=2&&x.stage==="ended"&&x.tEnd<=h2.t+8000&&x.dir===undefined&&/absorbed/.test(x.peakReading)&&x.peakEvidence.length>0,e,"one fast sell-absorption episode: start before detection, resumed (pulses>=2), ended within 8 s of the flow stopping, no bull/bear field");
+  });
+  add("burst episode: aggressive sellers, ends soon after the burst stops",E=>{
+    const e=E.create(),a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:21,params:()=>burstSell});sim(e,{t0:b.t,mid0:b.mid,seconds:40,seed:22});
+    const x=eps(e,"burst",p=>p.horizon==="fast"&&p.aggressor==="sell")[0];
+    return epResult(!!x&&x.stage==="ended"&&x.tEnd<=b.t+6000&&x.tStart<=x.tDetected&&/sellers/.test(x.reading)&&x.evidence.some(i=>i.k==="liq"&&i.ok),e,"a fast burst episode by sellers, ended within 6 s of the burst, with the liquidation evidence confirmed");
+  });
+  add("wall episode: opens once the wall has stood long enough, start back-dated, ends pulled",E=>{
+    const e=E.create(),a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:20,seed:11,params:()=>({vol:0,bidWalls:[{idx:12,size:6}]})});sim(e,{t0:b.t,mid0:b.mid,seconds:4,seed:12,params:()=>({vol:0})});
+    const x=eps(e,"wall")[0];
+    return epResult(!!x&&x.passive==="buy"&&x.stage==="ended"&&x.outcome==="pulled"&&x.tDetected-x.tStart>=15000&&eps(e,"wall").length===1,e,"exactly one bid wall episode, started when the wall appeared (>= 15 s before detection), ended pulled");
+  });
+  add("flickering walls (a few seconds) do not become episodes",E=>{
+    const e=E.create(),a=calm(e);let t=a.t,mid=a.mid;
+    for(let i=0;i<4;i++){const w=sim(e,{t0:t,mid0:mid,seconds:6,seed:50+i,params:()=>({vol:0,bidWalls:[{idx:12,size:6}]})}),g=sim(e,{t0:w.t,mid0:w.mid,seconds:3,seed:60+i,params:()=>({vol:0})});t=g.t;mid=g.mid;}
+    return epResult(eps(e,"wall").length===0,e,"no wall episodes from walls that last only 6 s");
+  });
+  add("wall episodes wait for calibration",E=>{
+    const e=E.create();sim(e,{seconds:60,seed:11,params:()=>({vol:0,bidWalls:[{idx:12,size:6}]})});
+    return epResult(e.episodes.length===0,e,"no episodes while the engine is still calibrating");
+  });
+  add("exhaustion episode after a buying surge fades; none for the side that never led",E=>{
+    const e=E.create(),a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:14,seed:31,params:()=>({rate:200,buyP:.9,driftBps:6})});sim(e,{t0:b.t,mid0:b.mid,seconds:40,seed:32,params:()=>({rate:12,vol:.05})});
+    return epResult(eps(e,"exhaustion",p=>p.aggressor==="buy").length>0&&eps(e,"exhaustion",p=>p.aggressor==="sell").length===0,e,"a buy exhaustion episode and no sell exhaustion");
+  });
+  add("quiet market produces no episodes",E=>{const e=E.create();sim(e,{seconds:300,seed:5});return epResult(e.episodes.length===0,e,"no episodes at all");});
+  add("a data gap ends every open episode as 'gap'",E=>{
+    const e=E.create(),a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:21,params:()=>burstSell});e.advance(b.t+45000);
+    return epResult(e.episodes.length>0&&e.episodes.every(x=>x.stage==="ended")&&e.episodes.some(x=>x.outcome==="gap"),e,"all episodes ended, at least one with outcome gap");
+  });
+  add("replaying recorded inputs reproduces the same episodes",E=>{
+    const e=E.create();e.startRecording();const a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:21,params:()=>burstSell});sim(e,{t0:b.t,mid0:b.mid,seconds:30,seed:22});
+    const r=E.replayEngine(e.stopRecording()),sig=l=>l.map(p=>[p.family,p.venue,p.horizon,p.aggressor,p.tStart,p.tDetected,p.tEnd,p.stage,p.pulses].join("|")).join(";");
+    return epResult(e.episodes.length>0&&sig(e.episodes)===sig(r.episodes),e,"the replayed engine to hold identical episodes");
+  });
+  function run(Eng){return scenarios.map(sc=>{try{const r=sc.run(Eng);return{name:sc.name,ok:!!r.ok,detail:r.detail};}catch(err){return{name:sc.name,ok:false,detail:String(err&&err.stack||err)};}});}
+  return {T0,rng,poisson,levels,sim,scenarios,run};
+})();
+</script>
+<script>
+"use strict";
+// Overview (home): one phone-sized read of the market. Reads state owned by app.js; owns only its own 5 s history,
+// because app.js prunes its histories to 5 minutes and the overview shows up to 15.
+const OV = {hist:[], sym:null};
+const OV_WINS = {"1m":60000, "5m":300000, "15m":900000};
+const ov$ = id => document.getElementById(id);
+const ovMid = () => M.bnBid && M.bnAsk ? (M.bnBid+M.bnAsk)/2 : (M.bnMark || null);
+const ovHlMid = () => M.hlBid && M.hlAsk ? (M.hlBid+M.hlAsk)/2 : (M.hlMark || null);
+const ovDec = px => px>=1000 ? 1 : px>=10 ? 2 : px>=1 ? 3 : 5;
+const ovSpan = ms => ms>=3600000 ? (ms/3600000).toFixed(1)+"h" : ms>=60000 ? Math.round(ms/60000)+"m" : Math.round(ms/1000)+"s";
+const ovSigned = (x, f) => x==null ? "–" : (x>=0?"+":"-") + f(Math.abs(x));
+const ovCls = x => x==null || x===0 ? "" : x>0 ? "up" : "dn";
+
+function ovSample(){
+  try{
+    if (!connected) return;
+    const sym = bnSym(); if (OV.sym !== sym){ OV.sym = sym; OV.hist = []; }
+    const px = ovMid(); if (!(px>0)) return;
+    const hl = ovHlMid(), t = nowEx();
+    OV.hist.push({t, px, oi:M.bnOI||null, cb:cvd.bn, ch:cvd.hl, bas:hl?hl-px:null});
+    while (OV.hist.length && OV.hist[0].t < t-3900000) OV.hist.shift();
+  }catch{}
+}
+setInterval(ovSample, 5000);
+
+// oldest sample inside the window, or the oldest we have when the session is younger than the window
+function ovBase(ms){
+  const h = OV.hist; if (!h.length) return null;
+  const t0 = nowEx()-ms, i = h.findIndex(x=>x.t>=t0);
+  return h[i<0 ? h.length-1 : i];
+}
+
+function ovLine(cv, vals, color){
+  const {ctx,w,h} = prep(cv); if (vals.length<2 || w<2) return;
+  let lo = Math.min(...vals), hi = Math.max(...vals); if (hi===lo){ hi+=1; lo-=1; }
+  const X = i => i/(vals.length-1)*(w-4)+2, Y = v => h-3-(v-lo)/(hi-lo)*(h-6);
+  ctx.beginPath(); vals.forEach((v,i)=>i ? ctx.lineTo(X(i),Y(v)) : ctx.moveTo(X(i),Y(v)));
+  ctx.strokeStyle = color; ctx.lineWidth = 1.6; ctx.stroke();
+  ctx.lineTo(X(vals.length-1), h); ctx.lineTo(X(0), h); ctx.closePath(); ctx.globalAlpha = .12; ctx.fillStyle = color; ctx.fill(); ctx.globalAlpha = 1;
+  ctx.beginPath(); ctx.arc(X(vals.length-1), Y(vals[vals.length-1]), 2.6, 0, 7); ctx.fillStyle = color; ctx.fill();
+}
+
+function renderOverview(){
+  const px = ovMid(), win = +ov$("ovWin").value, wl = Object.keys(OV_WINS).find(k=>OV_WINS[k]===win) || "5m", rs = READER.state();
+  ov$("ovSym").textContent = (ov$("sym").value.trim().toUpperCase() || "–") + " perp";
+  ov$("ovStatus").textContent = connected ? `BN ${ov$("bnState").textContent} · HL ${ov$("hlState").textContent}` : "not connected — press Connect";
+  ov$("ovPx").textContent = px ? fmt(px, ovDec(px)) : "–";
+
+  // price change chips
+  ov$("ovChg").innerHTML = Object.entries(OV_WINS).map(([k,ms])=>{
+    const b = ovBase(ms); if (!b || !px) return `<span class="chg">${k} –</span>`;
+    const pct = (px/b.px-1)*100, span = nowEx()-b.t, part = span < ms*.8;
+    return `<span class="chg ${ovCls(pct)}${part?" part":""}" title="${part?"only "+ovSpan(span)+" of history so far":""}">${k} ${ovSigned(pct, a=>a.toFixed(2))}%${part?" ("+ovSpan(span)+")":""}</span>`;
+  }).join("");
+  const line = OV.hist.filter(x=>x.t >= nowEx()-900000).map(x=>x.px); if (px) line.push(px);
+  ovLine(ov$("ovSpark"), line, line.length>1 && line[line.length-1]<line[0] ? "#e5534b" : "#2fbf71");
+
+  // market numbers
+  const b = ovBase(win), age = b ? nowEx()-b.t : 0, part = b && age < win*.8, tag = part ? ovSpan(age) : wl;
+  const cb = b ? cvd.bn-b.cb : null, ch = b ? cvd.hl-b.ch : null, oiChg = b && b.oi && M.bnOI ? (M.bnOI/b.oi-1)*100 : null;
+  const hl = ovHlMid(), basis = px && hl ? hl-px : null, nf = M.bnNextFund ? M.bnNextFund-Date.now() : null;
+  const item = (k, v, sub, cls) => `<div class="metric"><span>${k}</span><b class="${cls||""}">${v}</b>${sub?`<small>${sub}</small>`:""}</div>`;
+  ov$("ovMetrics").innerHTML = [
+    item(`BN CVD Δ ${tag}`, ovSigned(cb, a=>"$"+fmtK(a)), "taker buy − sell", ovCls(cb)),
+    item(`HL CVD Δ ${tag}`, ovSigned(ch, a=>"$"+fmtK(a)), "taker buy − sell", ovCls(ch)),
+    item("Basis HL − BN", basis==null ? "–" : ovSigned(basis, a=>fmt(a,ovDec(px))), basis==null ? "" : ovSigned(basis/px*1e4, a=>a.toFixed(1))+" bps", ovCls(basis)),
+    item("BN funding (8h)", M.bnFund==null ? "–" : (M.bnFund*100).toFixed(4)+"%", nf>0 ? "next in "+ovSpan(nf) : "", ovCls(M.bnFund)),
+    item("HL funding (1h)", M.hlFund==null ? "–" : (M.hlFund*100).toFixed(4)+"%", "", ovCls(M.hlFund)),
+    item("BN open interest", M.bnOI ? fmtK(M.bnOI) : "–", oiChg==null ? "" : ovSigned(oiChg, a=>a.toFixed(2))+"% / "+tag, ovCls(oiChg)),
+    item("Activity", rs.calibrated ? rs.regime : "calibrating", rs.calibrated ? "x"+rs.ratio.toFixed(2)+" of normal flow" : Math.round(rs.calibratingPct*100)+"% of warm-up", rs.regime==="hot" && rs.calibrated ? "dn" : ""),
+  ].join("");
+
+  // Reader: the strongest active episodes, in plain language
+  const act = READER.activeEpisodes().sort((x,y)=>y.intensity-x.intensity).slice(0,3);
+  const lastEnded = READER.episodes.filter(e=>e.stage==="ended").slice(-1)[0];
+  ov$("ovReader").innerHTML = act.length ? act.map(e=>`<div class="ovev ${e.stage}"><span class="stat">${ovSpan(Math.max(0,rs.now-e.tStart))}</span> <b>${READER_EPISODES.FAMILY_LABEL[e.family]}</b> <span class="venue v-${e.venue}">${e.venue.toUpperCase()}</span> <span class="chip">${e.horizon}</span> <span class="stg">${e.stage}</span><div class="ovevd">${e.reading}</div></div>`).join("")
+    : `<div class="note" style="margin:0">${!connected ? "Not connected." : !rs.calibrated ? "Calibrating: detectors arm after about two minutes of data." : "Quiet: no active episodes."}${lastEnded ? ` Last: ${READER_EPISODES.FAMILY_LABEL[lastEnded.family].toLowerCase()} (${lastEnded.venue.toUpperCase()}) ended ${ovSpan(Math.max(0,rs.now-lastEnded.tEnd))} ago.` : ""}</div>`;
+
+  // Account
+  if (ACC.mode==="sim") ACC.data = simSnapshot();
+  const d = ACC.data;
+  if (!ACC.mode || !d) ov$("ovAcc").innerHTML = `<div class="note" style="margin:0">No account connected.</div>`;
+  else {
+    const up = d.balance.upnl, pos = d.positions.slice(0,3);
+    ov$("ovAcc").innerHTML = `<div class="metrics"><div class="metric"><span>wallet</span><b>$${fmt(d.balance.wallet,2)}</b></div>`
+      + `<div class="metric"><span>unrealized PnL</span><b class="${ovCls(up)}">${ovSigned(up, a=>"$"+fmt(a,2))}</b></div></div>`
+      + (pos.length ? `<table class="tt" style="margin-top:6px">${pos.map(p=>`<tr><td>${p.symbol}</td><td>${p.qty>0?"long":"short"} ${Math.abs(p.qty)}</td><td class="${ovCls(p.upnl)}">${ovSigned(p.upnl, a=>"$"+fmt(a,2))}</td></tr>`).join("")}</table>` : `<div class="note">No open positions.</div>`);
+  }
+}
+ov$("ovWin").onchange = () => { if (typeof visible==="function" && visible("overview")) renderOverview(); };
+ov$("ovOpenReader").onclick = () => setTab("reader");
+ov$("ovOpenAcc").onclick = () => setTab("accounts");
+
+</script>
 <script>
 "use strict";
 // ---------- stream catalogue ----------
@@ -373,6 +1044,11 @@ const HL_CHANNEL = {trades:"hl.trades", l2Book:"hl.l2Book", bbo:"hl.bbo", active
 
 // ---------- helpers ----------
 const $ = id => document.getElementById(id);
+// Per-viewer settings. Never holds keys/secrets. Every access is guarded: storage can be blocked or empty (private window, file:// quirks).
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem("sv1:"+k); return v==null ? d : JSON.parse(v); }catch{ return d; } },
+  set(k, v){ try{ localStorage.setItem("sv1:"+k, JSON.stringify(v)); }catch{} },
+};
 const fmt = (x, d=2) => x==null||isNaN(x) ? "–" : Number(x).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
 const fmtK = x => { if (x==null||isNaN(x)) return "–"; const a=Math.abs(x), s=x<0?"-":""; return a>=1e9?s+(a/1e9).toFixed(2)+"B":a>=1e6?s+(a/1e6).toFixed(2)+"M":a>=1e3?s+(a/1e3).toFixed(1)+"k":s+a.toFixed(0); };
 const hhmmss = t => { const d=new Date(t); return d.toTimeString().slice(0,8)+"."+String(d.getMilliseconds()).padStart(3,"0"); };
@@ -427,10 +1103,35 @@ function record(id, raw, evtTime, payload, opts={}){
   dirty = true;
 }
 function addTrade(t){
+  if (!t.bf) rdSafe(() => READER.onTrade(t));
   if (t.mid == null){ const b = t.v==="bn" ? M.bnBid : M.hlBid, a = t.v==="bn" ? M.bnAsk : M.hlAsk; if (b && a) t.mid = (b+a)/2; }
   trades.push(t);
   if (ACC.mode==="sim" && t.v==="bn" && !t.liq) simOnTrade(t);
   if (!t.liq && !t.bf) cvd[t.v] += t.side==="buy" ? t.ntl : -t.ntl; // liquidations already appear as trades
+}
+
+// ---------- market reader: instance and hooks ----------
+const READER = READER_ENGINE.create();
+READER.selfTest = () => READER_SELFTEST.run(READER_ENGINE);
+const rdSafe = fn => { try{ fn(); }catch(e){ console.error("reader", e); } };
+const rdLastBook = {bn:0, hl:0};
+let rdWorker = null;
+function rdStopHeartbeat(){ if(rdWorker){ try{rdWorker.terminate();URL.revokeObjectURL(rdWorker._url);}catch{} rdWorker=null; } }
+function rdStartHeartbeat(){
+  rdStopHeartbeat();
+  try{
+    const url=URL.createObjectURL(new Blob(["setInterval(()=>postMessage(0),250)"],{type:"text/javascript"}));
+    rdWorker=new Worker(url); rdWorker._url=url;
+    rdWorker.onmessage=()=>rdSafe(()=>READER.advance(nowEx() - 1500));
+  }catch(e){ rdWorker=null; }
+}
+function rdBook(v, t){
+  rdSafe(() => {
+    if (!(t - rdLastBook[v] >= 250)) return;
+    rdLastBook[v] = t;
+    const b = v==="bn" ? bnTopN(30) : hlTop();
+    if (b) READER.onBook(v, t, b.bids, b.asks);
+  });
 }
 
 // ---------- Binance ----------
@@ -478,7 +1179,7 @@ function bnHandle(raw, lookup){
       break;
     }
     case "bn.depth": evt = d.T || d.E; bnDepth(d); break;
-    case "bn.bookTicker": evt = d.T || d.E; M.bnBid=+d.b; M.bnAsk=+d.a; M.bnBidSz=+d.B; M.bnAskSz=+d.A; break;
+    case "bn.bookTicker": evt = d.T || d.E; M.bnBid=+d.b; M.bnAsk=+d.a; M.bnBidSz=+d.B; M.bnAskSz=+d.A; rdSafe(() => READER.onQuote("bn", evt, M.bnBid, M.bnAsk)); break;
     case "bn.markPrice": M.bnMark=+d.p; M.bnIndex=+d.i; M.bnFund=+d.r; M.bnNextFund=d.T; break; // T here is next funding, not event time
     case "bn.forceOrder": {
       const o=d.o; evt=o.T; const px=+(o.ap||o.p), q=+(o.z||o.q);
@@ -509,6 +1210,7 @@ function bnDepth(d){
   for (const [p,q] of d.b){ +q ? b.bids.set(p,+q) : b.bids.delete(p); }
   for (const [p,q] of d.a){ +q ? b.asks.set(p,+q) : b.asks.delete(p); }
   b.lastU = d.u;
+  rdBook("bn", d.T || d.E);
 }
 function bnResync(){ const g=(bnBook.gaps||0)+1; bnBook={bids:new Map(),asks:new Map(),lastU:null,buffer:[],ready:false,gaps:g}; bnSnapshot(bnGen); }
 async function pollOI(){
@@ -563,8 +1265,8 @@ function hlHandle(raw){
       }
       break;
     }
-    case "hl.l2Book": evt = d.time; hlBook = d.levels; hlBookT = Date.now(); break;
-    case "hl.bbo": evt = d.time; if (d.bbo[0]){ M.hlBid=+d.bbo[0].px; M.hlBidSz=+d.bbo[0].sz; } if (d.bbo[1]){ M.hlAsk=+d.bbo[1].px; M.hlAskSz=+d.bbo[1].sz; } break;
+    case "hl.l2Book": evt = d.time; hlBook = d.levels; hlBookT = Date.now(); rdBook("hl", d.time); break;
+    case "hl.bbo": evt = d.time; if (d.bbo[0]){ M.hlBid=+d.bbo[0].px; M.hlBidSz=+d.bbo[0].sz; } if (d.bbo[1]){ M.hlAsk=+d.bbo[1].px; M.hlAskSz=+d.bbo[1].sz; } rdSafe(() => READER.onQuote("hl", d.time, M.hlBid, M.hlAsk)); break;
     case "hl.ctx": { const c=d.ctx; M.hlMark=+c.markPx; M.hlOracle=+c.oraclePx; M.hlFund=+c.funding; M.hlOI=+c.openInterest; M.hlVol=+c.dayNtlVlm; break; }
     case "hl.candle": break;
   }
@@ -643,6 +1345,15 @@ function drawBubbles(){
     ctx.fillStyle=c; ctx.strokeStyle=c; ctx.lineWidth = hollow ? 1.6 : 1; ctx.globalAlpha = p.bf ? .2 : .45;
     ctx.beginPath(); p.v==="bn" ? ctx.arc(x,y,r,0,Math.PI*2) : ctx.rect(x-r*.89,y-r*.89,r*1.78,r*1.78);
     if (!hollow) ctx.fill(); ctx.globalAlpha=.9; ctx.stroke(); ctx.globalAlpha=1;
+  }
+  // Reader events: compact directional markers on the shared price/time axes.
+  for (const e of READER.events){
+    if (e.t<t0 || e.t>t1 || !(e.px>=lo && e.px<=hi)) continue;
+    const x=X(e.t),y=Y(e.px),up=e.dir==="bull",neutral=e.dir==="neutral";
+    ctx.fillStyle=neutral?"#e0af68":up?COL.buy:COL.sell;ctx.strokeStyle="#0d1014";ctx.lineWidth=1;
+    ctx.beginPath();
+    if(neutral){ctx.arc(x,y,4,0,Math.PI*2);}else{ctx.moveTo(x,y+(up?6:-6));ctx.lineTo(x-5,y+(up?-3:3));ctx.lineTo(x+5,y+(up?-3:3));ctx.closePath();}
+    ctx.fill();ctx.stroke();
   }
   // current mids on the axis
   const last = mids[mids.length-1];
@@ -823,6 +1534,16 @@ function renderAlerts(){
 // ---------- microstructure ----------
 let microHist = [], heatBn = [], heatHl = [], sweeps = [], bnGroup = null;
 function resetMicro(){ retHist=[]; lastRetMid=null; microHist=[]; heatBn=[]; heatHl=[]; sweeps=[]; bnGroup=null; }
+function topN(map, n, desc){
+  const out = [];
+  for (const [p, q] of map){
+    const px = +p; let i = out.length;
+    while (i > 0 && (desc ? out[i-1][0] < px : out[i-1][0] > px)) i--;
+    if (i < n){ out.splice(i, 0, [px, q]); if (out.length > n) out.pop(); }
+  }
+  return out;
+}
+function bnTopN(n){ return bnBook && bnBook.ready && bnBook.bids.size && bnBook.asks.size ? {bids:topN(bnBook.bids,n,true), asks:topN(bnBook.asks,n,false)} : null; }
 function bnTop(){
   if (!bnBook || !bnBook.ready || !bnBook.bids.size || !bnBook.asks.size) return null;
   return { bids:[...bnBook.bids].map(([p,q])=>[+p,q]).sort((a,b)=>b[0]-a[0]),
@@ -865,6 +1586,7 @@ function addSweep(v, t, side, fills){
   sweeps.push({t, v, side, levels:pxs.size, fills:fills.length, from: side==="buy"?lo:hi, to: side==="buy"?hi:lo,
                ntl: fills.reduce((a,f)=>a+f.ntl,0)});
   if (sweeps.length > 300) sweeps.shift();
+  rdSafe(() => READER.onSweep(v, t, side, fills.reduce((a, f) => a + f.ntl, 0), pxs.size));
   dirty = true;
 }
 function bnSweepFeed(tr){   // Binance gives no taker-order id on @trade: same ms + same side ≈ one order
@@ -1381,18 +2103,24 @@ function renderViz(){
 $("vwin").onchange = $("profVenue").onchange = () => { if (visible("viz")) renderViz(); };
 
 // ---------- tabs ----------
-const TABS = [["charts","Charts"],["micro","Micro"],["viz","Visualizations"],["trading","Trading"],["accounts","Accounts"],["market","Market"],["tape","Tape"],["streams","Streams"],["health","Health"],["raw","Raw"],["all","All"]];
-let tab = "charts";
+const TABS = [["overview","Overview"],["charts","Charts"],["micro","Micro"],["reader","Reader"],["viz","Visualizations"],["trading","Trading"],["accounts","Accounts"],["market","Market"],["tape","Tape"],["streams","Streams"],["health","Health"],["raw","Raw"]];
+// Five groups; a group with several views shows them as a sub-row. A "view" is what data-tab on a <section> names.
+const GROUPS = [["live","Live",["overview","charts","micro","viz","tape"]],["reader","Reader",["reader"]],["trade","Trade",["trading","accounts"]],["market","Market",["market"]],["diag","Diagnostics",["streams","health","raw"]]];
+const groupOf = v => GROUPS.find(g=>g[2].includes(v)) || GROUPS[0];
+let tab = "overview";
 function setTab(t){
   tab = t;
-  document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("act", b.dataset.t===t));
-  document.querySelectorAll("main section").forEach(s=>s.classList.toggle("hide", t!=="all" && s.dataset.tab!==t));
-  $("main").classList.toggle("all", t==="all");
+  const g = groupOf(t), last = store.get("lastView", {}); last[g[0]] = t; store.set("lastView", last); store.set("view", t);
+  document.querySelectorAll("#groups button").forEach(b=>b.classList.toggle("act", b.dataset.g===g[0]));
+  $("views").hidden = g[2].length < 2;
+  $("views").innerHTML = g[2].length < 2 ? "" : g[2].map(v=>`<button data-t="${v}" class="${v===t?"act":""}">${TABS.find(x=>x[0]===v)[1]}</button>`).join("");
+  document.querySelectorAll("main section").forEach(s=>s.classList.toggle("hide", s.dataset.tab!==t));
   dirty = true; renderSlow();
 }
-const visible = name => tab==="all" || tab===name || (tab==="trading" && !!document.querySelector(`#tgrid section[data-home="${name}"]`));
-$("tabs").innerHTML = TABS.map(([t,l])=>`<button data-t="${t}">${l}</button>`).join("");
-$("tabs").onclick = e => { const b = e.target.closest("button"); if (b) setTab(b.dataset.t); };
+const visible = name => tab===name || (tab==="trading" && !!document.querySelector(`#tgrid section[data-home="${name}"]`));
+$("groups").innerHTML = GROUPS.map(([id,l])=>`<button data-g="${id}">${l}</button>`).join("");
+$("groups").onclick = e => { const b = e.target.closest("button"); if (!b) return; const g = GROUPS.find(x=>x[0]===b.dataset.g), last = store.get("lastView", {})[g[0]]; setTab(g[2].includes(last) ? last : g[2][0]); window.scrollTo(0, 0); };
+$("views").onclick = e => { const b = e.target.closest("button"); if (b) setTab(b.dataset.t); };
 
 
 // ---------- accounts (keys in memory only) ----------
@@ -1623,7 +2351,11 @@ function addModule(id){
   }
   afterLayout();
 }
-function afterLayout(){ $("tEmpty").style.display = $("tgrid").children.length ? "none" : ""; buildModCatalog(); setTab(tab); }
+let restoring = false;
+function afterLayout(){
+  $("tEmpty").style.display = $("tgrid").children.length ? "none" : ""; buildModCatalog(); setTab(tab);
+  if (!restoring) store.set("tmods", [...$("tgrid").children].map(sec => sec.id ? sec.id.replace(/-mod$/, "") : sec.dataset.mid));
+}
 $("addMod").onchange = e => { addModule(e.target.value); e.target.value = ""; };
 
 function buildTicket(el){
@@ -1705,6 +2437,61 @@ $("tgrid").addEventListener("click", async e => {
   }catch(err){ if (err.message!=="cancelled") alert(err.message); }
 });
 
+// ---------- market reader: tab ----------
+const rdFilter = {family:new Set(), venue:new Set(), min:0};
+const epFilter = {family:new Set(), horizon:new Set()}, epOpen = new Set(), epLast = {};
+const rdEsc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;");
+const rdMs = ms => ms >= 10000 ? (ms/1000).toFixed(0)+"s" : (ms/1000).toFixed(1)+"s";
+function rdInit(){
+  const chip = (kind,v) => `<button class="chip" data-kind="${kind}" data-v="${v}">${v}</button>`;
+  $("rdChips").innerHTML = ["wall","book","burst","absorption","exhaustion"].map(f=>chip("family",f)).join("") + ["bn","hl"].map(v=>chip("venue",v)).join("");
+  $("rdChips").onclick = e => { const b=e.target.closest("button"); if(!b)return; const set=rdFilter[b.dataset.kind]; set.has(b.dataset.v)?set.delete(b.dataset.v):set.add(b.dataset.v); b.classList.toggle("on",set.has(b.dataset.v)); renderReader(); };
+  $("rdMin").oninput = () => { rdFilter.min=+$("rdMin").value; renderReader(); };
+  $("rdSens").onchange = () => READER.setSensitivity(+$("rdSens").value);
+  const ec = (kind,v) => `<button class="chip" data-kind="${kind}" data-v="${v}">${v}</button>`;
+  $("epChips").innerHTML = Object.keys(READER_EPISODES.FAMILY_LABEL).map(f=>ec("family",f)).join("") + READER_EPISODES.DEFAULTS.horizons.map(h=>ec("horizon",h)).join("");
+  $("epChips").onclick = e => { const b=e.target.closest("button"); if(!b)return; const set=epFilter[b.dataset.kind]; set.has(b.dataset.v)?set.delete(b.dataset.v):set.add(b.dataset.v); b.classList.toggle("on",set.has(b.dataset.v)); store.set("epf",{family:[...epFilter.family],horizon:[...epFilter.horizon]}); renderReader(); };
+  $("epFamilies").innerHTML = Object.entries(READER_EPISODES.FAMILY_LABEL).map(([k,l])=>`<label><input type="checkbox" data-f="${k}" checked> ${l}</label>`).join("");
+  $("epFamilies").onchange = e => { const f=e.target.dataset.f; if(f){ READER.setFamily(f,e.target.checked); store.set("epOff",[...$("epFamilies").querySelectorAll("input[data-f]")].filter(c=>!c.checked).map(c=>c.dataset.f)); } };
+  for (const id of ["epActive","epDone"]) $(id).onclick = e => { const c=e.target.closest(".ep"); if(!c)return; const k=c.dataset.id; epOpen.has(k)?epOpen.delete(k):epOpen.add(k); epLast[id]=null; renderReader(); };
+  $("rdDetectors").innerHTML = Object.keys(READER.cfg.detectors).map(k=>`<label><input type="checkbox" data-d="${k}" checked> ${k.replace(/_/g," ")}</label>`).join("");
+  $("rdDetectors").onchange = e => { const d=e.target.dataset.d; if(d)READER.setDetector(d,e.target.checked); };
+}
+const epSide = x => x==="buy" ? "buyers" : "sellers";
+function epWho(ep){
+  if (ep.family==="wall") return `<span class="who">passive <i class="${ep.passive}">${epSide(ep.passive)}</i> (${ep.wall.side} wall)</span>`;
+  return `<span class="who">aggressor <i class="${ep.aggressor}">${epSide(ep.aggressor)}</i>${ep.passive ? ` · passive <i class="${ep.passive}">${epSide(ep.passive)}</i>` : ""}</span>`;
+}
+function epEvidence(ep){
+  return `<table class="evid">` + (ep.stage==="ended" && ep.peakEvidence ? ep.peakEvidence : ep.evidence).map(i=>`<tr class="${i.na?"na":i.ok?"ok":"no"}"><td><i class="tick"></i></td><td>${i.label}${i.gate?' <span class="gate" title="must hold for the episode to exist">required</span>':""}</td><td>${i.val}</td></tr>`).join("") + `</table>`;
+}
+function epCard(ep, now, compact){
+  const timing = ep.stage==="ended" ? `${hhmmss(ep.tStart).slice(0,8)} · lasted ${rdMs(ep.tEnd-ep.tStart)} · ${ep.outcome}`
+    : `began ${rdMs(now-ep.tStart)} ago${ep.tDetected ? ` · detected ${rdMs(now-ep.tDetected)} ago` : " · not yet confirmed"}`;
+  return `<div class="ep ${ep.stage}" data-id="${ep.id}"><div class="eph"><b>${READER_EPISODES.FAMILY_LABEL[ep.family]}</b> <span class="venue v-${ep.venue}">${ep.venue.toUpperCase()}</span><span class="chip">${ep.horizon}</span> <span class="stg">${ep.stage}</span>${ep.pulses>1 ? ` <span class="chip">${ep.pulses} pulses</span>` : ""} ${epWho(ep)}</div>`
+    + (compact ? "" : `<div class="epbar"><i style="width:${Math.round(ep.intensity*100)}%"></i></div>`)
+    + `<div class="epread">${ep.stage==="ended" && ep.peakReading ? "At its peak: " + ep.peakReading : ep.reading}</div><div class="epmeta stat">${timing} · peak ${Math.round(ep.peak*100)}%</div>${epOpen.has(String(ep.id)) ? epEvidence(ep) : ""}</div>`;
+}
+function renderEpisodes(s){
+  const keep = e => (!epFilter.family.size || epFilter.family.has(e.family)) && (!epFilter.horizon.size || epFilter.horizon.has(e.horizon) || e.horizon==="book");
+  const live = READER.activeEpisodes().concat(READER.formingEpisodes()).filter(keep).sort((a,b)=>(a.stage==="forming")-(b.stage==="forming") || b.intensity-a.intensity);
+  const done = READER.episodes.filter(e=>e.stage==="ended" && keep(e)).slice(-40).reverse();
+  const put = (id, html) => { if (epLast[id] !== html){ epLast[id] = html; $(id).innerHTML = html; } };   // only touch the DOM when something changed, so taps are not lost
+  put("epActive", live.length ? live.map(e=>epCard(e, s.now)).join("") : `<div class="note" style="margin:0">${!connected ? "Not connected." : !s.calibrated ? "Calibrating: episodes arm after about two minutes of data." : "No active episodes: nothing matches a pattern right now."}</div>`);
+  put("epDone", done.length ? done.map(e=>epCard(e, s.now, true)).join("") : `<div class="note" style="margin:0">Finished episodes appear here.</div>`);
+}
+function renderReader(){
+  const s=READER.state(),card=(k,v,cls)=>`<div class="rd-card ${cls||""}"><span>${k}</span><b>${v}</b></div>`;
+  $("rdStatus").textContent=s.calibrated?"armed":`calibrating ${(s.calibratingPct*100).toFixed(0)}%`;
+  renderEpisodes(s);
+  $("rdStrip").innerHTML=[card("activity",`${s.regime} (x${s.ratio.toFixed(2)})`)].concat(["fast","mid","slow"].map(k=>{const h=s.horizons[k];return h?card(`${k} - window ${rdMs(h.ms)}`,`${h.side} (${(h.share*100).toFixed(0)}% buy)`,h.side==="buyers"?"buy":h.side==="sellers"?"sell":""):card(k,"-");})).concat([card("episodes active",String(s.episodesActive))]).join("");
+  const rows=READER.events.slice().reverse().filter(e=>(!rdFilter.family.size||rdFilter.family.has(e.family))&&(!rdFilter.venue.size||rdFilter.venue.has(e.venue))&&e.strength>=rdFilter.min).slice(0,100);
+  $("rdFeed").innerHTML=`<tr><th>time</th><th>type</th><th>venue</th><th>price</th><th>horizon</th><th>strength</th><th>evidence</th></tr>`+rows.map(e=>`<tr class="neutral"><td>${hhmmss(e.t)}</td><td>${e.type.replace(/_/g," ")}</td><td><span class="venue v-${e.venue}">${e.venue.toUpperCase()}</span></td><td>${fmt(e.px,1)}</td><td>${e.horizon}</td><td><i class="rd-str" style="width:${Math.round(e.strength*60)}px"></i> ${(e.strength*100).toFixed(0)}</td><td style="white-space:normal">${rdEsc(e.evidence)}</td></tr>`).join("");
+  const hs=["bn.trade","bn.depth","bn.bookTicker","hl.trades","hl.l2Book","hl.bbo"].map(id=>[id.replace("."," "),S[id].on?(status(S[id])||"-"):"off"]);
+  hs.push(["events / min",s.eventsPerMin],["BN book age",s.bookAgeMs.bn==null?"-":s.bookAgeMs.bn+" ms"],["HL book age",s.bookAgeMs.hl==null?"-":s.bookAgeMs.hl+" ms"],["heartbeat",rdWorker?"on":"off"]);
+  $("rdHealth").innerHTML=hs.map(([k,v])=>`<div class="metric"><span>${k}</span><b>${v}</b></div>`).join("");
+}
+
 // ---------- loops ----------
 function renderSlow(){
   if (paused) return;
@@ -1718,12 +2505,14 @@ setInterval(()=>{
   for (const [st,pre] of [[bnStats,"bn"],[hlStats,"hl"]]){ $(pre+"Rate").textContent=st.cur; $(pre+"Bytes").textContent=(st.bytes/1024).toFixed(1); st.cur=0; st.bytes=0; }
   prune(); renderSlow();
 }, 1000);
-let lastFast = 0, lastChart = 0, lastMicro = 0, lastViz = 0, lastTrade = 0;
+let lastOv = 0, lastFast = 0, lastChart = 0, lastMicro = 0, lastViz = 0, lastTrade = 0, lastReader = 0;
 (function frame(ts){
   if (!paused){
+    if (visible("overview") && ts - lastOv > 250){ lastOv = ts; try{ renderOverview(); }catch(e){ console.error("overview", e); } }
     if (visible("charts") && ts - lastChart > 100){ lastChart = ts; drawBubbles(); drawCvd(); }
     if (visible("micro") && ts - lastMicro > 250){ lastMicro = ts; renderMicro(); }
     if (visible("viz") && ts - lastViz > 400){ lastViz = ts; renderViz(); }
+    if (visible("reader") && ts - lastReader > 250){ lastReader = ts; renderReader(); }
     if (tab==="trading" && ts - lastTrade > 400){ lastTrade = ts; renderTrading(); }
     if (dirty && ts - lastFast > 150){
       dirty = false; lastFast = ts;
@@ -1738,15 +2527,16 @@ let lastFast = 0, lastChart = 0, lastMicro = 0, lastViz = 0, lastTrade = 0;
 // ---------- controls ----------
 $("go").onclick = () => {
   if (connected){
-    connected=false; bnDisconnect(); hlDisconnect(); clearInterval(clockTimer);
+    connected=false; bnDisconnect(); hlDisconnect(); clearInterval(clockTimer); rdStopHeartbeat();
     $("go").textContent="Connect"; $("go").classList.add("primary"); renderSlow(); return;
   }
   connected = true; connectedAt = Date.now();
   for (const id in S) Object.assign(S[id], freshStats());
   trades=[]; cvd={bn:0,hl:0}; cvdHist=[]; midHist=[]; cvdBase=null; resetMicro(); logLines.length=0; hlBook=null; bnBook=null;
   resetMarket(); Object.assign(health, {bnReconnects:0, hlReconnects:0, hlReplays:0});
+  READER.reset(); rdLastBook.bn = rdLastBook.hl = 0;
   syncClock(); clockTimer = setInterval(syncClock, 60000);
-  bnConnect(); hlConnect();
+  bnConnect(); hlConnect(); rdStartHeartbeat();
   $("go").textContent="Disconnect"; $("go").classList.remove("primary");
 };
 $("pause").onclick = () => { paused=!paused; $("pause").classList.toggle("on",paused); $("pause").textContent = paused?"Resume":"Pause"; };
@@ -1757,12 +2547,69 @@ $("bnSrc").onchange = () => {
   trades = trades.filter(t => t.v!=="bn" || t.liq);   // avoid mixing sources in the history
   cvd.bn = 0; cvdHist = []; cvdBase = null;
 };
-$("sym").onchange = () => { if (connected){ resetMicro(); trades=[]; midHist=[]; cvdHist=[]; cvd={bn:0,hl:0}; resetMarket(); hlBook=null; bnConnect(); hlConnect(); } };
+$("sym").onchange = () => { if (connected){ resetMicro(); trades=[]; midHist=[]; cvdHist=[]; cvd={bn:0,hl:0}; resetMarket(); READER.reset(); rdLastBook.bn = rdLastBook.hl = 0; hlBook=null; bnConnect(); hlConnect(); } };
 $("cvdReset").onclick = () => { cvdBase = {t: nowEx()}; };
 $("logFilter").onchange = renderLog;
 $("clearLog").onclick = () => { logLines.length=0; renderLog(); };
 $("minNtl").oninput = renderTape;
-buildCards(); renderMetrics(); tagViewSections(); buildModCatalog(); renderAccount(); setTab("charts");
+rdInit(); buildCards(); renderMetrics(); tagViewSections(); buildModCatalog(); renderAccount();
+
+// ---------- settings sheet ----------
+function sheet(open){ $("sheet").hidden = !open; $("cog").setAttribute("aria-expanded", String(open)); }
+$("cog").onclick = () => sheet($("sheet").hidden);
+document.addEventListener("click", e => { if (!$("sheet").hidden && !e.target.closest("#sheet, #cog")) sheet(false); });
+document.addEventListener("keydown", e => { if (e.key==="Escape") sheet(false); });
+$("sym").addEventListener("input", () => { $("symLbl").textContent = $("sym").value.trim().toUpperCase() || "–"; });
+
+// ---------- remembered setup ----------
+for (const id of ["sym","route","bnSrc","vwin","ovWin","rdSens","rdMin","minNtl","swMin"]){
+  const el = $(id); if (!el) continue;
+  const v = store.get("v:"+id, null);
+  if (v != null && (el.tagName!=="SELECT" || [...el.options].some(o=>o.value===v))) el.value = v;
+  const save = () => store.set("v:"+id, el.value);
+  el.addEventListener("change", save); el.addEventListener("input", save);
+}
+$("symLbl").textContent = $("sym").value.trim().toUpperCase() || "–";
+READER.setSensitivity(+$("rdSens").value); rdFilter.min = +$("rdMin").value;
+const rdOff = new Set(store.get("rdOff", []));
+for (const cb of $("rdDetectors").querySelectorAll("input[data-d]")) if (rdOff.has(cb.dataset.d)){ cb.checked = false; READER.setDetector(cb.dataset.d, false); }
+{
+  const epf = store.get("epf", null); if (epf) for (const k of ["family","horizon"]) for (const v of epf[k] || []){ epFilter[k].add(v); const b = $("epChips").querySelector(`button[data-kind="${k}"][data-v="${v}"]`); if (b) b.classList.add("on"); }
+  for (const f of store.get("epOff", [])){ const cb = $("epFamilies").querySelector(`input[data-f="${f}"]`); if (cb){ cb.checked = false; READER.setFamily(f, false); } }
+}
+$("rdDetectors").addEventListener("change", () => store.set("rdOff", [...$("rdDetectors").querySelectorAll("input[data-d]")].filter(c=>!c.checked).map(c=>c.dataset.d)));
+
+// ---------- collapsible panels ----------
+// Each titled panel gets a body wrapper; tapping the title folds it. State is remembered by panel title.
+(function initPanels(){
+  const saved = store.get("collapsed", null), fold = new Set(saved || []), narrow = matchMedia("(max-width:700px)").matches;
+  let vizN = 0;
+  document.querySelectorAll("main > section[data-tab]").forEach(sec=>{
+    const h2 = sec.querySelector(":scope > h2"); if (!h2 || sec.classList.contains("tcontainer")) return;
+    const body = document.createElement("div"); body.className = "pbody";
+    while (h2.nextSibling) body.appendChild(h2.nextSibling);
+    sec.appendChild(body); sec.classList.add("cx");
+    const key = sec.dataset.tab + "/" + (h2.childNodes[0].textContent || "").trim();
+    sec.dataset.fold = key;
+    if (!saved && narrow && sec.dataset.tab==="viz" && ++vizN > 2) fold.add(key);   // first visit on a phone: Visualizations opens with its first panels only
+    sec.classList.toggle("collapsed", fold.has(key));
+  });
+  document.getElementById("main").addEventListener("click", e => {
+    const h2 = e.target.closest("section.cx > h2"); if (!h2 || e.target.closest(".ctl, .rm, button, input, select, label, a")) return;
+    const sec = h2.parentElement; sec.classList.toggle("collapsed");
+    const now = new Set(store.get("collapsed", null) || [...document.querySelectorAll("section.cx.collapsed")].map(x=>x.dataset.fold));
+    sec.classList.contains("collapsed") ? now.add(sec.dataset.fold) : now.delete(sec.dataset.fold);
+    store.set("collapsed", [...now]); dirty = true;
+  });
+  if (!saved) store.set("collapsed", [...fold]);
+})();
+
+// ---------- restore Trading layout, then the last view ----------
+const savedView = store.get("view", "overview");      // read first: restoring modules calls setTab, which rewrites it
+restoring = true;
+for (const id of store.get("tmods", [])) try{ addModule(id); }catch{}
+restoring = false;
+tab = TABS.some(t=>t[0]===savedView) ? savedView : "overview"; afterLayout();
 </script>
 </body>
 </html>

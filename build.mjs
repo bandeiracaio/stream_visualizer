@@ -1,0 +1,45 @@
+// Builds the single self-contained HTML file from src/.
+//   node build.mjs            -> dist/stream-visualizer.html   (dev build)
+//   node build.mjs --release  -> stream-visualizer_vNNN.html   (next free version, never overwrites)
+//   node build.mjs --out FILE -> FILE
+// The Reader self-test runs first; a failing scenario aborts the build.
+import fs from "node:fs";
+import path from "node:path";
+import vm from "node:vm";
+
+const root = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1"));
+const src = p => path.join(root, "src", p);
+const read = p => fs.readFileSync(src(p), "utf8");
+
+function selfTest() {
+  const code = read("js/reader-drift.js") + "\n" + read("js/reader-proposals.js") + "\n" + read("js/reader-register.js") + "\n" + read("js/reader-episodes.js") + "\n" + read("js/reader-engine.js") + "\n" + read("js/reader-selftest.js") + "\n;READER_SELFTEST.run(READER_ENGINE);";
+  const results = vm.runInNewContext(code, {}, { timeout: 120000 });
+  const bad = results.filter(r => !r.ok);
+  for (const r of results) console.log((r.ok ? "  pass  " : "  FAIL  ") + r.name + (r.ok ? "" : "\n        " + r.detail));
+  if (bad.length) { console.error(`\n${bad.length}/${results.length} self-test scenarios failed; build aborted.`); process.exit(1); }
+}
+
+function assemble() {
+  return read("index.html").split("\n").map(line => {
+    const m = line.match(/^<!--@include (\S+)-->$/);
+    if (!m) return line;
+    const body = read(m[1]);
+    if (/<\/script/i.test(body)) throw new Error(`${m[1]} contains "</script", which would end the inline script early`);
+    return body;
+  }).join("\n");
+}
+
+function nextRelease() {
+  const nums = fs.readdirSync(root).map(f => f.match(/^stream-visualizer_v(\d+)\.html$/)).filter(Boolean).map(m => +m[1]);
+  return path.join(root, `stream-visualizer_v${String((nums.length ? Math.max(...nums) : 0) + 1).padStart(3, "0")}.html`);
+}
+
+const args = process.argv.slice(2);
+selfTest();
+const html = assemble();
+const out = args.includes("--out") ? path.resolve(args[args.indexOf("--out") + 1])
+          : args.includes("--release") ? nextRelease()
+          : path.join(root, "dist", "stream-visualizer.html");
+fs.mkdirSync(path.dirname(out), { recursive: true });
+fs.writeFileSync(out, html);
+console.log(`\nwrote ${out} (${(Buffer.byteLength(html) / 1024).toFixed(1)} KB)`);

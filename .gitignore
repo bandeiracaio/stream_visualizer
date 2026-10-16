@@ -1,0 +1,3 @@
+dist/
+session_*.json.gz
+reader_register_*.json

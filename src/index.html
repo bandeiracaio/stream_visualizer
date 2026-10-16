@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Live Stream Visualizer</title>
+<style>
+<!--@include styles.css-->
+</style>
+</head>
+<body>
+<header>
+  <h1>Live Stream Visualizer</h1>
+  <button id="go" class="primary">Connect</button>
+  <button id="pause">Pause</button>
+  <span class="stat pill">BN <b id="bnState">off</b></span>
+  <span class="stat pill">HL <b id="hlState">off</b></span>
+  <span id="accBadge"></span>
+  <button id="cog" title="Settings" aria-expanded="false">⚙ <span id="symLbl">BTC</span></button>
+  <div id="alerts"></div>
+  <nav id="groups"></nav>
+  <nav id="views" hidden></nav>
+  <div id="sheet" hidden>
+    <label>Symbol <input id="sym" type="text" value="BTC" title="asset"></label>
+    <label>Binance routing
+      <select id="route" title="Binance routing">
+        <option value="routed">BN routed</option>
+        <option value="legacy">BN legacy /stream</option>
+      </select>
+    </label>
+    <label>Trade source
+      <select id="bnSrc" title="Which Binance stream feeds the tape, bubbles and CVD">
+        <option value="bn.trade">BN trades: @trade</option>
+        <option value="bn.aggTrade">BN trades: @aggTrade</option>
+      </select>
+    </label>
+    <div class="sheetstats stat">
+      <div>BN <b id="bnRate">0</b>/s · <b id="bnBytes">0</b> KB/s</div>
+      <div>HL <b id="hlRate">0</b>/s · <b id="hlBytes">0</b> KB/s</div>
+      <div>clock <b id="clk">–</b></div>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <section data-tab="overview" class="full ovhero">
+    <div class="ovtop"><span class="venue v-bn">BN</span><b id="ovSym">BTC perp</b><span id="ovStatus" class="stat"></span>
+      <label class="ctl">window <select id="ovWin"><option value="60000">1m</option><option value="300000" selected>5m</option><option value="900000">15m</option></select></label></div>
+    <div class="ovrow"><b id="ovPx" class="ovpx">–</b><div id="ovChg" class="ovchgs"></div></div>
+    <canvas id="ovSpark" class="ovspark"></canvas>
+  </section>
+
+  <section data-tab="overview" class="full">
+    <h2>Market now</h2>
+    <div class="metrics" id="ovMetrics"></div>
+  </section>
+
+  <section data-tab="overview">
+    <h2>Reader: right now <span class="ctl"><button id="ovOpenReader">open</button></span></h2>
+    <div id="ovReader"></div>
+  </section>
+
+  <section data-tab="overview">
+    <h2>Account <span class="ctl"><button id="ovOpenAcc">manage</button></span></h2>
+    <div id="ovAcc"></div>
+  </section>
+
+  <section data-tab="charts" class="full">
+    <h2>Trade bubbles <span class="ctl">window
+      <select id="win"><option value="60000">1m</option><option value="180000" selected>3m</option><option value="300000">5m</option></select>
+      size <input id="bubScale" type="range" min="0.4" max="3" step="0.1" value="1" style="width:80px"></span></h2>
+    <canvas id="cvBub" class="chart"></canvas>
+    <div class="legend">
+      <span><i style="border-radius:50%;background:var(--buy)"></i>BN buy</span>
+      <span><i style="border-radius:50%;background:var(--sell)"></i>BN sell</span>
+      <span><i style="background:var(--buy)"></i>HL buy</span>
+      <span><i style="background:var(--sell)"></i>HL sell</span>
+      <span>✕ liquidation</span>
+      <span><i style="height:2px;background:var(--bn)"></i>BN mid</span>
+      <span><i style="height:2px;background:var(--hl)"></i>HL mid</span>
+    </div>
+    <div class="note">Every trade is a dot: x = exchange time, y = price, area ∝ $ notional. The mid lines show where each book sits, so the gap between them is the HL − BN basis.</div>
+  </section>
+
+  <section data-tab="charts">
+    <h2>CVD — cumulative buy − sell $ <span class="ctl"><button id="cvdReset">rebase</button></span></h2>
+    <canvas id="cvCvd" class="chart"></canvas>
+    <div class="legend"><span><i style="height:2px;background:var(--bn)"></i>BN (left axis)</span><span><i style="height:2px;background:var(--hl)"></i>HL (right axis)</span></div>
+    <div class="note">Rebased to zero at the left edge of the window. Each venue has its own scale since Binance volume is far larger.</div>
+  </section>
+
+  <section data-tab="charts">
+    <h2>Aggressor flow</h2>
+    <div class="flow" id="flow"></div>
+    <div class="note">Taker buy vs sell $ volume. Imbalance = (buy − sell) / (buy + sell).</div>
+  </section>
+
+  <section data-tab="micro" class="full">
+    <h2>Liquidity heatmap <span class="ctl">
+      <select id="hmVenue"><option value="bn">Binance book</option><option value="hl">HL book (20 lvls)</option></select>
+      <select id="hmRange"><option value="0.0002">±0.02%</option><option value="0.0005" selected>±0.05%</option><option value="0.001">±0.10%</option><option value="0.0018">±0.18%</option></select>
+      window <select id="mwin"><option value="60000">1m</option><option value="180000" selected>3m</option><option value="300000">5m</option></select></span></h2>
+    <canvas id="cvHeat" class="chart"></canvas>
+    <div class="legend"><span>color = resting size at that price (log scale)</span><span>white line = mid</span><span>dots = trades</span><span>▲▼ = sweeps</span><span>grey = not sampled</span></div>
+    <div class="note">The book is sampled every 250ms. Walls show as bright horizontal bands; a band that ends without trades through it was pulled, one that ends with trades through it was eaten.</div>
+  </section>
+
+  <section data-tab="micro">
+    <h2>Book imbalance <span class="ctl">top <select id="imbN"><option>5</option><option selected>10</option><option>20</option></select> levels</span></h2>
+    <canvas id="cvImb" class="chart mchart"></canvas>
+    <div class="legend"><span><i style="height:2px;background:var(--bn)"></i>BN</span><span><i style="height:2px;background:var(--hl)"></i>HL</span></div>
+    <div class="note">(bid size − ask size) / (bid + ask) over the top N levels. +1 = all bids, −1 = all asks.</div>
+  </section>
+
+  <section data-tab="micro">
+    <h2>Microprice − mid</h2>
+    <canvas id="cvMicro" class="chart mchart"></canvas>
+    <h2 style="margin-top:10px">Spread</h2>
+    <canvas id="cvSpread" class="chart mchart"></canvas>
+    <div class="legend"><span><i style="height:2px;background:var(--bn)"></i>BN</span><span><i style="height:2px;background:var(--hl)"></i>HL</span></div>
+    <div class="note">Microprice = (bid·ask size + ask·bid size) / (bid size + ask size): the mid tilted toward the thinner side, where price is more likely to move next.</div>
+  </section>
+
+  <section data-tab="micro">
+    <h2>Basis HL − BN</h2>
+    <canvas id="cvBasis" class="chart mchart"></canvas>
+    <div class="metrics" id="basisStats" style="margin-top:6px"></div>
+    <div class="note">Difference between the two venues' mid prices.</div>
+  </section>
+
+  <section data-tab="micro">
+    <h2>Trade intensity</h2>
+    <canvas id="cvInt" class="chart mchart"></canvas>
+    <div class="legend"><span><i style="height:2px;background:var(--bn)"></i>BN trades/s</span><span><i style="height:2px;background:var(--hl)"></i>HL trades/s</span></div>
+    <h2 style="margin-top:10px">Trade size distribution</h2>
+    <canvas id="cvHist" class="chart"></canvas>
+    <div class="note">Bars = share of each venue's trade count in the window. Label above = share of that venue's $ volume.</div>
+  </section>
+
+  <section data-tab="micro">
+    <h2>HL order anatomy</h2>
+    <div class="metrics" id="anatSum" style="margin-bottom:8px"></div>
+    <table id="anat"></table>
+    <div class="note">avg = size ÷ number of orders at the level. A level with few orders and a large avg is one big participant; many orders and a small avg is a crowd.</div>
+  </section>
+
+  <section data-tab="micro" class="full">
+    <h2>Sweeps <span class="ctl">min $ <input id="swMin" type="number" value="0" style="width:90px"></span></h2>
+    <div class="metrics" id="swSum" style="margin-bottom:8px"></div>
+    <div class="tape"><table class="sw" id="swTable"></table></div>
+    <div class="note">A sweep is one aggressive order filling at 2+ price levels. HL is exact (fills share a hash). BN is a heuristic: consecutive fills with the same millisecond and side.</div>
+  </section>
+
+  <section data-tab="viz" class="full">
+    <h2>Visualizations <span class="ctl">window <select id="vwin"><option value="60000">1m</option><option value="180000" selected>3m</option><option value="300000">5m</option></select></span></h2>
+    <div class="note" style="margin-top:0">Editorial-style views of the same live data. Nothing here changes the other tabs.</div>
+  </section>
+
+  <section data-tab="viz" class="full">
+    <h2>Who is pushing — flow streamgraph</h2>
+    <canvas id="cvStream" class="chart"></canvas>
+    <div class="legend"><span><i style="background:#2fbf71"></i>BN buy</span><span><i style="background:#8fe3b4"></i>HL buy</span><span><i style="background:#e5534b"></i>BN sell</span><span><i style="background:#f4a39d"></i>HL sell</span></div>
+    <div class="note">Taker $ volume in small time bins. Buyers flow above the centre line, sellers below; the thicker side is in control.</div>
+  </section>
+
+  <section data-tab="viz">
+    <h2>Every trade, by size — beeswarm</h2>
+    <canvas id="cvSwarm" class="chart"></canvas>
+    <div class="note">One dot per trade (latest 300 per row), placed by $ size on a log scale. The line spans smallest to largest; the largest is labelled.</div>
+  </section>
+
+  <section data-tab="viz">
+    <h2>Where the fight happened — delta by price <span class="ctl"><select id="profVenue"><option value="bn">Binance</option><option value="hl">Hyperliquid</option></select></span></h2>
+    <canvas id="cvProf" class="chart"></canvas>
+    <div class="note">Net taker $ (buy − sell) at each price band in the window. Right column = buyers' share of the volume traded there. Dashed line = current mid.</div>
+  </section>
+
+  <section data-tab="viz">
+    <h2>Is the basis unusual? — anomaly vs its normal</h2>
+    <canvas id="cvAnom" class="chart"></canvas>
+    <div class="note">HL − BN basis against its trailing 60s mean (white) and ±2σ band (dashed). Red = above normal, blue = below, darker beyond 2σ.</div>
+  </section>
+
+  <section data-tab="viz">
+    <h2>The shifting bell curve — 1s returns</h2>
+    <div class="headline" id="bellHead"></div>
+    <canvas id="cvBell" class="chart"></canvas>
+    <div class="vleg" id="bellLeg"></div>
+    <div class="note">Binance mid returns per second, in units of this session's σ. Dashed = whole session; coloured = last 60 seconds.</div>
+  </section>
+
+  <section data-tab="viz">
+    <h2>The last minute on a clock — radial volume</h2>
+    <canvas id="cvRad" class="chart"></canvas>
+    <div class="note">Each spoke is one second of the clock minute; length = $ volume (√ scale), green buy / red sell stacked outward. Outer ring Binance, inner ring Hyperliquid. Older seconds fade.</div>
+  </section>
+
+  <section data-tab="viz">
+    <h2>Where the money went — treemap</h2>
+    <canvas id="cvTree" class="chart"></canvas>
+    <div class="note">Area = $ volume in the window, grouped by venue, then side and trade size. Darker = larger trades.</div>
+  </section>
+
+  <section data-tab="viz">
+    <h2>What built the delta — waterfall</h2>
+    <canvas id="cvWater" class="chart"></canvas>
+    <div class="note">Net buy − sell $ in the window, decomposed by venue and trade size. Shows whether small or large traders drove the move.</div>
+  </section>
+
+  <section data-tab="viz" class="full">
+    <h2>How far from mid trades land — fan</h2>
+    <canvas id="cvFan" class="chart"></canvas>
+    <div class="note">Last 30s. Each curve runs from the mid to the price a trade printed at, in bps of its own venue's mid; thickness and opacity grow with size. Right: $-weighted distribution.</div>
+  </section>
+
+  <section data-tab="reader" class="full">
+    <h2>Market reader <span class="ctl"><span id="rdStatus" class="stat">calibrating...</span>
+      <label>sensitivity <select id="rdSens"><option value="0.75">low</option><option value="1" selected>medium</option><option value="1.25">high</option></select></label></span></h2>
+    <div id="rdStrip" class="rd-strip"></div>
+    <div class="note">Read-only. Windows use normal-market activity: they shrink when the market is fast and stretch when it is slow. Detectors arm after about two minutes. Evidence describes order-flow behaviour; it is not advice.</div>
+  </section>
+
+  <section data-tab="reader" class="full">
+    <h2>Episodes now <span class="ctl"><span id="epChips"></span></span></h2>
+    <div id="epActive" class="eplist"></div>
+    <div class="note">An episode is one phenomenon with a lifecycle: forming, active, fading, ended, and it can resume. "Began" is back-dated to when the evidence started building; "detected" is when it held long enough to count. Tap a card to see its evidence checklist. Evidence describes order-flow behaviour; it is not advice.</div>
+  </section>
+
+  <section data-tab="reader" class="full">
+    <h2>Timeline <span class="ctl"><label>window <select id="tlWin"><option value="300000">5 min</option><option value="900000" selected>15 min</option><option value="1800000">30 min</option><option value="0">all</option></select></label></span></h2>
+    <canvas id="tlCv" class="chart" style="height:260px"></canvas>
+    <div class="legend" id="tlLegend"></div>
+    <div id="tlDetail"></div>
+  </section>
+
+  <section data-tab="reader" class="full">
+    <h2>Finished episodes</h2>
+    <div id="epDone" class="eplist"></div>
+  </section>
+
+  <section data-tab="reader" class="full">
+    <h2>Drift review</h2>
+    <div id="rvSummary" class="note" style="margin-top:0"></div>
+    <div id="rvNeeds"></div>
+    <div class="rt-h">Threshold proposals</div>
+    <div id="pxList"></div>
+    <div class="row" style="margin-top:8px"><button id="pxPick">Check against recordings</button><input id="pxFiles" type="file" multiple accept=".json,.gz,application/json,application/gzip" hidden><span id="pxStat" class="stat"></span></div>
+    <details><summary class="stat">All variables</summary><div id="rvAll"></div></details>
+    <details><summary class="stat">Settings: how sure it must be</summary><div id="rvSet" class="rd-det"></div></details>
+    <details><summary class="stat">History</summary><div id="rvHist"></div></details>
+    <div class="row" style="margin-top:8px"><button id="rvReport">Export review report</button></div>
+  </section>
+
+  <section data-tab="reader" class="full">
+    <h2>What the Reader assumes</h2>
+    <div class="note" style="margin-top:0">Measured from the live feed and kept on this device. For now it only watches: nothing here changes what the Reader detects.</div>
+    <div id="rgList" class="rd-det"></div>
+    <div class="row" style="margin-top:8px"><button id="rgExport">Export register</button><button id="rgImportBtn">Import register</button><input id="rgImport" type="file" accept=".json,application/json" hidden></div>
+    <div id="rgMsg" class="note"></div>
+  </section>
+
+  <section data-tab="reader" class="full">
+    <h2>Session, replay and labels</h2>
+    <div class="row"><button id="rtRec">Record</button><span id="rtStat" class="stat">not recording</span></div>
+    <div class="row" style="margin-top:8px">
+      <button id="rtSave" disabled>Save session</button><button id="rtLoadBtn">Load session</button><input id="rtLoad" type="file" accept=".json,.gz,application/json,application/gzip" hidden>
+      <button id="rtReplay" disabled>Replay with current settings</button><button id="rtLive" disabled>Back to live</button>
+    </div>
+    <div id="rtMsg" class="note"></div>
+    <div class="rt-h">Episode thresholds (used live and in replays)</div>
+    <div id="rtTune" class="rd-det"></div>
+    <div class="rt-h">Your labels</div>
+    <div class="row">
+      <span class="stat">Saw something it missed?</span>
+      <select id="rtMissFam"><option value="absorption">absorption</option><option value="exhaustion">exhaustion</option><option value="burst">aggression burst</option><option value="wall">wall</option></select>
+      <select id="rtMissSide"><option value="">either side</option><option value="buy">buyers aggressive</option><option value="sell">sellers aggressive</option></select>
+      <button id="rtMiss">Mark last 30 s</button><button id="rtExport">Export labels</button><button id="rtClear">Clear labels</button>
+    </div>
+    <div id="rtScore" class="note"></div>
+    <div class="note">Record a session while connected, save it, then replay it with different thresholds to compare. Tap Agree or Disagree on an episode (open its card) to label it. Labels are matched by time, so they still apply when thresholds change. Everything stays on this device.</div>
+  </section>
+
+  <section data-tab="reader" class="full">
+    <h2>Raw events (one-off detectors) <span class="ctl"><span id="rdChips"></span> min strength <input id="rdMin" type="range" min="0" max="1" step="0.05" value="0" style="width:90px"></span></h2>
+    <div class="tape" style="height:420px"><table id="rdFeed" class="rd-feed"></table></div>
+  </section>
+
+  <section data-tab="reader">
+    <h2>Detectors</h2>
+    <div class="note" style="margin:0 0 6px">Episode families</div>
+    <div id="epFamilies" class="rd-det" style="margin-bottom:10px"></div>
+    <div class="note" style="margin:0 0 6px">Raw event detectors</div>
+    <div id="rdDetectors" class="rd-det"></div>
+  </section>
+
+  <section data-tab="reader">
+    <h2>Engine health</h2>
+    <div class="metrics" id="rdHealth"></div>
+  </section>
+
+  <section data-tab="trading" class="full tcontainer">
+    <h2>Trading <span class="ctl"><select id="addMod"><option value="">+ add module…</option></select></span></h2>
+    <div id="tEmpty" class="note" style="margin:0 0 10px">This tab starts empty. Add trading modules, or any panel from the other tabs. A panel you add moves here and goes back to its tab when you remove it (✕).</div>
+    <div id="tgrid"></div>
+  </section>
+
+  <section data-tab="accounts" class="full">
+    <h2>Accounts</h2>
+    <div class="headline" id="accActive">No account connected.</div>
+    <div class="acc-grid">
+      <div class="acc-card">
+        <h3>Simulated paper</h3>
+        <p>Paper trading inside this page, filled against live Binance prices (market at bid/ask, limits when the tape trades through). No keys, nothing sent anywhere.</p>
+        <label class="row">Start balance (USDT) <input id="simStart" type="number" value="10000" style="width:110px"></label>
+        <button id="simGo" class="primary">Start simulated account</button>
+        <div class="acc-msg" id="simMsg"></div>
+      </div>
+      <div class="acc-card">
+        <h3>Binance demo</h3>
+        <p>Binance's own paper-trading futures account (demo-fapi.binance.com). Use keys created in Binance Demo Trading.</p>
+        <input id="demoKey" type="text" placeholder="API key" autocomplete="off" spellcheck="false">
+        <input id="demoSecret" type="password" placeholder="Secret key" autocomplete="new-password">
+        <button id="demoGo" class="primary">Connect demo</button>
+        <div class="acc-msg" id="demoMsg"></div>
+      </div>
+      <div class="acc-card live">
+        <h3>Binance live — real money</h3>
+        <p>Orders are real and can lose money. Every order asks for confirmation and is capped at the max order value below.</p>
+        <input id="liveKey" type="text" placeholder="API key" autocomplete="off" spellcheck="false">
+        <input id="liveSecret" type="password" placeholder="Secret key" autocomplete="new-password">
+        <label class="row">Max order value (USD) <input id="liveMax" type="number" value="500" style="width:100px"></label>
+        <label class="row" style="align-items:flex-start"><input id="liveAck" type="checkbox" style="width:auto;margin-top:3px"> I understand orders placed here are real and I am responsible for them.</label>
+        <button id="liveGo" style="border-color:var(--sell);color:var(--sell);font-weight:600">Connect live</button>
+        <div class="acc-msg" id="liveMsg"></div>
+      </div>
+    </div>
+    <div class="row" style="margin-top:10px"><button id="logout">Log out</button></div>
+    <div class="note">Keys stay only in this page's memory: never saved, only ever sent to Binance, and gone when you refresh or log out. Use keys with USD-M futures trading enabled and <b>withdrawals disabled</b>. Orders are one-way mode (not hedge mode), on the asset selected in the header (e.g. BTC → BTCUSDT). If Binance or the browser refuses signed requests from a local file, the error is shown here.</div>
+  </section>
+
+  <section data-tab="market">
+    <h2>Market state</h2>
+    <div class="metrics" id="metrics"></div>
+  </section>
+
+  <section data-tab="market">
+    <h2>Books</h2>
+    <div class="books">
+      <div><div class="row" style="margin-bottom:4px"><span class="venue v-hl">HL</span><span class="stat" id="hlBookAge"></span></div><table id="hlBook"></table></div>
+      <div><div class="row" style="margin-bottom:4px"><span class="venue v-bn">BN</span><span class="stat" id="bnBookAge"></span></div><table id="bnBook"></table></div>
+    </div>
+    <div class="note">HL: full snapshot each message, n = resting orders at the level. BN: rebuilt from @depth@100ms diffs on a REST snapshot, with pu/u sequence checks.</div>
+  </section>
+
+  <section data-tab="tape">
+    <h2>Tape <span class="ctl">min $ <input id="minNtl" type="number" value="0" style="width:90px"></span></h2>
+    <div class="tape"><table id="tape"><thead><tr><th style="text-align:left">time</th><th>venue</th><th>side</th><th>price</th><th>size</th><th>$</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section data-tab="streams" class="full">
+    <h2>Streams <span class="ctl">tap to inspect · toggle to (un)subscribe</span></h2>
+    <div class="cards" id="cards"></div>
+  </section>
+
+  <section data-tab="health" class="full">
+    <h2>Feed health</h2>
+    <div class="hk" id="healthKeys"></div>
+    <div style="overflow-x:auto"><table class="health" id="health"></table></div>
+    <div class="note">Latency = (receive time + clock offset) − exchange event time. The offset is measured against Binance's server clock (NTP-style, lowest round-trip of 5 samples, refreshed every minute), so these numbers are not skewed by your device clock. Late = corrected latency above 1s. A stream is flagged silent when it exceeds its normal gap.</div>
+  </section>
+
+  <section data-tab="raw">
+    <h2>Raw messages <span class="ctl"><select id="logFilter"><option value="">all streams</option></select><button id="clearLog">clear</button></span></h2>
+    <div class="log" id="log"></div>
+  </section>
+
+  <section data-tab="raw">
+    <h2>Inspector <span class="ctl" id="inspName" style="font-family:var(--mono)"></span></h2>
+    <pre class="inspect" id="inspect">Tap a stream (Streams tab) to see its latest payload.</pre>
+  </section>
+</main>
+
+<script id="reader-drift">
+<!--@include js/reader-drift.js-->
+</script>
+<script id="reader-proposals">
+<!--@include js/reader-proposals.js-->
+</script>
+<script id="reader-register">
+<!--@include js/reader-register.js-->
+</script>
+<script id="reader-episodes">
+<!--@include js/reader-episodes.js-->
+</script>
+<script id="reader-engine">
+<!--@include js/reader-engine.js-->
+</script>
+<script id="reader-selftest">
+<!--@include js/reader-selftest.js-->
+</script>
+<script>
+<!--@include js/overview.js-->
+</script>
+<script>
+<!--@include js/app.js-->
+</script>
+<script>
+<!--@include js/reader-tools.js-->
+</script>
+</body>
+</html>
