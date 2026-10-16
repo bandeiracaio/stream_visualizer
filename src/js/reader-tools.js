@@ -105,6 +105,7 @@ rt$("rtLive").onclick = () => { rdView.engine = null; rtMsg(""); rtFresh(); };
 // ---------- labels ----------
 const rtSave = () => { RT.labels = RT.labels.slice(-2000); store.set("labels", RT.labels); };
 function rtMatch(lb, ep){
+  if (ep.members) return ep.members.some(m => rtMatch(lb, m));    // an episode group: a label matches if it matches any member
   return lb.family===ep.family && (lb.venue==="any" || lb.venue===ep.venue) && (!lb.side || !rtSide(ep) || lb.side===rtSide(ep)) && lb.t0 <= (ep.tEnd || ep.tUpdate || Infinity) && lb.t1 >= ep.tStart;
 }
 function rdLabelFor(ep){ for (let i = RT.labels.length-1; i >= 0; i--){ const l = RT.labels[i]; if (l.verdict !== "missed" && rtMatch(l, ep)) return l; } return null; }
@@ -115,12 +116,12 @@ function epLabelBar(ep){
 }
 function rtToggleLabel(ep, verdict){
   const cur = rdLabelFor(ep); if (cur) RT.labels = RT.labels.filter(l => l !== cur);
-  if (!cur || cur.verdict !== verdict) RT.labels.push({id:Date.now()+"."+Math.floor(Math.random()*1e6), verdict, family:ep.family, venue:ep.venue, side:rtSide(ep), horizon:ep.horizon, t0:ep.tStart, t1:ep.tEnd || ep.tUpdate, at:Date.now(), src:rdView.engine ? "replay" : "live"});
+  if (!cur || cur.verdict !== verdict) RT.labels.push({id:Date.now()+"."+Math.floor(Math.random()*1e6), verdict, family:ep.family, venue:ep.venues && ep.venues.length>1 ? "any" : ep.venue, side:rtSide(ep), horizon:ep.horizons && ep.horizons.length>1 ? undefined : ep.horizon, group:ep.primary, t0:ep.tStart, t1:ep.tEnd || ep.tUpdate, at:Date.now(), src:rdView.engine ? "replay" : "live"});
   rtSave();
 }
 document.addEventListener("click", e => {                        // capture phase: a label tap must not also fold/unfold the card
   const b = e.target.closest("button[data-label]"); if (!b) return; e.stopPropagation();
-  const card = b.closest(".ep"), ep = card && RD().episodes.find(x => String(x.id) === card.dataset.id);
+  const card = b.closest(".ep"), ep = card && RD().episodeGroups().find(x => String(x.id) === card.dataset.id);
   if (ep){ rtToggleLabel(ep, b.dataset.label); epLast.epActive = epLast.epDone = RT.last.detail = null; renderReader(); }
 }, true);
 rt$("rtMiss").onclick = () => {
@@ -149,7 +150,7 @@ function rtScore(){
 // ---------- timeline ----------
 function rtTimeline(s){
   const cv = rt$("tlCv"), eng = RD(), now = s.now; if (!now) return;
-  const win = +rt$("tlWin").value, ph = eng.priceHistory("bn").length ? eng.priceHistory("bn") : eng.priceHistory("hl"), eps = eng.episodes;
+  const win = +rt$("tlWin").value, ph = eng.priceHistory("bn").length ? eng.priceHistory("bn") : eng.priceHistory("hl"), eps = eng.episodeGroups();
   let t0 = win > 0 ? now-win : Math.min(ph.length ? ph[0][0] : now, eps.length ? eps[0].tStart : now); if (!(now-t0 > 1000)) t0 = now-60000;
   const vis = eps.filter(e => (e.tEnd || now) >= t0 && e.tStart <= now), rowOf = new Map();
   const fams = ["absorption","exhaustion","burst","wall"], rowH = 9, gap = 2, laneGap = 9, PH = 120, T = 8, B = 24, L = 54, R = 8;

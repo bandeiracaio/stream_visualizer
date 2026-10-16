@@ -75,6 +75,48 @@ const READER_SELFTEST=(()=>{
     const e=E.create();sim(e,{seconds:60,seed:5});const h=e.priceHistory("bn");
     return epResult(h.length>=55&&h.length<=61&&h.every((x,i)=>i===0||x[0]-h[i-1][0]===1000),e,"about 60 one-second price points");
   });
+  // ---- episode groups and end resolutions (derived after the fact; the per-track episodes above are untouched) ----
+  const grp=(e,family,pred)=>e.episodeGroups().filter(g=>g.family===family&&(!pred||pred(g)));
+  const grpSig=e=>e.episodeGroups().map(g=>[g.id,g.members.map(m=>m.id).join("+"),g.stage,g.tStart,g.tEnd,g.resolution,g.resolutionSigma==null?"":g.resolutionSigma.toFixed(6)].join("|")).join(";");
+  const grpResult=(ok,e,want)=>({ok,detail:ok?"ok":`wanted ${want}; got groups [${e.episodeGroups().map(g=>`${g.id}:${g.family}:${g.aggressor}:${g.venues}:${g.horizons}:${g.members.length}:${g.stage}:${g.resolution}`).join(", ")}] from [${Array.from(e.episodes,x=>`${x.id}:${x.family}/${x.venue}/${x.horizon}`).join(", ")}]`});
+  add("group: one burst seen on the fast and mid horizons is one group of two; the episodes underneath stay separate",E=>{
+    const e=E.create(),a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:21,params:()=>burstSell});sim(e,{t0:b.t,mid0:b.mid,seconds:40,seed:22});
+    const g=grp(e,"burst",p=>p.aggressor==="sell"),x=g[0];
+    return grpResult(g.length===1&&x.members.length===2&&x.horizons.join()==="fast,mid"&&x.venues.join()==="bn"&&eps(e,"burst",p=>p.aggressor==="sell").length===2&&x.id==="g"+x.primary&&x.tStart===Math.min(...x.members.map(m=>m.tStart)),e,"one sell-burst group with two members (fast, mid) and two separate episodes");
+  });
+  add("group: the same phenomenon on both venues joins; opposite sides and far-apart repeats do not",E=>{
+    const e=E.create(),a=sim(e,{seconds:150,seed:3}),a2=sim(e,{t0:a.t,mid0:a.mid,venue:"hl",seconds:150,seed:3});
+    const b=sim(e,{t0:a2.t,mid0:a2.mid,seconds:20,seed:41,params:()=>heavySell}),c=sim(e,{t0:b.t,mid0:b.mid,venue:"hl",seconds:20,seed:42,params:()=>heavySell});
+    const d=sim(e,{t0:c.t,mid0:c.mid,seconds:60,seed:44}),f=sim(e,{t0:d.t,mid0:d.mid,seconds:20,seed:45,params:()=>({rate:120,buyP:.92,vol:.02})}),h=sim(e,{t0:f.t,mid0:f.mid,seconds:40,seed:46});
+    const g=grp(e,"absorption"),sell=g.filter(p=>p.aggressor==="sell"),buy=g.filter(p=>p.aggressor==="buy");
+    return grpResult(sell.length>=1&&sell.some(p=>p.venues.length===2)&&sell.every(p=>p.members.every(m=>m.aggressor==="sell"))&&buy.every(p=>p.members.every(m=>m.aggressor==="buy"))&&g.length<eps(e,"absorption").length&&h.t>0,e,"a sell absorption group over bn and hl, never mixing buyers and sellers");
+  });
+  add("group: bursts a minute apart are separate groups",E=>{
+    const e=E.create(),a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:21,params:()=>burstSell}),c=sim(e,{t0:b.t,mid0:b.mid,seconds:70,seed:22}),d=sim(e,{t0:c.t,mid0:c.mid,seconds:12,seed:23,params:()=>burstSell});sim(e,{t0:d.t,mid0:d.mid,seconds:40,seed:24});
+    const g=grp(e,"burst",p=>p.aggressor==="sell");
+    return grpResult(g.length===2&&g[0].tEnd<g[1].tStart-10000,e,"two sell-burst groups, the first ended more than 10 s before the second began");
+  });
+  add("group: a wall is a group of one",E=>{
+    const e=E.create(),a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:75,seed:11,params:()=>({vol:0,bidWalls:[{idx:12,size:6}]})});sim(e,{t0:b.t,mid0:b.mid,seconds:4,seed:12,params:()=>({vol:0})});
+    const g=grp(e,"wall");
+    return grpResult(g.length===1&&g[0].members.length===1&&g[0].wall&&g[0].resolution===null,e,"exactly one wall group with one member and no price resolution");
+  });
+  add("resolution: price keeps going with the aggressor, goes back against it, or stays put after an episode fades",E=>{
+    const run=drift=>{const e=E.create(),a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:21,params:()=>burstSell});sim(e,{t0:b.t,mid0:b.mid,seconds:60,seed:22,params:()=>({driftBps:drift})});return e;};
+    const pick=e=>eps(e,"burst",p=>p.horizon==="fast"&&p.aggressor==="sell")[0],w=pick(run(-1.5)),n=pick(run(1.5)),f=pick(run(0));
+    return epResult(!!w&&!!n&&!!f&&w.outcome==="faded"&&w.resolution==="resolved-with"&&n.resolution==="resolved-against"&&f.resolution==="flat"&&w.resolutionSigma>0&&n.resolutionSigma<0,run(0),`with/against/flat after the burst; got ${[w,n,f].map(x=>x&&x.resolution+":"+(x.resolutionSigma==null?"":x.resolutionSigma.toFixed(2)))}`);
+  });
+  add("resolution: it waits for the look-ahead, is skipped when the data has a gap,",E=>{
+    const e=E.create(),a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:21,params:()=>burstSell}),c=sim(e,{t0:b.t,mid0:b.mid,seconds:14,seed:22}),x=eps(e,"burst",p=>p.horizon==="fast"&&p.aggressor==="sell")[0];
+    const early=x&&x.stage==="ended"&&x.resolution==null&&c.t<x.tEnd+30000;
+    const g=E.create(),ga=calm(g),gb=sim(g,{t0:ga.t,mid0:ga.mid,seconds:12,seed:21,params:()=>burstSell});sim(g,{t0:gb.t,mid0:gb.mid,seconds:8,seed:22});g.advance(gb.t+90000);
+    return epResult(!!early&&g.episodes.length>0&&g.episodes.every(p=>p.resolution==null),e,"no resolution yet 14 s after the end, and none at all across a data gap");
+  });
+  add("groups and resolutions replay identically from recorded inputs",E=>{
+    const e=E.create();e.startRecording();const a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:21,params:()=>burstSell});sim(e,{t0:b.t,mid0:b.mid,seconds:60,seed:22});
+    const r=E.replayEngine(e.stopRecording());
+    return grpResult(e.episodeGroups().length>0&&grpSig(e)===grpSig(r)&&e.episodeGroups().some(g=>g.resolution),e,"the replayed engine to hold identical groups and resolutions");
+  });
   // ---- assumption register (Part 1: measures only) ----
   const R=READER_REGISTER, snapSig=s=>JSON.stringify(s);
   add("register: quantile sketch reads known quantiles from a bounded sample",E=>{

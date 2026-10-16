@@ -16,6 +16,8 @@ const READER_EPISODES = (() => {
     // evidence cut-offs that used to be written inline; now named so they can be measured and proposed for revision
     recentShare:.55, recentPace:.5, crossShare:.6, crossZ:2, burstLiq:2, burstSweeps:3,
     exhDecay:.5, exhWasZ:1.5, exhWasShare:.55, exhGap:1, exhSize:.75,
+    // after-the-fact layers: what price did after an episode faded, and how far apart episodes may be to count as one phenomenon
+    outcomeLookMs:30000, outcomeFlatSigma:.5, groupGapMs:10000,
   };
   const FAMILY_LABEL = {absorption:"Absorption", exhaustion:"Exhaustion", burst:"Aggression burst", wall:"Wall"};
   const clamp = (x,lo,hi) => Math.min(hi, Math.max(lo,x));
@@ -31,7 +33,7 @@ const READER_EPISODES = (() => {
 
   function create(ctx){
     const cfg = ctx.cfg, E = () => cfg.ep;
-    let episodes = [], tracks = new Map(), walls = new Map(), seq = 0, refresh = {bn:{buy:0,sell:0}, hl:{buy:0,sell:0}};
+    let episodes = [], tracks = new Map(), walls = new Map(), pend = [], seq = 0, refresh = {bn:{buy:0,sell:0}, hl:{buy:0,sell:0}};
     const listeners = [];
     const notify = (ep, change) => { for (const fn of listeners) try{ fn(ep, change); }catch(err){} };
 
@@ -175,7 +177,7 @@ const READER_EPISODES = (() => {
     function openEp(tr, ev, t){
       const prev = tr.lastEnded;
       if (prev && t-prev.tEnd <= E().resumeMs){
-        prev.stage = "active"; prev.tEnd = null; prev.outcome = null; prev.pulses++; prev.resumedAt.push(t); prev.fadingSince = null;
+        prev.stage = "active"; prev.tEnd = null; prev.outcome = null; prev.resolution = null; prev.resolutionSigma = null; pend = pend.filter(x => x !== prev); prev.pulses++; prev.resumedAt.push(t); prev.fadingSince = null;
         tr.lastEnded = null; tr.ep = prev; tr.onSince = null; tr.lowSince = null; refreshEp(prev, ev, t); notify(prev, "resumed"); return;
       }
       const ep = {id:++seq, family:tr.fam, kind:tr.fam, venue:tr.vn, horizon:tr.hz, aggressor:tr.side, passive:tr.fam==="absorption" ? opp(tr.side) : null,
@@ -185,7 +187,7 @@ const READER_EPISODES = (() => {
     }
     function endEp(tr, tEnd, outcome){
       const ep = tr.ep; ep.stage = "ended"; ep.tEnd = tEnd; ep.outcome = outcome; ep.fadingSince = null;
-      tr.lastEnded = ep; tr.ep = null; tr.onSince = null; tr.runSince = null; tr.lowSince = null; notify(ep, "ended");
+      tr.lastEnded = ep; tr.ep = null; tr.onSince = null; tr.runSince = null; tr.lowSince = null; if (outcome=="faded") pend.push(ep); notify(ep, "ended");
     }
     function step(fam, vn, hz, side, ev, t){
       const key = fam+"|"+vn+"|"+hz+"|"+side; let tr = tracks.get(key);
@@ -215,6 +217,20 @@ const READER_EPISODES = (() => {
         for (const side of ["buy","sell"]){ const ev = EVAL[fam](vn, hz, side, t); if (ev && ctx.observe) ctx.observe(vn, hz, fam, ev.quants); step(fam, vn, hz, side, ev, t); }
       }
       for (const [k, ep] of walls) if (t-ep.tSeen > c.wallStaleMs) closeWall(k, ep, t, "left", null);
+      resolve(t);
+    }
+    // After the fact: what did price do in the aggressor's direction during the look-ahead after the episode faded? Never feeds back into a detection.
+    function resolve(t){
+      if (!pend.length) return;
+      const c = E(), keep = [];
+      for (const ep of pend){
+        if (t < ep.tEnd+c.outcomeLookMs){ keep.push(ep); continue; }
+        const p0 = ctx.priceAt(ep.venue, ep.tEnd), p1 = ctx.priceAt(ep.venue, ep.tEnd+c.outcomeLookMs);
+        if (!(p0 > 0) || !(p1 > 0)) continue;
+        const mv = (ep.aggressor==="buy"?1:-1) * (p1/p0-1) * 1e4 / (ctx.sigmaBps(ep.venue)*Math.sqrt(c.outcomeLookMs/1000));
+        ep.resolutionSigma = mv; ep.resolution = mv >= c.outcomeFlatSigma ? "resolved-with" : mv <= -c.outcomeFlatSigma ? "resolved-against" : "flat"; notify(ep, "resolved");
+      }
+      pend = keep;
     }
 
     // ---- wall episodes: fed by the engine's wall tracker (a confirmed wall opens one; its resolution ends it) ----
@@ -266,15 +282,42 @@ const READER_EPISODES = (() => {
       }
       return out;
     }
+    // Groups: one phenomenon seen on several venues / horizons. Derived on demand from the per-track episodes, which stay as they are.
+    // Same family and aggressor, a different venue or horizon, and the time spans overlap (within groupGapMs). Walls are a group of one.
+    function groups(){
+      const gap = E().groupGapMs, list = episodes.slice().sort((a,b) => a.tStart-b.tStart || a.id-b.id), par = list.map((_, i) => i);
+      const find = i => { while (par[i] !== i) i = par[i] = par[par[i]]; return i; }, endOf = e => e.tEnd != null ? e.tEnd : e.tUpdate;
+      for (let i = 0; i < list.length; i++){
+        const a = list[i]; if (a.family==="wall") continue;
+        for (let j = i+1; j < list.length; j++){
+          const b = list[j]; if (b.tStart > endOf(a)+gap) break;   // sorted by start: nothing later can overlap a either
+          if (b.family!==a.family || b.aggressor!==a.aggressor || (b.venue===a.venue && b.horizon===a.horizon)) continue;
+          if (b.tStart <= endOf(a)+gap && a.tStart <= endOf(b)+gap) par[find(j)] = find(i);
+        }
+      }
+      const by = new Map(); list.forEach((e, i) => { const r = find(i); if (!by.has(r)) by.set(r, []); by.get(r).push(e); });
+      const out = [], rank = {active:2, fading:1, ended:0};
+      for (const m of by.values()){
+        const prim = m.reduce((x, y) => (y.tDetected < x.tDetected || (y.tDetected===x.tDetected && y.id < x.id)) ? y : x), lead = m.reduce((x, y) => y.peak > x.peak ? y : x);
+        const stage = m.reduce((x, y) => rank[y.stage] > rank[x] ? y.stage : x, "ended"), ended = stage==="ended";
+        out.push({id:"g"+prim.id, primary:prim.id, members:m, family:lead.family, kind:lead.kind, aggressor:lead.aggressor, passive:lead.passive, venue:lead.venue, horizon:lead.horizon,
+          venues:Array.from(new Set(m.map(e => e.venue))).sort(), horizons:Array.from(new Set(m.map(e => e.horizon))),
+          stage, pulses:Math.max(...m.map(e => e.pulses)), tStart:Math.min(...m.map(e => e.tStart)), tDetected:Math.min(...m.map(e => e.tDetected)), tEnd:ended ? Math.max(...m.map(e => e.tEnd)) : null,
+          tUpdate:Math.max(...m.map(e => e.tUpdate)), peak:Math.max(...m.map(e => e.peak)), intensity:Math.max(...m.map(e => e.intensity)), resumedAt:[].concat(...m.map(e => e.resumedAt || [])).sort((a,b) => a-b),
+          reading:lead.reading, peakReading:lead.peakReading, evidence:lead.evidence, peakEvidence:lead.peakEvidence, facts:lead.facts, wall:lead.wall, px:lead.px,
+          outcome:ended ? lead.outcome : null, resolution:lead.resolution || null, resolutionSigma:lead.resolutionSigma == null ? null : lead.resolutionSigma});
+      }
+      return out.sort((a,b) => a.tStart-b.tStart || a.primary-b.primary);
+    }
     function closeAll(t, reason){
       for (const tr of tracks.values()) if (tr.ep) endEp(tr, t, reason);
       for (const [k, ep] of Array.from(walls)) closeWall(k, ep, t, reason, null);
-      tracks.clear();
+      tracks.clear(); pend = [];
     }
     function setFamily(name, on){ if (!Object.prototype.hasOwnProperty.call(E().families, name)) return; E().families[name] = !!on; if (!on) for (const tr of tracks.values()) if (tr.fam===name && tr.ep) endEp(tr, tr.ep.tUpdate, "disabled"); }
     return {
-      reset(){ episodes = []; tracks = new Map(); walls = new Map(); seq = 0; refresh = {bn:{buy:0,sell:0}, hl:{buy:0,sell:0}}; },
-      tick, closeAll, setFamily, forming, wallUpdate, wallClose,
+      reset(){ episodes = []; tracks = new Map(); walls = new Map(); pend = []; seq = 0; refresh = {bn:{buy:0,sell:0}, hl:{buy:0,sell:0}}; },
+      tick, closeAll, setFamily, forming, groups, wallUpdate, wallClose,
       noteRefresh(vn, side, t){ refresh[vn][side] = t; },
       list: () => episodes, active: () => episodes.filter(e => e.stage !== "ended"),
       subscribe(fn){ listeners.push(fn); return () => { const i = listeners.indexOf(fn); if (i >= 0) listeners.splice(i, 1); }; },
