@@ -340,6 +340,10 @@ const READER_SELFTEST=(()=>{
     const e=E.create(),a=jumpSim(e,{seconds:900}),sg=e.debug().sigmaBps("bn"),true1=Math.sqrt(.08*4)*1.2,ex=e.register.expectations().filter(x=>x.key==="bn|prog.fast")[0],zs=zeroShare(e);
     return{ok:zs>.5&&sg>.5*true1&&sg<1.5*true1&&ex.ready&&ex.ok,detail:JSON.stringify({zeroShare:+zs.toFixed(2),sigma:+sg.toFixed(3),true1:+true1.toFixed(3),ex:{ready:ex.ready,ok:ex.ok,medAbs:ex.medAbs,tail:ex.tail}})};
   });
+  add("sigma: a market with about 30% zero returns (quiet Hyperliquid) is not underestimated",E=>{
+    const e=E.create(),o={seconds:900,pJump:.26,jumpBps:1},x=jumpSim(e,o),sg=e.debug().sigmaBps("bn"),true1=Math.sqrt(.26*4)*1,zs=zeroShare(e);
+    return{ok:zs>.15&&zs<.6&&sg>.75*true1&&sg<1.25*true1,detail:JSON.stringify({zeroShare:+zs.toFixed(2),sigma:+sg.toFixed(3),true1:+true1.toFixed(3)})};
+  });
   add("sigma: until there is enough history it stays at the floor instead of guessing",E=>{
     const e=E.create();jumpSim(e,{seconds:40});return{ok:e.debug().sigmaBps("bn")===.05,detail:String(e.debug().sigmaBps("bn"))};
   });

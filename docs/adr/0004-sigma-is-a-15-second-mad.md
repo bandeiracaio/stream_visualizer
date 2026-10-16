@@ -4,7 +4,7 @@ Status: accepted
 
 "Sigma" is the scale of normal price movement, in bps per root second. Windows are measured in multiples of it (price progress,
 distance to an extreme). It used to be the MAD of 1-second returns, which is zero whenever more than half of them are, so it sat on
-its floor. It is now the MAD of overlapping returns over `sigmaLagMs` (15 s) divided by sqrt(lag), floored at 0.05 bps, and it
+its floor. It is now the robust spread of overlapping returns over `sigmaLagMs` (15 s) divided by sqrt(lag) (v014: the 75th percentile of absolute deviation from the median divided by 1.1503, because in quiet Hyperliquid 25-50% of 15 s returns are exactly zero and the MAD, the 50th percentile, underestimated: 0.90 vs std 1.44 over a 28-minute chunk), floored at 0.05 bps, and it
 stays at the floor until 60 samples exist. 15 seconds is long enough that returns are rarely zero, and the estimate stays robust
 to spikes (a standard deviation would not).
 
