@@ -17,6 +17,7 @@ const READER_EPISODES = (() => {
     recentShare:.55, recentPace:.5, crossShare:.6, crossZ:2, burstLiq:2, burstSweeps:3,
     exhDecay:.5, exhWasZ:1.5, exhWasShare:.55, exhGap:1, exhSize:.75,
     // after-the-fact layers: what price did after an episode faded, and how far apart episodes may be to count as one phenomenon
+    absConc:.2, exhCount:.5, wallReposts:2, wallDip:.7, wallBack:.9,
     outcomeLookMs:30000, outcomeFlatSigma:.5, groupGapMs:10000,
   };
   const FAMILY_LABEL = {absorption:"Absorption", exhaustion:"Exhaustion", burst:"Aggression burst", wall:"Wall"};
@@ -78,7 +79,7 @@ const READER_EPISODES = (() => {
       const dSide = side==="sell" ? "bid" : "ask", start = r.length ? r[0][dSide+"Depth"] : 0, refill = start > 0 ? v.depth[dSide]/start : null;
       const w = ctx.walletEvidence(vn, side, t-h.ms), oh = ctx.horizon(other(vn), hz);
       const oShare = oh ? (side==="buy" ? oh.share : 1-oh.share) : null, oProg = oh && oh.open > 0 ? progress(other(vn), oh, side) : null;
-      const rc = recent(vn, h, side, rate);
+      const rc = recent(vn, h, side, rate), conc = h.maxTrade/(h.buy+h.sell);   // the largest single trade's share of the window's flow (either side): low = many small fills
       const items = [
         item("flow", "aggressor share of taker flow", share >= cfg.absorbShare, 2, pct(share), true),
         item("stalled", "price progress with the aggressor", prog <= cfg.absorbSigma, 2, sgn(prog)+"σ", true),
@@ -86,12 +87,13 @@ const READER_EPISODES = (() => {
         item("intensity", "flow intensity vs normal", z >= ctx.th("absorbZ"), 1.5, "z "+z.toFixed(1)),
         item("efficiency", "price path efficiency (low = chop)", eff <= cfg.absorbEfficiency, 1, eff.toFixed(2)),
         refill == null ? na("refill", "passive depth refilled") : item("refill", "passive depth refilled", refill >= cfg.absorbRefill, 1.5, pct(refill)),
+        item("fills", "flow spread over many fills (no one large trade)", conc <= E().absConc, 1, pct(conc)),
         item("level", "repeated fills at one level", t-refresh[vn][side] <= E().refreshMs, 1, t-refresh[vn][side] <= E().refreshMs ? "yes" : "no"),
         vn==="hl" ? item("wallet", "one wallet dominates", !!w, 1, w ? pct(w.share) : "no") : na("wallet", "one wallet dominates"),
         oShare == null || oProg == null ? na("cross", "other venue agrees") : item("cross", "other venue agrees", oShare >= E().crossShare && oProg <= cfg.absorbSigma, 1, pct(oShare)),
       ];
       return {items, ...scoreOf(items), px:h.close, facts:{share, z, prog, eff, refill, dSide, open:h.open, secs, rate$:rate*secs},
-        quants:{share, z, prog, eff, refill, recentShare:rc.share, recentPace:rc.pace}};
+        quants:{share, z, prog, eff, refill, conc, recentShare:rc.share, recentPace:rc.pace}};
     }
 
     // ---- exhaustion: one side's aggression, strong a moment ago, has faded, near an extreme, price stops progressing ----
@@ -109,7 +111,7 @@ const READER_EPISODES = (() => {
       const ratio = was > 0 ? rate/was : 1, prog = progress(vn, h, side), late = lateProgress(vn, h, side), wasShare = prev.buy+prev.sell > 0 ? (side==="buy" ? prev.buy : prev.sell)/(prev.buy+prev.sell) : 0;
       const ext = side==="buy" ? Math.max(h.hi, prev.hi) : Math.min(h.lo, prev.lo), prior = side==="buy" ? ctx.priorHigh(vn, 2*count) : ctx.priorLow(vn, 2*count);
       const gap = Number.isFinite(prior) ? (side==="buy" ? prior-ext : ext-prior)/ext*1e4/sig : 0;
-      const sizeNow = h.n ? (h.buy+h.sell)/h.n : 0, sizeWas = prev.n ? (prev.buy+prev.sell)/prev.n : 0, poke = v.lastPokeFail && v.lastPokeFail.side===(side==="buy" ? "high" : "low") && t-v.lastPokeFail.t <= E().pokeMs;
+      const countRatio = prev.n > 0 ? h.n/prev.n : null, sizeNow = h.n ? (h.buy+h.sell)/h.n : 0, sizeWas = prev.n ? (prev.buy+prev.sell)/prev.n : 0, poke = v.lastPokeFail && v.lastPokeFail.side===(side==="buy" ? "high" : "low") && t-v.lastPokeFail.t <= E().pokeMs;
       const items = [
         item("decay", "aggression vs the window before", ratio <= E().exhDecay, 2.5, pct(ratio), true),
         item("was", "it was elevated before", zWas >= E().exhWasZ, 1.5, "z "+zWas.toFixed(1), true),
@@ -117,10 +119,11 @@ const READER_EPISODES = (() => {
         item("extreme", "near the 5-minute extreme", gap <= E().exhGap, 1.5, gap <= 0 ? "new extreme" : gap.toFixed(1)+"σ away"),
         item("stalled", "price progress with the aggressor (latest seconds)", late <= cfg.absorbSigma, 1.5, sgn(late)+"σ", true),
         item("poke", "recent failed poke", !!poke, 1.5, poke ? "yes" : "no"),
+        countRatio == null ? na("count", "trade count falling") : item("count", "trade count vs the window before", countRatio <= E().exhCount, 1, pct(countRatio)),
         item("size", "average trade size shrinking", sizeWas > 0 && sizeNow <= E().exhSize*sizeWas, 1, sizeWas > 0 ? pct(sizeNow/sizeWas) : "-"),
       ];
       return {items, ...scoreOf(items), px:h.close, facts:{ratio, zWas, gap, prog, poke:!!poke, side, open:h.open, secs},
-        quants:{decay:ratio, zWas, wasShare, gap, late, sizeRatio:sizeWas > 0 ? sizeNow/sizeWas : null}};
+        quants:{decay:ratio, zWas, wasShare, gap, late, sizeRatio:sizeWas > 0 ? sizeNow/sizeWas : null, countRatio}};
     }
 
     // ---- aggression burst: a surge of one side's flow, with price movement and supporting signs ----
@@ -217,6 +220,7 @@ const READER_EPISODES = (() => {
         for (const side of ["buy","sell"]){ const ev = EVAL[fam](vn, hz, side, t); if (ev && ctx.observe) ctx.observe(vn, hz, fam, ev.quants); step(fam, vn, hz, side, ev, t); }
       }
       for (const [k, ep] of walls) if (t-ep.tSeen > c.wallStaleMs) closeWall(k, ep, t, "left", null);
+      if (ctx.observe) for (const ep of walls.values()) ctx.observe(ep.venue, "book", "wall", {reposts:ep.wall.reposts});
       resolve(t);
     }
     // After the fact: what did price do in the aggressor's direction during the look-ahead after the episode faded? Never feeds back into a detection.
@@ -238,7 +242,7 @@ const READER_EPISODES = (() => {
     function wallItems(ep, ratio, distBps){
       const w = ep.wall, th = ctx.th("wallRatio");
       return [item("size", "size vs median level", ratio >= th, 2, ratio.toFixed(1)+"x", true), item("held", "held without being hit", ep.tUpdate-ep.tStart >= cfg.wallConfirmMs, 1.5, Math.round((ep.tUpdate-ep.tStart)/1000)+" s"),
-        item("intact", "still near its peak size", w.size >= w.peak*E().wallFadeFrac, 2, pct(w.size/w.peak)), item("near", "distance from mid", true, 0, distBps.toFixed(1)+" bps")];
+        item("intact", "still near its peak size", w.size >= w.peak*E().wallFadeFrac, 2, pct(w.size/w.peak)), item("repost", "refilled after being hit", w.reposts >= E().wallReposts, 1, String(w.reposts)), item("near", "distance from mid", true, 0, distBps.toFixed(1)+" bps")];
     }
     // A confirmed wall becomes an episode only once it has stood long enough (flickering liquidity is noise), after calibration, and within a per-side cap.
     function wallUpdate(vn, t, w, ratio, mid){
@@ -249,7 +253,7 @@ const READER_EPISODES = (() => {
         if (n >= c.wallMaxActive || ratio < ctx.th("wallRatio")*c.wallMinMult) return;
         ep = wallOpen(vn, t, w, ratio, mid); fresh = true;
       }
-      const x = ep.wall; x.size = w.size; x.peak = w.peak; x.ratio = ratio; ep.tSeen = t; ep.tUpdate = t;
+      const x = ep.wall; x.size = w.size; x.peak = w.peak; x.ratio = ratio; x.reposts = w.reposts || 0; ep.tSeen = t; ep.tUpdate = t;
       ep.intensity = clamp01(Math.log2(Math.max(ratio, 1)/ctx.th("wallRatio"))/4); if (ep.intensity > ep.peak) ep.peak = ep.intensity;
       const fading = w.size <= w.peak*E().wallFadeFrac;
       if (fading && ep.stage==="active"){ ep.stage = "fading"; ep.fadingSince = t; ep.evidence = wallItems(ep, ratio, Math.abs(w.px-mid)/mid*1e4); ep.reading = reading(ep); notify(ep, "fading"); }
@@ -261,7 +265,7 @@ const READER_EPISODES = (() => {
       const key = wallKey(vn, w);
       const ep = {id:++seq, family:"wall", kind:w.side+" wall", venue:vn, horizon:"book", aggressor:null, passive:w.side==="bid" ? "buy" : "sell", stage:"active", pulses:1,
         tStart:w.born, tDetected:t, tEnd:null, peak:0, intensity:0, evidence:[], facts:{}, reading:"", outcome:null, resumedAt:[], trace:[], px:w.px, pxStart:w.px, tUpdate:t, tSeen:t, fadingSince:null,
-        wall:{side:w.side, px:w.px, size:w.size, peak:w.peak, ratio, tradedFrac:null}};
+        wall:{side:w.side, px:w.px, size:w.size, peak:w.peak, ratio, reposts:w.reposts || 0, tradedFrac:null}};
       walls.set(key, ep); episodes.push(ep); trim(); return ep;
     }
     function closeWall(key, ep, t, outcome, frac, size){

@@ -35,7 +35,8 @@ const READER_REGISTER = (() => {
     ["refill","passive depth refilled",""], ["recentShare","aggressor share in the latest seconds",""], ["recentPace","pace now vs the window",""],
     ["liq","liquidations in the window","n"], ["sweeps","multi-level sweeps in the window","n"], ["crossZ","other venue's flow (z)",""],
     ["decay","aggression vs the window before",""], ["zWas","flow in the window before (z)",""], ["wasShare","dominant side's share before",""],
-    ["gap","distance from the 5-minute extreme","sigma"], ["late","price progress, latest seconds","sigma"], ["sizeRatio","trade size vs the window before",""]];
+    ["gap","distance from the 5-minute extreme","sigma"], ["late","price progress, latest seconds","sigma"], ["sizeRatio","trade size vs the window before",""],
+    ["conc","largest single trade as a share of the flow",""], ["countRatio","trade count vs the window before",""]];
   for (const hz of ["fast", "mid"]) for (const [id, label, unit] of QDEF) VARS.push({id:id + "." + hz, label:label + " (" + hz + ")", unit, prior:null, q:id, hz});
   VARS.push({id:"wallMult", label:"largest book level vs the median level", unit:"x", prior:null, q:"wallMult"});
   // What the Reader outputs: one number per session segment, venue-less ("all").
@@ -43,6 +44,9 @@ const READER_REGISTER = (() => {
     VARS.push({id:"rate." + f, label:f + " episodes started per hour", unit:"/h", prior:null, venues:["all"], scalar:true});
     VARS.push({id:"dur." + f, label:f + " median episode length", unit:"ms", prior:null, venues:["all"], scalar:true});
   }
+  VARS.push({id:"reposts.book", label:"times a live wall was refilled after being hit", unit:"n", prior:null, q:"reposts", hz:"book"});
+  // Variables added after the first release draw from their own generator, so adding one never changes what an older variable's sample holds.
+  const OWN_RNG = new Set(["conc", "countRatio", "reposts"]);
   const BYID = {}; for (const d of VARS) BYID[d.id] = d;
   const venuesOf = d => d.venues || ["bn", "hl"];
   // Each threshold the detectors apply, linked to the quantity it is compared with. at: "cfg" or "ep" (cfg.ep). Values are read from the live config.
@@ -58,6 +62,8 @@ const READER_REGISTER = (() => {
     {k:"exhDecay", at:"ep", q:"decay", fams:["exhaustion"], label:"aggression has faded to"}, {k:"exhWasZ", at:"ep", q:"zWas", fams:["exhaustion"], label:"it was elevated before at z"},
     {k:"exhWasShare", at:"ep", q:"wasShare", fams:["exhaustion"], label:"it was the dominant side before at share"}, {k:"exhGap", at:"ep", q:"gap", fams:["exhaustion"], label:"near the 5-minute extreme within (sigma)"},
     {k:"exhSize", at:"ep", q:"sizeRatio", fams:["exhaustion"], label:"trade size is shrinking under"}, {k:"wallRatio", at:"cfg", q:"wallMult", fams:["wall"], label:"a wall is big at (x median level)"},
+    {k:"absConc", at:"ep", q:"conc", fams:["absorption"], label:"absorption: flow is spread over many fills (largest trade under)"}, {k:"exhCount", at:"ep", q:"countRatio", fams:["exhaustion"], label:"exhaustion: trade count has fallen to"},
+    {k:"wallReposts", at:"ep", q:"reposts", fams:["wall"], int:true, label:"a wall counts as refilled after this many re-posts"},
   ];
   const TAILN = 10, KEEP_TAILS = 60, KEEP_PROPOSALS = 60, EXPIRE_MS = 30 * 86400000;
   const keyOf = (vn, id) => vn + "|" + id;
@@ -72,12 +78,13 @@ const READER_REGISTER = (() => {
 
   function create(options, state){
     const cfg = Object.assign({}, DEFAULTS, options || {});
-    let seed = 20240607, cum = {}, cur = null, sessions = [], history = [], run = null, proposals = [], approvals = [], overrides = {}, epoch = 0;
+    let seed = 20240607, cum = {}, cur = null, sessions = [], history = [], run = null, proposals = [], approvals = [], overrides = {}, epoch = 0, seed2 = 1013904223;
+    const rand2 = () => (seed2 = (Math.imul(seed2, 1664525) + 1013904223) >>> 0) / 4294967296;
     const rand = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;
-    function put(cell, x){
+    function put(cell, x, rnd){
       cell.n++;
       if (cell.res.length < cfg.cap) cell.res.push(x);
-      else { const j = Math.floor(rand() * cell.n); if (j < cfg.cap) cell.res[j] = x; }
+      else { const j = Math.floor((rnd || rand)() * cell.n); if (j < cfg.cap) cell.res[j] = x; }
     }
     function observe(t, vn, vals){
       if (!(t > 0)) return;
@@ -87,9 +94,10 @@ const READER_REGISTER = (() => {
       for (const id in vals){
         const x = vals[id]; if (!finite(x) || !BYID[id]) continue;
         const k = keyOf(vn, id);
-        put(cum[k] || (cum[k] = newCell()), x);
+        const rnd = OWN_RNG.has(BYID[id].q) ? rand2 : rand;
+        put(cum[k] || (cum[k] = newCell()), x, rnd);
         const cc = cur.cells[k] || (cur.cells[k] = newCell());
-        put(cc, x);
+        put(cc, x, rnd);
         if (BYID[id].q) tail(cc, x);
       }
     }
@@ -285,7 +293,7 @@ const READER_REGISTER = (() => {
       return out;
     }
     // full state: includes the samples, so it can be restored and keep learning
-    function save(){ const settings = {}; for (const k of SETTABLE) settings[k] = cfg[k]; return {v:1, seed, cum, cur, sessions, history, settings, proposals, approvals, overrides, epoch}; }
+    function save(){ const settings = {}; for (const k of SETTABLE) settings[k] = cfg[k]; return {v:1, seed, seed2, cum, cur, sessions, history, settings, proposals, approvals, overrides, epoch}; }
     function load(s){
       if (!s || s.v !== 1 || typeof s.cum !== "object") return false;
       const ok = c => c && Array.isArray(c.res) && finite(c.n) && c.res.every(finite);
@@ -300,10 +308,11 @@ const READER_REGISTER = (() => {
       if (finite(s.epoch)) epoch = s.epoch;
       proposals = Array.isArray(s.proposals) ? s.proposals.filter(x => x && typeof x.id === "string" && typeof x.k === "string" && finite(x.to) && finite(x.from) && Array.isArray(x.families)).slice(-KEEP_PROPOSALS) : [];
       if (finite(s.seed)) seed = s.seed >>> 0;
+      if (finite(s.seed2)) seed2 = s.seed2 >>> 0;
       if (s.cur && finite(s.cur.start) && s.cur.cells){ cur = {id:s.cur.id, start:s.cur.start, end:s.cur.end, run:finite(s.cur.run) ? s.cur.run : s.cur.id, cells:clean(s.cur.cells), fire:s.cur.fire && typeof s.cur.fire === "object" ? s.cur.fire : {}, mixed:Array.isArray(s.cur.mixed) ? s.cur.mixed.filter(f => FAMS.includes(f)) : []}; endSession(); }   // a run that was cut by closing the page
       return true;
     }
-    function reset(){ cum = {}; cur = null; sessions = []; history = []; proposals = []; approvals = []; overrides = {}; epoch = 0; run = null; seed = 20240607; }
+    function reset(){ cum = {}; cur = null; sessions = []; history = []; proposals = []; approvals = []; overrides = {}; epoch = 0; run = null; seed = 20240607; seed2 = 1013904223; }
     function claims(engineCfg){ return LINKS.map(c => ({q:c.q, k:c.k, label:c.label, value:c.at === "ep" ? (engineCfg.ep || {})[c.k] : engineCfg[c.k]})); }
     const api = {cfg, observe, noteEpisode, endSession, snapshot, save, load, reset, status, claims, review, expectations, ack, undo, setSetting, recompute, reject, oldRates, approve, resetOverride, settleOverrides, applyOverrides, recordApproval, vars:VARS,
       get sessions(){ return sessions; }, get proposals(){ return proposals; }, get overrides(){ return overrides; }, get approvals(){ return approvals; }, get epoch(){ return epoch; }, get history(){ return history; }, get active(){ return !!cur; }};

@@ -117,6 +117,30 @@ const READER_SELFTEST=(()=>{
     const r=E.replayEngine(e.stopRecording());
     return grpResult(e.episodeGroups().length>0&&grpSig(e)===grpSig(r)&&e.episodeGroups().some(g=>g.resolution),e,"the replayed engine to hold identical groups and resolutions");
   });
+  // ---- new evidence items (v016): fills (absorption), trade count (exhaustion), re-posts (wall) ----
+  const atStart=(e,fam,pred)=>{const out=[];e.subscribeEpisodes((x,ch)=>{if(ch==="started"&&x.family===fam&&(!pred||pred(x)))out.push({ep:x,items:x.evidence.map(i=>Object.assign({},i))});});return out;};
+  const itemOf=(snap,k)=>snap&&snap.items.find(i=>i.k===k);
+  add("absorption: flow spread over many small fills passes the 'fills' item; one huge trade in the window fails it",E=>{
+    const run=lump=>{const e=E.create(),a=calm(e),got=atStart(e,"absorption",p=>p.venue==="bn"&&p.horizon==="fast"&&p.aggressor==="sell");
+      const h=sim(e,{t0:a.t,mid0:a.mid,seconds:20,seed:41,params:(sec,mid)=>Object.assign({},heavySell,{trades:lump&&sec>1.9&&sec<2.1?[{side:"sell",px:mid-.05,q:60,ntl:60*(mid-.05)}]:[]})});sim(e,{t0:h.t,mid0:h.mid,seconds:40,seed:44});return {e,s:got[0]};};
+    const a=run(false),b=run(true),fa=itemOf(a.s,"fills"),fb=itemOf(b.s,"fills");
+    return epResult(!!fa&&!!fb&&fa.ok&&!fa.na&&!fb.ok&&fa.w===1&&!fa.gate,b.e,`fills true without the lump (${fa&&fa.val}) and false with it (${fb&&fb.val})`);
+  });
+  add("exhaustion: trade count falling passes the 'count' item; the same notional fade with the same number of trades fails it",E=>{
+    const run=after=>{const e=E.create({ep:{famHorizons:{exhaustion:["fast"]}}}),a=calm(e),got=atStart(e,"exhaustion",p=>p.aggressor==="buy"),b=sim(e,{t0:a.t,mid0:a.mid,seconds:14,seed:31,params:()=>({rate:200,buyP:.9,driftBps:6})});sim(e,{t0:b.t,mid0:b.mid,seconds:40,seed:32,params:()=>after});return {e,s:got[0]};};
+    const fall=run({rate:12,vol:.05}),same=run({rate:200,buyP:.5,vol:.05,size:.012}),ff=itemOf(fall.s,"count"),fs=itemOf(same.s,"count");
+    return epResult(!!ff&&ff.ok&&!ff.gate&&(!fs||!fs.ok),same.e,`count true when trades thin out (${ff&&ff.val}) and not when the trade count holds (${fs&&fs.val})`);
+  });
+  add("wall: re-posts are counted when a wall is hit and refilled; the item needs two",E=>{
+    const run=dips=>{const e=E.create(),a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:90,seed:11,params:sec=>({vol:0,bidWalls:[{idx:12,size:(dips>0&&sec>65&&sec<68)||(dips>1&&sec>72&&sec<75)?3.5:6}]})});sim(e,{t0:b.t,mid0:b.mid,seconds:4,seed:12,params:()=>({vol:0})});return e;};
+    const one=eps(run(1),"wall")[0],two=eps(run(2),"wall")[0],none=eps(run(0),"wall")[0],it=x=>x&&x.evidence.find(i=>i.k==="repost");
+    return epResult(!!one&&!!two&&!!none&&it(none).val==="0"&&it(one).val==="1"&&!it(one).ok&&it(two).val==="2"&&it(two).ok&&two.wall.reposts===2,run(2),`0 re-posts without a dip, 1 (item false) after one dip, 2 (item true) after two; got ${[none,one,two].map(x=>x&&it(x).val+":"+it(x).ok+":"+x.wall.reposts)}`);
+  });
+  add("register: the new quantities are measured (fills, trade count, wall re-posts)",E=>{
+    const e=E.create(),a=calm(e),h=sim(e,{t0:a.t,mid0:a.mid,seconds:20,seed:41,params:()=>heavySell}),b=sim(e,{t0:h.t,mid0:h.mid,seconds:14,seed:31,params:()=>({rate:200,buyP:.9,driftBps:6})}),w=sim(e,{t0:b.t,mid0:b.mid,seconds:90,seed:11,params:()=>({vol:0,bidWalls:[{idx:12,size:6}]})});sim(e,{t0:w.t,mid0:w.mid,seconds:4,seed:12,params:()=>({vol:0})});
+    const v=e.register.snapshot().vars,n=k=>v[k]?v[k].n:0,L=READER_REGISTER.LINKS.map(l=>l.k);
+    return{ok:n("bn|conc.fast")>20&&n("bn|countRatio.mid")>10&&n("bn|reposts.book")>5&&["absConc","exhCount","wallReposts"].every(k=>L.includes(k)),detail:`conc ${n("bn|conc.fast")}, count ${n("bn|countRatio.mid")}, reposts ${n("bn|reposts.book")}; links ${L.slice(-3)}`};
+  });
   // ---- assumption register (Part 1: measures only) ----
   const R=READER_REGISTER, snapSig=s=>JSON.stringify(s);
   add("register: quantile sketch reads known quantiles from a bounded sample",E=>{
