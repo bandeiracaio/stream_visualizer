@@ -1426,7 +1426,7 @@ const rdEsc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;");
 const rdMs = ms => ms >= 10000 ? (ms/1000).toFixed(0)+"s" : (ms/1000).toFixed(1)+"s";
 function rdInit(){
   const chip = (kind,v) => `<button class="chip" data-kind="${kind}" data-v="${v}">${v}</button>`;
-  $("rdChips").innerHTML = ["wall","book","burst","absorption","exhaustion"].map(f=>chip("family",f)).join("") + ["bn","hl"].map(v=>chip("venue",v)).join("");
+  $("rdChips").innerHTML = ["wall","book","burst","absorption","exhaustion","silence","leadlag","cluster"].map(f=>chip("family",f)).join("") + ["bn","hl"].map(v=>chip("venue",v)).join("");
   $("rdChips").onclick = e => { const b=e.target.closest("button"); if(!b)return; const set=rdFilter[b.dataset.kind]; set.has(b.dataset.v)?set.delete(b.dataset.v):set.add(b.dataset.v); b.classList.toggle("on",set.has(b.dataset.v)); renderReader(); };
   $("rdMin").oninput = () => { rdFilter.min=+$("rdMin").value; renderReader(); };
   $("rdSens").onchange = () => READER.setSensitivity(+$("rdSens").value);
