@@ -470,6 +470,27 @@ const READER_SELFTEST=(()=>{
     const on=run(true),off=run(false),strip=x=>JSON.stringify(x.events.filter(y=>!y.raw),(k,v)=>k==="id"?undefined:v);
     return{ok:strip(on)===strip(off)&&JSON.stringify(on.episodes)===JSON.stringify(off.episodes)&&off.events.every(x=>!x.raw),detail:"legacy events or episodes differ with the raw events on"};
   });
+  // ---- flow landscape (v020): the pure grid behind the 3D view ----
+  const LS=READER_LANDSCAPE;
+  add("landscape: buying above the mid and selling below it land in the right cells with the right sign, and totals add up",E=>{
+    const src={trades:[{t:T0+59000,v:"bn",side:"buy",px:100.02,ntl:300},{t:T0+59500,v:"bn",side:"sell",px:99.98,ntl:200},{t:T0+30000,v:"bn",side:"buy",px:100.02,ntl:50},{t:T0+59900,v:"bn",side:"buy",px:105,ntl:999}],mid:()=>100};
+    const g=LS.grid(src,T0+60000,{venue:"bn",halfBps:4,xBins:41,yBins:24,spanMs:60000}),at=(xBps,ageS)=>g.z[Math.floor(ageS/60*24)*41+Math.floor((xBps+4)/8*41)];
+    return{ok:at(2,1)===300&&at(-2,.5)===-200&&at(2,30)===50&&g.clipped===1&&g.buy===350&&g.sell===200&&g.net===150&&g.peakBuy.z===300&&g.peakSell.z===-200,detail:JSON.stringify({a:at(2,1),b:at(-2,.5),c:at(2,30),clipped:g.clipped,buy:g.buy,sell:g.sell})};
+  });
+  add("landscape: a steady price makes a ridge along time, a trend makes a diagonal, and the price path ends at the playhead",E=>{
+    const steady=[],trend=[];for(let s=0;s<60;s++){steady.push({t:T0+s*1000+500,v:"bn",side:"buy",px:100.02,ntl:100});trend.push({t:T0+s*1000+500,v:"bn",side:"buy",px:100+s*.0005,ntl:100});}
+    const midTrend=(v,t)=>100+Math.max(0,(t-T0)/1000)*.0005,gs=LS.grid({trades:steady,mid:()=>100},T0+60000,{venue:"bn",halfBps:4}),cols=new Set();
+    for(let j=0;j<gs.ny;j++)for(let i=0;i<gs.nx;i++)if(gs.z[j*gs.nx+i]>0)cols.add(i);
+    const gt=LS.grid({trades:trend,mid:midTrend},T0+60000,{venue:"bn",halfBps:4}),cols2=new Set();
+    for(let j=0;j<gt.ny;j++)for(let i=0;i<gt.nx;i++)if(gt.z[j*gt.nx+i]>0)cols2.add(i);
+    const p=gt.path;
+    return{ok:cols.size===1&&cols2.size>=4&&p[0]>p[p.length-1]*0-1&&p[p.length-1]<-.5&&gt.moveBps>.5&&Math.abs(p[0])<Math.abs(p[p.length-1]),detail:JSON.stringify({cols:cols.size,cols2:cols2.size,p0:p[0],pn:p[p.length-1],move:gt.moveBps})};
+  });
+  add("landscape: a recorded session becomes a source, the playhead can sit anywhere in it, and the grid never changes its input",E=>{
+    const inputs=[["q","bn",T0,99.99,100.01],["t",{t:T0+1000,v:"bn",side:"buy",px:100.02,q:1,ntl:200}],["q","bn",T0+2000,100.09,100.11],["t",{t:T0+2500,v:"hl",side:"sell",px:100.08,q:1,ntl:70}],["q","hl",T0+2000,100.07,100.09]];
+    const s=LS.fromInputs(inputs),before=JSON.stringify(s.trades),g1=LS.grid(s,T0+3000,{venue:"both",spanMs:60000}),g2=LS.grid(s,T0+3000,{venue:"both",spanMs:60000}),early=LS.grid(s,T0+1500,{venue:"bn",spanMs:60000});
+    return{ok:s.trades.length===2&&s.t0===T0&&s.mid("bn",T0+1000)===100&&Math.abs(s.mid("bn",T0+2500)-100.1)<1e-9&&s.mid("bn",T0+90000)===null&&JSON.stringify(Array.from(g1.z))===JSON.stringify(Array.from(g2.z))&&JSON.stringify(s.trades)===before&&early.trades===1&&early.buy===200,detail:JSON.stringify({n:s.trades.length,e:early.trades,eb:early.buy,m:s.mid("bn",T0+2500)})};
+  });
   function run(Eng){return scenarios.map(sc=>{try{const r=sc.run(Eng);return{name:sc.name,ok:!!r.ok,detail:r.detail};}catch(err){return{name:sc.name,ok:false,detail:String(err&&err.stack||err)};}});}
   return {T0,rng,poisson,levels,sim,scenarios,run};
 })();

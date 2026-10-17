@@ -27,6 +27,7 @@ Stream Visualizer tries to do both jobs honestly:
 | **Five areas** | Live (overview, charts, microstructure, visualizations, tape), Reader, Trade, Market, Diagnostics. |
 | **Episode-based Reader** | Phenomena have a lifecycle (forming, active, fading, ended, resumable) with a back-dated start and a multi-variable evidence checklist. |
 | **Self-revising** | A register of assumptions, per-variable drift detection, threshold proposals, replay verdicts, and an approval step. |
+| **Flow landscape** | A 3D surface of where, and how long ago, buyers and sellers hit the book (price x age x net aggressor flow), with a playhead that walks through live history or a recorded session. |
 | **Record and replay** | Save a live session to a file, load it on any device, replay it with different thresholds, and label episodes agree / disagree / missed. |
 | **Pure, tested engine** | The Reader engine has no DOM and no timers, and 84 simulator scenarios run on every build; a failing one aborts the build. |
 | **Trading built in** | A simulated paper broker filled against live prices, Binance's own demo account, or a real-money Binance account behind an explicit acknowledgement. |
@@ -138,6 +139,8 @@ src/
     reader-drift.js     pure drift judgement per variable
     reader-proposals.js pure percentile maps, proposals, replay verdict
     reader-tools.js     record / save / load / replay, timeline, labels
+    reader-landscape.js pure grid maths for the Flow landscape (3D tape surface)
+    reader-landscape-view.js  the 3D drawing, playhead and controls
     reader-selftest.js  simulator scenarios (run by the build)
 build.mjs               self-test + single-file assembler
 fold.mjs                folds approved revisions into the defaults

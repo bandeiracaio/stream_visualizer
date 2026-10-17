@@ -233,6 +233,25 @@
     <div id="tlDetail"></div>
   </section>
 
+  <section data-tab="reader" class="full" id="lsSection">
+    <h2>Flow landscape <span class="ctl">
+      <label>source <select id="lsSrc"><option value="live">Live (last 5 min)</option><option value="session">Loaded session</option></select></label>
+      <label>venue <select id="lsVenue"><option value="both">BN + HL</option><option value="bn">Binance</option><option value="hl">Hyperliquid</option></select></label>
+      <label>window <select id="lsSpan"><option value="30000">30 s</option><option value="60000">60 s</option><option value="120000">2 min</option></select></label>
+    </span></h2>
+    <canvas id="lsCv" class="chart" style="height:440px;touch-action:pan-y;cursor:grab"></canvas>
+    <div class="lsbar">
+      <button id="lsLive" title="Follow the market again">Live</button>
+      <button id="lsPlay">Play</button>
+      <select id="lsSpeed" title="Playback speed"><option value="1">1x</option><option value="4">4x</option><option value="16">16x</option></select>
+      <input id="lsT" type="range" min="0" max="1000" value="1000" step="1">
+      <span id="lsClock" class="stat"></span>
+      <span id="lsView" class="lsview"><button data-v="3d">3D</button><button data-v="top">Top</button><button data-v="front">Front</button><button data-v="side">Side</button></span>
+    </div>
+    <div id="lsRead" class="lsread"></div>
+    <div class="note">How to read it. Floor: left to right is price relative to where the mid is at the playhead; front to back is how many seconds ago. Height and colour: net aggressor flow in that spot, green where buyers hit the asks, red where sellers hit the bids, flat where nothing traded. The white line on the floor is where the mid price actually was. A ridge that runs straight back at one price while the white line stays put is flow being absorbed there; a ridge that slides sideways along the white line is flow that pushed price. Drag to rotate (sideways only on a phone), use the buttons for fixed angles, and move the slider or press Play to walk through time; Live follows the market. Read-only: nothing here changes any detection.</div>
+  </section>
+
   <section data-tab="reader" class="full">
     <h2>Finished episodes</h2>
     <div id="epDone" class="eplist"></div>
@@ -395,6 +414,9 @@
 <script id="reader-engine">
 <!--@include js/reader-engine.js-->
 </script>
+<script id="reader-landscape">
+<!--@include js/reader-landscape.js-->
+</script>
 <script id="reader-selftest">
 <!--@include js/reader-selftest.js-->
 </script>
@@ -406,6 +428,9 @@
 </script>
 <script>
 <!--@include js/reader-tools.js-->
+</script>
+<script>
+<!--@include js/reader-landscape-view.js-->
 </script>
 </body>
 </html>

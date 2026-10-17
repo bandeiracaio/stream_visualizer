@@ -30,6 +30,7 @@ The app ships as ONE self-contained HTML file (must run offline-capable from a p
 
 - `src/js/reader-episodes.js` (pure): episode state machines and evidence checklists for absorption / exhaustion / burst / wall. Tunables in `READER_EPISODES.DEFAULTS` (also `READER.cfg.ep` at runtime).
 - `src/js/reader-engine.js` (pure): order-flow engine and the legacy one-off event detectors; drives the episode layer once a second. Recording is `startRecording({quoteMs})`; replay is `READER_ENGINE.replayEngine(inputs, cfg)`.
+- `src/js/reader-landscape.js` (pure): grid maths for the Flow landscape (3D surface, playhead = time). `src/js/reader-landscape-view.js`: its drawing and controls; read-only, hooks `renderReader`, loaded last. Spec in `.scratch/flow-landscape/`.
 - `src/js/reader-selftest.js`: simulator scenarios; the build runs them and fails if any fail. Add a scenario for any new engine behaviour.
 - `src/js/overview.js`: Overview (home) view. `src/js/app.js`: feeds, charts, navigation, Reader cards. `src/js/reader-tools.js`: record/save/load/replay, threshold tuning, timeline, agree/disagree/missed labels (loaded last, called from `renderReader`).
 - Testing UI: serve `dist/` with `python -m http.server`, drive it with the Chrome tools; the window does not resize the viewport, so test phone width through a 390px iframe. Hidden tabs throttle requestAnimationFrame to ~1 fps, which makes rendering look stale.
