@@ -424,6 +424,15 @@ const READER_SELFTEST=(()=>{
     const after=r.review().expectations.filter(x=>x.key==="bn|prog.fast")[0];
     return{ok:!before.ok&&after.ok&&r.history.filter(h=>h.type==="setting").length===2&&R.SETTABLE.includes("expTailLo"),detail:JSON.stringify({b:before.reasons,a:after.reasons})};
   });
+  add("expectation: a short test or simulator session never sets off the scale check; counted sessions do, also after save and load",E=>{
+    const feed=(r,t0,vals)=>vals.forEach((v,i)=>r.observe(t0+i*1000,"bn",{"prog.fast":v}));
+    const get=r=>r.expectations().filter(x=>x.key==="bn|prog.fast")[0];
+    const r=R.create({minLearned:300});feed(r,T0,normal(5,10,400));r.endSession();const shortOnly=get(r);
+    feed(r,T0+1e6,normal(6,1,1000));const live=get(r);r.endSession();const done=get(r);
+    const r2=R.create({minLearned:300},r.save());const again=get(r2);
+    const bad=R.create({minLearned:300});feed(bad,T0,normal(7,10,1000));bad.endSession();const wild=get(bad);
+    return{ok:!shortOnly.ready&&live.ready&&live.ok&&done.ready&&done.ok&&again.ok&&wild.ready&&!wild.ok,detail:JSON.stringify({shortOnly:shortOnly.ready,live:live.ok,done:done.ok,again:again.ok,wild:wild.ok})};
+  });
   function run(Eng){return scenarios.map(sc=>{try{const r=sc.run(Eng);return{name:sc.name,ok:!!r.ok,detail:r.detail};}catch(err){return{name:sc.name,ok:false,detail:String(err&&err.stack||err)};}});}
   return {T0,rng,poisson,levels,sim,scenarios,run};
 })();

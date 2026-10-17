@@ -78,7 +78,7 @@ const READER_REGISTER = (() => {
 
   function create(options, state){
     const cfg = Object.assign({}, DEFAULTS, options || {});
-    let seed = 20240607, cum = {}, cur = null, sessions = [], history = [], run = null, proposals = [], approvals = [], overrides = {}, epoch = 0, seed2 = 1013904223;
+    let seed = 20240607, cum = {}, cumOk = {}, cur = null, sessions = [], history = [], run = null, proposals = [], approvals = [], overrides = {}, epoch = 0, seed2 = 1013904223;
     const rand2 = () => (seed2 = (Math.imul(seed2, 1664525) + 1013904223) >>> 0) / 4294967296;
     const rand = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;
     function put(cell, x, rnd){
@@ -124,6 +124,8 @@ const READER_REGISTER = (() => {
         sum["all|rate." + f] = {n:x.n, v:rnd(x.n / hours)};
         if (x.durs.length){ const d = x.durs.slice().sort((a, b) => a - b), m = d.length >> 1; sum["all|dur." + f] = {n:d.length, v:rnd(d.length % 2 ? d[m] : (d[m - 1] + d[m]) / 2)}; }
       }
+      const counted = cur.end - cur.start >= cfg.minSessionMs;
+      if (counted) poolCounted(cur.cells);
       const d = new Date(cur.start);
       const s = {id:cur.id, start:cur.start, end:cur.end, run:cur.run, hour:d.getUTCHours(), dow:d.getUTCDay(), durationMs:cur.end - cur.start, counts:cur.end - cur.start >= cfg.minSessionMs, sum};
       if (cur.mixed && cur.mixed.length) s.mixed = cur.mixed;
@@ -134,6 +136,14 @@ const READER_REGISTER = (() => {
         noteDrifts(); return s;
       }
       return null;
+    }
+    // price progress from sessions that count only (the static expectation must not be set off by a 3-minute test or simulator run).
+    // Pure hash instead of the shared random generators, so the sampling of every other cell stays as it was.
+    function poolCounted(cells){
+      for (const k in cells){ if (!k.includes("|prog.")) continue;
+        const c = cumOk[k] || (cumOk[k] = newCell());
+        for (const x of cells[k].res) put(c, x, () => ((c.n * 2654435761) >>> 0) / 4294967296);
+      }
     }
     const endSession = () => finalize(false);
     const allKeys = () => { const k = []; for (const d of VARS) for (const vn of venuesOf(d)) k.push(keyOf(vn, d.id)); return k; };
@@ -250,7 +260,8 @@ const READER_REGISTER = (() => {
     function expectations(){
       const out = [], med = a => { const x = a.slice().sort((u, v) => u - v), n = x.length; return n % 2 ? x[n >> 1] : (x[n / 2 - 1] + x[n / 2]) / 2; };
       for (const d of VARS) if (d.q === "prog") for (const vn of ["bn", "hl"]){
-        const key = keyOf(vn, d.id), c = cum[key];
+        const key = keyOf(vn, d.id), base = cumOk[key], live = cur && cur.end - cur.start >= cfg.minSessionMs && cur.cells[key];
+        const c = base || live ? {n:(base ? base.n : 0) + (live ? live.n : 0), res:(base ? base.res : []).concat(live ? live.res : [])} : null;
         if (!c || c.n < cfg.minLearned){ out.push({key, n:c ? c.n : 0, ready:false, ok:true, reasons:[]}); continue; }
         const q = quantiles(c.res), medAbs = med(c.res.map(Math.abs)), tail = (Math.abs(q[0]) + Math.abs(q[4])) / 2, reasons = [];
         if (medAbs < cfg.expMedLo || medAbs > cfg.expMedHi) reasons.push("a typical move is " + medAbs.toFixed(2) + " sigma (expected " + cfg.expMedLo + " to " + cfg.expMedHi + ")");
@@ -293,14 +304,14 @@ const READER_REGISTER = (() => {
       return out;
     }
     // full state: includes the samples, so it can be restored and keep learning
-    function save(){ const settings = {}; for (const k of SETTABLE) settings[k] = cfg[k]; return {v:1, seed, seed2, cum, cur, sessions, history, settings, proposals, approvals, overrides, epoch}; }
+    function save(){ const settings = {}; for (const k of SETTABLE) settings[k] = cfg[k]; return {v:1, seed, seed2, cum, cumOk, cur, sessions, history, settings, proposals, approvals, overrides, epoch}; }
     function load(s){
       if (!s || s.v !== 1 || typeof s.cum !== "object") return false;
       const ok = c => c && Array.isArray(c.res) && finite(c.n) && c.res.every(finite);
       const tl = a => Array.isArray(a) && a.length <= TAILN && a.every(finite) ? a.slice() : undefined;
       const clean = o => { const r = {}; for (const k in o) if (ok(o[k])){ r[k] = {n:o[k].n, res:o[k].res.slice(0, cfg.cap)}; const hi = tl(o[k].hi), lo = tl(o[k].lo); if (hi && lo){ r[k].hi = hi; r[k].lo = lo; } } return r; };
       if (s.settings) for (const k of SETTABLE) if (finite(s.settings[k]) && s.settings[k] > 0) cfg[k] = s.settings[k];
-      cum = clean(s.cum); cur = null; run = null;
+      cum = clean(s.cum); cumOk = s.cumOk && typeof s.cumOk === "object" ? clean(s.cumOk) : {}; cur = null; run = null;
       sessions = Array.isArray(s.sessions) ? s.sessions.filter(x => x && finite(x.id) && finite(x.start) && finite(x.end) && x.sum).slice(-cfg.keepSessions).map(x => { const d = new Date(x.start); return Object.assign({run:x.id, hour:d.getUTCHours(), dow:d.getUTCDay(), durationMs:x.end - x.start}, x); }) : [];
       history = Array.isArray(s.history) ? s.history.filter(h => h && ["drift", "setting", "approval", "revert", "import"].includes(h.type)).slice(-cfg.keepHistory) : [];
       approvals = Array.isArray(s.approvals) ? s.approvals.filter(a => a && typeof a.id === "string" && typeof a.k === "string" && Array.isArray(a.families) && finite(a.at)).slice(-200) : [];
@@ -312,7 +323,7 @@ const READER_REGISTER = (() => {
       if (s.cur && finite(s.cur.start) && s.cur.cells){ cur = {id:s.cur.id, start:s.cur.start, end:s.cur.end, run:finite(s.cur.run) ? s.cur.run : s.cur.id, cells:clean(s.cur.cells), fire:s.cur.fire && typeof s.cur.fire === "object" ? s.cur.fire : {}, mixed:Array.isArray(s.cur.mixed) ? s.cur.mixed.filter(f => FAMS.includes(f)) : []}; endSession(); }   // a run that was cut by closing the page
       return true;
     }
-    function reset(){ cum = {}; cur = null; sessions = []; history = []; proposals = []; approvals = []; overrides = {}; epoch = 0; run = null; seed = 20240607; seed2 = 1013904223; }
+    function reset(){ cum = {}; cumOk = {}; cur = null; sessions = []; history = []; proposals = []; approvals = []; overrides = {}; epoch = 0; run = null; seed = 20240607; seed2 = 1013904223; }
     function claims(engineCfg){ return LINKS.map(c => ({q:c.q, k:c.k, label:c.label, value:c.at === "ep" ? (engineCfg.ep || {})[c.k] : engineCfg[c.k]})); }
     const api = {cfg, observe, noteEpisode, endSession, snapshot, save, load, reset, status, claims, review, expectations, ack, undo, setSetting, recompute, reject, oldRates, approve, resetOverride, settleOverrides, applyOverrides, recordApproval, vars:VARS,
       get sessions(){ return sessions; }, get proposals(){ return proposals; }, get overrides(){ return overrides; }, get approvals(){ return approvals; }, get epoch(){ return epoch; }, get history(){ return history; }, get active(){ return !!cur; }};
