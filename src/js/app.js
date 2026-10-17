@@ -10,7 +10,7 @@ const STREAMS = [
   {id:"bn.forceOrder", v:"bn", name:"@forceOrder",    sock:"market", sub:s=>`${s}@forceOrder`,   gap:Infinity,desc:"Liquidations (≤1 per second per symbol). Can be silent for long periods."},
   {id:"bn.ticker",     v:"bn", name:"@ticker",        sock:"market", sub:s=>`${s}@ticker`,       gap:5000,   desc:"Rolling 24h stats.", off:true},
   {id:"bn.kline",      v:"bn", name:"@kline_1m",      sock:"market", sub:s=>`${s}@kline_1m`,     gap:5000,   desc:"1m kline updates (raw only, not charted).", off:true},
-  {id:"bn.oi",         v:"bn", name:"openInterest",   rest:true,                                   gap:25000,  desc:"REST poll every 10s (not pushed)."},
+  {id:"bn.oi",         v:"bn", name:"openInterest",   rest:true,                                   gap:75000,  desc:"REST poll every 10s (not pushed). A background tab is throttled to about one poll a minute, so the alert waits 75s."},
   {id:"hl.trades",     v:"hl", name:"trades",         hl:c=>({type:"trades",coin:c}),             gap:30000,  desc:"Fills with side + both wallets [buyer, seller]."},
   {id:"hl.l2Book",     v:"hl", name:"l2Book",         hl:c=>({type:"l2Book",coin:c}),             gap:10000,  desc:"Full 20-level snapshots, n orders per level."},
   {id:"hl.bbo",        v:"hl", name:"bbo",            hl:c=>({type:"bbo",coin:c}),                gap:15000,  desc:"Best bid/ask on change, per block."},
