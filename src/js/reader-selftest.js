@@ -545,10 +545,10 @@ const READER_SELFTEST=(()=>{
   });
   add("autorec: a recording ends at its time limit even if the market stays wild, and either trigger alone is enough to start",E=>{
     const A=AUTOREC,calm={fast:.5,slow:.5,ratio:1,ready:true},wild={fast:2,slow:1,ratio:2,ready:true},T=1e6;
-    const byRatio=A.step({mode:"waiting"},{fast:.9,slow:.4,ratio:2.2,ready:true},T,{}),bySigma=A.step({mode:"waiting"},{fast:1.5,slow:1.4,ratio:1.07,ready:true},T,{}),no=A.step({mode:"waiting"},{fast:1.1,slow:.7,ratio:1.57,ready:true},T,{}),notReady=A.step({mode:"waiting"},{fast:3,slow:.4,ratio:7,ready:false},T,{});
+    const byRatio=A.step({mode:"waiting"},{fast:.9,slow:.4,ratio:2.2,ready:true},T,{}),bySigma=A.step({mode:"waiting"},{fast:1.5,slow:1.4,ratio:1.07,ready:true},T,{}),no=A.step({mode:"waiting"},{fast:1.1,slow:.7,ratio:1.57,ready:true},T,{}),notReady=A.step({mode:"waiting"},{fast:3,slow:.4,ratio:7,ready:false},T,{}),deadCalm=A.step({mode:"waiting"},{fast:.2,slow:.08,ratio:2.5,ready:true},T,{});
     const st={mode:"recording",since:T,calmSince:null},o=A.step(st,wild,T+59*60000,{maxMin:60}),o2=A.step(st,wild,T+60*60000,{maxMin:60});
     const dip=A.step({mode:"recording",since:T,calmSince:T+60000},wild,T+400000,{}),keep=A.step({mode:"recording",since:T,calmSince:T+60000},calm,T+240000,{calmMin:5});
-    return{ok:byRatio.action==="start"&&byRatio.why==="ratio"&&bySigma.action==="start"&&bySigma.why==="sigma"&&no.action===null&&notReady.action===null&&o.action===null&&o2.action==="stop"&&o2.why==="max"&&dip.action===null&&dip.st.calmSince===null&&keep.action===null,
+    return{ok:byRatio.action==="start"&&byRatio.why==="ratio"&&bySigma.action==="start"&&bySigma.why==="sigma"&&no.action===null&&notReady.action===null&&deadCalm.action===null&&o.action===null&&o2.action==="stop"&&o2.why==="max"&&dip.action===null&&dip.st.calmSince===null&&keep.action===null,
       detail:JSON.stringify({byRatio:byRatio.why,bySigma:bySigma.why,no:no.action,o:o.action,o2:o2.why,dip:dip.action,keep:keep.action})};
   });
   function run(Eng){return scenarios.map(sc=>{try{const r=sc.run(Eng);return{name:sc.name,ok:!!r.ok,detail:r.detail};}catch(err){return{name:sc.name,ok:false,detail:String(err&&err.stack||err)};}});}

@@ -6,7 +6,7 @@
 const AUTOREC = (() => {
   const DEFAULTS = {
     fastSec:300, slowSec:3600, lagSec:15, minFast:200, minSlow:900,       // 5 min against the last hour; needs 15 min of history before it can judge
-    trigRatio:1.8, trigSigma:1.2,                                          // start when the 5 min sigma is 1.8x the hour's, or above 1.2 bps/root s (either)
+    trigRatio:1.8, trigSigma:1.2, trigFloor:.4,                                          // start when the 5 min sigma is 1.8x the hour's, or above 1.2 bps/root s (either; the ratio only counts above trigFloor, so a dead-calm market cannot trigger it)
     exitRatio:1.3, exitSigma:.8, calmMin:5, maxMin:60,                     // stop after 5 minutes below both exit levels, or after 60 minutes
   };
   const SIZE = 4096;
@@ -34,7 +34,7 @@ const AUTOREC = (() => {
   function step(st, v, tMs, cfg) {
     const c = Object.assign({}, DEFAULTS, cfg), o = Object.assign({}, st);
     if (o.mode === "waiting"){
-      if (v.ready && (v.ratio >= c.trigRatio || v.fast >= c.trigSigma)){ o.mode = "recording"; o.since = tMs; o.calmSince = null; return {st:o, action:"start", why:v.ratio >= c.trigRatio ? "ratio" : "sigma"}; }
+      if (v.ready && ((v.ratio >= c.trigRatio && v.fast >= c.trigFloor) || v.fast >= c.trigSigma)){ o.mode = "recording"; o.since = tMs; o.calmSince = null; return {st:o, action:"start", why:v.ratio >= c.trigRatio && v.fast >= c.trigFloor ? "ratio" : "sigma"}; }
       return {st:o, action:null, why:""};
     }
     const calm = v.ready && v.ratio < c.exitRatio && v.fast < c.exitSigma;

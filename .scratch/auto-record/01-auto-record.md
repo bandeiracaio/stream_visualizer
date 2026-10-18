@@ -1,6 +1,6 @@
 # Auto-record on volatility
 
-Status: built (v031).
+Status: built (v031), relative floor added (v032).
 
 ## Goal
 Leave the app waiting at almost no cost, and have it start a session recording when the market turns volatile, keep recording while it
@@ -10,6 +10,8 @@ the fast sigma component helps) need a recording that contains a jump in activit
 ## Decisions (user, 2026-10-18)
 - Trigger: both a relative and an absolute condition, either is enough. Relative: the last 5 minutes are 1.8x as volatile as the last hour.
   Absolute: the last 5 minutes are above 1.2 bps per root second (BTC is about 0.5 on a normal day). All settable in the Reader tab, remembered.
+  v032: the relative trigger only counts above a floor of 0.4 (fixed, not in the UI). The first real run (2026-10-18, Sunday) fired on a dead-calm
+  market (sigma ~0.18, which is 1.8x of ~0.10) and recorded 10 useless minutes.
 - Stop: after N minutes calm (default 5; below both exit levels, 1.3x and 0.8) or after at most X minutes (default 60), whichever comes first.
 
 ## How it works
