@@ -4,7 +4,7 @@
 
 Open the file in a browser (phone or PC), press **Connect**, and watch two venues' trades, books and liquidations side by side. No server, no install, no external assets, no account. It runs offline-capable once loaded; the only network traffic is the public exchange feeds.
 
-> Status: personal research tool under active development (19 numbered releases so far). Not financial advice; see [Safety](#safety).
+> Status: personal research tool under active development (26 numbered releases so far). Not financial advice; see [Safety](#safety).
 
 ---
 
@@ -27,7 +27,7 @@ Stream Visualizer tries to do both jobs honestly:
 | **Five areas** | Live (overview, charts, microstructure, visualizations, tape), Reader, Trade, Market, Diagnostics. |
 | **Episode-based Reader** | Phenomena have a lifecycle (forming, active, fading, ended, resumable) with a back-dated start and a multi-variable evidence checklist. |
 | **Self-revising** | A register of assumptions, per-variable drift detection, threshold proposals, replay verdicts, and an approval step. |
-| **Flow landscape** | A 3D surface of where, and how long ago, buyers and sellers hit the book (price x age x net aggressor flow), with a playhead that walks through live history or a recorded session. |
+| **Flow landscape** | A 3D surface of where, and how long ago, buyers and sellers hit the book (price x age x net aggressor flow), with a playhead that walks through live history or a recorded session, and the Reader's episodes marked on the floor where and when they happened. |
 | **Record and replay** | Save a live session to a file, load it on any device, replay it with different thresholds, and label episodes agree / disagree / missed. |
 | **Pure, tested engine** | The Reader engine has no DOM and no timers, and 87 simulator scenarios run on every build; a failing one aborts the build. |
 | **Trading built in** | A simulated paper broker filled against live prices, Binance's own demo account, or a real-money Binance account behind an explicit acknowledgement. |

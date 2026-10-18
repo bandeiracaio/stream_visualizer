@@ -103,5 +103,22 @@ const READER_LANDSCAPE = (() => {
     const data = o.sessId != null ? "s" + o.sessId : n + "@" + (n ? o.trades[0].t + "-" + o.trades[n-1].t : 0);
     return [o.src, o.venue, o.spanMs, tq, data].join("|");
   }
-  return {DEFAULTS, grid, autoHalf, path, span, fromInputs, midAt, cacheKey};
+  // Reader episodes drawn on the floor of the landscape. list: episode groups ({family, venue|venues, stage, tStart, tEnd, tDetected, px}).
+  // An episode becomes a mark when it overlaps the window; z0..z1 is its stretch along the age axis (-1 = newest, 1 = oldest edge of the window),
+  // zd where it was detected, and u its price as a share of half the price range (offset from the mid of its venue at the playhead). Read only.
+  function episodeMarks(src, tNow, g, list) {
+    const out = [], w0 = tNow - g.spanMs, toZ = t => Math.max(-1, Math.min(1, (tNow - t)/g.spanMs*2 - 1));
+    for (const e of list || []){
+      const t0 = e.tStart, t1 = e.tEnd == null ? tNow : Math.min(e.tEnd, tNow);
+      if (t0 > tNow || t1 < w0) continue;
+      const v = e.venue || (e.venues && e.venues[0]) || "bn", m = src.mid(v, tNow);
+      if (g.venue !== "both" && g.venue !== v && !(e.venues && e.venues.includes(g.venue))) continue;
+      const px = e.px != null ? e.px : e.pxStart;
+      if (!(m > 0) || !(px > 0)) continue;
+      out.push({family:e.family, venue:v, stage:e.stage, wall:e.family === "wall", u:Math.max(-1, Math.min(1, off(px, m)/g.half)), outside:Math.abs(off(px, m)) > g.half,
+                z0:toZ(t1), z1:toZ(t0), zd:e.tDetected != null && e.tDetected >= w0 && e.tDetected <= tNow ? toZ(e.tDetected) : null});
+    }
+    return out;
+  }
+  return {DEFAULTS, grid, autoHalf, path, span, fromInputs, midAt, cacheKey, episodeMarks};
 })();

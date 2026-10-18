@@ -19,6 +19,7 @@ that walks through time. Inspired by a MATLAB-style surface plot (peaks and vall
 - On the floor: a dashed line for the mid now, and a white line for where the mid actually was, so a ridge that stays at one price while the white line stays put reads as absorption, and one that slides with the white line reads as flow that pushed price.
 - Venue: BN + HL (each venue against its own mid, so the basis between them cancels), or one of them. Window 30 s, 60 s or 2 min.
 - Reader episodes active at the playhead are listed under the picture (live, or a replayed session).
+- (v026) Episodes are also drawn on the floor: a stripe along the age axis at the episode's price (walls thicker, ended ones faded), with a diamond where it was detected. Colours: absorption blue, exhaustion amber, burst purple, wall light grey. Price is the episode's `px` as an offset from its venue's mid at the playhead; one outside the price range sits on the edge, dashed. Marks come from `READER_LANDSCAPE.episodeMarks` (pure, self-tested) and only read the episode list.
 
 ## Safety for what exists
 - New files only: `src/js/reader-landscape.js` (pure grid maths, self-tested) and `src/js/reader-landscape-view.js` (drawing). One new section in the Reader tab, a few CSS lines, and a build step that includes the pure file in the self-test.

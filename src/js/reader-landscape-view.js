@@ -38,6 +38,7 @@ const lsRange = src => src === LV.sess ? {a: src.t0, b: src.t1} : {a: src.t0 + L
 const LS_BUY = [47,191,113], LS_SELL = [229,83,75], LS_LEVELS = 24;
 const lsRgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
 const LS_FILL = [LS_SELL, LS_BUY].map(col => Array.from({length: LS_LEVELS+1}, (_, k) => { const m = k/LS_LEVELS; return lsRgba(col.map(c => Math.round(c*(.45+.55*Math.sqrt(m)) + 12*(1-m))), (.25 + .7*Math.sqrt(m)).toFixed(3)); }));
+const LS_FAM = {absorption:"122,162,247", exhaustion:"240,185,80", burst:"187,134,252", wall:"214,221,230"};   // episode marks on the floor
 const LS_EDGE = [LS_SELL, LS_BUY].map(col => lsRgba(col, .28));
 
 function lsPrepCanvas(cv, fast) {
@@ -48,7 +49,7 @@ function lsPrepCanvas(cv, fast) {
   return {ctx, w, h};
 }
 
-function lsDraw(cv, g, info, fast) {
+function lsDraw(cv, g, info, fast, marks) {
   const {ctx, w, h} = lsPrepCanvas(cv, fast); if (w < 60) return;
   const nx = g.nx, ny = g.ny, n = nx*ny, S = Math.min(w*.27, h*.33), cx = w/2, cy = h*.5;
   const cyw = Math.cos(LV.yaw), syw = Math.sin(LV.yaw), cp = Math.cos(LV.pitch), sp = Math.sin(LV.pitch);
@@ -90,7 +91,13 @@ function lsDraw(cv, g, info, fast) {
     ctx.fillStyle = LS_FILL[side][lv]; ctx.fill();
     ctx.strokeStyle = fast ? LS_FILL[side][lv] : LS_EDGE[side]; ctx.stroke();      // fast mode: a hairline in the fill colour only hides the seams
   }
-  trace("rgba(240,244,248,.5)", 1);                              // the path again over the surface, so a peak cannot hide it
+  trace("rgba(240,244,248,.5)", 1);
+  for (const m of marks || []){                                  // Reader episodes: a stripe along the age axis at the episode's price, a diamond where it was detected
+    const col = LS_FAM[m.family] || "214,221,230", a0 = P(m.u, 0, m.z0), a1 = P(m.u, 0, m.z1);
+    ctx.strokeStyle = `rgba(${col},${m.stage === "ended" ? .45 : .95})`; ctx.lineWidth = m.wall ? 3 : 2; ctx.setLineDash(m.outside ? [3,3] : []);
+    ctx.beginPath(); ctx.moveTo(a0[0], a0[1]); ctx.lineTo(a1[0], a1[1]); ctx.stroke(); ctx.setLineDash([]); ctx.lineWidth = 1;
+    if (m.zd != null){ const d = P(m.u, 0, m.zd); ctx.fillStyle = `rgb(${col})`; ctx.beginPath(); ctx.moveTo(d[0], d[1]-5); ctx.lineTo(d[0]+4, d[1]); ctx.lineTo(d[0], d[1]+5); ctx.lineTo(d[0]-4, d[1]); ctx.closePath(); ctx.fill(); }
+  }                              // the path again over the surface, so a peak cannot hide it
   ctx.strokeStyle = "rgba(122,162,247,.9)"; ctx.lineWidth = 1.5; { const a = P(-1,0,-1), b = P(1,0,-1); ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke(); } ctx.lineWidth = 1;
   // axes
   ctx.fillStyle = "#7d8a99"; ctx.textAlign = "center";
@@ -103,11 +110,15 @@ function lsDraw(cv, g, info, fast) {
 }
 
 // ---------- readout ----------
+function lsEpisodeList(tNow, all) {
+  const eng = RD(); if (!eng || !eng.episodeGroups) return [];
+  if (LV.src === "session" && !rdView.engine) return [];
+  if (LV.src === "live" && rdView.engine) return [];
+  const gs = eng.episodeGroups();
+  return all ? gs : gs.filter(e => e.tStart <= tNow && (e.tEnd == null || e.tEnd >= tNow - 5000));
+}
 function lsEpisodes(tNow) {
-  const eng = RD(); if (!eng || !eng.episodeGroups) return "";
-  if (LV.src === "session" && !rdView.engine) return "";
-  if (LV.src === "live" && rdView.engine) return "";
-  const list = eng.episodeGroups().filter(e => e.tStart <= tNow && (e.tEnd == null || e.tEnd >= tNow - 5000));
+  const list = lsEpisodeList(tNow);
   if (!list.length) return "";
   return " Reader episodes at this moment: " + list.map(e => `${READER_EPISODES.FAMILY_LABEL[e.family] || e.family} (${(e.venues || [e.venue]).map(v => v.toUpperCase()).join("+")}, ${e.stage})`).join("; ") + ".";
 }
@@ -146,7 +157,7 @@ function lsRender() {
   LV.dirty = false;
   { const b = ls$("lsPlay"), want = LV.play ? "Pause" : "Play"; if (b.textContent !== want) b.textContent = want; }      // a pause lands on a cached grid, so the label is kept right here
   const fast = !!LV.drag || LV.play, t1 = performance.now();
-  lsDraw(cv, c.g, c.live ? "LIVE" : "PLAYHEAD " + hhmmss(c.tNow).slice(0,8), fast);
+  lsDraw(cv, c.g, c.live ? "LIVE" : "PLAYHEAD " + hhmmss(c.tNow).slice(0,8), fast, READER_LANDSCAPE.episodeMarks(src, c.tNow, c.g, lsEpisodeList(c.tNow, true)));
   LV.ms = performance.now() - t1;
   const now = performance.now(); if (now - (LV.perfAt || 0) > 700){ LV.perfAt = now; ls$("lsPerf").textContent = "grid " + c.gridMs.toFixed(1) + " ms · draw " + LV.ms.toFixed(1) + " ms" + (fast ? " (fast mode)" : ""); }      // DOM text is written rarely: writing it every frame forces a page layout
 }

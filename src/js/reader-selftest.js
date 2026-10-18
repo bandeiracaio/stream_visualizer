@@ -509,6 +509,18 @@ const READER_SELFTEST=(()=>{
     const play=Object.assign({},base,{live:false,tNow:100200,sessId:1,src:"session"}),s1=K(play),sNext=K(Object.assign({},play,{sessId:2}))!==s1,exact=K(Object.assign({},play,{tNow:100201}))!==s1;
     return{ok:same&&moved&&grown&&trimmed&&venue&&span&&sNext&&exact,detail:JSON.stringify({same,moved,grown,trimmed,venue,span,sNext,exact})};
   });
+  add("landscape: episodes become marks on the floor at their price and time, and only when they overlap the window",E=>{
+    const LS=READER_LANDSCAPE,T=100000,src={trades:[],t0:0,t1:T,mid:()=>100},g={spanMs:60000,half:4,venue:"both"};
+    const eps=[{family:"wall",venue:"bn",stage:"active",tStart:T-20000,tEnd:null,tDetected:T-15000,px:100.02},
+      {family:"absorption",venue:"hl",stage:"ended",tStart:T-90000,tEnd:T-70000,tDetected:T-85000,px:100},
+      {family:"burst",venue:"hl",stage:"ended",tStart:T-80000,tEnd:T-30000,tDetected:T-79000,px:99.96},
+      {family:"exhaustion",venue:"bn",stage:"active",tStart:T-5000,tEnd:null,tDetected:T-1000,px:101}];
+    const m=LS.episodeMarks(src,T,g,eps),w=m.find(x=>x.family==="wall"),b=m.find(x=>x.family==="burst"),x=m.find(x=>x.family==="exhaustion");
+    const hl=LS.episodeMarks(src,T,Object.assign({},g,{venue:"hl"}),eps);
+    return{ok:m.length===3&&!m.some(y=>y.family==="absorption")&&Math.abs(w.u-.5)<1e-9&&Math.abs(w.z0+1)<1e-9&&Math.abs(w.z1-(20000/60000*2-1))<1e-9&&Math.abs(w.zd-(15000/60000*2-1))<1e-9
+      &&b.zd===null&&b.z1===1&&Math.abs(b.u+1)<1e-9&&x.u===1&&x.outside===true&&hl.length===1&&hl[0].family==="burst"&&LS.episodeMarks(src,T,g,null).length===0,
+      detail:JSON.stringify({n:m.length,w,b,x,hl:hl.length})};
+  });
   function run(Eng){return scenarios.map(sc=>{try{const r=sc.run(Eng);return{name:sc.name,ok:!!r.ok,detail:r.detail};}catch(err){return{name:sc.name,ok:false,detail:String(err&&err.stack||err)};}});}
   return {T0,rng,poisson,levels,sim,scenarios,run};
 })();

@@ -18,6 +18,7 @@ The app ships as ONE self-contained HTML file (must run offline-capable from a p
 
 - `node build.mjs` runs the Reader self-test, then writes `dist/stream-visualizer.html` (dev build).
 - `node build.mjs --release` writes the next `stream-visualizer_vNNN.html` in the repo root (never overwrites an existing version). Release after each finished step so the user always has an up-to-date single file.
+- Line endings are mixed: `app.js`, `reader-episodes.js`, `reader-register.js`, `reader-tools.js` are CRLF, the rest LF. Edit without converting (Python `open(..., newline="")`), then check `git diff --stat`: a whole-file diff means the endings changed.
 - Scope: each piece of work is its own step and its own release. UX steps leave the Reader engine, trading/paper-broker and feed logic alone; note anything else spotted instead of changing it. Feature steps (Overview, then the Reader redesign) may touch the engine, which must stay pure, DOM-free and replayable, with self-test scenarios added for new behaviour.
 - Reader redesign direction (agreed): detect *episodes* (forming -> active -> fading -> ended, resumable) instead of one-off events; report detected time and back-dated start; multi-variable evidence checklist per episode; neutral participant language (aggressor / passive side), no bull/bear; first families: absorption, exhaustion, aggression burst, wall; validate with session record/replay, a span timeline, and agree/disagree labels.
 

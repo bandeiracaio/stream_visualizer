@@ -1,6 +1,6 @@
 # Self-revising Reader, Part 1: assumption register + passive baselines
 
-Status: needs-triage (inventory below awaits the user's sign-off before build)
+Status: built (part 1 shipped in the v001-v013 source rebuild; parts 2 and 3 followed, see their own files).
 
 ## Goal
 The Reader should revise what it believes when data differs from what it expected, and only when sure.
