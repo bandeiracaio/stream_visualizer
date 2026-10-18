@@ -5,7 +5,7 @@
 // fails the rest of the Reader tab keeps working.
 const LV = {
   src: "live", venue: store.get("ls.venue", "both"), spanMs: +store.get("ls.span", 60000) || 60000, speed: +store.get("ls.speed", 4) || 4,
-  yaw: -.62, pitch: .62, t: null, play: false, half: 0, zscale: 0, sess: null, sessOf: null, drag: null, last: 0, raf: 0, dirty: true, box: null,
+  yaw: -.62, pitch: .62, t: null, play: false, half: 0, zscale: 0, sess: null, sessOf: null, drag: null, last: 0, raf: 0, dirty: true, cache: null, order: null, orderKey: "", ms: 0,
 };
 const ls$ = id => document.getElementById(id);
 const LS_HEIGHT = .78;                      // tallest peak, as a share of half the floor width
@@ -13,7 +13,7 @@ const LS_HEIGHT = .78;                      // tallest peak, as a share of half 
 function lsSource() {
   if (LV.src === "session") {
     if (typeof RT === "undefined" || !RT.session) return null;
-    if (LV.sessOf !== RT.session){ LV.sessOf = RT.session; LV.sess = READER_LANDSCAPE.fromInputs(RT.session.inputs); LV.t = null; }
+    if (LV.sessOf !== RT.session){ LV.sessOf = RT.session; LV.sessId = (LV.sessId || 0) + 1; LV.sess = READER_LANDSCAPE.fromInputs(RT.session.inputs); LV.t = null; }
     return LV.sess.trades.length ? LV.sess : null;
   }
   return {
@@ -31,63 +31,75 @@ function lsSource() {
 }
 const lsRange = src => src === LV.sess ? {a: src.t0, b: src.t1} : {a: src.t0 + LV.spanMs, b: src.t1};
 
-// ---------- projection ----------
-function lsProject(box, X, H, Z) {
-  const cy = Math.cos(LV.yaw), sy = Math.sin(LV.yaw), cp = Math.cos(LV.pitch), sp = Math.sin(LV.pitch);
-  const x1 = X*1.6*cy - Z*sy, z1 = X*sy + Z*cy, y2 = H*cp + z1*sp, z2 = z1*cp - H*sp, f = 3.6/(3.6 + z2);
-  return {x: box.cx + x1*f*box.S, y: box.cy - y2*f*box.S, d: z2};
-}
-const lsMix = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
-const LS_BUY = [47,191,113], LS_SELL = [229,83,75];
+// ---------- drawing ----------
+// Cost control (v022): the data (grid) is computed only when the playhead, window, venue or live data changes; rotating redraws from the cached
+// grid. Each frame projects the 41x24 vertices once (not four corners per quad), walks the cells far to near in an order that is sorted only
+// when the angle changes, and fills from a small colour table. While dragging or playing it draws at 1x resolution without cell outlines.
+const LS_BUY = [47,191,113], LS_SELL = [229,83,75], LS_LEVELS = 24;
+const lsRgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+const LS_FILL = [LS_SELL, LS_BUY].map(col => Array.from({length: LS_LEVELS+1}, (_, k) => { const m = k/LS_LEVELS; return lsRgba(col.map(c => Math.round(c*(.45+.55*Math.sqrt(m)) + 12*(1-m))), (.25 + .7*Math.sqrt(m)).toFixed(3)); }));
+const LS_EDGE = [LS_SELL, LS_BUY].map(col => lsRgba(col, .28));
 
-function lsDraw(cv, g, info) {
-  const {ctx, w, h} = prep(cv); if (w < 60) return;
-  const box = LV.box = {cx: w/2, cy: h*.5, S: Math.min(w*.27, h*.33)}, nx = g.nx, ny = g.ny;
-  const U = i => (i+.5)/nx*2 - 1, Zc = j => (j+.5)/ny*2 - 1;                        // price left to right; age: newest at the front (-1)
-  const P = (u, hgt, z) => lsProject(box, u, hgt, z);
-  const sc = LV.zscale || 1, sq = x => Math.sign(x)*Math.sqrt(Math.min(1, Math.abs(x)/sc));   // height and colour grow with the square root of the flow, so small pockets stay visible beside big ones
-  ctx.lineWidth = 1; ctx.font = "10.5px ui-monospace,Menlo,Consolas,monospace";
-  // floor
+function lsPrepCanvas(cv, fast) {
+  const dpr = fast ? 1 : Math.min(window.devicePixelRatio || 1, 2), w = cv.clientWidth, h = cv.clientHeight;
+  if (cv.width !== Math.round(w*dpr) || cv.height !== Math.round(h*dpr)){ cv.width = Math.round(w*dpr); cv.height = Math.round(h*dpr); }
+  const ctx = cv.getContext("2d"); ctx.setTransform(cv.width/w, 0, 0, cv.height/h, 0, 0); ctx.clearRect(0, 0, w, h);
+  ctx.font = "10.5px ui-monospace,Menlo,Consolas,monospace";
+  return {ctx, w, h};
+}
+
+function lsDraw(cv, g, info, fast) {
+  const {ctx, w, h} = lsPrepCanvas(cv, fast); if (w < 60) return;
+  const nx = g.nx, ny = g.ny, n = nx*ny, S = Math.min(w*.27, h*.33), cx = w/2, cy = h*.5;
+  const cyw = Math.cos(LV.yaw), syw = Math.sin(LV.yaw), cp = Math.cos(LV.pitch), sp = Math.sin(LV.pitch);
+  const P = (X, H, Z) => { const x1 = X*1.6*cyw - Z*syw, z1 = X*1.6*syw + Z*cyw, y2 = H*cp + z1*sp, z2 = z1*cp - H*sp, f = 3.6/(3.6 + z2); return [cx + x1*f*S, cy - y2*f*S]; };
+  const U = i => (i+.5)/nx*2 - 1, Zc = j => (j+.5)/ny*2 - 1;
+  const sc = LV.zscale || 1, sq = x => Math.sign(x)*Math.sqrt(Math.min(1, Math.abs(x)/sc));
+  ctx.lineWidth = 1;
+  // floor and grid
   const c4 = [P(-1,0,-1), P(1,0,-1), P(1,0,1), P(-1,0,1)];
-  ctx.beginPath(); c4.forEach((p, k) => k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath();
+  ctx.beginPath(); c4.forEach((p, k) => k ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath();
   ctx.fillStyle = "rgba(122,162,247,.05)"; ctx.fill(); ctx.strokeStyle = "#2c3744"; ctx.stroke();
-  ctx.strokeStyle = "rgba(125,138,153,.16)";
-  for (let k = 1; k < 4; k++){ const u = -1 + k/2, a = P(u,0,-1), b = P(u,0,1); ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); }
-  for (let k = 1; k < 4; k++){ const z = -1 + k/2, a = P(-1,0,z), b = P(1,0,z); ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); }
-  // the current mid, as a line along time
-  ctx.setLineDash([4,4]); ctx.strokeStyle = "rgba(214,221,230,.4)"; { const a = P(0,0,-1), b = P(0,0,1); ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); } ctx.setLineDash([]);
-  // where the price actually was
-  ctx.strokeStyle = "rgba(240,244,248,.95)"; ctx.lineWidth = 2; ctx.beginPath(); let pen = false;
-  g.path.forEach((off, j) => { if (off == null){ pen = false; return; } const u = Math.max(-1, Math.min(1, off/g.half)), p = P(u, 0, Zc(j)); pen ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); pen = true; });
-  ctx.stroke(); ctx.lineWidth = 1;
-  // surface, far to near
-  const H = (i, j) => sq(g.zs[j*nx+i]) * LS_HEIGHT, quads = [];
-  for (let j = 0; j < ny-1; j++) for (let i = 0; i < nx-1; i++){
-    const v = sq((g.zs[j*nx+i] + g.zs[j*nx+i+1] + g.zs[(j+1)*nx+i] + g.zs[(j+1)*nx+i+1]) / 4);
-    if (Math.abs(v) < .04) continue;
-    const p = [P(U(i),H(i,j),Zc(j)), P(U(i+1),H(i+1,j),Zc(j)), P(U(i+1),H(i+1,j+1),Zc(j+1)), P(U(i),H(i,j+1),Zc(j+1))];
-    quads.push({p, v, d:(p[0].d+p[1].d+p[2].d+p[3].d)/4});
-  }
-  quads.sort((a, b) => b.d - a.d);
-  for (const q of quads){
-    const m = Math.min(1, Math.abs(q.v)), col = q.v > 0 ? LS_BUY : LS_SELL, a = .25 + .7*Math.sqrt(m);
-    ctx.beginPath(); q.p.forEach((p, k) => k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath();
-    ctx.fillStyle = lsMix(col.map((c, k) => Math.round(c*(.45+.55*Math.sqrt(m)) + 12*(1-m))), a); ctx.fill();
-    ctx.strokeStyle = lsMix(col, .28); ctx.stroke();
-  }
-  ctx.strokeStyle = "rgba(240,244,248,.5)"; ctx.lineWidth = 1; ctx.beginPath(); pen = false;      // the path again over the surface, so a peak cannot hide it
-  g.path.forEach((off, j) => { if (off == null){ pen = false; return; } const u = Math.max(-1, Math.min(1, off/g.half)), p = P(u, 0, Zc(j)); pen ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); pen = true; });
+  ctx.strokeStyle = "rgba(125,138,153,.16)"; ctx.beginPath();
+  for (let k = 1; k < 4; k++){ const u = -1 + k/2, a = P(u,0,-1), b = P(u,0,1), c = P(-1,0,u), d = P(1,0,u); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.moveTo(c[0],c[1]); ctx.lineTo(d[0],d[1]); }
   ctx.stroke();
-  // the newest edge, drawn over the surface
-  ctx.strokeStyle = "rgba(122,162,247,.9)"; ctx.lineWidth = 1.5; { const a = P(-1,0,-1), b = P(1,0,-1); ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); } ctx.lineWidth = 1;
+  ctx.setLineDash([4,4]); ctx.strokeStyle = "rgba(214,221,230,.4)"; { const a = P(0,0,-1), b = P(0,0,1); ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke(); } ctx.setLineDash([]);
+  const trace = (style, width) => {                              // where the price actually was
+    ctx.strokeStyle = style; ctx.lineWidth = width; ctx.beginPath(); let pen = false;
+    g.path.forEach((off, j) => { if (off == null){ pen = false; return; } const p = P(Math.max(-1, Math.min(1, off/g.half)), 0, Zc(j)); pen ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); pen = true; });
+    ctx.stroke(); ctx.lineWidth = 1;
+  };
+  trace("rgba(240,244,248,.95)", 2);
+  // vertices, projected once
+  const vx = new Float32Array(n), vy = new Float32Array(n);
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++){ const k = j*nx + i, p = P(U(i), sq(g.zs[k]) * LS_HEIGHT, Zc(j)); vx[k] = p[0]; vy[k] = p[1]; }
+  // far-to-near cell order depends only on the angle
+  const key = LV.yaw.toFixed(3) + "|" + LV.pitch.toFixed(3) + "|" + nx + "x" + ny;
+  if (LV.orderKey !== key){
+    const m = (nx-1)*(ny-1), depth = new Float64Array(m), idx = new Uint16Array(m);
+    for (let j = 0; j < ny-1; j++) for (let i = 0; i < nx-1; i++){ const q = j*(nx-1) + i; idx[q] = q; depth[q] = (U(i)+.5/nx)*1.6*syw + (Zc(j)+.5/ny)*cyw; }
+    idx.sort((a, b) => depth[b] - depth[a]); LV.order = idx; LV.orderKey = key;
+  }
+  const order = LV.order;
+  for (let t = 0; t < order.length; t++){
+    const q = order[t], j = (q / (nx-1)) | 0, i = q - j*(nx-1), k = j*nx + i;
+    const v = sq((g.zs[k] + g.zs[k+1] + g.zs[k+nx] + g.zs[k+nx+1]) / 4);
+    if (v > -.04 && v < .04) continue;
+    const side = v > 0 ? 1 : 0, lv = Math.min(LS_LEVELS, Math.round(Math.abs(v)*LS_LEVELS));
+    ctx.beginPath(); ctx.moveTo(vx[k], vy[k]); ctx.lineTo(vx[k+1], vy[k+1]); ctx.lineTo(vx[k+nx+1], vy[k+nx+1]); ctx.lineTo(vx[k+nx], vy[k+nx]); ctx.closePath();
+    ctx.fillStyle = LS_FILL[side][lv]; ctx.fill();
+    ctx.strokeStyle = fast ? LS_FILL[side][lv] : LS_EDGE[side]; ctx.stroke();      // fast mode: a hairline in the fill colour only hides the seams
+  }
+  trace("rgba(240,244,248,.5)", 1);                              // the path again over the surface, so a peak cannot hide it
+  ctx.strokeStyle = "rgba(122,162,247,.9)"; ctx.lineWidth = 1.5; { const a = P(-1,0,-1), b = P(1,0,-1); ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke(); } ctx.lineWidth = 1;
   // axes
   ctx.fillStyle = "#7d8a99"; ctx.textAlign = "center";
-  for (const u of [-1, 0, 1]){ const p = P(u,0,-1.2); ctx.fillText((u > 0 ? "+" : u < 0 ? "-" : "") + (Math.abs(u)*g.half).toFixed(g.half < 10 ? 1 : 0) + " bps", p.x, p.y+4); }
+  for (const u of [-1, 0, 1]){ const p = P(u,0,-1.2); ctx.fillText((u > 0 ? "+" : u < 0 ? "-" : "") + (Math.abs(u)*g.half).toFixed(g.half < 10 ? 1 : 0) + " bps", p[0], p[1]+4); }
   ctx.textAlign = "left";
-  for (const z of [-1, 0, 1]){ const p = P(1.08,0,z); ctx.fillText(z === -1 ? "now" : ((z+1)/2*g.spanMs/1000).toFixed(0) + " s ago", p.x, p.y+3); }
-  { const a = P(-1,0,1), b = P(-1,LS_HEIGHT,1), c = P(-1,-LS_HEIGHT,1); ctx.strokeStyle = "#2c3744"; ctx.beginPath(); ctx.moveTo(c.x,c.y); ctx.lineTo(b.x,b.y); ctx.stroke();
-    ctx.textAlign = "left"; ctx.fillStyle = lsMix(LS_BUY, 1); ctx.fillText("buyers", b.x+4, b.y+3); ctx.fillStyle = lsMix(LS_SELL, 1); ctx.fillText("sellers", c.x+4, c.y+3); }
-  ctx.fillStyle = "#7d8a99"; ctx.textAlign = "left"; ctx.fillText(info + "   ·   full height = " + fmtK(sc) + " net per spot (square-root scale)", 8, 14);
+  for (const z of [-1, 0, 1]){ const p = P(1.08,0,z); ctx.fillText(z === -1 ? "now" : ((z+1)/2*g.spanMs/1000).toFixed(0) + " s ago", p[0], p[1]+3); }
+  { const b = P(-1,LS_HEIGHT,1), c = P(-1,-LS_HEIGHT,1); ctx.strokeStyle = "#2c3744"; ctx.beginPath(); ctx.moveTo(c[0],c[1]); ctx.lineTo(b[0],b[1]); ctx.stroke();
+    ctx.fillStyle = lsRgba(LS_BUY, 1); ctx.fillText("buyers", b[0]+4, b[1]+3); ctx.fillStyle = lsRgba(LS_SELL, 1); ctx.fillText("sellers", c[0]+4, c[1]+3); }
+  ctx.fillStyle = "#7d8a99"; ctx.textAlign = "left"; ctx.fillText(info + "   \u00b7   full height = " + fmtK(sc) + " net per spot (square-root scale)", 8, 14);
 }
 
 // ---------- readout ----------
@@ -114,19 +126,28 @@ function lsPlayhead(src) {
   if (LV.t == null) return LV.src === "live" ? r.b : r.a;
   return Math.max(r.a, Math.min(r.b, LV.t));
 }
-function lsRender(force) {
+function lsRender() {
   const sec = ls$("lsSection"); if (!sec || !visible("reader")) return;
   const cv = ls$("lsCv"), src = lsSource();
-  if (!src){ const {ctx, w, h} = prep(cv); emptyMsg(ctx, w, h, LV.src === "session" ? "Load a recorded session (Session, replay and labels) to walk through it." : "Connect to see the landscape."); ls$("lsRead").textContent = ""; lsControls(null); return; }
-  const tNow = lsPlayhead(src), live = LV.src === "live" && LV.t == null;
-  const o = {venue: LV.venue, spanMs: LV.spanMs}, target = READER_LANDSCAPE.autoHalf(src, tNow, o);
-  LV.half = !LV.half ? target : target > LV.half ? target : LV.half + (target - LV.half)*.1;
-  const g = READER_LANDSCAPE.grid(src, tNow, Object.assign({halfBps: Math.ceil(LV.half*2)/2}, o));
-  const a = Array.from(g.zs, Math.abs).filter(x => x > 0).sort((x, y) => x - y), p = a.length ? a[Math.min(a.length-1, Math.floor(a.length*.97))] : 0;
-  LV.zscale = !LV.zscale || p > LV.zscale ? Math.max(p, 1) : Math.max(1, LV.zscale*.96 + p*.04);
-  lsDraw(cv, g, live ? "LIVE" : "PLAYHEAD " + hhmmss(tNow).slice(0,8));
-  ls$("lsRead").innerHTML = lsReadout(g, tNow);
-  lsControls(src, tNow, live);
+  if (!src){ const {ctx, w, h} = prep(cv); emptyMsg(ctx, w, h, LV.src === "session" ? "Load a recorded session (Session, replay and labels) to walk through it." : "Connect to see the landscape."); ls$("lsRead").textContent = ""; lsControls(null); LV.cache = null; return; }
+  const live = LV.src === "live" && LV.t == null, tNow = lsPlayhead(src), tq = live ? Math.round(tNow/500)*500 : tNow;
+  const key = [LV.src, LV.venue, LV.spanMs, tq, src === LV.sess ? "s" + LV.sessId : trades.length + "@" + (trades.length ? trades[0].t + "-" + trades[trades.length-1].t : 0)].join("|");
+  let c = LV.cache;
+  if (!c || c.key !== key){                                    // new data or a new moment: recompute; otherwise rotate from the cache
+    const t0 = performance.now(), o = {venue: LV.venue, spanMs: LV.spanMs}, path = READER_LANDSCAPE.path(src, tNow, o);
+    const target = READER_LANDSCAPE.autoHalf(src, tNow, Object.assign({path}, o));
+    LV.half = !LV.half ? target : target > LV.half ? target : LV.half + (target - LV.half)*.1;
+    const g = READER_LANDSCAPE.grid(src, tNow, Object.assign({halfBps: Math.ceil(LV.half*2)/2, path}, o));
+    LV.zscale = !LV.zscale || g.scale > LV.zscale ? Math.max(g.scale, 1) : Math.max(1, LV.zscale*.96 + g.scale*.04);
+    c = LV.cache = {key, g, tNow, live, gridMs: performance.now() - t0};
+    const dn = performance.now();                              // text and slider are written at most 4 times a second while playing: each write forces a page layout
+    if (!LV.play || dn - (LV.domAt || 0) > 250){ LV.domAt = dn; ls$("lsRead").innerHTML = lsReadout(g, tNow); lsControls(src, tNow, live); }
+  } else if (!LV.dirty) return;                                  // nothing changed since the last draw
+  LV.dirty = false;
+  const fast = !!LV.drag || LV.play, t1 = performance.now();
+  lsDraw(cv, c.g, c.live ? "LIVE" : "PLAYHEAD " + hhmmss(c.tNow).slice(0,8), fast);
+  LV.ms = performance.now() - t1;
+  const now = performance.now(); if (now - (LV.perfAt || 0) > 700){ LV.perfAt = now; ls$("lsPerf").textContent = "grid " + c.gridMs.toFixed(1) + " ms · draw " + LV.ms.toFixed(1) + " ms" + (fast ? " (fast mode)" : ""); }      // DOM text is written rarely: writing it every frame forces a page layout
 }
 function lsControls(src, tNow, live) {
   const sl = ls$("lsT"), has = !!src;
@@ -147,7 +168,7 @@ function lsLoop() {
     if (t >= r.b){ t = r.b; LV.play = false; if (LV.src === "live") t = null; }
     LV.t = t;
   }
-  if (LV.dirty || LV.play){ LV.dirty = false; try { lsRender(); } catch (e) { /* the landscape must never take the Reader down */ } }
+  if (LV.dirty || LV.play){ try { lsRender(); } catch (e) { /* the landscape must never take the Reader down */ } }
   if (LV.play || LV.drag) LV.raf = requestAnimationFrame(lsLoop);
 }
 function lsKick() { LV.dirty = true; if (!LV.raf) { LV.lastFrame = performance.now(); LV.raf = requestAnimationFrame(lsLoop); } }
@@ -172,7 +193,7 @@ function lsKick() { LV.dirty = true; if (!LV.raf) { LV.lastFrame = performance.n
   cv.addEventListener("pointerdown", e => { cv.setPointerCapture(e.pointerId); LV.drag = {kind:"rotate", x:e.clientX, y:e.clientY, touch:e.pointerType !== "mouse"}; lsKick(); });
   cv.addEventListener("pointermove", e => { const d = LV.drag; if (!d || d.kind !== "rotate") return;
     LV.yaw += (e.clientX - d.x)*.008; if (!d.touch) LV.pitch = Math.max(.05, Math.min(1.5, LV.pitch + (e.clientY - d.y)*.006)); d.x = e.clientX; d.y = e.clientY; LV.dirty = true; });
-  const end = () => { if (LV.drag && LV.drag.kind === "rotate") LV.drag = null; };
+  const end = () => { if (LV.drag && LV.drag.kind === "rotate"){ LV.drag = null; lsKick(); } };
   cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end);
   window.addEventListener("resize", () => { LV.dirty = true; });
 })();

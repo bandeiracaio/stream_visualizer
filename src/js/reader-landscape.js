@@ -28,20 +28,22 @@ const READER_LANDSCAPE = (() => {
   }
 
   // A symmetric price range that holds the trades and the mid path of the window (at least 1.5 bps, rounded up so it does not jitter).
+  // opt.path lets a caller that already has the path pass it in instead of computing it again.
   function autoHalf(src, tNow, opt) {
-    const o = Object.assign({}, DEFAULTS, opt), vs = venuesOf(o), a = [];
-    for (const v of vs){ const m = src.mid(v, tNow); if (!(m > 0)) continue; for (const tr of inWindow(src, tNow, o)) if (tr.v === v && tr.px > 0) a.push(Math.abs(off(tr.px, m))); }
-    for (const p of path(src, tNow, o)) if (p != null) a.push(Math.abs(p));
+    const o = Object.assign({}, DEFAULTS, opt), vs = venuesOf(o), [i0, i1] = span(src, tNow, o), a = [];
+    for (const v of vs){ const m = src.mid(v, tNow); if (!(m > 0)) continue; for (let i = i0; i < i1; i++){ const tr = src.trades[i]; if (tr.v === v && tr.px > 0) a.push(Math.abs(off(tr.px, m))); } }
+    for (const p of (o.path || path(src, tNow, o))) if (p != null) a.push(Math.abs(p));
     if (!a.length) return o.halfBps;
     a.sort((x, y) => x-y); const p95 = a[Math.min(a.length-1, Math.floor(a.length*.95))];
     const x = Math.max(1.5, p95*1.15), step = x < 5 ? .5 : x < 20 ? 1 : 5;
     return Math.ceil(x/step)*step;
   }
 
-  function inWindow(src, tNow, o) {
-    const t0 = tNow - o.spanMs, i0 = lower(src.trades, t0, x => x.t), out = [];
-    for (let i = i0; i < src.trades.length && src.trades[i].t <= tNow; i++) out.push(src.trades[i]);
-    return out;
+  // The index range [i0, i1) of the trades inside the window; nothing is copied.
+  function span(src, tNow, o) {
+    const i0 = lower(src.trades, tNow - o.spanMs, x => x.t);
+    let i1 = i0; while (i1 < src.trades.length && src.trades[i1].t <= tNow) i1++;
+    return [i0, i1];
   }
 
   // The surface at the playhead tNow. z is the raw net flow per cell; zs is the lightly smoothed copy used for drawing.
@@ -49,8 +51,9 @@ const READER_LANDSCAPE = (() => {
     const o = Object.assign({}, DEFAULTS, opt), nx = o.xBins, ny = o.yBins, z = new Float64Array(nx*ny), half = o.halfBps;
     const vs = venuesOf(o), base = {}; for (const v of vs){ const m = src.mid(v, tNow); if (m > 0) base[v] = m; }
     let buy = 0, sell = 0, n = 0, clipped = 0;
-    for (const tr of inWindow(src, tNow, o)){
-      const m = base[tr.v]; if (!m || !(tr.px > 0) || !(tr.ntl > 0)) continue;
+    const [i0, i1] = span(src, tNow, o);
+    for (let k = i0; k < i1; k++){
+      const tr = src.trades[k], m = base[tr.v]; if (!m || !(tr.px > 0) || !(tr.ntl > 0)) continue;
       const xi = Math.floor((off(tr.px, m) + half)/(2*half)*nx), yi = Math.floor((tNow - tr.t)/o.spanMs*ny);
       if (xi < 0 || xi >= nx){ clipped++; continue; }
       const yj = Math.min(ny-1, Math.max(0, yi)), s = tr.side === "buy" ? tr.ntl : -tr.ntl;
@@ -63,14 +66,16 @@ const READER_LANDSCAPE = (() => {
         out[j*nx+i] = s/c;
       } return out; };
     const zs = blur(blur(z));
+    const tmp = new Float64Array(zs.length); let cnt = 0; for (let k = 0; k < zs.length; k++){ const m = Math.abs(zs[k]); if (m > 0) tmp[cnt++] = m; }
+    const sorted = tmp.subarray(0, cnt).sort(), scale = cnt ? sorted[Math.min(cnt-1, Math.floor(cnt*.97))] : 0;   // the 97th percentile of the smoothed flow: what the picture treats as full height
     let peakBuy = null, peakSell = null;
     for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++){
       const v = z[j*nx+i], cell = {z:v, xBps:-half + (i+.5)/nx*2*half, ageS:(j+.5)/ny*o.spanMs/1000};
       if (v > 0 && (!peakBuy || v > peakBuy.z)) peakBuy = cell;
       if (v < 0 && (!peakSell || v < peakSell.z)) peakSell = cell;
     }
-    const p = path(src, tNow, o), first = p.slice().reverse().find(x => x != null);
-    return {nx, ny, half, spanMs:o.spanMs, venue:o.venue, tNow, z, zs, buy, sell, net:buy-sell, trades:n, clipped, peakBuy, peakSell, path:p, moveBps:first == null ? null : -first};
+    const p = o.path || path(src, tNow, o), first = p.slice().reverse().find(x => x != null);
+    return {nx, ny, half, scale, spanMs:o.spanMs, venue:o.venue, tNow, z, zs, buy, sell, net:buy-sell, trades:n, clipped, peakBuy, peakSell, path:p, moveBps:first == null ? null : -first};
   }
 
   // A recorded session (the inputs of the Reader's record/replay) as a source: trades in time order and a mid series per venue.
@@ -91,5 +96,5 @@ const READER_LANDSCAPE = (() => {
     if (i > 0 && t - a[i-1][0] <= 5000) return a[i-1][1];
     return i < a.length && a[i][0] - t <= 5000 ? a[i][1] : null;
   }
-  return {DEFAULTS, grid, autoHalf, path, fromInputs, midAt};
+  return {DEFAULTS, grid, autoHalf, path, span, fromInputs, midAt};
 })();
