@@ -2,7 +2,7 @@
 // Market Reader engine: pure logic, no DOM and no timers. Exchange timestamps drive its clock.
 const READER_ENGINE = (() => {
   const DEFAULTS = {
-    bucketMs:250, sigmaLagMs:15000, keepMs:1800000, warmupMs:120000, baseTauMs:1800000,
+    bucketMs:250, sigmaLagMs:15000, sigmaFastN:0, sigmaFastW:.5, keepMs:1800000, warmupMs:120000, baseTauMs:1800000,
     horizons:{fast:15000,mid:60000,slow:300000}, minWindowMs:3000, maxWindowMs:600000,
     gapResetMs:30000, cooldownMs:5000, maxEventsPerMin:20, keepEvents:500, sens:1,
     detectors:{wall_appears:true,wall_pulled:true,wall_eaten:true,book_thin:true,imbalance_flip:true,spoof_like:true,capitulation:true,selling_exhausted:true,squeeze:true,breakout:true,passive_absorption:true,refreshing_level:true,failed_poke:true,buyer_exhaustion:true,seller_exhaustion:true,silence_started:true,silence_ended:true,lead_lag:true,trade_cluster:true},
@@ -36,9 +36,12 @@ const READER_ENGINE = (() => {
     function touch(v,p){if(!(p>0))return;v.px=p;const c=v.cur;if(c.open==null)c.open=c.hi=c.lo=p;else{if(p>c.hi)c.hi=p;if(p<c.lo)c.lo=p;}c.close=p;}
     function isCalibrated(){return firstT!=null&&now-firstT>=cfg.warmupMs&&venues.bn.baseN>0;}
     function sample(vn){const v=venues[vn],r=v.ring;if(r.length<8)return;const h=horizon(vn,"fast");if(h){const s=h.ms/1000;push(v.samples.buy,h.buy/s,1800);push(v.samples.sell,h.sell/s,1800);}const n=r.length;const L=Math.max(4,Math.round(cfg.sigmaLagMs/cfg.bucketMs));if(n>L&&r[n-1-L].close>0)push(v.samples.ret,(r[n-1].close/r[n-1-L].close-1)*1e4,1800);push(v.depthRing.bid,v.depth.bid,30);push(v.depthRing.ask,v.depth.ask,30);}
-    function stat(v,key){const arr=v.samples[key],c=v.stats[key];if(arr.length<30)return {n:arr.length,med:0,mad:0,at:now};if(c&&now-c.at<5000)return c;const s=arr.slice().sort((a,b)=>a-b),med=s[s.length>>1],dev=s.map(x=>Math.abs(x-med)).sort((a,b)=>a-b);return(v.stats[key]={n:arr.length,med,mad:1.4826*dev[dev.length>>1],q75:dev[Math.floor(dev.length*.75)]/1.1503,at:now});}
+    function stat(v,key){const arr=v.samples[key],c=v.stats[key];if(arr.length<30)return {n:arr.length,med:0,mad:0,at:now};if(c&&now-c.at<5000)return c;const s=arr.slice().sort((a,b)=>a-b),med=s[s.length>>1],dev=s.map(x=>Math.abs(x-med)).sort((a,b)=>a-b);const o={n:arr.length,med,mad:1.4826*dev[dev.length>>1],q75:dev[Math.floor(dev.length*.75)]/1.1503,at:now};if(key==="ret"&&cfg.sigmaFastN>0&&arr.length>=cfg.sigmaFastN)o.q75f=q75of(arr.slice(-cfg.sigmaFastN));return(v.stats[key]=o);}
+    function q75of(a){const m=a.slice().sort((x,y)=>x-y)[a.length>>1],d=a.map(x=>Math.abs(x-m)).sort((x,y)=>x-y);return d[Math.floor(d.length*.75)]/1.1503;}
+    // sigma: the robust 15 s spread over the whole history (slow), optionally blended in variance with the same spread over the last sigmaFastN seconds (fast), so a busier market is measured against its own current pace
+    function blendSigma(slow,fast){if(!(cfg.sigmaFastN>0)||fast==null)return slow;return Math.sqrt((1-cfg.sigmaFastW)*slow*slow+cfg.sigmaFastW*fast*fast);}
     function robustZ(x,vn,key,floor){const st=stat(venues[vn],key);if(st.n<60)return 0;return(x-st.med)/Math.max(st.mad,.1*Math.abs(st.med),floor);}
-    function sigmaBps(vn){const st=stat(venues[vn],"ret");if(st.n<60)return .05;return Math.max(st.q75/Math.sqrt(cfg.sigmaLagMs/1000),.05);}
+    function sigmaBps(vn){const st=stat(venues[vn],"ret");if(st.n<60)return .05;const r=Math.sqrt(cfg.sigmaLagMs/1000);return Math.max(blendSigma(st.q75/r,st.q75f==null?null:st.q75f/r),.05);}
     function rateRatio(){const v=venues.bn,r=v.ring,n=Math.min(r.length,20);if(n<4||!(v.base>0))return 1;let s=0;for(let i=r.length-n;i<r.length;i++)s+=r[i].buy+r[i].sell;return clamp((s/(n*cfg.bucketMs/1000))/v.base,.25,4);}
     function windowMs(name){const nominal=cfg.horizons[name];return nominal>0?clamp(nominal/rateRatio(),cfg.minWindowMs,cfg.maxWindowMs):NaN;}
     function horizon(vn,name){const v=venues[vn],r=v&&v.ring;if(!r||!r.length)return null;const ms=windowMs(name);if(!(ms>0))return null;const count=clamp(Math.round(ms/cfg.bucketMs),1,r.length),h={ms:count*cfg.bucketMs,buy:0,sell:0,n:0,maxTrade:0,hi:-Infinity,lo:Infinity,open:null,close:null,liqBuyN:0,liqSellN:0,sweepBuyN:0,sweepSellN:0};for(let i=r.length-count;i<r.length;i++){const b=r[i];h.buy+=b.buy;h.sell+=b.sell;h.n+=b.n;if(b.maxTrade>h.maxTrade)h.maxTrade=b.maxTrade;if(b.hi!=null){if(b.hi>h.hi)h.hi=b.hi;if(b.lo<h.lo)h.lo=b.lo;if(h.open==null)h.open=b.open;h.close=b.close;}h.liqBuyN+=b.liqBuyN;h.liqSellN+=b.liqSellN;h.sweepBuyN+=b.sweepBuyN;h.sweepSellN+=b.sweepSellN;}if(h.open==null)return null;const total=h.buy+h.sell;h.share=total>0?h.buy/total:.5;h.delta=h.buy-h.sell;return h;}
@@ -83,7 +86,7 @@ const READER_ENGINE = (() => {
     function trimEvents(raw){let n=0;for(const x of events)if(!!x.raw===raw)n++;if(n>cfg.keepEvents)events.splice(events.findIndex(x=>!!x.raw===raw),1);}
     function rawOf(v){return v.raw||(v.raw={lastT:null,gaps:[],silent:false,silentThr:0,run:[],cluOn:false,ntls:[]});}
     function rawSigma(vn){const c=rawSigmaCache[vn];if(c&&c.t===now)return c.v;const v=rawSigmaCalc(vn);rawSigmaCache[vn]={t:now,v};return v;}
-    function rawSigmaCalc(vn){const a=venues[vn].samples.ret;if(a.length<60)return .05;const m=a.slice().sort((x,y)=>x-y)[a.length>>1],d=a.map(x=>Math.abs(x-m)).sort((x,y)=>x-y);return Math.max(d[Math.floor(d.length*.75)]/1.1503/Math.sqrt(cfg.sigmaLagMs/1000),.05);}
+    function rawSigmaCalc(vn){const a=venues[vn].samples.ret;if(a.length<60)return .05;const r=Math.sqrt(cfg.sigmaLagMs/1000);return Math.max(blendSigma(q75of(a)/r,cfg.sigmaFastN>0&&a.length>=cfg.sigmaFastN?q75of(a.slice(-cfg.sigmaFastN))/r:null),.05);}
     const pctile=(a,q)=>{const s=a.slice().sort((x,y)=>x-y);return s[Math.min(s.length-1,Math.floor(q*s.length))];};
     function silenceLimit(r){return r.gaps.length<cfg.silenceMinGaps?null:Math.max(pctile(r.gaps,cfg.silencePct),cfg.silenceMinMs);}
     function rawTrade(tr,v){const r=rawOf(v);
