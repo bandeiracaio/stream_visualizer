@@ -236,11 +236,11 @@
   <section data-tab="reader" class="full" id="lsSection">
     <h2>Flow landscape <span class="ctl">
       <label>source <select id="lsSrc"><option value="live">Live (last 5 min)</option><option value="session">Loaded session</option></select></label>
-      <label>venue <select id="lsVenue"><option value="both">BN + HL</option><option value="bn">Binance</option><option value="hl">Hyperliquid</option></select></label>
+      <label>venue <select id="lsVenue"><option value="both">BN + HL</option><option value="bn">Binance</option><option value="hl">Hyperliquid</option><option value="split">BN | HL split</option></select></label>
       <label>window <select id="lsSpan"><option value="30000">30 s</option><option value="60000">60 s</option><option value="120000">2 min</option></select></label>
       <label>episodes <select id="lsMarks" title="Reader episodes drawn on the floor"><option value="all">all</option><option value="nowall">no walls</option><option value="off">off</option></select></label>
     </span></h2>
-    <canvas id="lsCv" class="chart" style="height:440px;touch-action:pan-y;cursor:grab"></canvas>
+    <div id="lsWrap" class="lswrap"><canvas id="lsCv" class="chart" style="height:440px;touch-action:pan-y;cursor:grab"></canvas><canvas id="lsCv2" class="chart" hidden style="height:440px;touch-action:pan-y;cursor:grab"></canvas></div>
     <div class="lsbar">
       <button id="lsLive" title="Follow the market again">Live</button>
       <button id="lsPlay">Play</button>

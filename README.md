@@ -4,7 +4,7 @@
 
 Open the file in a browser (phone or PC), press **Connect**, and watch two venues' trades, books and liquidations side by side. No server, no install, no external assets, no account. It runs offline-capable once loaded; the only network traffic is the public exchange feeds.
 
-> Status: personal research tool under active development (28 numbered releases so far). Not financial advice; see [Safety](#safety).
+> Status: personal research tool under active development (29 numbered releases so far). Not financial advice; see [Safety](#safety).
 
 ---
 

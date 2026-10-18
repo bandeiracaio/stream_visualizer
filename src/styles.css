@@ -178,3 +178,6 @@ td.up{color:var(--buy)}td.dn{color:var(--sell)}
 .rv-tbl{width:100%;border-collapse:collapse;font-size:12px}
 .rv-tbl td,.rv-tbl th{text-align:left;padding:3px 6px;border-bottom:1px solid #1e252e;vertical-align:middle}
 .lsbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px}.lsbar input[type=range]{flex:1 1 160px;min-width:120px;padding:0}.lsview{display:inline-flex;gap:4px;margin-left:auto}.lsread{margin:8px 0 4px;font-size:12.5px;line-height:1.5}.lsread b{font-family:var(--mono);color:var(--text)}
+.lswrap{display:grid;grid-template-columns:1fr;gap:6px}
+@media(min-width:900px){.lswrap.split{grid-template-columns:1fr 1fr}}
+#lsSection h2 .ctl{flex-wrap:wrap}

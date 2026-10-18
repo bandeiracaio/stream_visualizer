@@ -122,16 +122,20 @@ function lsEpisodes(tNow) {
   if (!list.length) return "";
   return " Reader episodes at this moment: " + list.map(e => `${READER_EPISODES.FAMILY_LABEL[e.family] || e.family} (${(e.venues || [e.venue]).map(v => v.toUpperCase()).join("+")}, ${e.stage})`).join("; ") + ".";
 }
-function lsReadout(g, tNow) {
+function lsReadout(g, tNow, withEpisodes = true) {
   const cell = c => c ? `${fmtK(Math.abs(c.z))} at ${c.xBps >= 0 ? "+" : "-"}${Math.abs(c.xBps).toFixed(1)} bps, ${c.ageS.toFixed(0)} s ago` : "none";
   const tot = g.buy + g.sell, lean = tot > 0 ? g.net/tot : 0;
   const side = Math.abs(lean) < .15 ? "flow was balanced" : lean > 0 ? "buyers were the aggressors" : "sellers were the aggressors";
   const move = g.moveBps == null ? "" : ` The mid moved ${g.moveBps >= 0 ? "+" : ""}${g.moveBps.toFixed(1)} bps over the window.`;
   return `<b>${hhmmss(tNow).slice(0,8)}</b> · last ${(g.spanMs/1000).toFixed(0)} s · ${g.venue === "both" ? "BN + HL" : g.venue.toUpperCase()}: ${side} (buy ${fmtK(g.buy)}, sell ${fmtK(g.sell)}).` +
-    ` Biggest buying pocket: ${cell(g.peakBuy)}. Biggest selling pocket: ${cell(g.peakSell)}.${move}${g.clipped ? ` ${g.clipped} trade${g.clipped === 1 ? "" : "s"} fell outside the price range.` : ""}${lsEpisodes(tNow)}`;
+    ` Biggest buying pocket: ${cell(g.peakBuy)}. Biggest selling pocket: ${cell(g.peakSell)}.${move}${g.clipped ? ` ${g.clipped} trade${g.clipped === 1 ? "" : "s"} fell outside the price range.` : ""}${withEpisodes ? lsEpisodes(tNow) : ""}`;
 }
 
 // ---------- frame ----------
+function lsLayout(split) {                                        // side by side: a second canvas, two columns on a wide screen and stacked on a phone
+  const cv2 = ls$("lsCv2"); if (!cv2 || cv2.hidden === !split) return;
+  cv2.hidden = !split; ls$("lsWrap").classList.toggle("split", split); ls$("lsCv").style.height = cv2.style.height = split ? "340px" : "440px"; LV.dirty = true; LV.cache = null;
+}
 function lsPlayhead(src) {
   const r = lsRange(src);
   if (LV.t == null) return LV.src === "live" ? r.b : r.a;
@@ -139,25 +143,28 @@ function lsPlayhead(src) {
 }
 function lsRender() {
   const sec = ls$("lsSection"); if (!sec || !visible("reader")) return;
-  const cv = ls$("lsCv"), src = lsSource();
+  const cv = ls$("lsCv"), cv2 = ls$("lsCv2"), split = LV.venue === "split", src = lsSource();
+  lsLayout(split);
   if (!src){ const {ctx, w, h} = prep(cv); emptyMsg(ctx, w, h, LV.src === "session" ? "Load a recorded session (Session, replay and labels) to walk through it." : "Connect to see the landscape."); ls$("lsRead").textContent = ""; lsControls(null); LV.cache = null; return; }
   const live = LV.src === "live" && LV.t == null, tNow = lsPlayhead(src);
   const key = READER_LANDSCAPE.cacheKey({src: LV.src, venue: LV.venue, spanMs: LV.spanMs, tNow, live, sessId: src === LV.sess ? LV.sessId : null, trades});
   let c = LV.cache;
   if (!c || c.key !== key){                                    // new data or a new moment: recompute; otherwise rotate from the cache
-    const t0 = performance.now(), o = {venue: LV.venue, spanMs: LV.spanMs}, path = READER_LANDSCAPE.path(src, tNow, o);
-    const target = READER_LANDSCAPE.autoHalf(src, tNow, Object.assign({path}, o));
+    const t0 = performance.now(), L = READER_LANDSCAPE, vs = split ? ["bn", "hl"] : [LV.venue];                  // side by side: one grid per venue, on a shared price range and height scale
+    const os = vs.map(v => { const o = {venue: v, spanMs: LV.spanMs}; o.path = L.path(src, tNow, o); return o; });
+    const target = Math.max(...os.map(o => L.autoHalf(src, tNow, o)));
     LV.half = !LV.half ? target : target > LV.half ? target : LV.half + (target - LV.half)*.1;
-    const g = READER_LANDSCAPE.grid(src, tNow, Object.assign({halfBps: Math.ceil(LV.half*2)/2, path}, o));
-    LV.zscale = !LV.zscale || g.scale > LV.zscale ? Math.max(g.scale, 1) : Math.max(1, LV.zscale*.96 + g.scale*.04);
-    c = LV.cache = {key, g, tNow, live, gridMs: performance.now() - t0};
+    const gs = os.map(o => L.grid(src, tNow, Object.assign({halfBps: Math.ceil(LV.half*2)/2}, o))), g = gs[0], sc = Math.max(...gs.map(x => x.scale));
+    LV.zscale = !LV.zscale || sc > LV.zscale ? Math.max(sc, 1) : Math.max(1, LV.zscale*.96 + sc*.04);
+    c = LV.cache = {key, g, gs, tNow, live, gridMs: performance.now() - t0};
     const dn = performance.now();                              // text and slider are written at most 4 times a second while playing: each write forces a page layout
-    if (!LV.play || dn - (LV.domAt || 0) > 250){ LV.domAt = dn; ls$("lsRead").innerHTML = lsReadout(g, tNow); lsControls(src, tNow, live); }
+    if (!LV.play || dn - (LV.domAt || 0) > 250){ LV.domAt = dn; ls$("lsRead").innerHTML = gs.map((x, i) => lsReadout(x, tNow, i === gs.length - 1)).join("<br>"); lsControls(src, tNow, live); }
   } else if (!LV.dirty) return;                                  // nothing changed since the last draw
   LV.dirty = false;
   { const b = ls$("lsPlay"), want = LV.play ? "Pause" : "Play"; if (b.textContent !== want) b.textContent = want; }      // a pause lands on a cached grid, so the label is kept right here
   const fast = !!LV.drag || LV.play, t1 = performance.now();
-  lsDraw(cv, c.g, c.live ? "LIVE" : "PLAYHEAD " + hhmmss(c.tNow).slice(0,8), fast, LV.marks === "off" ? [] : READER_LANDSCAPE.episodeMarks(src, c.tNow, c.g, lsEpisodeList(c.tNow, true), {hide: LV.marks === "nowall" ? {wall: true} : {}}));
+  [cv, cv2].slice(0, c.gs.length).forEach((cvx, i) => { const gx = c.gs[i];
+    lsDraw(cvx, gx, (c.live ? "LIVE" : "PLAYHEAD " + hhmmss(c.tNow).slice(0,8)) + (split ? "   ·   " + gx.venue.toUpperCase() : ""), fast, LV.marks === "off" ? [] : READER_LANDSCAPE.episodeMarks(src, c.tNow, gx, lsEpisodeList(c.tNow, true), {hide: LV.marks === "nowall" ? {wall: true} : {}})); });
   LV.ms = performance.now() - t1;
   const now = performance.now(); if (now - (LV.perfAt || 0) > 700){ LV.perfAt = now; ls$("lsPerf").textContent = "grid " + c.gridMs.toFixed(1) + " ms · draw " + LV.ms.toFixed(1) + " ms" + (fast ? " (fast mode)" : ""); }      // DOM text is written rarely: writing it every frame forces a page layout
 }
@@ -187,7 +194,7 @@ function lsKick() { LV.dirty = true; if (!LV.raf) { LV.lastFrame = performance.n
 
 // ---------- wiring ----------
 (function lsInit() {
-  const cv = ls$("lsCv"); if (!cv) return;
+  const cv = ls$("lsCv"), cv2 = ls$("lsCv2"); if (!cv) return;
   ls$("lsSrc").value = LV.src; ls$("lsVenue").value = LV.venue; ls$("lsSpan").value = String(LV.spanMs); ls$("lsSpeed").value = String(LV.speed);
   ls$("lsSrc").onchange = e => { LV.src = e.target.value; LV.t = null; LV.play = false; LV.half = LV.zscale = 0; lsKick(); };
   ls$("lsVenue").onchange = e => { LV.venue = e.target.value; store.set("ls.venue", LV.venue); LV.half = LV.zscale = 0; lsKick(); };
@@ -203,11 +210,11 @@ function lsKick() { LV.dirty = true; if (!LV.raf) { LV.lastFrame = performance.n
   ls$("lsView").onclick = e => { const b = e.target.closest("button"); if (!b) return; const v = b.dataset.v;
     if (v === "3d"){ LV.yaw = -.62; LV.pitch = .62; } else if (v === "top"){ LV.yaw = 0; LV.pitch = 1.5; } else if (v === "side"){ LV.yaw = 1.45; LV.pitch = .12; } else if (v === "front"){ LV.yaw = 0; LV.pitch = .22; }
     lsKick(); };
-  cv.addEventListener("pointerdown", e => { cv.setPointerCapture(e.pointerId); LV.drag = {kind:"rotate", x:e.clientX, y:e.clientY, touch:e.pointerType !== "mouse"}; lsKick(); });
-  cv.addEventListener("pointermove", e => { const d = LV.drag; if (!d || d.kind !== "rotate") return;
+  for (const cvx of [cv, cv2]) cvx.addEventListener("pointerdown", e => { cvx.setPointerCapture(e.pointerId); LV.drag = {kind:"rotate", x:e.clientX, y:e.clientY, touch:e.pointerType !== "mouse"}; lsKick(); });
+  for (const cvx of [cv, cv2]) cvx.addEventListener("pointermove", e => { const d = LV.drag; if (!d || d.kind !== "rotate") return;
     LV.yaw += (e.clientX - d.x)*.008; if (!d.touch) LV.pitch = Math.max(.05, Math.min(1.5, LV.pitch + (e.clientY - d.y)*.006)); d.x = e.clientX; d.y = e.clientY; LV.dirty = true; });
   const end = () => { if (LV.drag && LV.drag.kind === "rotate"){ LV.drag = null; lsKick(); } };
-  cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end);
+  for (const cvx of [cv, cv2]){ cvx.addEventListener("pointerup", end); cvx.addEventListener("pointercancel", end); }
   window.addEventListener("resize", () => { LV.dirty = true; });
 })();
 

@@ -30,3 +30,4 @@ that walks through time. Inspired by a MATLAB-style surface plot (peaks and vall
 - Live history is limited to the 5 minutes the app keeps; a longer live buffer would need its own store.
 - Z-axis uses a smoothed scale; true cell values are only in the readout.
 - (v028) Episode marks: a "episodes" selector (all / no walls / off, remembered) and repeated marks of one family at one price (within a cell) that touch or sit under 5 s apart are merged into one, so a re-posted wall reads as one line (recorded BTC session, 2 min window: 21 wall marks became 12).
+- (v029) Venue "BN | HL split": two surfaces side by side (stacked on a phone), one grid per venue on a shared price range and height scale, one readout line per venue, rotation shared. Landscape controls wrap on a narrow screen. Seen at 390 px: nothing in the section overflows (the Reader tab has an older, separate overflow in its review tables, `.rv-tbl`, not touched here).
