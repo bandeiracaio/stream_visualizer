@@ -130,8 +130,8 @@ function lsRender() {
   const sec = ls$("lsSection"); if (!sec || !visible("reader")) return;
   const cv = ls$("lsCv"), src = lsSource();
   if (!src){ const {ctx, w, h} = prep(cv); emptyMsg(ctx, w, h, LV.src === "session" ? "Load a recorded session (Session, replay and labels) to walk through it." : "Connect to see the landscape."); ls$("lsRead").textContent = ""; lsControls(null); LV.cache = null; return; }
-  const live = LV.src === "live" && LV.t == null, tNow = lsPlayhead(src), tq = live ? Math.round(tNow/500)*500 : tNow;
-  const key = [LV.src, LV.venue, LV.spanMs, tq, src === LV.sess ? "s" + LV.sessId : trades.length + "@" + (trades.length ? trades[0].t + "-" + trades[trades.length-1].t : 0)].join("|");
+  const live = LV.src === "live" && LV.t == null, tNow = lsPlayhead(src);
+  const key = READER_LANDSCAPE.cacheKey({src: LV.src, venue: LV.venue, spanMs: LV.spanMs, tNow, live, sessId: src === LV.sess ? LV.sessId : null, trades});
   let c = LV.cache;
   if (!c || c.key !== key){                                    // new data or a new moment: recompute; otherwise rotate from the cache
     const t0 = performance.now(), o = {venue: LV.venue, spanMs: LV.spanMs}, path = READER_LANDSCAPE.path(src, tNow, o);

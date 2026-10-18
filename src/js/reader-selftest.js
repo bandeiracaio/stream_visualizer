@@ -501,6 +501,14 @@ const READER_SELFTEST=(()=>{
     const mk=cfg=>{const e=E.create(cfg),a=sim(e,{seconds:400,seed:3,params:()=>({vol:.3})});sim(e,{t0:a.t,mid0:a.mid,seconds:60,seed:4,params:()=>({vol:1})});return e.debug().sigmaBps("bn");};
     return{ok:E.DEFAULTS.sigmaFastN===0&&mk({})===mk({sigmaFastN:0,sigmaFastW:.9}),detail:String(E.DEFAULTS.sigmaFastN)};
   });
+  // ---- landscape view (v025): the cache key decides when a drawn grid may be reused, so a stale one would show the wrong market ----
+  add("landscape: the cache key reuses a grid for the same moment and changes for anything that changes the picture",E=>{
+    const K=READER_LANDSCAPE.cacheKey,tr=(t0,n)=>Array.from({length:n},(_,i)=>({t:t0+i*10})),base={src:"live",venue:"both",spanMs:60000,tNow:100000,live:true,trades:tr(0,50)};
+    const k=K(base),same=K(Object.assign({},base,{tNow:100200}))===k,moved=K(Object.assign({},base,{tNow:100400}))!==k,grown=K(Object.assign({},base,{trades:tr(0,51)}))!==k;
+    const trimmed=K(Object.assign({},base,{trades:tr(500,50)}))!==k,venue=K(Object.assign({},base,{venue:"bn"}))!==k,span=K(Object.assign({},base,{spanMs:120000}))!==k;
+    const play=Object.assign({},base,{live:false,tNow:100200,sessId:1,src:"session"}),s1=K(play),sNext=K(Object.assign({},play,{sessId:2}))!==s1,exact=K(Object.assign({},play,{tNow:100201}))!==s1;
+    return{ok:same&&moved&&grown&&trimmed&&venue&&span&&sNext&&exact,detail:JSON.stringify({same,moved,grown,trimmed,venue,span,sNext,exact})};
+  });
   function run(Eng){return scenarios.map(sc=>{try{const r=sc.run(Eng);return{name:sc.name,ok:!!r.ok,detail:r.detail};}catch(err){return{name:sc.name,ok:false,detail:String(err&&err.stack||err)};}});}
   return {T0,rng,poisson,levels,sim,scenarios,run};
 })();

@@ -96,5 +96,12 @@ const READER_LANDSCAPE = (() => {
     if (i > 0 && t - a[i-1][0] <= 5000) return a[i-1][1];
     return i < a.length && a[i][0] - t <= 5000 ? a[i][1] : null;
   }
-  return {DEFAULTS, grid, autoHalf, path, span, fromInputs, midAt};
+  // Identifies what a drawn grid was computed from, so a redraw (rotating) can reuse it. live: the playhead follows the market, rounded to
+  // half a second; a session is told apart by id, live trades by count and first/last time (the buffer is trimmed, so the count alone can repeat).
+  function cacheKey(o) {
+    const tq = o.live ? Math.round(o.tNow/500)*500 : o.tNow, n = o.trades ? o.trades.length : 0;
+    const data = o.sessId != null ? "s" + o.sessId : n + "@" + (n ? o.trades[0].t + "-" + o.trades[n-1].t : 0);
+    return [o.src, o.venue, o.spanMs, tq, data].join("|");
+  }
+  return {DEFAULTS, grid, autoHalf, path, span, fromInputs, midAt, cacheKey};
 })();
