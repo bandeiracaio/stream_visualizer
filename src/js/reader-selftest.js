@@ -530,6 +530,27 @@ const READER_SELFTEST=(()=>{
     return{ok:raw.length===7&&m.length===5&&walls.length===4&&!!big&&Math.abs(big.z0+1/3)<1e-9&&Math.abs(big.z1-2/3)<1e-9&&Math.abs(big.zd-(49000/60000*2-1))<1e-9&&hid.length===1&&hid[0].family==="absorption"&&walls.filter(x=>x.venue==="hl").length===1,
       detail:JSON.stringify({raw:raw.length,m:m.length,walls:walls.map(x=>[x.venue,x.n,+x.u.toFixed(3)]),hid:hid.length})};
   });
+  // ---- auto-record (v031): when to start and stop recording, from a one-second price series ----
+  add("autorec: sigma of a random walk matches its true scale, on the same footing as the engine's sigma",E=>{
+    const r=rng(11),h=AUTOREC.createHistory();let px=82000,t=T0;for(let i=0;i<3700;i++){px*=1+(r()-.5)*2*.6/1e4;t+=1000;AUTOREC.push(h,t,px);}
+    const g=AUTOREC.sigma(h,3600,15),want=.6/Math.sqrt(3);
+    return{ok:Math.abs(g.sigma/want-1)<.15&&g.n>3500,detail:JSON.stringify({got:+g.sigma.toFixed(3),want:+want.toFixed(3),n:g.n})};
+  });
+  add("autorec: it learns an hour first, ignores a calm market, starts soon after a jump, stays while it lasts, and stops after the calm minutes",E=>{
+    const A=AUTOREC,r=rng(5),h=A.createHistory(),cfg={};let px=82000,t=T0,st={mode:"waiting"};const ev=[];
+    const run=(secs,vol)=>{for(let i=0;i<secs;i++){px*=1+(r()-.5)*2*vol/1e4;t+=1000;A.push(h,t,px);if(i%5===4&&!ev.some(x=>x.a==="stop")){const v=A.vol(h,cfg),o=A.step(st,v,t,cfg);st=o.st;if(o.action)ev.push({a:o.action,why:o.why,t});}}};   // the view disarms after a stop, so nothing is asked after it
+    run(600,.3);const notReady=ev.length===0;run(1800,.3);const quiet=ev.length===0,jumpAt=t;run(900,1.2);const jumpEnd=t;run(2400,.3);
+    const start=ev.find(x=>x.a==="start"),stop=ev.find(x=>x.a==="stop");
+    return{ok:notReady&&quiet&&!!start&&start.t>jumpAt&&start.t-jumpAt<=300000&&!!stop&&stop.why==="calm"&&stop.t>jumpEnd&&ev.length===2,detail:JSON.stringify({notReady,quiet,start:start&&(start.t-jumpAt)/1000,why:start&&start.why,stop:stop&&(stop.t-jumpEnd)/1000,n:ev.length})};
+  });
+  add("autorec: a recording ends at its time limit even if the market stays wild, and either trigger alone is enough to start",E=>{
+    const A=AUTOREC,calm={fast:.5,slow:.5,ratio:1,ready:true},wild={fast:2,slow:1,ratio:2,ready:true},T=1e6;
+    const byRatio=A.step({mode:"waiting"},{fast:.9,slow:.4,ratio:2.2,ready:true},T,{}),bySigma=A.step({mode:"waiting"},{fast:1.5,slow:1.4,ratio:1.07,ready:true},T,{}),no=A.step({mode:"waiting"},{fast:1.1,slow:.7,ratio:1.57,ready:true},T,{}),notReady=A.step({mode:"waiting"},{fast:3,slow:.4,ratio:7,ready:false},T,{});
+    const st={mode:"recording",since:T,calmSince:null},o=A.step(st,wild,T+59*60000,{maxMin:60}),o2=A.step(st,wild,T+60*60000,{maxMin:60});
+    const dip=A.step({mode:"recording",since:T,calmSince:T+60000},wild,T+400000,{}),keep=A.step({mode:"recording",since:T,calmSince:T+60000},calm,T+240000,{calmMin:5});
+    return{ok:byRatio.action==="start"&&byRatio.why==="ratio"&&bySigma.action==="start"&&bySigma.why==="sigma"&&no.action===null&&notReady.action===null&&o.action===null&&o2.action==="stop"&&o2.why==="max"&&dip.action===null&&dip.st.calmSince===null&&keep.action===null,
+      detail:JSON.stringify({byRatio:byRatio.why,bySigma:bySigma.why,no:no.action,o:o.action,o2:o2.why,dip:dip.action,keep:keep.action})};
+  });
   function run(Eng){return scenarios.map(sc=>{try{const r=sc.run(Eng);return{name:sc.name,ok:!!r.ok,detail:r.detail};}catch(err){return{name:sc.name,ok:false,detail:String(err&&err.stack||err)};}});}
   return {T0,rng,poisson,levels,sim,scenarios,run};
 })();

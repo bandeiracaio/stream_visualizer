@@ -282,6 +282,17 @@
   <section data-tab="reader" class="full">
     <h2>Session, replay and labels</h2>
     <div class="row"><button id="rtRec">Record</button><span id="rtStat" class="stat">not recording</span></div>
+    <div class="rt-h">Auto-record when the market gets volatile</div>
+    <div class="rd-det" id="arCfg">
+      <label title="Start when the last 5 minutes are this many times as volatile as the last hour">start at x of the hour <input id="arTrigRatio" type="number" step="0.1" min="1"></label>
+      <label title="Or start when the last 5 minutes are above this sigma (bps per root second; BTC is about 0.5 on a normal day)">or sigma above <input id="arTrigSigma" type="number" step="0.1" min="0"></label>
+      <label title="Calm again when below this many times the hour's volatility">calm below x of the hour <input id="arExitRatio" type="number" step="0.1" min="1"></label>
+      <label title="and below this sigma">and sigma below <input id="arExitSigma" type="number" step="0.1" min="0"></label>
+      <label title="Stop after it has been calm this long">stop after calm (min) <input id="arCalmMin" type="number" step="1" min="1"></label>
+      <label title="Never record longer than this">at most (min) <input id="arMaxMin" type="number" step="5" min="5"></label>
+    </div>
+    <div class="row" style="margin-top:6px"><button id="arArm">Arm</button><span id="arStat" class="stat">off</span></div>
+    <div id="arMsg" class="note">While armed the app listens to one price stream only and does nothing else; it connects everything and starts recording when the market turns volatile, then saves the file when it calms down. Disconnect first, and keep this tab open and the screen on (it is the page that records).</div>
     <div class="row" style="margin-top:8px">
       <button id="rtSave" disabled>Save session</button><button id="rtLoadBtn">Load session</button><input id="rtLoad" type="file" accept=".json,.gz,application/json,application/gzip" hidden>
       <button id="rtReplay" disabled>Replay with current settings</button><button id="rtLive" disabled>Back to live</button>
@@ -418,6 +429,9 @@
 <script id="reader-landscape">
 <!--@include js/reader-landscape.js-->
 </script>
+<script id="auto-record-core">
+<!--@include js/auto-record-core.js-->
+</script>
 <script id="reader-selftest">
 <!--@include js/reader-selftest.js-->
 </script>
@@ -432,6 +446,9 @@
 </script>
 <script>
 <!--@include js/reader-landscape-view.js-->
+</script>
+<script>
+<!--@include js/auto-record.js-->
 </script>
 </body>
 </html>

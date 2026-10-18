@@ -42,10 +42,10 @@ function rtSetSession(s){
 function rtRecTick(){
   const r = READER.recording(), ms = Date.now()-RT.rec.t0;
   rt$("rtStat").textContent = `recording ${rtDur(ms)} · ${r.n.toLocaleString()} inputs`;
-  if (r.n > 600000 || ms > 1800000) rtRecStop();
+  const lim = RT.recLimit || {n:600000, ms:1800000}; if (r.n > lim.n || ms > lim.ms) rtRecStop();
 }
 function rtRecStop(){
-  clearInterval(RT.recTimer); const inputs = READER.stopRecording(), meta = RT.rec; RT.rec = null;
+  clearInterval(RT.recTimer); const inputs = READER.stopRecording(), meta = RT.rec; RT.rec = null; RT.recLimit = null;
   rt$("rtRec").textContent = "Record"; rt$("rtStat").textContent = "not recording";
   rtSetSession({inputs, sym:meta.sym, startedAt:meta.t0, baseline:meta.baseline});
 }
