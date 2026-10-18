@@ -93,7 +93,16 @@ function addTrade(t){
 // ---------- market reader: instance and hooks ----------
 const READER = READER_ENGINE.create();
 READER.selfTest = () => READER_SELFTEST.run(READER_ENGINE);
-const rdSafe = fn => { try{ fn(); }catch(e){ console.error("reader", e); } };
+// Time spent inside the Reader engine per call, for Diagnostics: one bucket per second (last 60) and the last 2000 call times for a percentile.
+const rdPerf = {sec:[], durs:new Float32Array(2000), i:0, n:0, slow:0, SLOW_MS:8};
+function rdPerfAdd(d){
+  const sec = Math.floor(performance.now()/1000), q = rdPerf.sec;
+  let b = q.length ? q[q.length-1] : null;
+  if (!b || b.s !== sec){ b = {s:sec, n:0, ms:0, max:0, slow:0}; q.push(b); if (q.length > 60) q.shift(); }
+  b.n++; b.ms += d; if (d > b.max) b.max = d; if (d > rdPerf.SLOW_MS){ b.slow++; rdPerf.slow++; }
+  rdPerf.durs[rdPerf.i] = d; rdPerf.i = (rdPerf.i+1) % rdPerf.durs.length; if (rdPerf.n < rdPerf.durs.length) rdPerf.n++;
+}
+const rdSafe = fn => { const t0 = performance.now(); try{ fn(); }catch(e){ console.error("reader", e); } rdPerfAdd(performance.now() - t0); };
 const rdLastBook = {bn:0, hl:0};
 let rdWorker = null;
 function rdStopHeartbeat(){ if(rdWorker){ try{rdWorker.terminate();URL.revokeObjectURL(rdWorker._url);}catch{} rdWorker=null; } }
@@ -484,6 +493,15 @@ function renderInspector(){
 }
 
 // ---------- feed health ----------
+function rdPerfKeys(){
+  const q = rdPerf.sec, now = Math.floor(performance.now()/1000), live = q.filter(b => now - b.s < 60);
+  if (!live.length) return [["Engine work", "–"]];
+  const n = live.reduce((a,b)=>a+b.n,0), ms = live.reduce((a,b)=>a+b.ms,0), max = Math.max(...live.map(b=>b.max)), busy = ms/(live.length*1000)*100;
+  const d = Array.from(rdPerf.durs.subarray(0, rdPerf.n)).sort((a,b)=>a-b), p99 = d[Math.min(d.length-1, Math.floor(d.length*.99))];
+  const fmt = x => x < 1 ? (x*1000).toFixed(0)+" µs" : x.toFixed(1)+" ms";
+  return [["Engine calls / s", (n/live.length).toFixed(0)], ["Engine avg call", fmt(ms/n)], ["Engine p99 call", fmt(p99)], ["Engine worst (60 s)", fmt(max)],
+          ["Engine busy", busy.toFixed(1)+" %"], ["Calls over "+rdPerf.SLOW_MS+" ms", rdPerf.slow]];
+}
 function renderHealth(){
   const k = [
     ["Clock offset", clockOk ? `${clockOffset>=0?"+":""}${clockOffset.toFixed(0)} ms` : "unsynced"],
@@ -491,7 +509,7 @@ function renderHealth(){
     ["BN reconnects", health.bnReconnects], ["HL reconnects", health.hlReconnects],
     ["BN book resyncs", bnBook ? (bnBook.gaps||0) : "–"], ["HL trade replays", health.hlReplays],
     ["Uptime", connected ? ((Date.now()-connectedAt)/60000).toFixed(1)+" min" : "–"],
-  ];
+  ].concat(rdPerfKeys());
   $("healthKeys").innerHTML = k.map(([a,b])=>`<div class="metric"><span>${a}</span><b>${b}</b></div>`).join("");
   const ms = x => x==null ? "–" : x.toFixed(0);
   $("health").innerHTML = `<tr><th>stream</th><th>status</th><th>msg/s</th><th>avg/s 60s</th><th>p50</th><th>p99</th><th>max</th><th>late</th><th>silent</th><th>total</th></tr>` +
