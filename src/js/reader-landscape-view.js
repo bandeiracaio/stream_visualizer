@@ -144,6 +144,7 @@ function lsRender() {
     if (!LV.play || dn - (LV.domAt || 0) > 250){ LV.domAt = dn; ls$("lsRead").innerHTML = lsReadout(g, tNow); lsControls(src, tNow, live); }
   } else if (!LV.dirty) return;                                  // nothing changed since the last draw
   LV.dirty = false;
+  { const b = ls$("lsPlay"), want = LV.play ? "Pause" : "Play"; if (b.textContent !== want) b.textContent = want; }      // a pause lands on a cached grid, so the label is kept right here
   const fast = !!LV.drag || LV.play, t1 = performance.now();
   lsDraw(cv, c.g, c.live ? "LIVE" : "PLAYHEAD " + hhmmss(c.tNow).slice(0,8), fast);
   LV.ms = performance.now() - t1;
