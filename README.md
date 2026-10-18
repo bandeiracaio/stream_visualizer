@@ -4,7 +4,7 @@
 
 Open the file in a browser (phone or PC), press **Connect**, and watch two venues' trades, books and liquidations side by side. No server, no install, no external assets, no account. It runs offline-capable once loaded; the only network traffic is the public exchange feeds.
 
-> Status: personal research tool under active development (26 numbered releases so far). Not financial advice; see [Safety](#safety).
+> Status: personal research tool under active development (28 numbered releases so far). Not financial advice; see [Safety](#safety).
 
 ---
 
@@ -29,7 +29,7 @@ Stream Visualizer tries to do both jobs honestly:
 | **Self-revising** | A register of assumptions, per-variable drift detection, threshold proposals, replay verdicts, and an approval step. |
 | **Flow landscape** | A 3D surface of where, and how long ago, buyers and sellers hit the book (price x age x net aggressor flow), with a playhead that walks through live history or a recorded session, and the Reader's episodes marked on the floor where and when they happened. |
 | **Record and replay** | Save a live session to a file, load it on any device, replay it with different thresholds, and label episodes agree / disagree / missed. |
-| **Pure, tested engine** | The Reader engine has no DOM and no timers, and 87 simulator scenarios run on every build; a failing one aborts the build. |
+| **Pure, tested engine** | The Reader engine has no DOM and no timers, and 92 simulator scenarios run on every build; a failing one aborts the build. |
 | **Trading built in** | A simulated paper broker filled against live prices, Binance's own demo account, or a real-money Binance account behind an explicit acknowledgement. |
 
 ## Quick start
@@ -120,7 +120,7 @@ cd dist && python -m http.server 8765    # then open http://localhost:8765/strea
 
 ## Testing
 
-`node build.mjs` runs 87 simulator scenarios in a sandbox before writing anything and aborts on the first failure. They cover each detector and episode family, the register, drift, proposals, replay determinism, the sigma estimator and static expectation, save/load round trips, and (for v019) the raw events, including a check that adding them leaves every older detection and episode **byte-identical** on a recorded session.
+`node build.mjs` runs 92 simulator scenarios in a sandbox before writing anything and aborts on the first failure. They cover each detector and episode family, the register, drift, proposals, replay determinism, the sigma estimator and static expectation, save/load round trips, and (for v019) the raw events, including a check that adding them leaves every older detection and episode **byte-identical** on a recorded session.
 
 Rule of thumb in this repo: any new engine behaviour ships with a scenario, and any change to evidence cut-offs is byte-compared on simulated and recorded data before and after.
 

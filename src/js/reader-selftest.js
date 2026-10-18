@@ -521,6 +521,15 @@ const READER_SELFTEST=(()=>{
       &&b.zd===null&&b.z1===1&&Math.abs(b.u+1)<1e-9&&x.u===1&&x.outside===true&&hl.length===1&&hl[0].family==="burst"&&LS.episodeMarks(src,T,g,null).length===0,
       detail:JSON.stringify({n:m.length,w,b,x,hl:hl.length})};
   });
+  add("landscape: a wall that was re-posted again and again is one mark; different prices, venues and far-apart times stay separate; a family can be hidden",E=>{
+    const LS=READER_LANDSCAPE,T=100000,src={trades:[],t0:0,t1:T,mid:()=>100},g={spanMs:60000,half:4,nx:41,venue:"both"};
+    const w=(a,b,px,v)=>({family:"wall",venue:v||"bn",stage:"ended",tStart:T-a,tEnd:T-b,tDetected:T-a+1000,px});
+    const eps=[w(50000,40000,100.02),w(39000,30000,100.0201),w(28000,20000,100.02),w(10000,5000,100.02),w(45000,35000,100.05),w(45000,35000,100.02,"hl"),{family:"absorption",venue:"bn",stage:"active",tStart:T-8000,tEnd:null,tDetected:T-6000,px:100.02}];
+    const m=LS.episodeMarks(src,T,g,eps),raw=LS.episodeMarks(src,T,g,eps,{merge:false}),walls=m.filter(x=>x.wall),hid=LS.episodeMarks(src,T,g,eps,{hide:{wall:true}});
+    const big=walls.find(x=>x.n===3);
+    return{ok:raw.length===7&&m.length===5&&walls.length===4&&!!big&&Math.abs(big.z0+1/3)<1e-9&&Math.abs(big.z1-2/3)<1e-9&&Math.abs(big.zd-(49000/60000*2-1))<1e-9&&hid.length===1&&hid[0].family==="absorption"&&walls.filter(x=>x.venue==="hl").length===1,
+      detail:JSON.stringify({raw:raw.length,m:m.length,walls:walls.map(x=>[x.venue,x.n,+x.u.toFixed(3)]),hid:hid.length})};
+  });
   function run(Eng){return scenarios.map(sc=>{try{const r=sc.run(Eng);return{name:sc.name,ok:!!r.ok,detail:r.detail};}catch(err){return{name:sc.name,ok:false,detail:String(err&&err.stack||err)};}});}
   return {T0,rng,poisson,levels,sim,scenarios,run};
 })();

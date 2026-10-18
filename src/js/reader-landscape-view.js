@@ -4,7 +4,7 @@
 // episodes) and draws; it never writes to the Reader engine. It hooks renderReader, and every call is guarded, so if anything here
 // fails the rest of the Reader tab keeps working.
 const LV = {
-  src: "live", venue: store.get("ls.venue", "both"), spanMs: +store.get("ls.span", 60000) || 60000, speed: +store.get("ls.speed", 4) || 4,
+  src: "live", venue: store.get("ls.venue", "both"), spanMs: +store.get("ls.span", 60000) || 60000, speed: +store.get("ls.speed", 4) || 4, marks: store.get("ls.marks", "all"),
   yaw: -.62, pitch: .62, t: null, play: false, half: 0, zscale: 0, sess: null, sessOf: null, drag: null, last: 0, raf: 0, dirty: true, cache: null, order: null, orderKey: "", ms: 0,
 };
 const ls$ = id => document.getElementById(id);
@@ -157,7 +157,7 @@ function lsRender() {
   LV.dirty = false;
   { const b = ls$("lsPlay"), want = LV.play ? "Pause" : "Play"; if (b.textContent !== want) b.textContent = want; }      // a pause lands on a cached grid, so the label is kept right here
   const fast = !!LV.drag || LV.play, t1 = performance.now();
-  lsDraw(cv, c.g, c.live ? "LIVE" : "PLAYHEAD " + hhmmss(c.tNow).slice(0,8), fast, READER_LANDSCAPE.episodeMarks(src, c.tNow, c.g, lsEpisodeList(c.tNow, true)));
+  lsDraw(cv, c.g, c.live ? "LIVE" : "PLAYHEAD " + hhmmss(c.tNow).slice(0,8), fast, LV.marks === "off" ? [] : READER_LANDSCAPE.episodeMarks(src, c.tNow, c.g, lsEpisodeList(c.tNow, true), {hide: LV.marks === "nowall" ? {wall: true} : {}}));
   LV.ms = performance.now() - t1;
   const now = performance.now(); if (now - (LV.perfAt || 0) > 700){ LV.perfAt = now; ls$("lsPerf").textContent = "grid " + c.gridMs.toFixed(1) + " ms · draw " + LV.ms.toFixed(1) + " ms" + (fast ? " (fast mode)" : ""); }      // DOM text is written rarely: writing it every frame forces a page layout
 }
@@ -192,6 +192,7 @@ function lsKick() { LV.dirty = true; if (!LV.raf) { LV.lastFrame = performance.n
   ls$("lsSrc").onchange = e => { LV.src = e.target.value; LV.t = null; LV.play = false; LV.half = LV.zscale = 0; lsKick(); };
   ls$("lsVenue").onchange = e => { LV.venue = e.target.value; store.set("ls.venue", LV.venue); LV.half = LV.zscale = 0; lsKick(); };
   ls$("lsSpan").onchange = e => { LV.spanMs = +e.target.value; store.set("ls.span", LV.spanMs); LV.half = LV.zscale = 0; lsKick(); };
+  ls$("lsMarks").value = LV.marks; ls$("lsMarks").onchange = e => { LV.marks = e.target.value; store.set("ls.marks", LV.marks); lsKick(); };
   ls$("lsSpeed").onchange = e => { LV.speed = +e.target.value; store.set("ls.speed", LV.speed); };
   ls$("lsLive").onclick = () => { LV.t = null; LV.play = false; lsKick(); };
   ls$("lsPlay").onclick = () => { const src = lsSource(); if (!src) return; if (!LV.play){ const r = lsRange(src); if (lsPlayhead(src) >= r.b - 500 && LV.src === "session") LV.t = r.a; if (LV.src === "live" && LV.t == null) LV.t = Math.max(r.a, r.b - 120000); } LV.play = !LV.play; lsKick(); };
