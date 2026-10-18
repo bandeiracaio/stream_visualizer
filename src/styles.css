@@ -181,3 +181,11 @@ td.up{color:var(--buy)}td.dn{color:var(--sell)}
 .lswrap{display:grid;grid-template-columns:1fr;gap:6px}
 @media(min-width:900px){.lswrap.split{grid-template-columns:1fr 1fr}}
 #lsSection h2 .ctl{flex-wrap:wrap}
+@media(max-width:640px){                                   /* phone: the Reader review tables wrap instead of widening the page */
+  .rd-det{overflow-x:auto}                              /* a wide data table scrolls inside its box, not the page */
+  .rv-tbl td,.rv-tbl th{white-space:normal;overflow-wrap:anywhere}
+  .rv-keys,.rv-keys tbody{display:block}
+  .rv-keys tr{display:grid;grid-template-columns:1fr auto;gap:2px 8px;padding:4px 0;border-bottom:1px solid #1e252e}
+  .rv-keys td{border:0;padding:1px 6px}
+  .rv-keys td:nth-child(3),.rv-keys td:nth-child(4){grid-column:1/-1}
+}
