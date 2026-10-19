@@ -24,7 +24,7 @@ function arOpen() {
   const gen = AR.gen; let ws;
   try { ws = new WebSocket(arUrl()); } catch { arMsg("The browser blocked the connection."); return; }
   AR.ws = ws;
-  ws.onmessage = ev => { try { const j = JSON.parse(ev.data), d = j.data || j; if (d && d.p) AUTOREC.push(AR.h, d.E || Date.now(), +d.p); } catch {} };
+  ws.onmessage = ev => { try { const j = JSON.parse(ev.data), d = j.data || j; if (d && d.p) AUTOREC.push(AR.h, Date.now(), +d.p); } catch {} };
   ws.onclose = () => { if (AR.on && gen === AR.gen) setTimeout(() => { if (AR.on && gen === AR.gen) arOpen(); }, 5000); };
 }
 async function arLock() { try { if (navigator.wakeLock && !AR.lock) { AR.lock = await navigator.wakeLock.request("screen"); AR.lock.onrelease = () => { AR.lock = null; }; } } catch {} }
@@ -39,8 +39,11 @@ function arToggle() {
 }
 function arTick() {
   if (!AR.on) return;
-  const v = AUTOREC.vol(AR.h, AR.cfg), now = Date.now();
-  if (AR.st.mode === "recording" && !RT.rec) return arFinish("The recording was stopped by hand, so auto-record is off. The session is loaded: use Save session.");
+  const now = Date.now(), v = AUTOREC.vol(AR.h, AR.cfg, now);
+  if (AR.st.mode === "recording" && !RT.rec){
+    if (AR.byUs && connected) $("go").click();
+    return arFinish("The recording stopped on its own (by hand or at its input limit), so auto-record is off. The session is loaded: use Save session.");
+  }
   const r = AUTOREC.step(AR.st, v, now, AR.cfg); AR.st = r.st;
   if (r.action === "start") arStart(r.why, v); else if (r.action === "stop") arStop(r.why);
   if (AR.on) arStatus(v, now);
@@ -48,7 +51,7 @@ function arTick() {
 function arStatus(v, now) {
   const c = AR.cfg, fx = x => x.toFixed(2);
   let t;
-  if (!v.ready) t = `learning the last hour: ${Math.min(15, Math.round(v.nSlow/60))} of 15 min`;
+  if (!v.ready) t = v.nSlow >= AR.cfg.minSlow ? "price stream stalled: waiting for fresh prices" : `learning the last hour: ${Math.min(15, Math.round(v.nSlow/60))} of 15 min`;
   else if (AR.st.mode === "waiting") t = `waiting · sigma ${fx(v.fast)} (x${fx(v.ratio)} of the hour) · starts at x${c.trigRatio} or ${c.trigSigma}`;
   else t = `recording ${arDur(now - AR.st.since)} of at most ${c.maxMin} min · sigma ${fx(v.fast)} (x${fx(v.ratio)}) · calm ${AR.st.calmSince == null ? 0 : Math.floor((now - AR.st.calmSince)/60000)} of ${c.calmMin} min`;
   ar$("arStat").textContent = t;

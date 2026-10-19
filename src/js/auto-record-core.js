@@ -7,7 +7,7 @@ const AUTOREC = (() => {
   const DEFAULTS = {
     fastSec:300, slowSec:3600, lagSec:15, minFast:200, minSlow:900,       // 5 min against the last hour; needs 15 min of history before it can judge
     trigRatio:1.8, trigSigma:1.2, trigFloor:.4,                                          // start when the 5 min sigma is 1.8x the hour's, or above 1.2 bps/root s (either; the ratio only counts above trigFloor, so a dead-calm market cannot trigger it)
-    exitRatio:1.3, exitSigma:.8, calmMin:5, maxMin:60,                     // stop after 5 minutes below both exit levels, or after 60 minutes
+    exitRatio:1.3, exitSigma:.8, calmMin:5, maxMin:60, staleSec:10,                     // stop after 5 minutes below both exit levels, or after 60 minutes
   };
   const SIZE = 4096;
   function createHistory() { return {px:new Float64Array(SIZE), sec:new Float64Array(SIZE).fill(-1), last:-1}; }
@@ -26,9 +26,10 @@ const AUTOREC = (() => {
     const s = Float64Array.from(r).sort(), med = s[s.length >> 1], d = Float64Array.from(s, x => Math.abs(x - med)).sort();
     return {sigma:d[Math.floor(d.length*.75)]/1.1503/Math.sqrt(lagSec), n:r.length};
   }
-  function vol(h, cfg) {
+  // nowMs (the clock the prices were stamped with): when the newest price is older than staleSec the stream has stalled, and the last window is not judged
+  function vol(h, cfg, nowMs) {
     const c = Object.assign({}, DEFAULTS, cfg), f = sigma(h, c.fastSec, c.lagSec), sl = sigma(h, c.slowSec, c.lagSec);
-    return {fast:f.sigma, slow:sl.sigma, ratio:sl.sigma > 0 ? f.sigma/sl.sigma : 0, nFast:f.n, nSlow:sl.n, ready:f.n >= c.minFast && sl.n >= c.minSlow};
+    return {fast:f.sigma, slow:sl.sigma, ratio:sl.sigma > 0 ? f.sigma/sl.sigma : 0, nFast:f.n, nSlow:sl.n, ready:f.n >= c.minFast && sl.n >= c.minSlow && !(nowMs != null && nowMs/1000 - h.last > c.staleSec)};
   }
   // One decision per check. st: {mode:"waiting"|"recording", since, calmSince}; returns the new state and an action ("start" | "stop" | null) with the reason.
   function step(st, v, tMs, cfg) {

@@ -114,7 +114,7 @@ const READER_LANDSCAPE = (() => {
       if (o.hide[e.family]) continue;
       const t0 = e.tStart, t1 = e.tEnd == null ? tNow : Math.min(e.tEnd, tNow);
       if (t0 > tNow || t1 < w0) continue;
-      const v = e.venue || (e.venues && e.venues[0]) || "bn", m = src.mid(v, tNow);
+      const v = g.venue !== "both" && e.venues && e.venues.includes(g.venue) ? g.venue : e.venue || (e.venues && e.venues[0]) || "bn", m = src.mid(v, tNow);
       if (g.venue !== "both" && g.venue !== v && !(e.venues && e.venues.includes(g.venue))) continue;
       const px = e.px != null ? e.px : e.pxStart;
       if (!(m > 0) || !(px > 0)) continue;
@@ -127,7 +127,7 @@ const READER_LANDSCAPE = (() => {
     for (const m of out){
       const k = merged.find(x => x.family === m.family && x.venue === m.venue && Math.abs(x.u - m.u) <= cell && m.z0 <= x.z1 + gapZ && m.z1 >= x.z0 - gapZ);
       if (!k){ merged.push(m); continue; }
-      k.z0 = Math.min(k.z0, m.z0); k.z1 = Math.max(k.z1, m.z1); k.n += m.n; if (m.stage !== "ended") k.stage = m.stage;
+      k.z0 = Math.min(k.z0, m.z0); k.z1 = Math.max(k.z1, m.z1); k.n += m.n; k.outside = k.outside && m.outside;     // k is the newest mark (sorted), so it keeps its stage
       k.zd = k.zd == null ? m.zd : m.zd == null ? k.zd : Math.max(k.zd, m.zd); k.u = (k.u*(k.n-m.n) + m.u*m.n)/k.n;
     }
     return merged;

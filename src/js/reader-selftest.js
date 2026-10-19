@@ -551,6 +551,19 @@ const READER_SELFTEST=(()=>{
     return{ok:byRatio.action==="start"&&byRatio.why==="ratio"&&bySigma.action==="start"&&bySigma.why==="sigma"&&no.action===null&&notReady.action===null&&deadCalm.action===null&&o.action===null&&o2.action==="stop"&&o2.why==="max"&&dip.action===null&&dip.st.calmSince===null&&keep.action===null,
       detail:JSON.stringify({byRatio:byRatio.why,bySigma:bySigma.why,no:no.action,o:o.action,o2:o2.why,dip:dip.action,keep:keep.action})};
   });
+  add("autorec: a price stream that has gone quiet is not judged: the last window is stale, so nothing starts and nothing counts as calm",E=>{
+    const A=AUTOREC,r=rng(3),h=A.createHistory();let px=82000,t=T0;for(let i=0;i<3700;i++){px*=1+(r()-.5)*2*1.5/1e4;t+=1000;A.push(h,t,px);}
+    const live=A.vol(h,{},t+2000),stale=A.vol(h,{},t+60000),a=A.step({mode:"waiting"},stale,t+60000,{});
+    return{ok:live.ready&&!stale.ready&&a.action===null,detail:JSON.stringify({live:live.ready,stale:stale.ready,action:a.action})};
+  });
+  add("landscape: a multi-venue episode on a single-venue grid is placed against that venue's mid; a merged mark keeps the newest stage and is dashed only if every mark was",E=>{
+    const LS=READER_LANDSCAPE,T=100000,src={trades:[],t0:0,t1:T,mid:v=>v==="hl"?100:200},g={spanMs:60000,half:4,nx:41,venue:"hl"};
+    const one=LS.episodeMarks(src,T,g,[{family:"burst",venues:["bn","hl"],stage:"ended",tStart:T-20000,tEnd:T-10000,tDetected:T-19000,px:100.02}]);
+    const w=(a,b,px,st)=>({family:"wall",venue:"hl",stage:st,tStart:T-a,tEnd:T-b,tDetected:T-a+1000,px});
+    const m=LS.episodeMarks(src,T,g,[w(20000,10000,100.02,"ended"),w(40000,23000,100.02,"fading"),w(60000,50000,104.5,"ended"),w(55000,52000,104.5,"ended")]);
+    const mid=m.find(x=>!x.outside),far=m.find(x=>x.outside);
+    return{ok:one.length===1&&Math.abs(one[0].u-.5)<1e-9&&m.length===2&&mid.n===2&&mid.stage==="ended"&&!!far&&far.n===2&&far.outside===true,detail:JSON.stringify({one:one.length&&one[0].u,m:m.map(x=>[x.n,x.stage,x.outside])})};
+  });
   function run(Eng){return scenarios.map(sc=>{try{const r=sc.run(Eng);return{name:sc.name,ok:!!r.ok,detail:r.detail};}catch(err){return{name:sc.name,ok:false,detail:String(err&&err.stack||err)};}});}
   return {T0,rng,poisson,levels,sim,scenarios,run};
 })();
