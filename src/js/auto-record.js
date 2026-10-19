@@ -2,7 +2,7 @@
 // Auto-record (view): while armed it listens to ONE price stream (Binance mark price, about 1 message a second) and nothing else: no other feeds,
 // no Reader engine, no drawing. When AUTOREC says the market has turned volatile it connects the app and starts the normal recording; when it
 // has been calm long enough (or the time limit hits) it stops, saves the file, and disconnects again if it was the one who connected.
-const AR = {on:false, ws:null, gen:0, h:null, st:null, cfg:null, timer:null, lock:null, byUs:false, t0:0};
+const AR = {on:false, ws:null, gen:0, h:null, st:null, cfg:null, timer:null, lock:null, byUs:false, t0:0, lastMsg:0};
 const ar$ = id => document.getElementById(id);
 const AR_FIELDS = {arTrigRatio:"trigRatio", arTrigSigma:"trigSigma", arExitRatio:"exitRatio", arExitSigma:"exitSigma", arCalmMin:"calmMin", arMaxMin:"maxMin"};
 const arCfgFromUi = () => { const c = {}; for (const id in AR_FIELDS){ const v = +ar$(id).value; if (v > 0) c[AR_FIELDS[id]] = v; } return Object.assign({}, AUTOREC.DEFAULTS, c); };
@@ -23,15 +23,15 @@ function arUrl() {
 function arOpen() {
   const gen = AR.gen; let ws;
   try { ws = new WebSocket(arUrl()); } catch { arMsg("The browser blocked the connection."); return; }
-  AR.ws = ws;
-  ws.onmessage = ev => { try { const j = JSON.parse(ev.data), d = j.data || j; if (d && d.p) AUTOREC.push(AR.h, Date.now(), +d.p); } catch {} };
+  AR.ws = ws; AR.lastMsg = Date.now();
+  ws.onmessage = ev => { try { const j = JSON.parse(ev.data), d = j.data || j; if (d && d.p){ AR.lastMsg = Date.now(); AUTOREC.push(AR.h, AR.lastMsg, +d.p); } } catch {} };
   ws.onclose = () => { if (AR.on && gen === AR.gen) setTimeout(() => { if (AR.on && gen === AR.gen) arOpen(); }, 5000); };
 }
 async function arLock() { try { if (navigator.wakeLock && !AR.lock) { AR.lock = await navigator.wakeLock.request("screen"); AR.lock.onrelease = () => { AR.lock = null; }; } } catch {} }
 
 function arToggle() {
-  if (AR.on) return arFinish("Disarmed.");
-  if (typeof connected !== "undefined" && connected){ arMsg("Disconnect first (the Disconnect button at the top): while it waits the app should listen to one stream only."); return; }
+  if (AR.on) return arFinish(AR.st.mode === "recording" ? "Disarmed. The recording and the connection keep running: stop them by hand (Stop recording, then Save session)." : "Disarmed.");
+  if (connected){ arMsg("Disconnect first (the Disconnect button at the top): while it waits the app should listen to one stream only."); return; }
   AR.cfg = arCfgFromUi(); store.set("ar.cfg", AR.cfg);
   AR.on = true; AR.gen++; AR.h = AUTOREC.createHistory(); AR.st = {mode:"waiting"}; AR.byUs = false; AR.t0 = Date.now();
   arOpen(); arLock(); AR.timer = setInterval(arTick, 5000);
@@ -39,6 +39,7 @@ function arToggle() {
 }
 function arTick() {
   if (!AR.on) return;
+  if (AR.ws && Date.now() - AR.lastMsg > 15000) try { AR.ws.close(); } catch {}     // a socket that went silent without closing: close it so onclose reopens it
   const now = Date.now(), v = AUTOREC.vol(AR.h, AR.cfg, now);
   if (AR.st.mode === "recording" && !RT.rec){
     if (AR.byUs && connected) $("go").click();

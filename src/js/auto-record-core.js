@@ -9,7 +9,7 @@ const AUTOREC = (() => {
     trigRatio:1.8, trigSigma:1.2, trigFloor:.4,                                          // start when the 5 min sigma is 1.8x the hour's, or above 1.2 bps/root s (either; the ratio only counts above trigFloor, so a dead-calm market cannot trigger it)
     exitRatio:1.3, exitSigma:.8, calmMin:5, maxMin:60, staleSec:10,                     // stop after 5 minutes below both exit levels, or after 60 minutes
   };
-  const SIZE = 4096;
+  const SIZE = 4096, SD_PER_Q75 = 1.1503, Q75 = .75;     // the 75th percentile of the absolute deviation over 1.1503 is the standard deviation of a normal; the same constants as the engine's sigma
   function createHistory() { return {px:new Float64Array(SIZE), sec:new Float64Array(SIZE).fill(-1), last:-1}; }
   function push(h, tMs, p) {
     if (!(p > 0)) return;
@@ -24,7 +24,7 @@ const AUTOREC = (() => {
     for (let s = h.last - winSec + 1; s <= h.last; s++){ const a = priceAt(h, s), b = priceAt(h, s - lagSec); if (a && b) r.push((a/b - 1)*1e4); }
     if (r.length < 30) return {sigma:0, n:r.length};
     const s = Float64Array.from(r).sort(), med = s[s.length >> 1], d = Float64Array.from(s, x => Math.abs(x - med)).sort();
-    return {sigma:d[Math.floor(d.length*.75)]/1.1503/Math.sqrt(lagSec), n:r.length};
+    return {sigma:d[Math.floor(d.length*Q75)]/SD_PER_Q75/Math.sqrt(lagSec), n:r.length};
   }
   // nowMs (the clock the prices were stamped with): when the newest price is older than staleSec the stream has stalled, and the last window is not judged
   function vol(h, cfg, nowMs) {
