@@ -1,0 +1,39 @@
+# Publishes the newest release file (stream-visualizer_vNNN.html in the repo root) as the GitHub Pages site.
+# Runs on every push to main, so after `node build.mjs --release` + push the link serves the new version.
+name: Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pick the newest release as index.html
+        run: |
+          latest=$(ls stream-visualizer_v*.html | sort | tail -1)
+          echo "Publishing $latest"
+          mkdir _site
+          cp "$latest" _site/index.html
+          touch _site/.nojekyll
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
