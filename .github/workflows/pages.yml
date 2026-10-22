@@ -30,6 +30,9 @@ jobs:
           echo "Publishing $latest"
           mkdir _site
           cp "$latest" _site/index.html
+          # the page fetches this to learn whether a newer release exists
+          v=${latest#stream-visualizer_}; v=${v%.html}
+          echo "{\"version\":\"$v\"}" > _site/version.json
           touch _site/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

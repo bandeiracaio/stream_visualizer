@@ -101,6 +101,12 @@ section.tcontainer{background:none;border:none;padding:0}
 .pill{display:inline-flex;gap:4px;align-items:center;max-width:40vw;white-space:nowrap}
 .pill b{overflow:hidden;text-overflow:ellipsis}
 #cog{margin-left:auto}
+#liveChips{display:contents}
+#liveChips .chip{white-space:nowrap}
+.sb-ok{color:var(--buy);border-color:var(--buy)}.sb-warn{color:var(--warn);border-color:var(--warn)}.sb-bad{color:var(--sell);border-color:var(--sell)}.sb-info{color:var(--accent);border-color:var(--accent)}
+#updBar{flex:1 0 100%;display:flex;gap:8px;align-items:center;background:var(--panel2);border:1px solid var(--accent);border-radius:6px;padding:4px 8px;font-size:12px}
+#updBar[hidden]{display:none}
+#updBar span{flex:1}
 #sheet{position:absolute;top:100%;left:0;right:0;z-index:6;background:var(--panel);border-bottom:1px solid var(--line);box-shadow:0 10px 24px #000a;padding:10px 12px;display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
 #sheet label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--dim)}
 #sheet input[type=text],#sheet select{width:100%}

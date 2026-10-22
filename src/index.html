@@ -10,11 +10,13 @@
 </head>
 <body>
 <header>
+  <div id="updBar" hidden><span id="updText"></span><button id="updBtn" class="primary">Reload</button><button id="updClose" title="Hide until the next check">✕</button></div>
   <h1>Live Stream Visualizer</h1>
   <button id="go" class="primary">Connect</button>
   <button id="pause">Pause</button>
   <span class="stat pill">BN <b id="bnState">off</b></span>
   <span class="stat pill">HL <b id="hlState">off</b></span>
+  <span id="liveChips"></span>
   <span id="accBadge"></span>
   <button id="cog" title="Settings" aria-expanded="false">⚙ <span id="symLbl">BTC</span></button>
   <div id="alerts"></div>
@@ -434,6 +436,9 @@
 <script id="auto-record-core">
 <!--@include js/auto-record-core.js-->
 </script>
+<script>
+<!--@include js/status-core.js-->
+</script>
 <script id="reader-selftest">
 <!--@include js/reader-selftest.js-->
 </script>
@@ -454,6 +459,9 @@
 </script>
 <script>
 <!--@include js/recordings.js-->
+</script>
+<script>
+<!--@include js/status-bar.js-->
 </script>
 </body>
 </html>

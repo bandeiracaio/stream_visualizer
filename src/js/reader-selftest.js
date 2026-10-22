@@ -584,6 +584,28 @@ const READER_SELFTEST=(()=>{
     const empty=R.create({},{v:1,cum:{}}).review().scale.ok;
     return{ok:fresh&&marked&&flagged&&again&&learned&&cleared&&empty&&typeof saved.sigmaScale==="number",detail:JSON.stringify({fresh,marked,flagged,again,learned,cleared,empty})};
   });
+  add("status: a connected, flowing market shows 'streaming' with the rate; nothing is shown while disconnected",E=>{
+    const v=(ageMs,rate,on=true)=>({on,ageMs,rate}),base={connected:true,paused:false,online:true,venues:{bn:v(200,40),hl:v(900,8)},ar:{on:false},rec:{on:false},kept:0};
+    const a=STATUS.chips(base),b=STATUS.chips(Object.assign({},base,{connected:false}));
+    return{ok:a.length===1&&a[0].id==="data"&&a[0].tone==="ok"&&a[0].text==="streaming 48/s"&&b.length===0,detail:JSON.stringify({a,b})};
+  });
+  add("status: a venue silent for over 5 s, no network and a pause are called out; an unused venue is not blamed",E=>{
+    const v=(ageMs,rate,on=true)=>({on,ageMs,rate}),base={connected:true,paused:false,online:true,venues:{bn:v(200,40),hl:v(12000,0)},ar:{on:false},rec:{on:false},kept:0};
+    const silent=STATUS.chips(base)[0],never=STATUS.chips(Object.assign({},base,{venues:{bn:v(200,40),hl:v(null,0)}}))[0],off=STATUS.chips(Object.assign({},base,{venues:{bn:v(200,40),hl:v(null,0,false)}}))[0];
+    const net=STATUS.chips(Object.assign({},base,{online:false}))[0],pz=STATUS.chips(Object.assign({},base,{paused:true}))[0];
+    return{ok:silent.tone==="bad"&&silent.text==="HL silent 12 s"&&never.text==="HL silent"&&off.tone==="ok"&&net.id==="net"&&pz.text==="paused",detail:JSON.stringify({silent,never,off,net,pz})};
+  });
+  add("status: auto-record shows learning, waiting and recording; a lost wake lock and a manual recording are shown too",E=>{
+    const base={connected:false,paused:false,online:true,venues:{},rec:{on:false},kept:2};
+    const learn=STATUS.chips(Object.assign({},base,{ar:{on:true,ready:false,learnMin:4,wake:true}})),wait=STATUS.chips(Object.assign({},base,{ar:{on:true,ready:true,mode:"waiting",wake:false}}));
+    const rec=STATUS.chips(Object.assign({},base,{ar:{on:true,ready:true,mode:"recording",wake:true},rec:{on:true,ms:192000,n:5}})),man=STATUS.chips(Object.assign({},base,{rec:{on:true,ms:65000,n:12345}}));
+    const t=l=>l.map(c=>c.text).join(" | ");
+    return{ok:t(learn)==="armed · learning 4/15 min | 2 saved"&&t(wait)==="armed · waiting | screen may sleep | 2 saved"&&t(rec)==="auto REC 3:12 | 2 saved"&&/^REC 1:05 · 12[.,  ]?345 inputs/.test(t(man)),detail:[t(learn),t(wait),t(rec),t(man)].join(" // ")};
+  });
+  add("status: only a higher release number counts as a newer version; a dev build never asks to update",E=>{
+    const n=STATUS.newer;
+    return{ok:n("v040","v041")&&!n("v040","v040")&&!n("v041","v040")&&n("v099","v100")&&!n("dev","v041")&&!n("v040","")&&!n("v040",null)&&!n("v040","latest"),detail:"version comparison"};
+  });
   function run(Eng){return scenarios.map(sc=>{try{const r=sc.run(Eng);return{name:sc.name,ok:!!r.ok,detail:r.detail};}catch(err){return{name:sc.name,ok:false,detail:String(err&&err.stack||err)};}});}
   return {T0,rng,poisson,levels,sim,scenarios,run};
 })();

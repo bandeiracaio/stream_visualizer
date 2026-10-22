@@ -13,7 +13,7 @@ const src = p => path.join(root, "src", p);
 const read = p => fs.readFileSync(src(p), "utf8");
 
 function selfTest() {
-  const code = read("js/reader-drift.js") + "\n" + read("js/reader-proposals.js") + "\n" + read("js/reader-register.js") + "\n" + read("js/reader-episodes.js") + "\n" + read("js/reader-engine.js") + "\n" + read("js/reader-landscape.js") + "\n" + read("js/auto-record-core.js") + "\n" + read("js/reader-selftest.js") + "\n;READER_SELFTEST.run(READER_ENGINE);";
+  const code = read("js/reader-drift.js") + "\n" + read("js/reader-proposals.js") + "\n" + read("js/reader-register.js") + "\n" + read("js/reader-episodes.js") + "\n" + read("js/reader-engine.js") + "\n" + read("js/reader-landscape.js") + "\n" + read("js/auto-record-core.js") + "\n" + read("js/status-core.js") + "\n" + read("js/reader-selftest.js") + "\n;READER_SELFTEST.run(READER_ENGINE);";
   const results = vm.runInNewContext(code, {}, { timeout: 120000 });
   const bad = results.filter(r => !r.ok);
   for (const r of results) console.log((r.ok ? "  pass  " : "  FAIL  ") + r.name + (r.ok ? "" : "\n        " + r.detail));
@@ -38,10 +38,11 @@ function nextRelease() {
 const args = process.argv.slice(2);
 if (args.includes("--out") && !args[args.indexOf("--out") + 1]) { console.error("--out needs a file path"); process.exit(1); }
 selfTest();
-const html = assemble();
 const out = args.includes("--out") ? path.resolve(args[args.indexOf("--out") + 1])
           : args.includes("--release") ? nextRelease()
           : path.join(root, "dist", "stream-visualizer.html");
+const version = (path.basename(out).match(/^stream-visualizer_(v\d+)\.html$/) || [, "dev"])[1];     // stamped into the page so it can tell when a newer release is published
+const html = assemble().replace("__APP_VERSION__", version);
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, html);
 console.log(`\nwrote ${out} (${(Buffer.byteLength(html) / 1024).toFixed(1)} KB)`);

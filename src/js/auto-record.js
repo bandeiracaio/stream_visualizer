@@ -40,7 +40,7 @@ function arToggle() {
 function arTick() {
   if (!AR.on) return;
   if (AR.ws && Date.now() - AR.lastMsg > 15000) try { AR.ws.close(); } catch {}     // a socket that went silent without closing: close it so onclose reopens it
-  const now = Date.now(), v = AUTOREC.vol(AR.h, AR.cfg, now);
+  const now = Date.now(), v = AR.v = AUTOREC.vol(AR.h, AR.cfg, now);      // AR.v is read by the header status (status-bar.js)
   if (AR.st.mode === "recording" && !RT.rec){
     if (AR.byUs && connected) $("go").click();
     return arFinish("The recording stopped on its own (by hand or at its input limit), so auto-record is off. The session is loaded: use Save session.");
