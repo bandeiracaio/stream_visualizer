@@ -6,8 +6,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
+import { fileURLToPath } from "node:url";
 
-const root = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1"));
+const root = path.dirname(fileURLToPath(import.meta.url));
 const src = p => path.join(root, "src", p);
 const read = p => fs.readFileSync(src(p), "utf8");
 
@@ -35,6 +36,7 @@ function nextRelease() {
 }
 
 const args = process.argv.slice(2);
+if (args.includes("--out") && !args[args.indexOf("--out") + 1]) { console.error("--out needs a file path"); process.exit(1); }
 selfTest();
 const html = assemble();
 const out = args.includes("--out") ? path.resolve(args[args.indexOf("--out") + 1])

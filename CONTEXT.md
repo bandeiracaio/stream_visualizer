@@ -2,6 +2,10 @@
 
 **Episode**: one market phenomenon with a lifecycle (forming, active, fading, ended; resumable). Families: absorption, exhaustion, aggression burst, wall.
 
+**Signal**: a point-in-time detection with no lifecycle (for example silence, lead/lag, trade clustering, or a one-off burst). Signals and episodes are separate layers, detected independently. Replaces the word "event". Avoid: event.
+
+**Input**: one message from a feed (a trade, quote, book update or sweep) that the engine consumes and replay re-feeds. Avoid: event.
+
 **Assumption**: a claim about how the market normally behaves that a detector relies on (e.g. "normal price movement is X bps"). Not a tuning constant.
 
 **Register**: the explicit list of assumptions, each with a written prior and a learned baseline.
