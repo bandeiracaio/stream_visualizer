@@ -32,3 +32,9 @@ the fast sigma component helps) need a recording that contains a jump in activit
 - A recording of hours is large (about 1.3 MB gzipped per 30 minutes of BTC).
 - Closing the tab, a phone going to sleep, or losing the network ends the wait (a dropped stream is reopened after 5 s; history gaps of a few
   seconds are tolerated).
+
+## Keep watching after a recording (v042)
+- Setting `rearm` (default on): after a recording stops and is saved, auto-record stays armed instead of disarming. The price stream and its history keep running, so there is no new 15 minutes to learn.
+- A cooldown (`cooldownMin`, default 10) blocks a new start straight after a recording, so a long volatile stretch cannot become a string of short files.
+- At most `maxRuns` (8) recordings per arming, then it disarms (storage bound). A recording stopped by hand still disarms.
+- Header chip: `armed · cooldown N min`, then `armed · waiting · N recorded`.

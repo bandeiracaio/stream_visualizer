@@ -606,6 +606,21 @@ const READER_SELFTEST=(()=>{
     const n=STATUS.newer;
     return{ok:n("v040","v041")&&!n("v040","v040")&&!n("v041","v040")&&n("v099","v100")&&!n("dev","v041")&&!n("v040","")&&!n("v040",null)&&!n("v040","latest"),detail:"version comparison"};
   });
+  add("autorec: after a recording it stays armed but waits out the cooldown, then starts again on the next jump",E=>{
+    const A=AUTOREC,r=rng(9),h=A.createHistory(),cfg={cooldownMin:10};let px=82000,t=T0,st={mode:"waiting"};const ev=[];
+    const run=(secs,vol)=>{for(let i=0;i<secs;i++){px*=1+(r()-.5)*2*vol/1e4;t+=1000;A.push(h,t,px);if(i%5===4){const v=A.vol(h,cfg),o=A.step(st,v,t,cfg);st=o.st;if(o.action){ev.push({a:o.action,why:o.why,t});if(o.action==="stop")st=A.afterStop(t,cfg);}}}};
+    run(2400,.3);run(900,1.2);for(let g=0;g<1000&&!ev.some(x=>x.a==="stop");g++)run(5,.3);      // learn, a jump, calm until the recording stops: then the view stays armed
+    const stop=ev.find(x=>x.a==="stop"),n1=ev.length;
+    run(180,2.5);const v=A.vol(h,cfg),wouldTrigger=v.fast>=cfg.trigSigma||v.ratio>=1.8&&v.fast>=.4,blocked=ev.length===n1&&st.mode==="waiting";   // wild again 3 minutes later, inside the cooldown
+    run(600,2.5);const second=ev.filter(x=>x.a==="start")[1];                  // still wild once the cooldown is over
+    const none=A.step({mode:"waiting"},{ready:true,ratio:3,fast:2},T0,cfg).action==="start";   // a state with no cooldown starts at once
+    return{ok:!!stop&&n1===2&&wouldTrigger&&blocked&&!!second&&second.t>=stop.t+600000&&none&&A.afterStop(T0,{}).until===T0+600000,detail:JSON.stringify({n1,wouldTrigger,blocked,second:second&&(second.t-stop.t)/1000,none})};
+  });
+  add("status: auto-record shows the cooldown after a recording and how many it has made",E=>{
+    const base={connected:false,paused:false,online:true,venues:{},rec:{on:false},kept:0},t=l=>l.map(c=>c.text).join(" | ");
+    const cd=STATUS.chips(Object.assign({},base,{ar:{on:true,ready:true,mode:"waiting",wake:true,runs:1,cooldownMin:7}})),after=STATUS.chips(Object.assign({},base,{ar:{on:true,ready:true,mode:"waiting",wake:true,runs:2,cooldownMin:0}}));
+    return{ok:t(cd)==="armed · cooldown 7 min"&&t(after)==="armed · waiting · 2 recorded",detail:t(cd)+" // "+t(after)};
+  });
   function run(Eng){return scenarios.map(sc=>{try{const r=sc.run(Eng);return{name:sc.name,ok:!!r.ok,detail:r.detail};}catch(err){return{name:sc.name,ok:false,detail:String(err&&err.stack||err)};}});}
   return {T0,rng,poisson,levels,sim,scenarios,run};
 })();

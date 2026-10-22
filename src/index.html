@@ -292,6 +292,8 @@
       <label title="and below this sigma">and sigma below <input id="arExitSigma" type="number" step="0.1" min="0"></label>
       <label title="Stop after it has been calm this long">stop after calm (min) <input id="arCalmMin" type="number" step="1" min="1"></label>
       <label title="Never record longer than this">at most (min) <input id="arMaxMin" type="number" step="5" min="5"></label>
+      <label title="After a recording is saved, stay armed and watch for the next volatile stretch (up to 8 recordings per arming)">keep watching after a recording <input id="arRearm" type="checkbox"></label>
+      <label title="Minutes after a recording during which it will not start another">cooldown after one (min) <input id="arCooldown" type="number" step="1" min="1"></label>
     </div>
     <div class="row" style="margin-top:6px"><button id="arArm">Arm</button><span id="arStat" class="stat">off</span></div>
     <div id="arMsg" class="note">While armed the app listens to one price stream only and does nothing else; it connects everything and starts recording when the market turns volatile, then saves the file when it calms down. Disconnect first, and keep this tab open and the screen on (it is the page that records).</div>

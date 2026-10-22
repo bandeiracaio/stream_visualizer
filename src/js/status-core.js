@@ -22,7 +22,8 @@ const STATUS = (() => {
     if (a.on) {
       if (a.mode === "recording") out.push({id:"ar", text:"auto REC " + dur(i.rec && i.rec.on ? i.rec.ms : 0), tone:"bad", title:"Auto-record started a recording"});
       else if (!a.ready) out.push({id:"ar", text:"armed · learning " + Math.min(15, a.learnMin || 0) + "/15 min", tone:"warn", title:"Auto-record needs 15 minutes of prices before it can judge the market"});
-      else out.push({id:"ar", text:"armed · waiting", tone:"info", title:"Auto-record is watching for a volatile stretch"});
+      else if (a.cooldownMin > 0) out.push({id:"ar", text:"armed · cooldown " + a.cooldownMin + " min", tone:"info", title:"A recording was just saved; auto-record can start again after the cooldown"});
+      else out.push({id:"ar", text:"armed · waiting" + (a.runs ? " · " + a.runs + " recorded" : ""), tone:"info", title:"Auto-record is watching for a volatile stretch" + (a.runs ? "; recordings made since arming: " + a.runs : "")});
       if (a.wake === false) out.push({id:"wake", text:"screen may sleep", tone:"warn", title:"The screen wake lock is not held; a sleeping device ends the wait"});
     }
     if (i.rec && i.rec.on && !(a.on && a.mode === "recording")) out.push({id:"rec", text:"REC " + dur(i.rec.ms) + " · " + (i.rec.n || 0).toLocaleString() + " inputs", tone:"bad", title:"A recording is running"});

@@ -11,7 +11,7 @@ function sbSnapshot() {
     const on = Object.values(S).filter(s => s.def.v === v && s.on), last = Math.max(0, ...on.map(s => s.last));
     venues[v] = {on:on.length > 0, ageMs:last ? now - last : null, rate:on.reduce((a, s) => a + s.rates.slice(-3).reduce((x, y) => x + y, 0) / 3, 0)};
   }
-  const ar = AR.on ? {on:true, ready:!!(AR.v && AR.v.ready), learnMin:AR.v ? Math.round(AR.v.nSlow / 60) : 0, mode:AR.st && AR.st.mode, wake:!!AR.lock} : {on:false};
+  const ar = AR.on ? {on:true, ready:!!(AR.v && AR.v.ready), learnMin:AR.v ? Math.round(AR.v.nSlow / 60) : 0, mode:AR.st && AR.st.mode, wake:!!AR.lock, runs:AR.runs, cooldownMin:AR.st && AR.st.until > now ? Math.ceil((AR.st.until - now) / 60000) : 0} : {on:false};
   const rec = RT.rec ? {on:true, ms:now - RT.rec.t0, n:READER.recording().n} : {on:false};
   return {connected, paused, online:navigator.onLine, venues, ar, rec, kept:typeof RC !== "undefined" ? RC.rows.length : 0};
 }

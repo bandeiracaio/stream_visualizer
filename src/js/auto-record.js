@@ -2,16 +2,17 @@
 // Auto-record (view): while armed it listens to ONE price stream (Binance mark price, about 1 message a second) and nothing else: no other feeds,
 // no Reader engine, no drawing. When AUTOREC says the market has turned volatile it connects the app and starts the normal recording; when it
 // has been calm long enough (or the time limit hits) it stops, saves the file, and disconnects again if it was the one who connected.
-const AR = {on:false, ws:null, gen:0, h:null, st:null, cfg:null, timer:null, lock:null, byUs:false, t0:0, lastMsg:0};
+const AR = {on:false, ws:null, gen:0, h:null, st:null, cfg:null, timer:null, lock:null, byUs:false, t0:0, lastMsg:0, runs:0};
 const ar$ = id => document.getElementById(id);
-const AR_FIELDS = {arTrigRatio:"trigRatio", arTrigSigma:"trigSigma", arExitRatio:"exitRatio", arExitSigma:"exitSigma", arCalmMin:"calmMin", arMaxMin:"maxMin"};
-const arCfgFromUi = () => { const c = {}; for (const id in AR_FIELDS){ const v = +ar$(id).value; if (v > 0) c[AR_FIELDS[id]] = v; } return Object.assign({}, AUTOREC.DEFAULTS, c); };
+const AR_FIELDS = {arTrigRatio:"trigRatio", arTrigSigma:"trigSigma", arExitRatio:"exitRatio", arExitSigma:"exitSigma", arCalmMin:"calmMin", arMaxMin:"maxMin", arCooldown:"cooldownMin"};
+const arCfgFromUi = () => { const c = {}; for (const id in AR_FIELDS){ const v = +ar$(id).value; if (v > 0) c[AR_FIELDS[id]] = v; } c.rearm = ar$("arRearm").checked; return Object.assign({}, AUTOREC.DEFAULTS, c); };
 const arMsg = t => { ar$("arMsg").textContent = t; };
 const arDur = ms => { const m = Math.floor(ms/60000); return ms < 60000 ? Math.round(ms/1000) + " s" : m >= 60 ? Math.floor(m/60) + " h " + (m%60) + " min" : m + " min"; };
 
 (function arInit() {
   const saved = store.get("ar.cfg", {});
   for (const id in AR_FIELDS){ const k = AR_FIELDS[id]; ar$(id).value = saved && saved[k] > 0 ? saved[k] : AUTOREC.DEFAULTS[k]; ar$(id).onchange = () => store.set("ar.cfg", arCfgFromUi()); }
+  ar$("arRearm").checked = !saved || saved.rearm !== false; ar$("arRearm").onchange = () => store.set("ar.cfg", arCfgFromUi());
   ar$("arArm").onclick = arToggle;
   document.addEventListener("visibilitychange", () => { if (AR.on && document.visibilityState === "visible") arLock(); });     // the screen lock is dropped when the tab is hidden
 })();
@@ -33,7 +34,7 @@ function arToggle() {
   if (AR.on) return arFinish(AR.st.mode === "recording" ? "Disarmed. The recording and the connection keep running: stop them by hand (Stop recording, then Save session)." : "Disarmed.");
   if (connected){ arMsg("Disconnect first (the Disconnect button at the top): while it waits the app should listen to one stream only."); return; }
   AR.cfg = arCfgFromUi(); store.set("ar.cfg", AR.cfg);
-  AR.on = true; AR.gen++; AR.h = AUTOREC.createHistory(); AR.st = {mode:"waiting"}; AR.byUs = false; AR.t0 = Date.now();
+  AR.on = true; AR.gen++; AR.h = AUTOREC.createHistory(); AR.st = {mode:"waiting"}; AR.byUs = false; AR.t0 = Date.now(); AR.runs = 0;
   arOpen(); arLock(); AR.timer = setInterval(arTick, 5000);
   ar$("arArm").textContent = "Disarm"; arMsg("Armed. It needs 15 minutes of prices to know what a normal hour looks like before it can judge."); arTick();
 }
@@ -53,6 +54,7 @@ function arStatus(v, now) {
   const c = AR.cfg, fx = x => x.toFixed(2);
   let t;
   if (!v.ready) t = v.nSlow >= AR.cfg.minSlow ? "price stream stalled: waiting for fresh prices" : `learning the last hour: ${Math.min(15, Math.round(v.nSlow/60))} of 15 min`;
+  else if (AR.st.mode === "waiting" && AR.st.until > now) t = `cooldown after recording ${AR.runs}: ${Math.ceil((AR.st.until - now)/60000)} min left before it can start again`;
   else if (AR.st.mode === "waiting") t = `waiting · sigma ${fx(v.fast)} (x${fx(v.ratio)} of the hour) · starts at x${c.trigRatio} or ${c.trigSigma}`;
   else t = `recording ${arDur(now - AR.st.since)} of at most ${c.maxMin} min · sigma ${fx(v.fast)} (x${fx(v.ratio)}) · calm ${AR.st.calmSince == null ? 0 : Math.floor((now - AR.st.calmSince)/60000)} of ${c.calmMin} min`;
   ar$("arStat").textContent = t;
@@ -69,7 +71,11 @@ function arStop(why) {
   if (RT.rec) rtRecStop();
   ar$("rtSave").click();                                           // downloads the file; the session also stays loaded, so Save session still works
   if (AR.byUs && connected) $("go").click();
-  arFinish(`Done (${why === "calm" ? "calm again" : "time limit"}), ${mins} recorded and saved: downloaded, and kept on this device under Saved recordings (Share sends it to mail or Drive).`);
+  const saved = `${mins} recorded and saved: downloaded, and kept on this device under Saved recordings (Share sends it to mail or Drive).`, how = why === "calm" ? "calm again" : "time limit";
+  AR.runs++;
+  if (!AR.cfg.rearm || AR.runs >= AR.cfg.maxRuns) return arFinish(`Done (${how}), ${saved}${AR.cfg.rearm ? ` That was recording ${AR.runs} of at most ${AR.cfg.maxRuns} per arming, so it is off now.` : ""}`);
+  AR.st = AUTOREC.afterStop(Date.now(), AR.cfg); AR.byUs = false;      // stay armed: the price stream and its history keep running, so there is no new 15 minutes to learn
+  arMsg(`Recording ${AR.runs} done (${how}), ${saved} Still armed: it can start again after a ${AR.cfg.cooldownMin} minute cooldown.`); arTick();
 }
 function arFinish(msg) {
   AR.on = false; AR.gen++; clearInterval(AR.timer); AR.timer = null;
