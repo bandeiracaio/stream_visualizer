@@ -1496,7 +1496,7 @@ function renderReader(){
   const rows=RD().events.slice().reverse().filter(e=>(!rdFilter.family.size||rdFilter.family.has(e.family))&&(!rdFilter.venue.size||rdFilter.venue.has(e.venue))&&e.strength>=rdFilter.min).slice(0,100);
   $("rdFeed").innerHTML=`<tr><th>time</th><th>type</th><th>venue</th><th>price</th><th>horizon</th><th>strength</th><th>evidence</th></tr>`+rows.map(e=>`<tr class="neutral"><td>${hhmmss(e.t)}</td><td>${e.type.replace(/_/g," ")}</td><td><span class="venue v-${e.venue}">${e.venue.toUpperCase()}</span></td><td>${fmt(e.px,1)}</td><td>${e.horizon}</td><td><i class="rd-str" style="width:${Math.round(e.strength*60)}px"></i> ${(e.strength*100).toFixed(0)}</td><td style="white-space:normal">${rdEsc(e.evidence)}</td></tr>`).join("");
   const hs=["bn.trade","bn.depth","bn.bookTicker","hl.trades","hl.l2Book","hl.bbo"].map(id=>[id.replace("."," "),S[id].on?(status(S[id])||"-"):"off"]);
-  hs.push(["events / min",s.eventsPerMin],["BN book age",s.bookAgeMs.bn==null?"-":s.bookAgeMs.bn+" ms"],["HL book age",s.bookAgeMs.hl==null?"-":s.bookAgeMs.hl+" ms"],["heartbeat",rdWorker?"on":"off"]);
+  hs.push(["signals / min",s.eventsPerMin],["BN book age",s.bookAgeMs.bn==null?"-":s.bookAgeMs.bn+" ms"],["HL book age",s.bookAgeMs.hl==null?"-":s.bookAgeMs.hl+" ms"],["heartbeat",rdWorker?"on":"off"]);
   $("rdHealth").innerHTML=hs.map(([k,v])=>`<div class="metric"><span>${k}</span><b>${v}</b></div>`).join("");
 }
 
