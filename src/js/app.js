@@ -335,7 +335,7 @@ function drawBubbles(){
     ctx.beginPath(); p.v==="bn" ? ctx.arc(x,y,r,0,Math.PI*2) : ctx.rect(x-r*.89,y-r*.89,r*1.78,r*1.78);
     if (!hollow) ctx.fill(); ctx.globalAlpha=.9; ctx.stroke(); ctx.globalAlpha=1;
   }
-  // Reader events: compact directional markers on the shared price/time axes.
+  // Reader signals: compact directional markers on the shared price/time axes.
   for (const e of READER.events){
     if (e.t<t0 || e.t>t1 || !(e.px>=lo && e.px<=hi)) continue;
     const x=X(e.t),y=Y(e.px),up=e.dir==="bull",neutral=e.dir==="neutral";

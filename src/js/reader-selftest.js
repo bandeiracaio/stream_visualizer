@@ -19,7 +19,7 @@ const READER_SELFTEST=(()=>{
   add("capitulation, then selling exhausted",E=>{const e=E.create(),a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:21,params:()=>({rate:200,buyP:.1,driftBps:-6,liqSell:3,sweepSell:2,bidMult:.4})});sim(e,{t0:b.t,mid0:b.mid,seconds:24,seed:22,params:()=>({driftBps:.2})});const i=e.events.findIndex(x=>x.type==="capitulation"&&x.dir==="bear"),j=e.events.findIndex(x=>x.type==="selling_exhausted"&&x.dir==="bull");return result(i>=0&&j>i,e,"capitulation:bear followed by selling_exhausted:bull");});
   add("squeeze that stays inside the 5-minute range",E=>{const e=E.create(),a=sim(e,{seconds:150,seed:3,params:sec=>({driftBps:sec<50?1:sec<110?-.8:0})});sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:31,params:()=>({rate:200,buyP:.9,driftBps:3.5,liqBuy:3,sweepBuy:2,askMult:.4})});return result(has(e,"squeeze","bull")&&!has(e,"breakout"),e,"squeeze:bull and no breakout");});
   add("breakout through the 5-minute high",E=>{const e=E.create(),a=calm(e);sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:32,params:()=>({rate:200,buyP:.9,driftBps:6,liqBuy:3,sweepBuy:2,askMult:.4})});return result(has(e,"breakout","bull")&&!has(e,"squeeze"),e,"breakout:bull and no squeeze");});
-  add("quiet market produces no events",E=>{const e=E.create();sim(e,{seconds:300,seed:5});return result(e.events.length===0,e,"no events at all");});
+  add("quiet market produces no signals",E=>{const e=E.create();sim(e,{seconds:300,seed:5});return result(e.events.length===0,e,"no signals at all");});
   // ---- episodes: lifecycle (forming -> active -> fading -> ended, resumable), several variables, neutral language ----
   const eps=(e,family,pred)=>e.episodes.filter(x=>x.family===family&&(!pred||pred(x)));
   const epResult=(ok,e,want)=>({ok,detail:ok?"ok":`wanted ${want}; got [${Array.from(e.episodes,x=>`${x.family}/${x.venue}/${x.horizon}:${x.aggressor}:${x.stage}:${x.outcome}`).join(", ")}]`});
@@ -173,11 +173,11 @@ const READER_SELFTEST=(()=>{
     const s=e.register.sessions;
     return{ok:!!n0&&n0.n>=150&&n0.n<=190&&s.length===1&&s[0].durationMs>=170000&&e.register.snapshot().vars["bn|buyRate"].n>=150,detail:`n=${n0&&n0.n}; sessions=${s.length} ${s[0]&&s[0].durationMs}`};
   });
-  add("register: it never changes a detection (a taught register gives identical events and episodes)",E=>{
+  add("register: it never changes a detection (a taught register gives identical signals and episodes)",E=>{
     const run=state=>{const e=E.create(state?{register:state}:undefined),a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:21,params:()=>burstSell});sim(e,{t0:b.t,mid0:b.mid,seconds:30,seed:22});return e;};
     const taught=R.create();for(let i=0;i<5000;i++)taught.observe(T0+i*1000,"bn",{buyRate:1e9,sellRate:1e9,share:.99,ret:50,depthBid:1e-9,depthAsk:1e-9,spreadBps:99});
     const x=run(),y=run(taught.save()),sig=e=>e.events.map(v=>v.type+v.t).join()+"|"+e.episodes.map(p=>[p.family,p.tStart,p.tEnd,p.stage].join(":")).join();
-    return{ok:x.episodes.length>0&&sig(x)===sig(y),detail:"events or episodes differ when the register was pre-loaded"};
+    return{ok:x.episodes.length>0&&sig(x)===sig(y),detail:"signals or episodes differ when the register was pre-loaded"};
   });
   add("register: replaying recorded inputs reproduces the same baselines",E=>{
     const e=E.create();e.startRecording();const a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:21,params:()=>burstSell});sim(e,{t0:b.t,mid0:b.mid,seconds:30,seed:22});
@@ -433,7 +433,7 @@ const READER_SELFTEST=(()=>{
     const bad=R.create({minLearned:300});feed(bad,T0,normal(7,10,1000));bad.endSession();const wild=get(bad);
     return{ok:!shortOnly.ready&&live.ready&&live.ok&&done.ready&&done.ok&&again.ok&&wild.ready&&!wild.ok,detail:JSON.stringify({shortOnly:shortOnly.ready,live:live.ok,done:done.ok,again:again.ok,wild:wild.ok})};
   });
-  // ---- raw events (v019): silence, trade clustering, cross-venue lead/lag ----
+  // ---- raw signals (v019): silence, trade clustering, cross-venue lead/lag ----
   const rawOf=(e,type)=>e.events.filter(x=>x.raw&&x.type===type);
   add("raw: a venue that goes quiet gets silence_started, and silence_ended when trading resumes",E=>{
     const e=E.create(),a=calm(e);let t=a.t;for(let i=0;i<6;i++){t+=1000;e.advance(t);}
@@ -465,10 +465,10 @@ const READER_SELFTEST=(()=>{
     const f=E.create(),c=twin(f,{t0:T0,mid0:82000,seconds:150}),d=twin(f,{t0:c.t,mid0:c.bn,hl0:c.hl,seconds:4,seed:6,jump:s=>s>=1&&s<2?{bn:6,hl:0}:{bn:0,hl:0}});
     return{ok:!rawOf(e,"lead_lag").length&&!rawOf(f,"lead_lag").length,detail:JSON.stringify({both:rawOf(e,"lead_lag").length,one:rawOf(f,"lead_lag").length})};
   });
-  add("raw: the new events leave every older detection and episode exactly as it was, and never count toward the per-minute cap",E=>{
+  add("raw: the new signals leave every older detection and episode exactly as it was, and never count toward the per-minute cap",E=>{
     const run=(on)=>{const e=E.create({detectors:{silence_started:on,silence_ended:on,lead_lag:on,trade_cluster:on}}),a=calm(e);sim(e,{t0:a.t,mid0:a.mid,seconds:5,seed:11,params:()=>({vol:0,bidWalls:[{idx:12,size:6}]})});return e;};
     const on=run(true),off=run(false),strip=x=>JSON.stringify(x.events.filter(y=>!y.raw),(k,v)=>k==="id"?undefined:v);
-    return{ok:strip(on)===strip(off)&&JSON.stringify(on.episodes)===JSON.stringify(off.episodes)&&off.events.every(x=>!x.raw),detail:"legacy events or episodes differ with the raw events on"};
+    return{ok:strip(on)===strip(off)&&JSON.stringify(on.episodes)===JSON.stringify(off.episodes)&&off.events.every(x=>!x.raw),detail:"legacy signals or episodes differ with the raw events on"};
   });
   // ---- flow landscape (v020): the pure grid behind the 3D view ----
   const LS=READER_LANDSCAPE;
