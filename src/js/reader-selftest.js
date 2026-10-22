@@ -564,6 +564,16 @@ const READER_SELFTEST=(()=>{
     const mid=m.find(x=>!x.outside),far=m.find(x=>x.outside);
     return{ok:one.length===1&&Math.abs(one[0].u-.5)<1e-9&&m.length===2&&mid.n===2&&mid.stage==="ended"&&!!far&&far.n===2&&far.outside===true,detail:JSON.stringify({one:one.length&&one[0].u,m:m.map(x=>[x.n,x.stage,x.outside])})};
   });
+  add("replay: an empty recording and one with unknown record types replay to a quiet engine without throwing",E=>{
+    const a=E.replayEngine([]),b=E.replayEngine([["zz",1],["a",T0],["x"],["a",T0+1000]]);
+    return{ok:a.events.length===0&&a.episodes.length===0&&b.events.length===0&&b.episodes.length===0,detail:`empty ${a.events.length}/${a.episodes.length}, unknown ${b.events.length}/${b.episodes.length}`};
+  });
+  add("register: a file from before the later fields (no seed2, settings, overrides, proposals, approvals, history, epoch) still loads and keeps learning",E=>{
+    const r=R.create();for(let i=0;i<500;i++)r.observe(T0+i*1000,"hl",{ret:Math.sin(i)});r.endSession();
+    const old=JSON.parse(JSON.stringify(r.save()));for(const k of ["seed2","settings","overrides","proposals","approvals","history","epoch"])delete old[k];
+    const r2=R.create({},old);r2.observe(T0+9e5,"hl",{ret:1});
+    return{ok:r2.sessions.length===1&&r2.overrides&&Object.keys(r2.overrides).length===0&&r2.epoch===0&&r2.snapshot().vars["hl|ret"].n===501,detail:`sessions ${r2.sessions.length}, n ${r2.snapshot().vars["hl|ret"].n}`};
+  });
   function run(Eng){return scenarios.map(sc=>{try{const r=sc.run(Eng);return{name:sc.name,ok:!!r.ok,detail:r.detail};}catch(err){return{name:sc.name,ok:false,detail:String(err&&err.stack||err)};}});}
   return {T0,rng,poisson,levels,sim,scenarios,run};
 })();
