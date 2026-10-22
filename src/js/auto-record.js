@@ -69,7 +69,7 @@ function arStop(why) {
   if (RT.rec) rtRecStop();
   ar$("rtSave").click();                                           // downloads the file; the session also stays loaded, so Save session still works
   if (AR.byUs && connected) $("go").click();
-  arFinish(`Done (${why === "calm" ? "calm again" : "time limit"}), ${mins} recorded and saved. Replay it from this panel or drop the file in the repo.`);
+  arFinish(`Done (${why === "calm" ? "calm again" : "time limit"}), ${mins} recorded and saved: downloaded, and kept on this device under Saved recordings (Share sends it to mail or Drive).`);
 }
 function arFinish(msg) {
   AR.on = false; AR.gen++; clearInterval(AR.timer); AR.timer = null;

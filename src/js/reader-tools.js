@@ -63,12 +63,13 @@ function rtDownload(blob, name){
 }
 rt$("rtSave").onclick = async () => {
   const s = RT.session; if (!s) return;
-  const stamp = new Date(s.startedAt || Date.now()).toISOString().slice(0,16).replace(/[-:T]/g, ""), base = `session_${s.sym || "X"}_${stamp}`;
+  const stamp = new Date(s.startedAt || Date.now()).toISOString().slice(0,16).replace(/[-:T]/g, ""), base = `session_${String(s.sym || "X").replace(/[^A-Za-z0-9_-]/g, "") || "X"}_${stamp}`;
   const text = JSON.stringify({kind:"sv-session", v:1, sym:s.sym, startedAt:s.startedAt, baseline:s.baseline || null, inputs:s.inputs});
-  if (typeof CompressionStream !== "undefined"){
-    rtDownload(await new Response(new Blob([text]).stream().pipeThrough(new CompressionStream("gzip"))).blob(), base + ".json.gz");
-  } else rtDownload(new Blob([text], {type:"application/json"}), base + ".json");
-  rtMsg("Saved. Load it later (or on another device) with Load session.");
+  const gz = typeof CompressionStream !== "undefined", name = base + (gz ? ".json.gz" : ".json");
+  const blob = gz ? await new Response(new Blob([text]).stream().pipeThrough(new CompressionStream("gzip"))).blob() : new Blob([text], {type:"application/json"});
+  rtDownload(blob, name);
+  const kept = typeof rcKeep === "function" ? await rcKeep(name, blob, {sym:s.sym, startedAt:s.startedAt}) : false;      // a copy stays on the device (recordings.js)
+  rtMsg("Saved." + (kept ? " A copy is kept on this device (Saved recordings below)." : "") + " Load it later (or on another device) with Load session.");
 };
 rt$("rtLoadBtn").onclick = () => rt$("rtLoad").click();
 async function rtReadSessionFile(f){
