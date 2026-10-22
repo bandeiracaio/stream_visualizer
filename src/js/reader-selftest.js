@@ -574,6 +574,16 @@ const READER_SELFTEST=(()=>{
     const r2=R.create({},old);r2.observe(T0+9e5,"hl",{ret:1});
     return{ok:r2.sessions.length===1&&r2.overrides&&Object.keys(r2.overrides).length===0&&r2.epoch===0&&r2.snapshot().vars["hl|ret"].n===501,detail:`sessions ${r2.sessions.length}, n ${r2.snapshot().vars["hl|ret"].n}`};
   });
+  add("register: a file carries the sigma scale; one without it loads, is flagged, and stays flagged until marked current",E=>{
+    const r=R.create();for(let i=0;i<500;i++)r.observe(T0+i*1000,"hl",{ret:Math.sin(i)});r.endSession();
+    const saved=JSON.parse(JSON.stringify(r.save())),fresh=R.create().review().scale.ok,marked=R.create({},saved).review().scale.ok;
+    const old=JSON.parse(JSON.stringify(saved));delete old.sigmaScale;
+    const r2=R.create({},old),flagged=!r2.review().scale.ok,again=JSON.parse(JSON.stringify(r2.save())).sigmaScale===undefined&&!R.create({},JSON.parse(JSON.stringify(r2.save()))).review().scale.ok;
+    const learned=r2.snapshot().vars["hl|ret"].n===500;r2.confirmScale();
+    const cleared=r2.review().scale.ok&&JSON.parse(JSON.stringify(r2.save())).sigmaScale===saved.sigmaScale;
+    const empty=R.create({},{v:1,cum:{}}).review().scale.ok;
+    return{ok:fresh&&marked&&flagged&&again&&learned&&cleared&&empty&&typeof saved.sigmaScale==="number",detail:JSON.stringify({fresh,marked,flagged,again,learned,cleared,empty})};
+  });
   function run(Eng){return scenarios.map(sc=>{try{const r=sc.run(Eng);return{name:sc.name,ok:!!r.ok,detail:r.detail};}catch(err){return{name:sc.name,ok:false,detail:String(err&&err.stack||err)};}});}
   return {T0,rng,poisson,levels,sim,scenarios,run};
 })();

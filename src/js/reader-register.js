@@ -17,6 +17,8 @@ const READER_REGISTER = (() => {
     // what a correct sigma looks like in the data (price progress is measured in sigmas): a random walk gives a typical |move| of 0.67
     // and tails near 1.64; real markets trend a little and progress is only sampled in busy windows, so the bands are wider (upper bounds widened from 1.0 and 2.6 after measuring BTC, ETH and DOGE). Tuned in the weekly review.
     expMedLo:.5, expMedHi:1.2, expTailLo:1.3, expTailHi:3.2};
+  // version of how sigma (and so every sigma-unit variable) is measured: 14 = 75th percentile of 15 s returns (v014, ADR 0004). A file without it may be on an older scale.
+  const SIGMA_SCALE = 14;
   const SETTABLE = ["k", "m", "medShift", "widthLo", "widthHi", "tailShift", "minSamples", "scalarShift", "minEpisodes", "expMedLo", "expMedHi", "expTailLo", "expTailHi", "segmentMs", "minSessionMs"];
   const FAMS = ["absorption", "exhaustion", "burst", "wall"];
   // prior: what we assumed before measuring (null when it depends on the asset). Kept as quantiles where it can be said.
@@ -78,7 +80,7 @@ const READER_REGISTER = (() => {
 
   function create(options, state){
     const cfg = Object.assign({}, DEFAULTS, options || {});
-    let seed = 20240607, cum = {}, cumOk = {}, cur = null, sessions = [], history = [], run = null, proposals = [], approvals = [], overrides = {}, epoch = 0, seed2 = 1013904223;
+    let seed = 20240607, cum = {}, cumOk = {}, cur = null, sessions = [], history = [], run = null, proposals = [], approvals = [], overrides = {}, epoch = 0, seed2 = 1013904223, scaleOk = true;   // scaleOk: false for a loaded file that does not carry the current sigma scale (ADR 0004)
     const rand2 = () => (seed2 = (Math.imul(seed2, 1664525) + 1013904223) >>> 0) / 4294967296;
     const rand = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;
     function put(cell, x, rnd){
@@ -279,7 +281,7 @@ const READER_REGISTER = (() => {
       const cq = {}; if (cur) for (const k in cur.cells) if (cur.cells[k].n >= 30) cq[k] = quantiles(cur.cells[k].res);
       const ev = READER_DRIFT.evaluate(sessions, cfg, allKeys(), {undone:undoneSet(), priors:priors(), cur:cq});
       expire();
-      return {keys:ev, history, proposals, expectations:expectations(), unacked:history.filter(h => h.type === "drift" && !h.acked && !h.undone).length};
+      return {keys:ev, history, proposals, expectations:expectations(), scale:{ok:scaleOk, current:SIGMA_SCALE}, unacked:history.filter(h => h.type === "drift" && !h.acked && !h.undone).length};
     }
     function ack(id){ const h = history.find(x => x.id === id && x.type === "drift"); if (h) h.acked = true; return !!h; }
     function undo(id){ const h = history.find(x => x.id === id && x.type === "drift"); if (!h || h.undone) return false; h.undone = true; h.acked = true; for (const p of proposals) if (p.driftId === id && p.status === "pending") p.status = "withdrawn"; noteDrifts(); return true; }
@@ -304,7 +306,7 @@ const READER_REGISTER = (() => {
       return out;
     }
     // full state: includes the samples, so it can be restored and keep learning
-    function save(){ const settings = {}; for (const k of SETTABLE) settings[k] = cfg[k]; return {v:1, seed, seed2, cum, cumOk, cur, sessions, history, settings, proposals, approvals, overrides, epoch}; }
+    function save(){ const settings = {}; for (const k of SETTABLE) settings[k] = cfg[k]; return {v:1, sigmaScale:scaleOk ? SIGMA_SCALE : undefined, seed, seed2, cum, cumOk, cur, sessions, history, settings, proposals, approvals, overrides, epoch}; }
     function load(s){
       if (!s || s.v !== 1 || typeof s.cum !== "object") return false;
       const ok = c => c && Array.isArray(c.res) && finite(c.n) && c.res.every(finite);
@@ -320,12 +322,14 @@ const READER_REGISTER = (() => {
       proposals = Array.isArray(s.proposals) ? s.proposals.filter(x => x && typeof x.id === "string" && typeof x.k === "string" && finite(x.to) && finite(x.from) && Array.isArray(x.families)).slice(-KEEP_PROPOSALS) : [];
       if (finite(s.seed)) seed = s.seed >>> 0;
       if (finite(s.seed2)) seed2 = s.seed2 >>> 0;
+      scaleOk = s.sigmaScale === SIGMA_SCALE || (!Object.keys(cum).length && !sessions.length);
       if (s.cur && finite(s.cur.start) && s.cur.cells){ cur = {id:s.cur.id, start:s.cur.start, end:s.cur.end, run:finite(s.cur.run) ? s.cur.run : s.cur.id, cells:clean(s.cur.cells), fire:s.cur.fire && typeof s.cur.fire === "object" ? s.cur.fire : {}, mixed:Array.isArray(s.cur.mixed) ? s.cur.mixed.filter(f => FAMS.includes(f)) : []}; endSession(); }   // a run that was cut by closing the page
       return true;
     }
-    function reset(){ cum = {}; cumOk = {}; cur = null; sessions = []; history = []; proposals = []; approvals = []; overrides = {}; epoch = 0; run = null; seed = 20240607; seed2 = 1013904223; }
+    function reset(){ cum = {}; cumOk = {}; cur = null; sessions = []; history = []; proposals = []; approvals = []; overrides = {}; epoch = 0; run = null; seed = 20240607; seed2 = 1013904223; scaleOk = true; }
+    function confirmScale(){ scaleOk = true; }
     function claims(engineCfg){ return LINKS.map(c => ({q:c.q, k:c.k, label:c.label, value:c.at === "ep" ? (engineCfg.ep || {})[c.k] : engineCfg[c.k]})); }
-    const api = {cfg, observe, noteEpisode, endSession, snapshot, save, load, reset, status, claims, review, expectations, ack, undo, setSetting, recompute, reject, oldRates, approve, resetOverride, settleOverrides, applyOverrides, recordApproval, vars:VARS,
+    const api = {cfg, confirmScale, observe, noteEpisode, endSession, snapshot, save, load, reset, status, claims, review, expectations, ack, undo, setSetting, recompute, reject, oldRates, approve, resetOverride, settleOverrides, applyOverrides, recordApproval, vars:VARS,
       get sessions(){ return sessions; }, get proposals(){ return proposals; }, get overrides(){ return overrides; }, get approvals(){ return approvals; }, get epoch(){ return epoch; }, get history(){ return history; }, get active(){ return !!cur; }};
     if (state) load(state);
     return api;

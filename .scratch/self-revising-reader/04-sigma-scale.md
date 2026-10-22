@@ -38,6 +38,7 @@ ETH (14 min) and DOGE (14 min), new sigma (old sigma was RED everywhere: typical
 
 ## Consequences
 - Old register files (including `reader_register_2026-10-16.json` saved before this change) hold price progress, gap and late progress on the wrong scale. Do not import them into v012 or later.
+  v038: a saved register carries `sigmaScale` (14). A file without it still loads but the review flags it until "Mark as current" is pressed; the mark is not written back until then.
 - One legacy self-test (squeeze inside the 5-minute range) built its range from +-150 bps swings; with an honest sigma that is high volatility. Its range and burst were rescaled to a realistic size (range +-50 bps, burst +42 bps); the scenario's intent is unchanged.
 - `sigmaLagMs` is an engine setting, not a linked threshold.
 - Thresholds that are in sigmas (absorbSigma, burstSigma, exhGap, pokeSigma) now mean what they say; whether the numbers are right is for labels and the weekly review.

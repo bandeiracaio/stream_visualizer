@@ -248,7 +248,7 @@ function rvRender(){
   const pend = rv.history.filter(h => h.type === "drift" && !h.acked && !h.undone), watch = keys.filter(k => rv.keys[k].state === "watching"), off = keys.filter(k => rv.keys[k].priorOff);
   const counted = reg.sessions.filter(x => x.durationMs >= reg.cfg.minSessionMs).length;
   const sum = `${counted} counted session${counted === 1 ? "" : "s"} (${reg.sessions.length} stored). ${pend.length} drift${pend.length === 1 ? "" : "s"} to review, ${watch.length} being watched. A drift needs ${reg.cfg.k} reference sessions and then ${reg.cfg.m} differing sessions in a row. This panel only reports; it never changes a detection.`;
-  const needs = expOff.map(x => `<div class="rv-row"><div class="grow"><b>The sigma scale looks wrong</b> on ${x.key.startsWith("bn") ? "Binance" : "Hyperliquid"} (${x.key.split("|")[1]}): ${x.reasons.join("; ")}.<div class="stat">Price progress is measured in sigmas, so it should have a known shape. ${x.n.toLocaleString()} samples so far.</div></div></div>`).join("") + pend.map(h => `<div class="rv-row"><div class="grow"><b>${rvName(h.key)}</b> drifted: ${h.reasons.join(", ")}.<div class="stat">From the session at ${rvWhen(h.from)}, confirmed ${rvWhen(h.at)}. The reference restarted there.${h.note ? " " + h.note : ""}</div></div><button data-rv="ack" data-id="${h.id}">Acknowledge</button><button data-rv="undo" data-id="${h.id}">Undo (was a one-off)</button></div>`).join("")
+  const needs = (rv.scale.ok ? "" : `<div class="rv-row"><div class="grow"><b>This register has no sigma-scale mark</b><div class="stat">It was saved before the mark existed. Registers from before v012 hold price progress, gap and late progress on the wrong scale (ADR 0004). If this one was saved by v014 or later, mark it as current; otherwise reset it.</div></div><button data-rv="scale">Mark as current</button></div>`) + expOff.map(x => `<div class="rv-row"><div class="grow"><b>The sigma scale looks wrong</b> on ${x.key.startsWith("bn") ? "Binance" : "Hyperliquid"} (${x.key.split("|")[1]}): ${x.reasons.join("; ")}.<div class="stat">Price progress is measured in sigmas, so it should have a known shape. ${x.n.toLocaleString()} samples so far.</div></div></div>`).join("") + pend.map(h => `<div class="rv-row"><div class="grow"><b>${rvName(h.key)}</b> drifted: ${h.reasons.join(", ")}.<div class="stat">From the session at ${rvWhen(h.from)}, confirmed ${rvWhen(h.at)}. The reference restarted there.${h.note ? " " + h.note : ""}</div></div><button data-rv="ack" data-id="${h.id}">Acknowledge</button><button data-rv="undo" data-id="${h.id}">Undo (was a one-off)</button></div>`).join("")
     + watch.map(k => `<div class="rv-row"><div class="grow"><b>${rvName(k)}</b> is being watched: ${rv.keys[k].streak} of ${rv.keys[k].m} sessions differ.</div></div>`).join("")
     + off.map(k => { const j = rv.keys[k]; return `<div class="rv-row"><div class="grow"><b>${rvName(k)}</b>: the reference median is ${j.priorGap.toFixed(2)} IQR away from what we assumed in advance.</div></div>`; }).join("");
   const all = `<table class="rv-tbl rv-keys"><tbody>${keys.map(k => { const j = rv.keys[k]; return `<tr><td>${rvName(k)}</td><td><span class="chip">${rvState(j)}</span></td><td>${rvSpark(j)}</td><td class="stat">${rvLast(j)}${j.preview ? `; running: ${j.preview.drifted ? "outside" : "inside"} the band (not a vote)` : ""}</td></tr>`; }).join("")}</tbody></table>`
@@ -268,11 +268,11 @@ function rvRender(){
 rt$("rvSet").onchange = e => { const k = e.target.dataset.rvk; if (!k) return; READER.register.setSetting(k, (+e.target.value) * (+e.target.dataset.sc), Date.now()); rgPersist(); RT.last.rv = null; rvRender(); };
 rt$("rvNeeds").onclick = e => {
   const b = e.target.closest("button[data-rv]"); if (!b) return;
-  if (b.dataset.rv === "ack") READER.register.ack(b.dataset.id); else READER.register.undo(b.dataset.id);
+  if (b.dataset.rv === "scale") READER.register.confirmScale(); else if (b.dataset.rv === "ack") READER.register.ack(b.dataset.id); else READER.register.undo(b.dataset.id);
   rgPersist(); RT.last.rv = null; rvRender(); rvBadge();
 };
 function rvBadge(){
-  const n = READER.register.review().unacked, g = document.querySelector('#groups button[data-g="reader"]'); if (!g) return;
+  const rv = READER.register.review(), n = rv.unacked + (rv.scale.ok ? 0 : 1), g = document.querySelector('#groups button[data-g="reader"]'); if (!g) return;
   const want = n ? `Reader<span class="badge">${n}</span>` : "Reader"; if (g.innerHTML !== want) g.innerHTML = want;
 }
 setInterval(rvBadge, 5000); setTimeout(rvBadge, 800);
@@ -281,6 +281,7 @@ function rvReportText(){
   L.push(`# Reader review ${d}`, "", `Counted sessions: ${reg.sessions.filter(x => x.durationMs >= reg.cfg.minSessionMs).length} of ${reg.sessions.length} stored. Times are UTC.`, "", "## Settings", "");
   for (const [k, l, , sc] of RV_SET) L.push(`- ${l}: ${+(reg.cfg[k] / sc).toFixed(3)}`);
   L.push("", "## To review", "");
+  if (!rv.scale.ok) L.push("- **This register has no sigma-scale mark** (saved before the mark existed): price progress, gap and late progress may be on an older scale.");
   for (const x of rv.expectations.filter(y => y.ready && !y.ok)) L.push(`- **The sigma scale looks wrong** on ${x.key}: ${x.reasons.join("; ")}.`);
   const pend = rv.history.filter(h => h.type === "drift" && !h.acked && !h.undone);
   if (!pend.length) L.push("Nothing confirmed and waiting.");
