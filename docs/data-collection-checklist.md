@@ -13,9 +13,17 @@ For the first real collection weeks. Numbers come from the code defaults (`reade
 
 1. Open the latest `stream-visualizer_vNNN.html` (check the version in the app against the newest file in the repo root).
 2. Leave **warm-up** to finish (the Reader shows calibrating until it has enough data); nothing is recorded in the baselines before that.
-3. Keep the tab visible or the screen awake. A hidden tab throttles timers, and a data gap ends the session.
+3. Keep the tab **visible**: its own Chrome window, in front, not minimized, not covered, not behind another tab, screen awake and the computer plugged in and set not to sleep. A hidden tab has its timers slowed to once a minute and can be frozen by the browser (seen on 2026-10-22: freezes of about 55 s a minute, price stream dropping every 2 minutes, learning restarting, and a recording that held 5 minutes of data in an hour). Chrome: turn off Memory Saver (`chrome://settings/performance`); the flags `chrome://flags` *Calculate window occlusion* and *Intensive wake up throttling* may also matter. The wake lock only works while the tab is visible.
 4. For jumps in activity, **arm auto-record at least 15 minutes ahead** (it needs 15 minutes of prices for its hour baseline). It starts at 1.8x the hour's sigma (above the 0.4 floor) or above 1.2 bps per root second, stops after 5 calm minutes or 60 minutes, then downloads the file.
 5. The app must be disconnected to arm auto-record; arming opens one price socket only.
+
+## Unattended collection: how to tell it worked
+
+- The header chips show `armed · waiting`, not `learning` after the first 15 minutes. If it keeps going back to `learning`, the tab is being throttled or frozen: open **Health log** (Reader tab, under Saved recordings) and look for `page frozen by the browser`, `gap`, `tab hidden`, `price-stream drop`, `wake lock lost`.
+- Each saved recording shows a quality line in **Saved recordings** (`47 of 61 min with data, longest silence 60 s, clock at 43%`). It is amber when there are holes. A `hollow` file (fewer than half the minutes have data) is not worth analysing; keep its health log.
+- An auto-recording also holds `pre`: the 30 minutes of Binance mark price before the trigger and the reading that fired it. Use it to see whether the trigger was late.
+- Since v050 the price feed runs in a Web Worker and the armed page holds a Web Lock, so a hidden tab should keep learning; the recording itself still runs on the page and needs the visible window.
+- Send the Health log (Download log) along with any recording that has holes.
 
 ## After a session
 

@@ -76,6 +76,11 @@ const READER_SELFTEST=(()=>{
     const d=A.dump(h,t,200),all=A.dump(h,t,4000);
     return{ok:d.length===180&&d[d.length-1][1]===82299&&d.every((p,i)=>i===0||p[0]>d[i-1][0])&&all.length===280&&A.dump(A.createHistory(),t,50).length===0,detail:JSON.stringify({n:d.length,all:all.length,last:d[d.length-1]})};
   });
+  add("wallet: one order split into many fills at one instant is not a wallet that keeps hitting; fills over several seconds are",E=>{
+    const run=(spread)=>{const e=E.create(),a=calm(e);for(let i=0;i<12;i++)e.onTrade({t:a.t+(spread?i*700:50),v:"hl",side:"sell",px:a.mid,q:1,ntl:a.mid,users:["0xbuyer"+i,"0xsellerAAAAAA"]});return e.debug().walletEvidence("hl","sell",a.t-1000);};
+    const one=run(false),many=run(true);
+    return{ok:!one&&!!many&&many.share>.9,detail:JSON.stringify({one,many})};
+  });
   add("flickering walls (a few seconds) do not become episodes",E=>{
     const e=E.create(),a=calm(e);let t=a.t,mid=a.mid;
     for(let i=0;i<4;i++){const w=sim(e,{t0:t,mid0:mid,seconds:6,seed:50+i,params:()=>({vol:0,bidWalls:[{idx:12,size:6}]})}),g=sim(e,{t0:w.t,mid0:w.mid,seconds:3,seed:60+i,params:()=>({vol:0})});t=g.t;mid=g.mid;}

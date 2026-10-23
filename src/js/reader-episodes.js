@@ -76,7 +76,7 @@ const READER_EPISODES = (() => {
       const z = ctx.robustZ(rate, vn, side, 1), prog = progress(vn, h, side), count = Math.round(h.ms/cfg.bucketMs), r = v.ring.slice(-count);
       let path = 0; for (let i = 1; i < r.length; i++) if (r[i-1].close > 0 && r[i].close > 0) path += Math.abs(r[i].close/r[i-1].close-1);
       const eff = path > 0 ? Math.abs(h.close/h.open-1)/path : 0;
-      const dSide = side==="sell" ? "bid" : "ask", start = r.length ? r[0][dSide+"Depth"] : 0, refill = start > 0 ? v.depth[dSide]/start : null;
+      const dSide = side==="sell" ? "bid" : "ask", start = r.length ? r[0][dSide+"Depth"] : 0, typical = ctx.typicalDepth(vn, dSide), refill = start > 0 && !(typical > 0 && start < ctx.cfg.thinFrac*typical) ? v.depth[dSide]/start : null;      // a start taken while the side was thin (thinFrac of its usual depth) makes the ratio meaningless: no refill reading
       const w = ctx.walletEvidence(vn, side, t-h.ms), oh = ctx.horizon(other(vn), hz);
       const oShare = oh ? (side==="buy" ? oh.share : 1-oh.share) : null, oProg = oh && oh.open > 0 ? progress(other(vn), oh, side) : null;
       const rc = recent(vn, h, side, rate), conc = h.maxTrade/(h.buy+h.sell);   // the largest single trade's share of the window's flow (either side): low = many small fills

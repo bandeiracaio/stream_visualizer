@@ -26,6 +26,8 @@
 
 **Stall (absorption)**: price has not progressed with the aggressor (at most 0.5 sigma) and has not clearly reversed against it (no more than 1 sigma, `absAdverse`, v049). A clear reversal is a different phenomenon.
 
+**Wallet dominates / refill (absorption evidence)**: the wallet item needs the wallet to trade in at least 2 different seconds (`walletSecs`), because one big order split into many fills at one instant is a single trade; the refill item has no reading when the side's depth at the start of the window was under 60% of its usual depth, because a thin snapshot makes the ratio meaningless (v052).
+
 **Wall region**: one resting wall seen at several nearby prices. Reported as a single wall episode: a new wall within 6 bps of an active one, or within 90 s of the last one's end, does not open another (v044). Walls under $100k notional are ignored (v045).
 
 **Extreme (exhaustion)**: two separate checks. "Made a new 5-minute extreme" is evidence; "price still near that extreme" (within 1 sigma of it, measured when the episode fires) is required (v046).
