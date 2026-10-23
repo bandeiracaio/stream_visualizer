@@ -305,6 +305,11 @@
     <div id="rtMsg" class="note"></div>
     <div class="note" style="margin-top:8px"><b>Saved recordings</b> (kept on this device; share one to mail it to yourself)</div>
     <div id="rcList"></div>
+    <details class="note" style="margin-top:8px"><summary id="hlSum">Health log</summary>
+      <div class="note">A black box that survives a reload: the tab hidden or frozen, the computer asleep, a venue going silent, the price stream dropping, the screen lock lost, learning starting over. Send it with a recording that has holes in it.</div>
+      <div class="row"><button id="hlSave">Download log</button><button id="hlClear">Clear</button></div>
+      <div id="hlList"></div>
+    </details>
     <div class="rt-h">Episode thresholds (used live and in replays)</div>
     <div id="rtTune" class="rd-det"></div>
     <div class="rt-h">Your labels</div>
@@ -465,6 +470,9 @@
 </script>
 <script>
 <!--@include js/status-bar.js-->
+</script>
+<script>
+<!--@include js/health-log.js-->
 </script>
 </body>
 </html>
