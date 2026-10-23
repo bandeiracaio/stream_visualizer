@@ -20,7 +20,7 @@ const rcTx = (mode, fn) => rcOpen().then(db => new Promise((ok, no) => {
 // Keep a copy; resolves true if stored, false if the browser refused (private window, quota). Never throws: the download has already happened.
 async function rcKeep(name, blob, meta) {
   try {
-    await rcTx("readwrite", st => st.put({name, blob, size:blob.size, at:Date.now(), sym:(meta && meta.sym) || "", startedAt:(meta && meta.startedAt) || 0}));
+    await rcTx("readwrite", st => st.put({name, blob, size:blob.size, at:Date.now(), sym:(meta && meta.sym) || "", startedAt:(meta && meta.startedAt) || 0, quality:(meta && meta.quality) || null}));
     try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch {}      // ask the browser not to evict it under storage pressure
     rcRender();
     return true;
@@ -44,7 +44,7 @@ async function rcRender() {
   if (!rows.length) { box.innerHTML = `<div class="note">Nothing kept yet. A recording is kept here when you press Save session or when auto-record finishes.</div>`; return; }
   box.innerHTML = rows.map(r => {
     const when = new Date(r.at).toLocaleString(), can = !!rcShareable(r);
-    return `<div class="rv-row" data-rc="${encodeURIComponent(r.name)}"><div class="grow"><b>${rcEsc(r.name)}</b><div class="stat">${rcSize(r.size)} · kept ${when}</div></div>`
+    return `<div class="rv-row" data-rc="${encodeURIComponent(r.name)}"><div class="grow"><b>${rcEsc(r.name)}</b><div class="stat">${rcSize(r.size)} · kept ${when}${r.quality ? ` · <span style="${r.quality.verdict === "complete" ? "" : "color:var(--warn)"}">${rcEsc(SQ.line(r.quality))}</span>` : ""}</div></div>`
       + (can ? `<button data-rcact="share">Share</button>` : "") + `<button data-rcact="dl">Download</button><button data-rcact="open">Open</button><button data-rcact="del">Delete</button></div>`;
   }).join("") + `<div class="note">${navigator.canShare ? "Share opens this device's share sheet (mail, Drive, Quick Share...)." : "This browser has no share sheet: use Download."} Recordings stay here until you delete them.</div>`;
 }

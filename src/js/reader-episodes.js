@@ -15,7 +15,7 @@ const READER_EPISODES = (() => {
     horizons:["fast","mid"], famHorizons:{exhaustion:["mid"]}, families:{absorption:true, exhaustion:true, burst:true, wall:true},
     // evidence cut-offs that used to be written inline; now named so they can be measured and proposed for revision
     recentShare:.55, recentPace:.5, crossShare:.6, crossZ:2, burstLiq:2, burstSweeps:3,
-    exhDecay:.5, exhWasZ:1.5, exhWasShare:.55, exhGap:1, exhNear:1, exhSize:.75,
+    exhDecay:.5, exhWasZ:1.5, exhWasShare:.55, exhGap:1, exhNear:1, exhSize:.75, absAdverse:1,
     // after-the-fact layers: what price did after an episode faded, and how far apart episodes may be to count as one phenomenon
     absConc:.2, exhCount:.5, wallReposts:2, wallDip:.7, wallBack:.9,
     outcomeLookMs:30000, outcomeFlatSigma:.5, groupGapMs:10000,
@@ -82,7 +82,7 @@ const READER_EPISODES = (() => {
       const rc = recent(vn, h, side, rate), conc = h.maxTrade/(h.buy+h.sell);   // the largest single trade's share of the window's flow (either side): low = many small fills
       const items = [
         item("flow", "aggressor share of taker flow", share >= cfg.absorbShare, 2, pct(share), true),
-        item("stalled", "price progress with the aggressor", prog <= cfg.absorbSigma, 2, sgn(prog)+"σ", true),
+        item("stalled", "price has not progressed with the aggressor, nor clearly reversed", prog <= cfg.absorbSigma && prog >= -E().absAdverse, 2, sgn(prog)+"σ", true),
         item("recent", "still happening in the latest seconds", rc.ok, 1.5, rc.val, true),
         item("intensity", "flow intensity vs normal", z >= ctx.th("absorbZ"), 1.5, "z "+z.toFixed(1)),
         item("efficiency", "price path efficiency (low = chop)", eff <= cfg.absorbEfficiency, 1, eff.toFixed(2)),

@@ -61,6 +61,16 @@ const READER_SELFTEST=(()=>{
     const huge=z({},1e13),low=z({zCap:5},1e13),plain=z({zOtherFrac:0,zCap:1e9},3e6),wide=z({zOtherFrac:50,zCap:1e9},3e6);
     return{ok:huge===50&&low===5&&wide<plain&&wide>0,detail:JSON.stringify({huge,low,plain,wide})};
   });
+  add("absorption: a clear move against the aggressor is a reversal, not a stall (a wide setting restores it)",E=>{
+    const run=(cfg,drift)=>{const e=E.create({ep:cfg}),a=calm(e);sim(e,{t0:a.t,mid0:a.mid,seconds:20,seed:41,params:()=>Object.assign({},heavySell,{driftBps:drift})});return eps(e,"absorption",p=>p.venue==="bn"&&p.aggressor==="sell").length;};
+    const flat=run({},0),up=run({},14),wide=run({absAdverse:1e9},14);
+    return{ok:flat>0&&up===0&&wide>0,detail:JSON.stringify({flat,up,wide})};
+  });
+  add("session quality: a complete recording, one with a silent stretch, and a hollow one are told apart",E=>{
+    const make=(minutes,skip)=>{const out=[];for(let s=0;s<minutes*60;s++){const m=Math.floor(s/60);if(skip&&skip(m))continue;for(let k=0;k<4;k++)out.push(["a",T0+s*1000+k*250]);for(let k=0;k<5;k++)out.push(k<3?["q","bn",T0+s*1000+k*200,100,101]:["t",{t:T0+s*1000+k*200,v:"bn",side:"buy",px:100,q:1,ntl:100}]);}return out;};
+    const ok=SQ.of(make(5)),holes=SQ.of(make(6,m=>m===2)),hollow=SQ.of(make(6,m=>m!==0&&m!==5)),none=SQ.of([]);
+    return{ok:ok.verdict==="complete"&&ok.dataMinutes===ok.minutes&&holes.verdict==="holes"&&holes.longestGapSec>=60&&hollow.verdict==="hollow"&&none.verdict==="empty"&&/silence/.test(SQ.line(holes))&&SQ.line(ok)===`${ok.minutes} of ${ok.minutes} min with data`,detail:JSON.stringify({ok,holes,hollow})};
+  });
   add("flickering walls (a few seconds) do not become episodes",E=>{
     const e=E.create(),a=calm(e);let t=a.t,mid=a.mid;
     for(let i=0;i<4;i++){const w=sim(e,{t0:t,mid0:mid,seconds:6,seed:50+i,params:()=>({vol:0,bidWalls:[{idx:12,size:6}]})}),g=sim(e,{t0:w.t,mid0:w.mid,seconds:3,seed:60+i,params:()=>({vol:0})});t=g.t;mid=g.mid;}

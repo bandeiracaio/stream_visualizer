@@ -24,6 +24,8 @@
 
 **Z-score (flow)**: how far a venue's current taker flow on one side is from its own baseline, in robust spreads. The yardstick is the larger of the MAD, 10% of the median, and 10% of the other side's median (so a side that has hardly traded is not scored against nothing); the result is capped at 50 (v047).
 
+**Stall (absorption)**: price has not progressed with the aggressor (at most 0.5 sigma) and has not clearly reversed against it (no more than 1 sigma, `absAdverse`, v049). A clear reversal is a different phenomenon.
+
 **Wall region**: one resting wall seen at several nearby prices. Reported as a single wall episode: a new wall within 6 bps of an active one, or within 90 s of the last one's end, does not open another (v044). Walls under $100k notional are ignored (v045).
 
 **Extreme (exhaustion)**: two separate checks. "Made a new 5-minute extreme" is evidence; "price still near that extreme" (within 1 sigma of it, measured when the episode fires) is required (v046).
