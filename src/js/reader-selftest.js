@@ -56,6 +56,11 @@ const READER_SELFTEST=(()=>{
     const near=run({},false),back=run({},true),wide=run({exhNear:1e9},true);
     return{ok:near>0&&back===0&&wide>0,detail:JSON.stringify({near,back,wide})};
   });
+  add("z-score: capped at 50, and a side's yardstick can come from the other side's level",E=>{
+    const z=(cfg,x)=>{const e=E.create(cfg);calm(e,200);return e.debug().robustZ(x,"bn","buy",1);};
+    const huge=z({},1e13),low=z({zCap:5},1e13),plain=z({zOtherFrac:0,zCap:1e9},3e6),wide=z({zOtherFrac:50,zCap:1e9},3e6);
+    return{ok:huge===50&&low===5&&wide<plain&&wide>0,detail:JSON.stringify({huge,low,plain,wide})};
+  });
   add("flickering walls (a few seconds) do not become episodes",E=>{
     const e=E.create(),a=calm(e);let t=a.t,mid=a.mid;
     for(let i=0;i<4;i++){const w=sim(e,{t0:t,mid0:mid,seconds:6,seed:50+i,params:()=>({vol:0,bidWalls:[{idx:12,size:6}]})}),g=sim(e,{t0:w.t,mid0:w.mid,seconds:3,seed:60+i,params:()=>({vol:0})});t=g.t;mid=g.mid;}

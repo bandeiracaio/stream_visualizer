@@ -2,7 +2,7 @@
 // Market Reader engine: pure logic, no DOM and no timers. Exchange timestamps drive its clock.
 const READER_ENGINE = (() => {
   const DEFAULTS = {
-    bucketMs:250, sigmaLagMs:15000, sigmaFastN:0, sigmaFastW:.5, keepMs:1800000, warmupMs:120000, baseTauMs:1800000,
+    bucketMs:250, sigmaLagMs:15000, sigmaFastN:0, sigmaFastW:.5, zOtherFrac:.1, zCap:50, keepMs:1800000, warmupMs:120000, baseTauMs:1800000,
     horizons:{fast:15000,mid:60000,slow:300000}, minWindowMs:3000, maxWindowMs:600000,
     gapResetMs:30000, cooldownMs:5000, maxEventsPerMin:20, keepEvents:500, sens:1,
     detectors:{wall_appears:true,wall_pulled:true,wall_eaten:true,book_thin:true,imbalance_flip:true,spoof_like:true,capitulation:true,selling_exhausted:true,squeeze:true,breakout:true,passive_absorption:true,refreshing_level:true,failed_poke:true,buyer_exhaustion:true,seller_exhaustion:true,silence_started:true,silence_ended:true,lead_lag:true,trade_cluster:true},
@@ -43,7 +43,7 @@ const READER_ENGINE = (() => {
     function q75of(a){const s=sortedCopy(a);return kthDev(s,s[s.length>>1],Math.floor(s.length*.75))/1.1503;}
     // sigma: the robust 15 s spread over the whole history (slow), optionally blended in variance with the same spread over the last sigmaFastN seconds (fast), so a busier market is measured against its own current pace
     function blendSigma(slow,fast){if(!(cfg.sigmaFastN>0)||fast==null)return slow;return Math.sqrt((1-cfg.sigmaFastW)*slow*slow+cfg.sigmaFastW*fast*fast);}
-    function robustZ(x,vn,key,floor){const st=stat(venues[vn],key);if(st.n<60)return 0;return(x-st.med)/Math.max(st.mad,.1*Math.abs(st.med),floor);}
+    function robustZ(x,vn,key,floor){const st=stat(venues[vn],key);if(st.n<60)return 0;const other=key==="buy"?"sell":key==="sell"?"buy":null,om=other?stat(venues[vn],other).med:0;return Math.min(cfg.zCap,(x-st.med)/Math.max(st.mad,.1*Math.abs(st.med),cfg.zOtherFrac*Math.abs(om),floor));}      // a side that has hardly traded gets the other side's level as its yardstick, so a quiet baseline cannot turn an ordinary flow into z in the thousands; z is capped at 50 (every threshold compared with it is far below that), so a few huge values cannot distort the register's statistics
     function sigmaBps(vn){const st=stat(venues[vn],"ret");if(st.n<60)return .05;const r=Math.sqrt(cfg.sigmaLagMs/1000);return Math.max(blendSigma(st.q75/r,st.q75f==null?null:st.q75f/r),.05);}
     function rateRatio(){const v=venues.bn,r=v.ring,n=Math.min(r.length,20);if(n<4||!(v.base>0))return 1;let s=0;for(let i=r.length-n;i<r.length;i++)s+=r[i].buy+r[i].sell;return clamp((s/(n*cfg.bucketMs/1000))/v.base,.25,4);}
     function windowMs(name){const nominal=cfg.horizons[name];return nominal>0?clamp(nominal/rateRatio(),cfg.minWindowMs,cfg.maxWindowMs):NaN;}
