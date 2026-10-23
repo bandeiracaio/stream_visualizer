@@ -1,6 +1,6 @@
 # Collectors: data we do not collect yet
 
-Status: agreed (2026-10-23). Framework and F self-telemetry built in v053.
+Status: agreed (2026-10-23). Framework and F self-telemetry built in v053; A derivatives context and the always-on worker built in v055.
 
 ## Goal
 Collect possibly useful data the app does not collect today, even where there is no event type or movement to attach it to yet. Log first,
@@ -46,3 +46,20 @@ ratios are REST; Hyperliquid has `metaAndAssetCtxs` on its info endpoint).
 
 ## Open
 Nothing undecided. The exact record shapes and the tape's key layout are implementation details for v053.
+
+## Verified endpoints for collector A, derivatives context (checked live 2026-10-23, BTCUSDT)
+All answer 200 with `Access-Control-Allow-Origin: *`, so the page and the worker can call them from the browser, no key.
+- **Binance `GET /fapi/v1/premiumIndex?symbol=`**: markPrice, indexPrice, estimatedSettlePrice, lastFundingRate, interestRate, nextFundingTime (weight 1, shows in `x-mbx-used-weight-1m`).
+- **Binance `GET /fapi/v1/openInterest?symbol=`**: openInterest in coins, with its own time.
+- **Binance `GET /futures/data/openInterestHist | globalLongShortAccountRatio | topLongShortPositionRatio | takerlongshortRatio`** (`period=5m`): one point per 5 minutes, so polling more than once a minute is waste. takerlongshortRatio is buyVol / sellVol per 5 minutes.
+- **Binance `@markPrice@1s` (stream)** already carries mark `p`, index `i`, funding `r` and next funding `T`: basis costs no extra request, and the worker already reads this stream.
+- **Binance `@forceOrder` (stream, `/market/stream?streams=`)**: liquidations as `{e:"forceOrder", o:{S, q, p, ap, z, X, T}}`; 2 in about 80 s on BTC. Not on REST: `/fapi/v1/allForceOrders` returns 404 now. The page already subscribes to it (app.js `bn.forceOrder`), but the worker's socket does not.
+- **Hyperliquid `POST /info {"type":"metaAndAssetCtxs"}`**: per asset funding, openInterest, premium, oraclePx, markPx, midPx, dayNtlVlm. Index 0 of the universe is BTC.
+- **Not found / left for later:** Hyperliquid liquidations (belongs to collector E, wallet layer); Binance predicted funding is `estimatedSettlePrice`/premium only, not a separate field.
+
+## Built in v055 (collector A, and the always-on worker)
+- **Always-on worker:** `collectors-worker.js` (embedded as `#colWorkerSrc`, with `collectors-core.js`) is started by `collectors.js` as soon as the page loads, whether or not auto-record is armed or the app is connected. It is separate from auto-record's price worker, which is unchanged. It restarts when the symbol changes and stops when its switch is turned off. If workers are unavailable or it errors, it only writes to the Health log; there is no retry loop (reload the page).
+- **Records** (all `["c", name, t, payload]`): `bnDerivs` every 15 s (premium index + open interest, either part `null` if it failed), `hlCtx` every 15 s (Hyperliquid funding, open interest, premium, oracle, mark, mid), `ratios` every 60 s but only when a new 5 minute point arrived (account long-short, top-trader position long-short, taker buy/sell), `basis` every 10 s (mark, index, funding, next funding, basis in bps, from the `@markPrice@1s` stream), `liq` one per liquidation (from `@forceOrder`). About 3.7 MB a day measured live (70 s run: 2965 bytes, before any liquidation).
+- **Failure isolation:** one failing source logs `collector error` to the Health log at most once per 5 minutes and the others carry on; HTTP 429 / 418 rests that source for 5 minutes.
+- **Stream:** one socket `wss://fstream.binance.com/market/stream?streams=<sym>usdt@markPrice@1s/<sym>usdt@forceOrder`, reopened after 5 s, closed and reopened after 15 s of silence.
+- **Frozen page:** the worker keeps running, but the tape is written by the page, so records posted while the page is frozen are written when it thaws (they carry their own time).

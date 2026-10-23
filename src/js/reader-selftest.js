@@ -92,6 +92,22 @@ const READER_SELFTEST=(()=>{
     const now=T0+99*10000,pr=COLLECT.prune(recs,now,200000),sl=COLLECT.slice(recs,T0+100000,T0+200000),ft=COLLECT.fit(recs,1500);
     return{ok:pr.length===21&&sl.length===11&&ft.length>5&&ft.length<30&&ft[ft.length-1]===recs[99]&&JSON.stringify(ft).length<=1500&&COLLECT.fit(recs,1e9).length===100,detail:JSON.stringify({pr:pr.length,sl:sl.length,ft:ft.length})};
   });
+  add("collectors: derivatives readers parse the real answer shapes and refuse unusable ones",E=>{
+    const pr=COLLECT.premium({symbol:"BTCUSDT",markPrice:"80667.20261594",indexPrice:"80708.63673913",estimatedSettlePrice:"80784.82",lastFundingRate:"0.00003407",nextFundingTime:1792800000000,time:1792797389000});
+    const oi=COLLECT.openInterest({symbol:"BTCUSDT",openInterest:"92836.854",time:1792797387450});
+    const acct=COLLECT.ratioPoint("acct",[{longAccount:"0.6",shortAccount:"0.4",longShortRatio:"1.5",timestamp:1},{longAccount:"0.6785",shortAccount:"0.3215",longShortRatio:"2.1104",timestamp:1792796700000}]);
+    const tk=COLLECT.ratioPoint("taker",[{buySellRatio:"0.4378",sellVol:"810.197",buyVol:"354.68",timestamp:1792796700000}]);
+    const hl=COLLECT.hlCtx([{universe:[{name:"ETH"},{name:"BTC"}]},[{markPx:"1"},{funding:"0.0000125",openInterest:"44627.99",premium:"-0.00015",oraclePx:"80702.0",markPx:"80688.7",midPx:"80689.5"}]],"BTC");
+    const fo=COLLECT.force({e:"forceOrder",E:1,o:{s:"BTCUSDT",S:"BUY",q:"0.039",p:"81115.10",ap:"80803.10",X:"FILLED",z:"0.039",T:1792797483260}});
+    const bs=COLLECT.basis({e:"markPriceUpdate",p:"80782.5",i:"80817.3426",r:"0.00003376",T:1792800000000});
+    const bad=[COLLECT.premium({}),COLLECT.premium(null),COLLECT.openInterest({openInterest:"x"}),COLLECT.ratioPoint("acct",[]),COLLECT.ratioPoint("taker",[{buyVol:"1"}]),COLLECT.hlCtx([{universe:[{name:"ETH"}]},[{markPx:"1"}]],"BTC"),COLLECT.hlCtx({},"BTC"),COLLECT.force({e:"markPriceUpdate"}),COLLECT.force({e:"forceOrder",o:{S:"BUY"}}),COLLECT.basis({p:"1"})];
+    return{ok:pr.mark===80667.20261594&&pr.fund===.00003407&&pr.next===1792800000000&&oi.oi===92836.854&&acct.ratio===2.1104&&acct.ts===1792796700000&&tk.buy===354.68&&tk.sell===810.197&&hl.fund===.0000125&&hl.mark===80688.7&&hl.oi===44627.99&&fo.side==="BUY"&&fo.qty===.039&&fo.px===80803.1&&bs.bps===-4.31&&bad.every(x=>x===null),detail:JSON.stringify({pr,oi,acct,tk,hl,fo,bs,bad})};
+  });
+  add("collectors: ratios are recorded only when a new 5 minute point arrives; polls are due on their own schedule",E=>{
+    const a={acct:{ts:1},top:{ts:1},taker:{ts:1}},same={acct:{ts:1},top:{ts:1},taker:{ts:1}},moved={acct:{ts:2},top:{ts:1},taker:{ts:1}},lost={acct:null,top:{ts:1},taker:{ts:1}};
+    const E_=COLLECT.EVERY;
+    return{ok:COLLECT.ratiosChanged(null,a)&&!COLLECT.ratiosChanged(a,same)&&COLLECT.ratiosChanged(a,moved)&&COLLECT.ratiosChanged(a,lost)&&COLLECT.due(0,T0,E_.prem)&&!COLLECT.due(T0,T0+14999,E_.prem)&&COLLECT.due(T0,T0+15000,E_.prem)&&!COLLECT.due(T0,T0+59999,E_.ratios)&&COLLECT.due(T0,T0+60000,E_.ratios)&&COLLECT.BACKOFF_MS===300000&&COLLECT.REGISTRY.some(c=>c.id==="derivs"&&c.on),detail:JSON.stringify(E_)};
+  });
   add("collectors: records among the inputs change no detection and no session quality",E=>{
     const e=E.create();e.startRecording();const a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:21,params:()=>burstSell});sim(e,{t0:b.t,mid0:b.mid,seconds:40,seed:22});
     const inputs=e.stopRecording(),mixed=[];inputs.forEach((r,i)=>{mixed.push(r);if(i%40===0)mixed.push(COLLECT.rec("feeds",T0+i,{src:"page",feeds:{bn:{n:1}}}));});

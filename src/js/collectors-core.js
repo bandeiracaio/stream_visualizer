@@ -6,6 +6,7 @@
 const COLLECT = (() => {
   const REGISTRY = [
     {id:"telemetry", label:"Self-telemetry: feed latency, message rates, gaps, clock offset", speed:"slow", on:true},
+    {id:"derivs", label:"Derivatives context: funding, open interest, basis, liquidations, long/short and taker ratios (Binance, Hyperliquid)", speed:"slow", on:true},
   ];
   const TAPE_MS = 24*3600*1000, FILE_BUDGET = 5*1024*1024;      // the rolling tape keeps 24 h; one session file takes at most about 5 MB of them
   const round = (x, d) => Math.round(x*Math.pow(10, d))/Math.pow(10, d);
@@ -34,6 +35,43 @@ const COLLECT = (() => {
       take(nowMs, dtMs) { const r = {n, hz:dtMs > 0 ? round(n/(dtMs/1000), 1) : null, lagMed:quantile(lags, .5), lagP90:quantile(lags, .9), lagMax:lags.length ? Math.max.apply(null, lags) : null, gapMs:gap, ageMs:last ? nowMs - last : null}; n = 0; gap = 0; return r; },
     };
   }
+
+  // ---- derivatives context (collector "derivs", run by collectors-worker.js). Readers of the public endpoints; each returns null for an answer that is not usable.
+  // Verified live 2026-10-23, see .scratch/collectors/01-collectors.md.
+  const EVERY = {prem:15000, hl:15000, ratios:60000, basis:10000}, BACKOFF_MS = 300000;      // polling spacing per source; a rate-limited source rests this long
+  const num = x => { const n = +x; return x != null && x !== "" && Number.isFinite(n) ? n : null; };
+  const due = (last, now, every) => !last || now - last >= every;
+  function premium(j) {
+    const mark = j && num(j.markPrice); if (mark == null) return null;
+    return {mark, index:num(j.indexPrice), est:num(j.estimatedSettlePrice), fund:num(j.lastFundingRate), next:num(j.nextFundingTime), t:num(j.time)};
+  }
+  function openInterest(j) { const oi = j && num(j.openInterest); return oi == null ? null : {oi, t:num(j.time)}; }
+  // the newest point of a /futures/data answer (5 minute periods): kind "acct" / "top" (long-short share) or "taker" (buy and sell volume)
+  function ratioPoint(kind, arr) {
+    if (!Array.isArray(arr) || !arr.length) return null;
+    const p = arr[arr.length - 1];
+    if (kind === "taker") { const buy = num(p.buyVol), sell = num(p.sellVol); return buy == null || sell == null ? null : {buy, sell, ratio:num(p.buySellRatio), ts:num(p.timestamp)}; }
+    const long = num(p.longAccount), short = num(p.shortAccount); return long == null || short == null ? null : {long, short, ratio:num(p.longShortRatio), ts:num(p.timestamp)};
+  }
+  const ratiosChanged = (prev, cur) => !prev || ["acct", "top", "taker"].some(k => (prev[k] && prev[k].ts) !== (cur[k] && cur[k].ts));      // the points only move every 5 minutes: no new point, no new record
+  // Hyperliquid metaAndAssetCtxs: [{universe:[{name}]}, [ctx...]] with the contexts in the order of the universe
+  function hlCtx(j, coin) {
+    if (!Array.isArray(j) || !j[0] || !Array.isArray(j[0].universe) || !Array.isArray(j[1])) return null;
+    const i = j[0].universe.findIndex(u => u.name === coin), c = i >= 0 && j[1][i]; if (!c) return null;
+    const mark = num(c.markPx); if (mark == null) return null;
+    return {fund:num(c.funding), oi:num(c.openInterest), prem:num(c.premium), oracle:num(c.oraclePx), mark, mid:num(c.midPx)};
+  }
+  function force(d) {
+    const o = d && d.e === "forceOrder" && d.o; if (!o) return null;
+    const qty = num(o.z) || num(o.q), px = num(o.ap) || num(o.p); if (!qty || !px) return null;
+    return {side:o.S, qty, px, limit:num(o.p), status:o.X, T:num(o.T)};
+  }
+  // one markPrice@1s message: mark, index, funding and the next funding time; basis in bps of the index
+  function basis(d) {
+    const mark = d && num(d.p), index = d && num(d.i); if (mark == null || index == null || !index) return null;
+    return {mark, index, fund:num(d.r), next:num(d.T), bps:round((mark - index)/index*1e4, 2)};
+  }
+
   // tape helpers on arrays of records
   const prune = (recs, nowMs, keepMs) => recs.filter(r => r[2] >= nowMs - (keepMs == null ? TAPE_MS : keepMs));
   const slice = (recs, t0, t1) => recs.filter(r => r[2] >= t0 && r[2] <= t1);
@@ -43,5 +81,5 @@ const COLLECT = (() => {
     for (let i = recs.length - 1; i >= 0; i--) { const b = JSON.stringify(recs[i]).length + 1; if (size + b > lim) break; size += b; out.push(recs[i]); }
     return out.reverse();
   }
-  return {REGISTRY, TAPE_MS, FILE_BUDGET, quantile, rec, isRec, feeds, streamStat, prune, slice, fit};
+  return {REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, due, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
 })();

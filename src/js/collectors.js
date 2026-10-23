@@ -46,13 +46,29 @@ function colSample() {
 }
 setInterval(colSample, 10000);
 
+// ---- the always-on worker (collectors-worker.js): derivatives context. It runs whether or not auto-record is armed, in a worker so a hidden tab
+// does not slow it. Its records come here and go onto the tape; a record posted while the page is frozen is written when the page thaws.
+function colWorkerSync() {
+  const sym = cl$("sym").value.trim().toLowerCase(), want = colOn("derivs") && !!sym;
+  if (CL.worker && (!want || CL.workerSym !== sym)) { try { CL.worker.postMessage({t:"stop"}); CL.worker.terminate(); } catch {} CL.worker = null; }
+  if (!want || CL.worker) return;
+  let w;
+  try { const u = URL.createObjectURL(new Blob([cl$("colWorkerSrc").textContent], {type:"text/javascript"})); w = new Worker(u); URL.revokeObjectURL(u); }
+  catch (e) { hlNote("collector worker failed", {err:String(e && e.message || e)}); return; }
+  CL.worker = w; CL.workerSym = sym;
+  w.onmessage = ev => { if (w !== CL.worker) return; const m = ev.data; if (m.t === "col") colAdd(m.rec); else if (m.t === "note") hlNote(m.k, m.d); };
+  w.onerror = () => { if (w !== CL.worker) return; CL.worker = null; try { w.terminate(); } catch {} hlNote("collector worker failed", {err:"stopped on an error"}); };      // no retry loop: reload the page
+  w.postMessage({t:"start", sym});
+}
+cl$("sym").addEventListener("change", colWorkerSync);
+
 // ---- the list under the Health log
 function colRender() {
   const box = cl$("colList"); if (!box) return;
   cl$("colSum").textContent = `Collectors: ${CL.count} records on the tape`;
   box.innerHTML = COLLECT.REGISTRY.map(c => `<label class="stat" style="display:block"><input type="checkbox" data-col="${c.id}"${colOn(c.id) ? " checked" : ""}> ${c.label}</label>`).join("");
 }
-cl$("colList").onchange = e => { const id = e.target.dataset && e.target.dataset.col; if (!id) return; CL.cfg[id] = e.target.checked; store.set("col.cfg", CL.cfg); if (AR.on && AR.worker) AR.worker.postMessage({t:"cfg", cfg:Object.assign({}, AR.cfg, {collectors:colWorkerCfg()})}); };
+cl$("colList").onchange = e => { const id = e.target.dataset && e.target.dataset.col; if (!id) return; CL.cfg[id] = e.target.checked; store.set("col.cfg", CL.cfg); colWorkerSync(); if (AR.on && AR.worker) AR.worker.postMessage({t:"cfg", cfg:Object.assign({}, AR.cfg, {collectors:colWorkerCfg()})}); };
 cl$("colSave").onclick = async () => {
   const text = JSON.stringify({kind:"sv-tape", v:1, version:APP_VERSION, at:Date.now(), records:await colAll()});
   rtDownload(new Blob([text], {type:"application/json"}), "tape_" + new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "") + ".json");
@@ -60,3 +76,4 @@ cl$("colSave").onclick = async () => {
 cl$("colClear").onclick = async () => { try { await colReq("readwrite", st => st.clear()); CL.count = 0; } catch {} colRender(); };
 colAll().then(a => { CL.count = a.length; colRender(); colPrune(); }, () => colRender());
 colRender();
+colWorkerSync();
