@@ -108,6 +108,18 @@ const READER_SELFTEST=(()=>{
     const E_=COLLECT.EVERY;
     return{ok:COLLECT.ratiosChanged(null,a)&&!COLLECT.ratiosChanged(a,same)&&COLLECT.ratiosChanged(a,moved)&&COLLECT.ratiosChanged(a,lost)&&COLLECT.due(0,T0,E_.prem)&&!COLLECT.due(T0,T0+14999,E_.prem)&&COLLECT.due(T0,T0+15000,E_.prem)&&!COLLECT.due(T0,T0+59999,E_.ratios)&&COLLECT.due(T0,T0+60000,E_.ratios)&&COLLECT.BACKOFF_MS===300000&&COLLECT.REGISTRY.some(c=>c.id==="derivs"&&c.on),detail:JSON.stringify(E_)};
   });
+  add("collectors: calendar tags follow the rules (closes, funding, US session with daylight saving, options expiry kinds)",E=>{
+    const U=(y,m,d,h,mi)=>Date.UTC(y,m-1,d,h||0,mi||0),at=(c,t)=>{const x=c.find(e=>e.t===t);return x?x.tags:[]};
+    const fri=COLLECT.calendar(U(2026,10,23,7,59),U(2026,10,23,20,0));         // Friday 23 Oct 2026, still summer time in New York
+    const mon=COLLECT.calendar(U(2026,10,25,23,59),U(2026,10,26,0,0));         // Monday 00:00 UTC: week close
+    const mth=COLLECT.calendar(U(2026,10,31,23,59),U(2026,11,1,0,0));          // Sunday 1 Nov 00:00 UTC: month close, no US session
+    const win=COLLECT.calendar(U(2026,11,2,14,0),U(2026,11,2,21,0));           // Monday 2 Nov: winter time, open 14:30 and close 21:00 UTC
+    const mo=COLLECT.calendar(U(2026,10,30,7,0),U(2026,10,30,9,0)),q=COLLECT.calendar(U(2026,12,25,7,0),U(2026,12,25,9,0)),dly=COLLECT.calendar(U(2026,10,27,7,0),U(2026,10,27,9,0));
+    const sat=COLLECT.calendar(U(2026,10,24,0,0),U(2026,10,25,23,0)),once=COLLECT.calendar(U(2026,10,23,7,59),U(2026,10,23,8,0)),none=COLLECT.calendar(U(2026,10,23,8,0),U(2026,10,23,8,0));
+    const has=(a,...t)=>t.every(x=>a.includes(x));
+    const f8=at(fri,U(2026,10,23,8)),f20=at(fri,U(2026,10,23,20)),m0=at(mon,U(2026,10,26)),n0=at(mth,U(2026,11,1));
+    return{ok:has(f8,"15m","1h","4h","funding","optExp:weekly")&&has(at(fri,U(2026,10,23,13,30)),"usOpen","15m")&&has(f20,"usClose","1h","4h")&&!f20.includes("funding")&&has(m0,"1h","4h","1d","1w","funding")&&!m0.includes("1M")&&has(n0,"1d","1M")&&!n0.includes("1w")&&!n0.some(x=>x.startsWith("us"))&&has(at(win,U(2026,11,2,14,30)),"usOpen")&&has(at(win,U(2026,11,2,21)),"usClose")&&has(at(mo,U(2026,10,30,8)),"optExp:monthly")&&has(at(q,U(2026,12,25,8)),"optExp:quarterly")&&has(at(dly,U(2026,10,27,8)),"optExp:daily")&&!sat.some(e=>e.tags.some(x=>x.startsWith("us")))&&once.length===1&&once[0].t===U(2026,10,23,8)&&none.length===0&&COLLECT.REGISTRY.some(c=>c.id==="calendar"&&c.on),detail:JSON.stringify({fri:fri.filter(e=>e.tags.length>1||e.tags.some(x=>x!=="15m")),mon,mth,win:win.filter(e=>e.tags.some(x=>x!=="15m")),mo:mo.filter(e=>e.tags.length>1),q:q.filter(e=>e.tags.length>1),dly:dly.filter(e=>e.tags.length>1)})};
+  });
   add("collectors: records among the inputs change no detection and no session quality",E=>{
     const e=E.create();e.startRecording();const a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:21,params:()=>burstSell});sim(e,{t0:b.t,mid0:b.mid,seconds:40,seed:22});
     const inputs=e.stopRecording(),mixed=[];inputs.forEach((r,i)=>{mixed.push(r);if(i%40===0)mixed.push(COLLECT.rec("feeds",T0+i,{src:"page",feeds:{bn:{n:1}}}));});

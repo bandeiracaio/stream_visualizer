@@ -2,8 +2,9 @@
 // auto-record is armed). Why a worker: its timers and sockets are not slowed with a hidden tab. It reads public endpoints only (no keys),
 // posts {t:"col", rec} for each record and {t:"note", k, d} for the Health log, and never touches anything else. An error or a rate limit
 // stops only the source concerned. Collector "derivs": Binance premium index + open interest (15 s), Hyperliquid funding / open interest
-// (15 s), long-short and taker ratios (60 s), and from one stream the basis (10 s) and every liquidation.
-let on = false, gen = 0, sym = "btc", ws = null, lastMsg = 0, timer = null, mk = null, prevRatios = null;
+// (15 s), long-short and taker ratios (60 s), and from one stream the basis (10 s) and every liquidation. Collector "calendar": a record at every
+// scheduled instant (COLLECT.calendar, by rule, no network). The page says which collectors are on in the start message: {t:"start", sym, want:{derivs, calendar}}.
+let on = false, gen = 0, sym = "btc", want = {}, ws = null, lastMsg = 0, timer = null, mk = null, prevRatios = null, lastCal = 0;
 const last = {}, busy = {}, hold = {}, said = {};
 const BN = "https://fapi.binance.com", HLI = "https://api.hyperliquid.xyz/info";
 const post = m => self.postMessage(m);
@@ -66,7 +67,12 @@ function open() {
 function tick() {
   if (!on) return;
   const now = Date.now();
-  if (ws && now - lastMsg > 15000) try { ws.close(); } catch {}      // silent without closing: close it so onclose reopens it
+  if (want.derivs && ws && now - lastMsg > 15000) try { ws.close(); } catch {}      // silent without closing: close it so onclose reopens it
+  if (want.calendar) {      // a gap longer than 6 h (the computer slept) is not back-filled
+    for (const c of COLLECT.calendar(Math.max(lastCal, now - 6*3600000), now)) col("cal", c.t, {tags:c.tags});
+    lastCal = now;
+  }
+  if (!want.derivs) return;
   const E = COLLECT.EVERY;
   if (COLLECT.due(last.prem, now, E.prem)) { last.prem = now; run("bnDerivs", pollPremium); }
   if (COLLECT.due(last.hl, now, E.hl)) { last.hl = now; run("hlCtx", pollHl); }
@@ -75,6 +81,6 @@ function tick() {
 }
 self.onmessage = ev => {
   const m = ev.data;
-  if (m.t === "start") { on = true; gen++; sym = String(m.sym || "btc"); mk = null; prevRatios = null; for (const k of [last, busy, hold, said]) for (const i in k) delete k[i]; open(); clearInterval(timer); timer = setInterval(tick, 1000); tick(); }
+  if (m.t === "start") { on = true; gen++; sym = String(m.sym || "btc"); want = m.want || {derivs:true}; mk = null; prevRatios = null; lastCal = Date.now(); for (const k of [last, busy, hold, said]) for (const i in k) delete k[i]; if (want.derivs) open(); clearInterval(timer); timer = setInterval(tick, 1000); tick(); }
   else if (m.t === "stop") { on = false; gen++; clearInterval(timer); try { if (ws) ws.close(); } catch {} ws = null; }
 };

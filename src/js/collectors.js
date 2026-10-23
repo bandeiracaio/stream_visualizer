@@ -46,19 +46,20 @@ function colSample() {
 }
 setInterval(colSample, 10000);
 
-// ---- the always-on worker (collectors-worker.js): derivatives context. It runs whether or not auto-record is armed, in a worker so a hidden tab
+// ---- the always-on worker (collectors-worker.js): derivatives context and calendar tags. It runs whether or not auto-record is armed, in a worker so a hidden tab
 // does not slow it. Its records come here and go onto the tape; a record posted while the page is frozen is written when the page thaws.
 function colWorkerSync() {
-  const sym = cl$("sym").value.trim().toLowerCase(), want = colOn("derivs") && !!sym;
-  if (CL.worker && (!want || CL.workerSym !== sym)) { try { CL.worker.postMessage({t:"stop"}); CL.worker.terminate(); } catch {} CL.worker = null; }
+  const sym = cl$("sym").value.trim().toLowerCase(), wants = {derivs:colOn("derivs"), calendar:colOn("calendar")}, key = sym + "|" + wants.derivs + "|" + wants.calendar;
+  const want = (wants.derivs || wants.calendar) && !!sym;
+  if (CL.worker && (!want || CL.workerKey !== key)) { try { CL.worker.postMessage({t:"stop"}); CL.worker.terminate(); } catch {} CL.worker = null; }
   if (!want || CL.worker) return;
   let w;
   try { const u = URL.createObjectURL(new Blob([cl$("colWorkerSrc").textContent], {type:"text/javascript"})); w = new Worker(u); URL.revokeObjectURL(u); }
   catch (e) { hlNote("collector worker failed", {err:String(e && e.message || e)}); return; }
-  CL.worker = w; CL.workerSym = sym;
+  CL.worker = w; CL.workerKey = key;
   w.onmessage = ev => { if (w !== CL.worker) return; const m = ev.data; if (m.t === "col") colAdd(m.rec); else if (m.t === "note") hlNote(m.k, m.d); };
   w.onerror = () => { if (w !== CL.worker) return; CL.worker = null; try { w.terminate(); } catch {} hlNote("collector worker failed", {err:"stopped on an error"}); };      // no retry loop: reload the page
-  w.postMessage({t:"start", sym});
+  w.postMessage({t:"start", sym, want:wants});
 }
 cl$("sym").addEventListener("change", colWorkerSync);
 

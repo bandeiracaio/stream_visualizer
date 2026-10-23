@@ -1,6 +1,6 @@
 # Collectors: data we do not collect yet
 
-Status: agreed (2026-10-23). Framework and F self-telemetry built in v053; A derivatives context and the always-on worker built in v055.
+Status: agreed (2026-10-23). Framework and F self-telemetry built in v053; A derivatives context and the always-on worker built in v055; G calendar tags (rules only) in v056.
 
 ## Goal
 Collect possibly useful data the app does not collect today, even where there is no event type or movement to attach it to yet. Log first,
@@ -63,3 +63,9 @@ All answer 200 with `Access-Control-Allow-Origin: *`, so the page and the worker
 - **Failure isolation:** one failing source logs `collector error` to the Health log at most once per 5 minutes and the others carry on; HTTP 429 / 418 rests that source for 5 minutes.
 - **Stream:** one socket `wss://fstream.binance.com/market/stream?streams=<sym>usdt@markPrice@1s/<sym>usdt@forceOrder`, reopened after 5 s, closed and reopened after 15 s of silence.
 - **Frozen page:** the worker keeps running, but the tape is written by the page, so records posted while the page is frozen are written when it thaws (they carry their own time).
+
+## Built in v056 (collector G, calendar tags: rules only)
+- Decision (user, 2026-10-23): rule-based tags only. Scheduled macro releases (CPI, FOMC, jobs) follow no rule and are not collected; they need a hand-kept list or a calendar source, left for later.
+- `COLLECT.calendar(t0, t1)` (pure, no network) returns `[{t, tags}]` for each instant in `(t0, t1]`, tags merged per instant. The always-on worker calls it every second from the last check, writes `["c", "cal", t, {tags}]` with `t` = the scheduled instant, and does not back-fill a gap over 6 h (the computer slept). A worker restart starts from "now", so no duplicates.
+- Tags (UTC): `15m`, `1h`, `4h`, `1d`, `1w` (Monday 00:00), `1M` (the 1st), `funding` (00 / 08 / 16: the Binance 8 h rule; a symbol on another interval is not followed), `usOpen` / `usClose` (09:30 / 16:00 New York on weekdays, daylight saving followed through `Intl`; exchange holidays and early closes are NOT known), `optExp:daily|weekly|monthly|quarterly` (08:00 UTC every day; Friday weekly; last Friday of the month monthly; last Friday of Mar / Jun / Sep / Dec quarterly).
+- The worker now gets `want:{derivs, calendar}` in its start message and restarts when the symbol or either switch changes; with only the calendar on it opens no socket and makes no request.
