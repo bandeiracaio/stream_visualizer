@@ -198,8 +198,8 @@ Nothing is relayed through any server of ours. There is no backend: GitHub Pages
 
 ## Contributing
 
-This is a personal project and external changes are not being actively sought, but issues and ideas are welcome. If you do send a change: edit `src/` (not the built file), run `node build.mjs`, add a self-test scenario for new engine behaviour, and keep UX changes separate from engine, trading and feed changes (one step, one release).
+This is a personal project and external changes are not being actively sought, but issues and ideas are welcome. By sending a change you agree it is released under the MIT license. If you do send a change: edit `src/` (not the built file), run `node build.mjs`, add a self-test scenario for new engine behaviour, and keep UX changes separate from engine, trading and feed changes (one step, one release).
 
 ## License
 
-No license has been chosen yet, so all rights are reserved by default. If you want to use the code, open an issue.
+[MIT](LICENSE): use, copy, modify and share it freely, with no warranty. This is a research tool, not financial advice; see [Safety](#safety).

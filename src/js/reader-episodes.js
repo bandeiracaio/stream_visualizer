@@ -11,7 +11,7 @@
 const READER_EPISODES = (() => {
   const DEFAULTS = {
     enterScore:.7, formScore:.5, exitScore:.45, enterHoldMs:2000, endHoldMs:4000, resumeMs:20000,
-    keepEpisodes:300, wallFadeFrac:.6, wallStaleMs:30000, wallEpisodeMs:60000, wallMinMult:1.5, keepWalls:300, wallMaxActive:2, wallMergeBps:6, wallMergeMs:90000, wallMinUsd:0, minTradesFast:5, minTradesMid:12, refreshMs:10000, pokeMs:30000, traceCap:240,
+    keepEpisodes:300, wallFadeFrac:.6, wallStaleMs:30000, wallEpisodeMs:60000, wallMinMult:1.5, keepWalls:300, wallMaxActive:2, wallMergeBps:6, wallMergeMs:90000, wallMinUsd:100000, minTradesFast:5, minTradesMid:12, refreshMs:10000, pokeMs:30000, traceCap:240,
     horizons:["fast","mid"], famHorizons:{exhaustion:["mid"]}, families:{absorption:true, exhaustion:true, burst:true, wall:true},
     // evidence cut-offs that used to be written inline; now named so they can be measured and proposed for revision
     recentShare:.55, recentPace:.5, crossShare:.6, crossZ:2, burstLiq:2, burstSweeps:3,
