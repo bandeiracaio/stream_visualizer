@@ -160,7 +160,7 @@ const READER_EPISODES = (() => {
       if (ep.family==="absorption") return `Aggressive ${who(a)} (${pct(f.share)} of taker flow, z ${zf(f.z)}) are being absorbed by passive ${who(opp(a))}: price ${moved(a, f.prog)}${f.refill != null ? `, ${f.dSide} depth ${pct(f.refill)} refilled` : ""}.`;
       if (ep.family==="exhaustion") return `Aggressive ${who(a)} have faded to ${pct(f.ratio)} of the previous window's pace${f.away <= E().exhNear ? `, near the 5-minute ${a==="buy" ? "high" : "low"}` : ""}${f.poke ? ", after a failed poke" : ""}; price ${moved(a, f.prog)}.`;
       if (ep.family==="burst") return `Aggressive ${who(a)}: $${money(f.notional)} in ${f.secs.toFixed(0)} s (z ${zf(f.z)}), price ${moved(a, f.prog)}${f.liq ? `, ${f.liq} liquidations` : ""}${f.sweeps ? `, ${f.sweeps} sweeps` : ""}.`;
-      const w = ep.wall; return `${w.side==="bid" ? "Bid" : "Ask"} wall at ${w.px}, ${w.ratio.toFixed(1)}x the median level, ${Math.round((ep.tUpdate-ep.tStart)/1000)} s old, ${pct(w.size/w.peak)} of its peak left${w.tradedFrac != null ? `; ${pct(w.tradedFrac)} of the size that left was traded through (the rest was pulled)` : ""}.`;
+      const w = ep.wall; return `${w.side==="bid" ? "Bid" : "Ask"} wall at ${w.px}, ${usd(w.peak*w.px)} at its peak (${w.ratio >= 100 ? "100x+" : w.ratio.toFixed(1)+"x"} the median level), ${Math.round((ep.tUpdate-ep.tStart)/1000)} s old, ${pct(w.size/w.peak)} of its peak left${w.tradedFrac != null ? `; ${pct(w.tradedFrac)} of the size that left was traded through (the rest was pulled)` : ""}.`;
     }
 
     // ---- lifecycle ----
@@ -241,9 +241,10 @@ const READER_EPISODES = (() => {
 
     // ---- wall episodes: fed by the engine's wall tracker (a confirmed wall opens one; its resolution ends it) ----
     const wallKey = (vn, w) => vn+"|"+w.side+"|"+w.px;
+    const usd = n => n >= 1e6 ? "$"+(n/1e6).toFixed(1)+"M" : "$"+Math.round(n/1e3)+"k";      // the multiple of a thin median level says little; the money at stake does
     function wallItems(ep, ratio, distBps){
       const w = ep.wall, th = ctx.th("wallRatio");
-      return [item("size", "size vs median level", ratio >= th, 2, ratio.toFixed(1)+"x", true), item("held", "held without being hit", ep.tUpdate-ep.tStart >= cfg.wallConfirmMs, 1.5, Math.round((ep.tUpdate-ep.tStart)/1000)+" s"),
+      return [item("size", "size vs median level", ratio >= th, 2, usd(w.peak*w.px)+" · "+(ratio >= 100 ? "100x+" : ratio.toFixed(1)+"x"), true), item("held", "held without being hit", ep.tUpdate-ep.tStart >= cfg.wallConfirmMs, 1.5, Math.round((ep.tUpdate-ep.tStart)/1000)+" s"),
         item("intact", "still near its peak size", w.size >= w.peak*E().wallFadeFrac, 2, pct(w.size/w.peak)), item("repost", "refilled after being hit", w.reposts >= E().wallReposts, 1, String(w.reposts)), item("near", "distance from mid", true, 0, distBps.toFixed(1)+" bps")];
     }
     // A confirmed wall becomes an episode only once it has stood long enough (flickering liquidity is noise), after calibration, and within a per-side cap.

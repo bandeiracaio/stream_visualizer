@@ -65,7 +65,8 @@ rt$("rtSave").onclick = async () => {
   const s = RT.session; if (!s) return;
   const stamp = new Date(s.startedAt || Date.now()).toISOString().slice(0,16).replace(/[-:T]/g, ""), base = `session_${String(s.sym || "X").replace(/[^A-Za-z0-9_-]/g, "") || "X"}_${stamp}`;
   const quality = SQ.of(s.inputs), health = typeof HL !== "undefined" ? HL.ev.filter(e => e.t >= (s.startedAt || 0) - 60000).slice(-60) : null;      // how complete it is, and what the page noted meanwhile
-  const text = JSON.stringify({kind:"sv-session", v:1, sym:s.sym, startedAt:s.startedAt, baseline:s.baseline || null, quality, health, inputs:s.inputs});
+  const pre = typeof AR !== "undefined" && AR.pre && AR.pre.at >= (s.startedAt || 0) - 120000 && AR.pre.at <= (s.startedAt || 0) + 120000 ? AR.pre : null;      // auto-record's 30 minutes of mark price before the trigger
+  const text = JSON.stringify({kind:"sv-session", v:1, sym:s.sym, startedAt:s.startedAt, baseline:s.baseline || null, quality, health, pre, inputs:s.inputs});
   const gz = typeof CompressionStream !== "undefined", name = base + (gz ? ".json.gz" : ".json");
   const blob = gz ? await new Response(new Blob([text]).stream().pipeThrough(new CompressionStream("gzip"))).blob() : new Blob([text], {type:"application/json"});
   rtDownload(blob, name);

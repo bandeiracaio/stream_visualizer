@@ -25,6 +25,7 @@ self.onmessage = ev => {
   const m = ev.data;
   if (m.t === "start") { on = true; gen++; url = m.url; cfg = m.cfg || {}; h = AUTOREC.createHistory(); open(); clearInterval(tickTimer); tickTimer = setInterval(tick, 2000); tick(); }
   else if (m.t === "cfg") cfg = m.cfg || {};
+  else if (m.t === "dump") post({t:"trace", rows:AUTOREC.dump(h, Date.now(), m.secs || 1800)});
   else if (m.t === "close") { try { if (ws) ws.close(); } catch {} }
   else if (m.t === "stop") { on = false; gen++; clearInterval(tickTimer); try { if (ws) ws.close(); } catch {} ws = null; }
 };

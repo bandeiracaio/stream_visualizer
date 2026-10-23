@@ -71,6 +71,11 @@ const READER_SELFTEST=(()=>{
     const ok=SQ.of(make(5)),holes=SQ.of(make(6,m=>m===2)),hollow=SQ.of(make(6,m=>m!==0&&m!==5)),none=SQ.of([]);
     return{ok:ok.verdict==="complete"&&ok.dataMinutes===ok.minutes&&holes.verdict==="holes"&&holes.longestGapSec>=60&&hollow.verdict==="hollow"&&none.verdict==="empty"&&/silence/.test(SQ.line(holes))&&SQ.line(ok)===`${ok.minutes} of ${ok.minutes} min with data`,detail:JSON.stringify({ok,holes,hollow})};
   });
+  add("autorec: dump returns the last seconds of prices as pairs, leaving out missed seconds",E=>{
+    const A=AUTOREC,h=A.createHistory();let t=T0;for(let i=0;i<300;i++){t+=1000;if(i>=100&&i<120)continue;A.push(h,t,82000+i);}
+    const d=A.dump(h,t,200),all=A.dump(h,t,4000);
+    return{ok:d.length===180&&d[d.length-1][1]===82299&&d.every((p,i)=>i===0||p[0]>d[i-1][0])&&all.length===280&&A.dump(A.createHistory(),t,50).length===0,detail:JSON.stringify({n:d.length,all:all.length,last:d[d.length-1]})};
+  });
   add("flickering walls (a few seconds) do not become episodes",E=>{
     const e=E.create(),a=calm(e);let t=a.t,mid=a.mid;
     for(let i=0;i<4;i++){const w=sim(e,{t0:t,mid0:mid,seconds:6,seed:50+i,params:()=>({vol:0,bidWalls:[{idx:12,size:6}]})}),g=sim(e,{t0:w.t,mid0:w.mid,seconds:3,seed:60+i,params:()=>({vol:0})});t=g.t;mid=g.mid;}

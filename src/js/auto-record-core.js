@@ -19,6 +19,8 @@ const AUTOREC = (() => {
   }
   // the price at second s, or the latest one within 3 s before it (a missed second does not break a return)
   function priceAt(h, s) { for (let k = 0; k <= 3; k++){ const i = (s-k) % SIZE; if (h.sec[i] === s-k) return h.px[i]; } return null; }
+  // the last secs seconds of prices as [second, price] pairs (a missed second is left out): the trace kept with a recording
+  function dump(h, nowMs, secs) { const out = [], end = Math.floor(nowMs/1000); for (let s = end - secs + 1; s <= end; s++){ const i = s % SIZE; if (h.sec[i] === s) out.push([s, h.px[i]]); } return out; }
   // robust sigma over the last winSec seconds: {sigma, n}
   function sigma(h, winSec, lagSec) {
     const r = [];
@@ -48,5 +50,5 @@ const AUTOREC = (() => {
   }
   // the state to carry on with after a recording was saved, when auto-record stays armed
   const afterStop = (tMs, cfg) => ({mode:"waiting", until:tMs + Object.assign({}, DEFAULTS, cfg).cooldownMin*60000});
-  return {DEFAULTS, createHistory, push, sigma, vol, step, afterStop};
+  return {DEFAULTS, createHistory, push, dump, sigma, vol, step, afterStop};
 })();

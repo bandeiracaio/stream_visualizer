@@ -2,7 +2,7 @@
 // Auto-record (view): while armed it listens to ONE price stream (Binance mark price, about 1 message a second) and nothing else: no other feeds,
 // no Reader engine, no drawing. When AUTOREC says the market has turned volatile it connects the app and starts the normal recording; when it
 // has been calm long enough (or the time limit hits) it stops, saves the file, and disconnects again if it was the one who connected.
-const AR = {on:false, ws:null, gen:0, h:null, st:null, cfg:null, timer:null, lock:null, byUs:false, t0:0, lastMsg:0, runs:0, drops:[], worker:null, volAt:0, unlock:null, v:null};
+const AR = {on:false, ws:null, gen:0, h:null, st:null, cfg:null, timer:null, lock:null, byUs:false, t0:0, lastMsg:0, runs:0, drops:[], worker:null, volAt:0, unlock:null, v:null, pre:null, preMeta:null};
 const ar$ = id => document.getElementById(id);
 const AR_FIELDS = {arTrigRatio:"trigRatio", arTrigSigma:"trigSigma", arExitRatio:"exitRatio", arExitSigma:"exitSigma", arCalmMin:"calmMin", arMaxMin:"maxMin", arCooldown:"cooldownMin"};
 const arCfgFromUi = () => { const c = {}; for (const id in AR_FIELDS){ const v = +ar$(id).value; if (v > 0) c[AR_FIELDS[id]] = v; } c.rearm = ar$("arRearm").checked; return Object.assign({}, AUTOREC.DEFAULTS, c); };
@@ -39,6 +39,7 @@ function arStartFeed() {
   w.onmessage = ev => {
     if (w !== AR.worker) return; const m = ev.data;
     if (m.t === "vol") { AR.v = m.v; AR.lastMsg = m.lastMsg; AR.volAt = Date.now(); AR.ws = {readyState:m.ws, close:() => w.postMessage({t:"close"})}; }
+    else if (m.t === "trace") { if (AR.preMeta) AR.pre = Object.assign({}, AR.preMeta, {prices:m.rows}); }
     else if (m.t === "drop") AR.drops = AR.drops.concat(m.d).slice(-20);      // kept so a pattern in the drops can be read afterwards
   };
   w.onerror = () => { if (w !== AR.worker) return; AR.worker = null; try { w.terminate(); } catch {} arOpen(); };      // the worker failed: do the same job on the page
@@ -83,6 +84,9 @@ function arStatus(v, now) {
   ar$("arStat").textContent = t;
 }
 function arStart(why, v) {
+  // keep the last 30 minutes of the mark price (one point a second) with this recording: what led up to the trigger, which no feed was recording yet
+  AR.preMeta = {at:Date.now(), why, fast:v.fast, slow:v.slow, ratio:v.ratio, trigRatio:AR.cfg.trigRatio, trigSigma:AR.cfg.trigSigma}; AR.pre = null;
+  if (AR.worker) AR.worker.postMessage({t:"dump", secs:1800}); else AR.pre = Object.assign({}, AR.preMeta, {prices:AUTOREC.dump(AR.h, Date.now(), 1800)});
   AR.byUs = !connected;
   if (!connected) $("go").click();
   RT.recLimit = {ms:(AR.cfg.maxMin + 2)*60000, n:2000000};
