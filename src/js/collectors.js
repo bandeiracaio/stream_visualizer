@@ -63,6 +63,54 @@ function colWorkerSync() {
 }
 cl$("sym").addEventListener("change", colWorkerSync);
 
+// ---- book depth summaries (fast collector "book"): only while the app is connected AND recording. Once a second it writes the Binance book (the full
+// local book, about 17 bps either side for BTC) and the Hyperliquid book (the exact 20 levels, plus a bucketed 20 levels every 2 s for the deeper edges).
+// The flow (size added / removed near the touch) is read from the Binance updates by watching bnDepth, which is called as before and never changed.
+// On a hidden tab the page's timers slow down, so this thins out; the recording itself needs the visible window anyway.
+const CB = {flow:COLLECT.flowStat(20), snap:null, snapOf:null, coarse:null, coarseAt:0, busy:false, hold:0, errAt:0};
+const colBookOn = () => colOn("book") && connected && !!RT.rec;
+function colBookObserve(d) {      // before bnDepth applies the update: compare each level with what the book held
+  try {
+    const b = bnBook; if (!b || !b.ready || d.u < b.lastU) return;
+    if (CB.snapOf !== b) {      // a new book: right now it is exactly the snapshot (this runs on every update, recording or not), so remember how far it covers
+      let lo = Infinity, hi = 0; for (const p of b.bids.keys()) if (+p < lo) lo = +p; for (const p of b.asks.keys()) if (+p > hi) hi = +p;
+      CB.snapOf = b; CB.snap = lo < Infinity && hi > 0 ? {lo, hi} : null;
+    }
+    if (!colBookOn() || !(M.bnBid > 0) || !(M.bnAsk > 0)) return;
+    const mid = (M.bnBid + M.bnAsk)/2, k = 1e4/mid;
+    for (const [p, q] of d.b) CB.flow.note("b", b.bids.get(p), +q, (mid - p)*k);
+    for (const [p, q] of d.a) CB.flow.note("a", b.asks.get(p), +q, (p - mid)*k);
+  } catch {}
+}
+if (typeof bnDepth === "function") { const bnDepthOrig = bnDepth; bnDepth = function(d) { colBookObserve(d); return bnDepthOrig.call(this, d); }; }
+function colBookTick() {
+  if (!colBookOn()) { CB.flow.take(); return; }
+  const now = Date.now(), arr = m => { const a = []; for (const [p, q] of m) a.push([+p, q]); return a; };
+  try {
+    const flow = CB.flow.take();
+    if (S["bn.depth"].on && bnBook && bnBook.ready) { const mid = (M.bnBid + M.bnAsk)/2, cover = CB.snap && CB.snapOf === bnBook && mid > 0 ? [Math.max(0, (mid - CB.snap.lo)*1e4/mid), Math.max(0, (CB.snap.hi - mid)*1e4/mid)] : [0, 0];      // no snapshot seen yet: no depth beyond the touch is claimed
+      const s = COLLECT.book(arr(bnBook.bids), arr(bnBook.asks), null, cover); if (s) colAdd(COLLECT.rec("bookBn", now, Object.assign(s, {fl:flow}))); }
+    const t = hlTop();
+    if (t && now - hlBookT < 5000) {
+      const fine = COLLECT.book(t.bids, t.asks), m = COLLECT.mergeBook(fine, now - CB.coarseAt < 10000 ? CB.coarse : null);
+      if (m) colAdd(COLLECT.rec("bookHl", now, Object.assign(m, {cAge:CB.coarseAt ? now - CB.coarseAt : null})));
+    }
+  } catch {}
+}
+async function colBookCoarse() {      // Hyperliquid l2Book aggregated to 4 significant figures: 20 levels that reach about 24 bps for BTC
+  if (CB.busy || !colBookOn() || Date.now() < CB.hold) return;
+  CB.busy = true;
+  try {
+    const r = await fetch("https://api.hyperliquid.xyz/info", {method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({type:"l2Book", coin:cl$("sym").value.trim().toUpperCase(), nSigFigs:4})});
+    if (r.status === 429) CB.hold = Date.now() + COLLECT.BACKOFF_MS;
+    if (!r.ok) throw new Error("HTTP " + r.status + (r.status === 429 ? ", resting 5 min" : ""));
+    const L = (await r.json()).levels;
+    CB.coarse = COLLECT.book(L[0].map(l => [+l.px, +l.sz]), L[1].map(l => [+l.px, +l.sz]), COLLECT.BOOK_EDGES); CB.coarseAt = Date.now();
+  } catch (e) { if (Date.now() - CB.errAt > 300000) { CB.errAt = Date.now(); hlNote("collector error", {collector:"book", err:String(e && e.message || e)}); } }
+  finally { CB.busy = false; }
+}
+setInterval(colBookTick, 1000); setInterval(colBookCoarse, 2000);
+
 // ---- the list under the Health log
 function colRender() {
   const box = cl$("colList"); if (!box) return;

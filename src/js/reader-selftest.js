@@ -120,6 +120,19 @@ const READER_SELFTEST=(()=>{
     const f8=at(fri,U(2026,10,23,8)),f20=at(fri,U(2026,10,23,20)),m0=at(mon,U(2026,10,26)),n0=at(mth,U(2026,11,1));
     return{ok:has(f8,"15m","1h","4h","funding","optExp:weekly")&&has(at(fri,U(2026,10,23,13,30)),"usOpen","15m")&&has(f20,"usClose","1h","4h")&&!f20.includes("funding")&&has(m0,"1h","4h","1d","1w","funding")&&!m0.includes("1M")&&has(n0,"1d","1M")&&!n0.includes("1w")&&!n0.some(x=>x.startsWith("us"))&&has(at(win,U(2026,11,2,14,30)),"usOpen")&&has(at(win,U(2026,11,2,21)),"usClose")&&has(at(mo,U(2026,10,30,8)),"optExp:monthly")&&has(at(q,U(2026,12,25,8)),"optExp:quarterly")&&has(at(dly,U(2026,10,27,8)),"optExp:daily")&&!sat.some(e=>e.tags.some(x=>x.startsWith("us")))&&once.length===1&&once[0].t===U(2026,10,23,8)&&none.length===0&&COLLECT.REGISTRY.some(c=>c.id==="calendar"&&c.on),detail:JSON.stringify({fri:fri.filter(e=>e.tags.length>1||e.tags.some(x=>x!=="15m")),mon,mth,win:win.filter(e=>e.tags.some(x=>x!=="15m")),mo:mo.filter(e=>e.tags.length>1),q:q.filter(e=>e.tags.length>1),dly:dly.filter(e=>e.tags.length>1)})};
   });
+  add("collectors: book depth sums levels within each edge, says null where the data does not reach, and tops a fine book up from a coarse one",E=>{
+    const bids=[[99.995,1],[99.96,2],[99.5,4],[99,8]],asks=[[100.005,1.5],[100.04,2.5],[100.5,5]];
+    const b=COLLECT.book(bids,asks),short=COLLECT.book(bids,asks.slice(0,2)),bad=[COLLECT.book([],asks),COLLECT.book(bids,[]),COLLECT.book([[101,1]],[[100,1]])];
+    const fine=COLLECT.book(bids.slice(0,2),asks.slice(0,2)),coarse=COLLECT.book([[99.92,3],[99.5,4]],[[100.08,3.5],[100.5,5]],COLLECT.BOOK_EDGES),m=COLLECT.mergeBook(fine,coarse),alone=COLLECT.mergeBook(fine,null);
+    const J=JSON.stringify;
+    return{ok:b.mid===100&&b.spr===1&&b.tb===1&&b.ta===1.5&&J(b.reach)==="[100,50]"&&J(b.d["1"])==="[1,1.5]"&&J(b.d["5"])==="[3,4]"&&J(b.d["20"])==="[3,4]"&&J(short.d["1"])==="[1,1.5]"&&J(short.d["5"])==="[3,null]"&&J(short.d["20"])==="[3,null]"&&bad.every(x=>x===null)&&m&&J(m.d["1"])==="[1,1.5]"&&J(m.d["10"])==="[3,3.5]"&&J(m.d["20"])==="[3,3.5]"&&J(m.coarse)==="[5,10,20]"&&J(COLLECT.book(bids,asks,null,[10,10]).d)===J({"1":[1,1.5],"5":[3,4],"10":[3,4],"20":[null,null]})&&alone.d["20"][0]===null&&alone.coarse.length===0,detail:J({b,short,m,alone})};
+  });
+  add("collectors: book flow counts size added and removed near the touch only, and resets when taken",E=>{
+    const f=COLLECT.flowStat(25);
+    f.note("b",null,2,1);f.note("b",2,5,1);f.note("b",5,1,1);f.note("b",1,0,1);f.note("b",3,3,1);f.note("b",1,9,30);f.note("a",0,4,-2);f.note("a",4,1,2);
+    const r=f.take(),again=f.take();
+    return{ok:r.b.nAdd===1&&r.b.nUp===1&&r.b.nRed===1&&r.b.nDel===1&&r.b.add===5&&r.b.rem===5&&r.a.nAdd===1&&r.a.add===4&&r.a.nRed===1&&r.a.rem===3&&again.b.add===0&&again.a.nAdd===0&&COLLECT.REGISTRY.some(c=>c.id==="book"&&c.speed==="fast"),detail:JSON.stringify({r,again})};
+  });
   add("collectors: records among the inputs change no detection and no session quality",E=>{
     const e=E.create();e.startRecording();const a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:21,params:()=>burstSell});sim(e,{t0:b.t,mid0:b.mid,seconds:40,seed:22});
     const inputs=e.stopRecording(),mixed=[];inputs.forEach((r,i)=>{mixed.push(r);if(i%40===0)mixed.push(COLLECT.rec("feeds",T0+i,{src:"page",feeds:{bn:{n:1}}}));});
