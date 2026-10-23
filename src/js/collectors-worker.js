@@ -3,8 +3,9 @@
 // posts {t:"col", rec} for each record and {t:"note", k, d} for the Health log, and never touches anything else. An error or a rate limit
 // stops only the source concerned. Collector "derivs": Binance premium index + open interest (15 s), Hyperliquid funding / open interest
 // (15 s), long-short and taker ratios (60 s), and from one stream the basis (10 s) and every liquidation. Collector "calendar": a record at every
-// scheduled instant (COLLECT.calendar, by rule, no network). The page says which collectors are on in the start message: {t:"start", sym, want:{derivs, calendar}}.
-let on = false, gen = 0, sym = "btc", want = {}, ws = null, lastMsg = 0, timer = null, mk = null, prevRatios = null, lastCal = 0;
+// scheduled instant (COLLECT.calendar, by rule, no network). Collector "venues" (fast, only while a recording is on): sockets to Coinbase, Bybit, OKX, Binance spot and the majors' marks, one record a second.
+// The page says which collectors are on in the start message: {t:"start", sym, want:{derivs, calendar, venues}, rec}, and tells when a recording starts or stops: {t:"rec", on}.
+let on = false, gen = 0, sym = "btc", want = {}, ws = null, lastMsg = 0, timer = null, mk = null, prevRatios = null, lastCal = 0, recOn = false, vOn = false, vGen = 0, vSock = {}, vState = {}, lastVen = 0, lastPing = 0;
 const last = {}, busy = {}, hold = {}, said = {};
 const BN = "https://fapi.binance.com", HLI = "https://api.hyperliquid.xyz/info";
 const post = m => self.postMessage(m);
@@ -64,6 +65,31 @@ function open() {
   };
   w.onclose = () => { if (!on || g !== gen) return; say("stream", "closed, reopening"); setTimeout(() => { if (on && g === gen) open(); }, 5000); };
 }
+// ---- extra venues: open only while a recording is on (and the collector is), close when it stops
+function vOpen(v) {
+  const g = vGen; let w;
+  try { w = new WebSocket(v.url); } catch (e) { say("venue " + v.id, e); return; }
+  vSock[v.id] = {w, last:Date.now()};
+  w.onopen = () => { if (v.sub) try { w.send(JSON.stringify(v.sub)); } catch {} };
+  w.onmessage = ev => {
+    const s = vSock[v.id]; if (!s || s.w !== w) return;
+    const now = s.last = Date.now(); let j; try { j = JSON.parse(ev.data); } catch { return; }      // OKX answers a ping with the plain text "pong"
+    COLLECT.venueApply(vState, COLLECT.venueParse(v.id, j), now);
+  };
+  w.onclose = () => { if (!vOn || g !== vGen) return; say("venue " + v.id, "closed, reopening"); setTimeout(() => { if (vOn && g === vGen) vOpen(v); }, 5000); };
+}
+function venuesClose() { vOn = false; vGen++; for (const id in vSock) try { vSock[id].w.close(); } catch {} vSock = {}; }
+function venuesSync() {
+  const wanted = !!(want.venues && recOn && on);
+  if (wanted && !vOn) { vOn = true; vGen++; vState = {}; lastVen = 0; for (const v of COLLECT.venueSubs(sym)) vOpen(v); }
+  else if (!wanted && vOn) venuesClose();
+}
+function venuesTick(now) {
+  if (!vOn) return;
+  if (now - lastPing >= 20000) { lastPing = now; for (const v of COLLECT.venueSubs(sym)) { const s = vSock[v.id]; if (v.ping && s && s.w.readyState === 1) try { s.w.send(typeof v.ping === "string" ? v.ping : JSON.stringify(v.ping)); } catch {} } }
+  for (const id in vSock) { const s = vSock[id]; if (now - s.last > 30000) try { s.w.close(); } catch {} }      // silent without closing: close it so onclose reopens it
+  if (now - lastVen >= 1000) { lastVen = now; const p = COLLECT.venueRecord(vState, now); if (p) col("venues", now, p); }
+}
 function tick() {
   if (!on) return;
   const now = Date.now();
@@ -72,6 +98,7 @@ function tick() {
     for (const c of COLLECT.calendar(Math.max(lastCal, now - 6*3600000), now)) col("cal", c.t, {tags:c.tags});
     lastCal = now;
   }
+  venuesTick(now);
   if (!want.derivs) return;
   const E = COLLECT.EVERY;
   if (COLLECT.due(last.prem, now, E.prem)) { last.prem = now; run("bnDerivs", pollPremium); }
@@ -81,6 +108,7 @@ function tick() {
 }
 self.onmessage = ev => {
   const m = ev.data;
-  if (m.t === "start") { on = true; gen++; sym = String(m.sym || "btc"); want = m.want || {derivs:true}; mk = null; prevRatios = null; lastCal = Date.now(); for (const k of [last, busy, hold, said]) for (const i in k) delete k[i]; if (want.derivs) open(); clearInterval(timer); timer = setInterval(tick, 1000); tick(); }
-  else if (m.t === "stop") { on = false; gen++; clearInterval(timer); try { if (ws) ws.close(); } catch {} ws = null; }
+  if (m.t === "start") { on = true; gen++; venuesClose(); sym = String(m.sym || "btc"); want = m.want || {derivs:true}; recOn = !!m.rec; mk = null; prevRatios = null; lastCal = Date.now(); for (const k of [last, busy, hold, said]) for (const i in k) delete k[i]; if (want.derivs) open(); venuesSync(); clearInterval(timer); timer = setInterval(tick, 1000); tick(); }
+  else if (m.t === "rec") { recOn = !!m.on; venuesSync(); }
+  else if (m.t === "stop") { venuesClose(); on = false; gen++; clearInterval(timer); try { if (ws) ws.close(); } catch {} ws = null; }
 };

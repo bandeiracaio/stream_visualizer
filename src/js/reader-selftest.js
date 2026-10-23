@@ -133,6 +133,27 @@ const READER_SELFTEST=(()=>{
     const r=f.take(),again=f.take();
     return{ok:r.b.nAdd===1&&r.b.nUp===1&&r.b.nRed===1&&r.b.nDel===1&&r.b.add===5&&r.b.rem===5&&r.a.nAdd===1&&r.a.add===4&&r.a.nRed===1&&r.a.rem===3&&again.b.add===0&&again.a.nAdd===0&&COLLECT.REGISTRY.some(c=>c.id==="book"&&c.speed==="fast"),detail:JSON.stringify({r,again})};
   });
+  add("collectors: extra venues: sockets per coin, real message shapes parsed, partial Bybit updates merged, ages and lags in the record",E=>{
+    const J=JSON.stringify,P=COLLECT.venueParse,subs=COLLECT.venueSubs("btc"),eth=COLLECT.venueSubs("ETH");
+    const cb=P("cb",{type:"ticker",product_id:"BTC-USD",price:"80993.52",best_bid:"80993.51",best_ask:"80993.52",time:"2026-10-23T23:48:10.644540Z"});
+    const by1=P("byL",{topic:"tickers.BTCUSDT",type:"snapshot",ts:1000,data:{symbol:"BTCUSDT",lastPrice:"81058.90",markPrice:"81059.93",indexPrice:"81102.51",fundingRate:"0.0000649",bid1Price:"81058.80",ask1Price:"81058.90"}});
+    const by2=P("byL",{topic:"tickers.BTCUSDT",type:"delta",ts:1100,data:{symbol:"BTCUSDT",bid1Price:"81054.70",bid1Size:"0.976"}});
+    const okT=P("ok",{arg:{channel:"tickers",instId:"BTC-USDT-SWAP"},data:[{instType:"SWAP",bidPx:"81053.8",askPx:"81053.9",last:"81053.8",ts:"1792799310072"}]});
+    const okP=P("ok",{arg:{channel:"tickers",instId:"BTC-USDT"},data:[{instType:"SPOT",bidPx:"81090.4",askPx:"81090.5",last:"81090.5",ts:"1792799310171"}]});
+    const okM=P("ok",{arg:{channel:"mark-price",instId:"BTC-USDT-SWAP"},data:[{markPx:"81053.5",ts:"1792799310183"}]});
+    const okI=P("ok",{arg:{channel:"index-tickers",instId:"BTC-USDT"},data:[{idxPx:"81095.4",ts:"1792799310081"}]});
+    const bn=P("bnS",{stream:"btcusdt@bookTicker",data:{u:1,s:"BTCUSDT",b:"81105.85000000",B:"2.3",a:"81105.86000000",A:"2.9"}});
+    const mj=P("maj",{stream:"ethusdt@markPrice@1s",data:{e:"markPriceUpdate",E:5000,s:"ETHUSDT",p:"3100.50000000"}});
+    const junk=[P("cb",{type:"subscriptions"}),P("byL",{success:true,op:"subscribe"}),P("ok",{event:"subscribe",arg:{channel:"tickers"}}),P("bnS",{result:null}),P("maj",{data:{e:"x"}}),P("cb",null),P("zz",{})];
+    const st={};COLLECT.venueApply(st,by1,10000);COLLECT.venueApply(st,by2,10200);COLLECT.venueApply(st,mj,10300);COLLECT.venueApply(st,mj&&{src:"maj",set:{sol:150.5},e:null},10400);COLLECT.venueApply(st,null,1);
+    const r=COLLECT.venueRecord(st,11000),none=COLLECT.venueRecord({},1);
+    return{ok:subs.length===6&&subs[0].sub.product_ids[0]==="BTC-USD"&&subs[1].sub.args[0]==="tickers.BTCUSDT"&&subs[3].sub.args[3].instId==="BTC-USDT"&&subs[4].url.endsWith("btcusdt@bookTicker")&&subs[5].url.includes("ethusdt@markPrice@1s")&&subs[5].url.includes("dogeusdt@markPrice@1s")&&!eth[5].url.includes("ethusdt")&&eth[5].url.includes("btc"+"usdt")===false&&!!subs[3].ping&&subs[1].ping.op==="ping"
+      &&cb.src==="cb"&&cb.set.b===80993.51&&cb.set.a===80993.52&&cb.set.l===80993.52&&cb.e===Date.parse("2026-10-23T23:48:10.644Z")
+      &&by1.set.m===81059.93&&by1.set.i===81102.51&&by1.set.f===.0000649&&J(Object.keys(by2.set))==='["b"]'&&by2.set.b===81054.7
+      &&okT.src==="okS"&&okT.set.b===81053.8&&okP.src==="okP"&&okP.set.a===81090.5&&okM.src==="okS"&&okM.set.m===81053.5&&okI.src==="okS"&&okI.set.i===81095.4
+      &&bn.src==="bnS"&&bn.set.b===81105.85&&bn.e===null&&mj.src==="maj"&&mj.set.eth===3100.5&&junk.every(x=>x===null)
+      &&r.byL.b===81054.7&&r.byL.m===81059.93&&r.byL.age===800&&r.byL.lag===9100&&r.maj.eth===3100.5&&r.maj.sol===150.5&&r.maj.age===600&&r.maj.lag===undefined&&none===null&&COLLECT.REGISTRY.some(c=>c.id==="venues"&&c.speed==="fast"),detail:J({cb,by1,by2,okT,bn,mj,r,eth5:eth[5].url})};
+  });
   add("collectors: records among the inputs change no detection and no session quality",E=>{
     const e=E.create();e.startRecording();const a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:21,params:()=>burstSell});sim(e,{t0:b.t,mid0:b.mid,seconds:40,seed:22});
     const inputs=e.stopRecording(),mixed=[];inputs.forEach((r,i)=>{mixed.push(r);if(i%40===0)mixed.push(COLLECT.rec("feeds",T0+i,{src:"page",feeds:{bn:{n:1}}}));});

@@ -9,8 +9,9 @@ const COLLECT = (() => {
     {id:"derivs", label:"Derivatives context: funding, open interest, basis, liquidations, long/short and taker ratios (Binance, Hyperliquid)", speed:"slow", on:true},
     {id:"calendar", label:"Calendar tags: funding times, 15m / 1h / 4h / daily / weekly / monthly closes, US open and close, options expiry (rules, no network)", speed:"slow", on:true},
     {id:"book", label:"Book depth (while recording): depth within 1 / 5 / 10 / 25 bps, spread, touch size, size added and removed per side (Binance, Hyperliquid)", speed:"fast", on:true},
+    {id:"venues", label:"Extra venues (while recording): Coinbase, Bybit and OKX quotes, Binance spot, perp marks and indexes, and the ETH / SOL / BNB / XRP / DOGE marks", speed:"fast", on:true},
   ];
-  const TAPE_MS = 24*3600*1000, FILE_BUDGET = 5*1024*1024;      // the rolling tape keeps 24 h; one session file takes at most about 5 MB of them
+  const TAPE_MS = 24*3600*1000, FILE_BUDGET = 8*1024*1024;      // the rolling tape keeps 24 h; one session file takes at most about 8 MB of them (5 MB until v058: book depth and the extra venues fill about 2 MB an hour each while recording)
   const round = (x, d) => Math.round(x*Math.pow(10, d))/Math.pow(10, d);
   const quantile = (arr, p) => { if (!arr || !arr.length) return null; const s = arr.slice().sort((a, b) => a - b); return s[Math.min(s.length - 1, Math.floor(s.length*p))]; };
   const rec = (name, t, payload) => ["c", name, t, payload];
@@ -152,6 +153,62 @@ const COLLECT = (() => {
     };
   }
 
+  // ---- extra venues (collector "venues", run by collectors-worker.js while a recording is on): the same instrument on other exchanges, to see who moves first and how
+  // far apart the prices are. Raw quotes only; the perp-spot basis and the correlation are worked out afterwards. Public sockets, no keys.
+  const MAJORS = ["eth", "sol", "bnb", "xrp", "doge"];      // Binance perp marks, for correlation (the symbol being watched is left out)
+  // the sockets to open for a coin: {id, url, sub (sent on open), ping (sent every 20 s)}
+  function venueSubs(coin) {
+    const C = String(coin || "BTC").toUpperCase(), c = C.toLowerCase();
+    return [
+      {id:"cb", url:"wss://ws-feed.exchange.coinbase.com", sub:{type:"subscribe", product_ids:[C + "-USD"], channels:["ticker"]}},
+      {id:"byL", url:"wss://stream.bybit.com/v5/public/linear", sub:{op:"subscribe", args:["tickers." + C + "USDT"]}, ping:{op:"ping"}},
+      {id:"byS", url:"wss://stream.bybit.com/v5/public/spot", sub:{op:"subscribe", args:["tickers." + C + "USDT"]}, ping:{op:"ping"}},
+      {id:"ok", url:"wss://ws.okx.com:8443/ws/v5/public", ping:"ping",
+       sub:{op:"subscribe", args:[{channel:"tickers", instId:C + "-USDT-SWAP"}, {channel:"tickers", instId:C + "-USDT"}, {channel:"mark-price", instId:C + "-USDT-SWAP"}, {channel:"index-tickers", instId:C + "-USDT"}]}},
+      {id:"bnS", url:"wss://stream.binance.com:9443/stream?streams=" + c + "usdt@bookTicker"},
+      {id:"maj", url:"wss://fstream.binance.com/market/stream?streams=" + MAJORS.filter(m => m !== c).map(m => m + "usdt@markPrice@1s").join("/")},
+    ];
+  }
+  // One parsed socket message -> {src, set, e} (e = the exchange's own time in ms, or null), or null for anything that is not a price. Fields: b / a = best bid / ask,
+  // l = last trade, m = mark, i = index, f = funding rate. Sources: cb Coinbase spot, byL Bybit perp, byS Bybit spot, okS OKX swap, okP OKX spot, bnS Binance spot, maj the majors.
+  // Bybit sends only the fields that changed, so a message is merged into what the source already holds (venueApply).
+  const BYBIT = {bid1Price:"b", ask1Price:"a", lastPrice:"l", markPrice:"m", indexPrice:"i", fundingRate:"f"};
+  function venueParse(id, j) {
+    if (!j || typeof j !== "object") return null;
+    const got = (src, pairs, e) => { const set = {}; let n = 0; for (const k in pairs) { const v = num(pairs[k]); if (v != null) { set[k] = v; n++; } } return n ? {src, set, e:e == null || !Number.isFinite(e) ? null : e} : null; };
+    if (id === "cb") return j.type === "ticker" ? got("cb", {b:j.best_bid, a:j.best_ask, l:j.price}, Date.parse(j.time)) : null;
+    if (id === "byL" || id === "byS") {
+      if (!j.data || typeof j.topic !== "string" || j.topic.indexOf("tickers.") !== 0) return null;
+      const pairs = {}; for (const k in BYBIT) if (j.data[k] != null) pairs[BYBIT[k]] = j.data[k];
+      return got(id, pairs, num(j.ts));
+    }
+    if (id === "ok") {
+      const d = j.arg && Array.isArray(j.data) && j.data[0]; if (!d) return null;
+      if (j.arg.channel === "tickers") return got(d.instType === "SWAP" ? "okS" : "okP", {b:d.bidPx, a:d.askPx, l:d.last}, num(d.ts));
+      if (j.arg.channel === "mark-price") return got("okS", {m:d.markPx}, num(d.ts));
+      if (j.arg.channel === "index-tickers") return got("okS", {i:d.idxPx}, num(d.ts));
+      return null;
+    }
+    if (id === "bnS") { const d = j.data; return d && d.b != null && d.a != null ? got("bnS", {b:d.b, a:d.a}, null) : null; }
+    if (id === "maj") {
+      const d = j.data; if (!d || d.e !== "markPriceUpdate" || typeof d.s !== "string") return null;
+      const v = num(d.p); if (v == null) return null;
+      return {src:"maj", set:{[d.s.toLowerCase().replace(/usdt$/, "")]:v}, e:num(d.E)};
+    }
+    return null;
+  }
+  function venueApply(state, p, nowMs) {
+    if (!p) return;
+    const s = state[p.src] || (state[p.src] = {f:{}, at:0, e:null});
+    Object.assign(s.f, p.set); s.at = nowMs; s.e = p.e;
+  }
+  // the once-a-second record: each source's latest fields, `age` (ms since it last spoke) and `lag` (local time minus the exchange's time when it sends one)
+  function venueRecord(state, nowMs) {
+    const out = {}; let n = 0;
+    for (const src in state) { const s = state[src]; out[src] = Object.assign({}, s.f, {age:nowMs - s.at}); if (s.e != null) out[src].lag = s.at - s.e; n++; }
+    return n ? out : null;
+  }
+
   // tape helpers on arrays of records
   const prune = (recs, nowMs, keepMs) => recs.filter(r => r[2] >= nowMs - (keepMs == null ? TAPE_MS : keepMs));
   const slice = (recs, t0, t1) => recs.filter(r => r[2] >= t0 && r[2] <= t1);
@@ -161,5 +218,5 @@ const COLLECT = (() => {
     for (let i = recs.length - 1; i >= 0; i--) { const b = JSON.stringify(recs[i]).length + 1; if (size + b > lim) break; size += b; out.push(recs[i]); }
     return out.reverse();
   }
-  return {REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, due, calendar, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
+  return {REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, due, calendar, MAJORS, venueSubs, venueParse, venueApply, venueRecord, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
 })();

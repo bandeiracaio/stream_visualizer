@@ -1,6 +1,6 @@
 # Collectors: data we do not collect yet
 
-Status: agreed (2026-10-23). Framework and F self-telemetry built in v053; A derivatives context and the always-on worker built in v055; G calendar tags (rules only) in v056; B book depth summaries in v057.
+Status: agreed (2026-10-23). Framework and F self-telemetry built in v053; A derivatives context and the always-on worker built in v055; G calendar tags (rules only) in v056; B book depth summaries in v057; C extra venues in v058.
 
 ## Goal
 Collect possibly useful data the app does not collect today, even where there is no event type or movement to attach it to yet. Log first,
@@ -78,3 +78,21 @@ All answer 200 with `Access-Control-Allow-Origin: *`, so the page and the worker
 - **Hyperliquid:** the exact 20 levels give the 1 bp edge and the touch; a `nSigFigs:4` REST poll every 2 s (rests 5 min on HTTP 429, errors to the Health log once per 5 minutes) gives the deeper edges, so those are bucket-resolution only (`coarse` lists them). The coarse settings are tuned for BTC; a low-priced coin gets coarser buckets.
 - **Flow (`fl`):** size added and removed within 20 bps of the mid per side, per second, from Binance's incremental updates: `add` / `rem` (coins), `nAdd` (new level), `nUp` (level grew), `nRed` (level shrank), `nDel` (level gone). "Removed" is a cancel or a trade; the two cannot be told apart from the book. It is read by wrapping `bnDepth` (called as before, never changed, observation inside try/catch).
 - Size: about 0.55 KB a second for both books, so about 2 MB an hour, inside the 10 MB an hour rule.
+
+## Verified endpoints for collector C, extra venues (checked live 2026-10-23, BTC; also from a browser origin in Chrome)
+All public WebSockets, no key. A browser page and a worker connect to every one of them.
+- **Coinbase** `wss://ws-feed.exchange.coinbase.com`, subscribe `{type:"subscribe", product_ids:["BTC-USD"], channels:["ticker"]}`: `price`, `best_bid`, `best_ask`, `time` (microsecond ISO string) on every trade.
+- **Bybit perp** `wss://stream.bybit.com/v5/public/linear`, `{op:"subscribe", args:["tickers.BTCUSDT"]}`: a snapshot, then **deltas carrying only the changed fields** (merge them); fields `bid1Price`, `ask1Price`, `lastPrice`, `markPrice`, `indexPrice`, `fundingRate`, with `ts`. Wants a `{op:"ping"}` every 20 s.
+- **Bybit spot** `.../v5/public/spot`: the ticker has only `lastPrice` (and `usdIndexPrice`), no bid or ask.
+- **OKX** `wss://ws.okx.com:8443/ws/v5/public`: channels `tickers` for `BTC-USDT-SWAP` and `BTC-USDT` (bid, ask, last, `ts`), `mark-price` for the swap, `index-tickers` for the pair. Wants the text `ping` every 20 s (answers `pong`, not JSON).
+- **Binance spot** `wss://stream.binance.com:9443/stream?streams=btcusdt@bookTicker`: bid, ask and sizes, no event time.
+- **Majors** `wss://fstream.binance.com/market/stream?streams=ethusdt@markPrice@1s/...`: mark price with event time. (`!markPrice@arr@1s` for every symbol was tried and is far too much: hundreds of symbols a second.)
+- REST for the same data exists but is not used: Bybit and OKX REST sent no CORS header, so a page could not call them.
+
+## Built in v058 (collector C, extra venues)
+- **Runs in the always-on worker, but only while a recording is on** (the fast-collector rule): the page tells the worker `{t:"rec", on}` within a second of a recording starting or stopping; the worker opens the six sockets then and closes them when it stops. Nothing is recorded or connected otherwise. With the symbol changed or the switch toggled the worker restarts as before.
+- **Record** `["c", "venues", t, {...}]` once a second, one entry per source that has spoken: `cb` Coinbase spot, `byL` Bybit perp, `byS` Bybit spot (last only), `okS` OKX swap, `okP` OKX spot, `bnS` Binance spot (bid and ask), `maj` (eth / sol / bnb / xrp / doge marks; the watched coin is left out). Fields: `b` bid, `a` ask, `l` last, `m` mark, `i` index, `f` funding rate, `age` (ms since the source last sent anything) and `lag` (local time minus the exchange's own time, where it sends one: this holds the clock offset too). Sizes are not kept; the book collector covers depth.
+- **Not computed here:** the perp-spot basis and the correlation. The raw quotes are kept so both can be worked out afterwards (Binance's own mark, index and basis are in the `basis` record).
+- A silent socket (30 s) is closed and reopened, a closed one is reopened after 5 s, notes go to the Health log at most once per 5 minutes per socket.
+- Measured live: about 500 bytes a record, so about 1.8 MB an hour. With book depth (about 2 MB an hour) a 60-minute recording is near the old 5 MB file budget, so `FILE_BUDGET` is now 8 MB.
+- **For a coin other than BTC** a venue may not list it (Coinbase has no `-USD` for many); that source simply never appears. Coins whose Binance symbol is not `<COIN>USDT` are not handled.
