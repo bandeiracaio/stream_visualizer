@@ -4,6 +4,7 @@
 const APP_VERSION = "__APP_VERSION__";            // "vNNN" in a release build, "dev" otherwise (build.mjs stamps it)
 const SB = {latest:null, sure:false, timer:null};
 const sb$ = id => document.getElementById(id);
+sb$("ver").textContent = APP_VERSION;           // tiny version tag next to the title
 
 function sbSnapshot() {
   const now = Date.now(), venues = {};
