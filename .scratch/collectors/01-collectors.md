@@ -1,6 +1,6 @@
 # Collectors: data we do not collect yet
 
-Status: agreed (2026-10-23), not built.
+Status: agreed (2026-10-23). Framework and F self-telemetry built in v053.
 
 ## Goal
 Collect possibly useful data the app does not collect today, even where there is no event type or movement to attach it to yet. Log first,
@@ -39,6 +39,10 @@ The collector framework plus F only: a registry of collectors, per-collector tog
 the size budget, the rolling tape, and the byte-identical guard test. Exact endpoints for each later collector are facts to verify for real
 before that collector is built (for example Binance `markPrice` already carries funding and the index price; open interest and the long/short
 ratios are REST; Hyperliquid has `metaAndAssetCtxs` on its info endpoint).
+
+## Built in v053 (and two small deviations from the plan above)
+- Records are `["c", name, t, payload]`, not `"x"` (the engine already uses `"x"` as its reset marker). They are attached to a saved session as `ext`, beside `inputs`, rather than mixed into `inputs`, because the tape slice is added at save time; the engine never sees them either way, and a self-test proves a replay with records among the inputs is identical.
+- Telemetry runs in the worker while armed (the mark-price stream) and in the page while connected (every stream's rate, age, latency, late messages, clock offset, reconnects). The always-on worker for collectors that need no price socket comes with the next collector.
 
 ## Open
 Nothing undecided. The exact record shapes and the tape's key layout are implementation details for v053.

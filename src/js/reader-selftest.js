@@ -81,6 +81,23 @@ const READER_SELFTEST=(()=>{
     const one=run(false),many=run(true);
     return{ok:!one&&!!many&&many.share>.9,detail:JSON.stringify({one,many})};
   });
+  add("collectors: feed telemetry is computed from two samples; a worker stream gives lag, rate and gap; records are validated",E=>{
+    const prev={a:{total:100,bytes:1,late:2,last:0,maxLat:50,lats:[]}},cur={a:{total:160,bytes:2,late:5,last:T0-400,maxLat:900,lats:[10,20,30,40,200]},b:{total:0,lats:[]}};
+    const f=COLLECT.feeds(prev,cur,T0,10000),st=COLLECT.streamStat();
+    st.note(T0-100,T0);st.note(T0+900,T0+1000);st.note(T0+3910,T0+4000);const w=st.take(T0+4500,5000),again=st.take(T0+9500,5000);
+    return{ok:f.a.n===60&&f.a.hz===6&&f.a.ageMs===400&&f.a.late===3&&f.a.latMed===30&&f.a.latP90===200&&!f.b&&w.n===3&&w.hz===.6&&w.lagMed===100&&w.gapMs===3000&&w.ageMs===500&&again.n===0&&again.gapMs===0&&COLLECT.isRec(COLLECT.rec("x",T0,{}))&&!COLLECT.isRec(["t",{}])&&!COLLECT.isRec(["c","x","no"]),detail:JSON.stringify({f,w,again})};
+  });
+  add("collectors: the tape is pruned to its window, sliced for a session, and fitted to the file budget",E=>{
+    const recs=[];for(let i=0;i<100;i++)recs.push(COLLECT.rec("feeds",T0+i*10000,{n:i,pad:"x".repeat(50)}));
+    const now=T0+99*10000,pr=COLLECT.prune(recs,now,200000),sl=COLLECT.slice(recs,T0+100000,T0+200000),ft=COLLECT.fit(recs,1500);
+    return{ok:pr.length===21&&sl.length===11&&ft.length>5&&ft.length<30&&ft[ft.length-1]===recs[99]&&JSON.stringify(ft).length<=1500&&COLLECT.fit(recs,1e9).length===100,detail:JSON.stringify({pr:pr.length,sl:sl.length,ft:ft.length})};
+  });
+  add("collectors: records among the inputs change no detection and no session quality",E=>{
+    const e=E.create();e.startRecording();const a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:21,params:()=>burstSell});sim(e,{t0:b.t,mid0:b.mid,seconds:40,seed:22});
+    const inputs=e.stopRecording(),mixed=[];inputs.forEach((r,i)=>{mixed.push(r);if(i%40===0)mixed.push(COLLECT.rec("feeds",T0+i,{src:"page",feeds:{bn:{n:1}}}));});
+    const sig=x=>JSON.stringify(E.replayEngine(x).episodes.map(p=>[p.family,p.venue,p.aggressor,p.tStart,p.tEnd,p.stage,p.outcome]));
+    return{ok:mixed.length>inputs.length&&sig(inputs)===sig(mixed)&&sig(inputs).length>10&&SQ.of(inputs).dataMinutes===SQ.of(mixed).dataMinutes,detail:`${inputs.length} inputs, ${mixed.length} with records`};
+  });
   add("flickering walls (a few seconds) do not become episodes",E=>{
     const e=E.create(),a=calm(e);let t=a.t,mid=a.mid;
     for(let i=0;i<4;i++){const w=sim(e,{t0:t,mid0:mid,seconds:6,seed:50+i,params:()=>({vol:0,bidWalls:[{idx:12,size:6}]})}),g=sim(e,{t0:w.t,mid0:w.mid,seconds:3,seed:60+i,params:()=>({vol:0})});t=g.t;mid=g.mid;}

@@ -39,11 +39,12 @@ function arStartFeed() {
   w.onmessage = ev => {
     if (w !== AR.worker) return; const m = ev.data;
     if (m.t === "vol") { AR.v = m.v; AR.lastMsg = m.lastMsg; AR.volAt = Date.now(); AR.ws = {readyState:m.ws, close:() => w.postMessage({t:"close"})}; }
+    else if (m.t === "col") { if (typeof colAdd === "function") colAdd(m.rec); }      // a collector record from the worker (collectors.js keeps the tape)
     else if (m.t === "trace") { if (AR.preMeta) AR.pre = Object.assign({}, AR.preMeta, {prices:m.rows}); }
     else if (m.t === "drop") AR.drops = AR.drops.concat(m.d).slice(-20);      // kept so a pattern in the drops can be read afterwards
   };
   w.onerror = () => { if (w !== AR.worker) return; AR.worker = null; try { w.terminate(); } catch {} arOpen(); };      // the worker failed: do the same job on the page
-  w.postMessage({t:"start", url:arUrl(), cfg:AR.cfg});
+  w.postMessage({t:"start", url:arUrl(), cfg:Object.assign({}, AR.cfg, {collectors:typeof colWorkerCfg === "function" ? colWorkerCfg() : {}})});
 }
 // A page that holds a Web Lock is not frozen by the browser while hidden; hold one while armed.
 function arKeepAlive() { try { if (navigator.locks) navigator.locks.request("sv-armed", {mode:"shared"}, () => new Promise(res => { AR.unlock = res; })); } catch {} }

@@ -310,6 +310,11 @@
       <div class="row"><button id="hlSave">Download log</button><button id="hlClear">Clear</button></div>
       <div id="hlList"></div>
     </details>
+    <details class="note" style="margin-top:8px"><summary id="colSum">Collectors</summary>
+      <div class="note">Data kept for later analysis that no detector uses yet. It sits on a 24 h tape on this device and is attached to every saved recording; it never changes a detection.</div>
+      <div id="colList"></div>
+      <div class="row"><button id="colSave">Download tape</button><button id="colClear">Clear tape</button></div>
+    </details>
     <div class="rt-h">Episode thresholds (used live and in replays)</div>
     <div id="rtTune" class="rd-det"></div>
     <div class="rt-h">Your labels</div>
@@ -467,6 +472,7 @@
 </script>
 <script type="text/plain" id="arWorkerSrc">
 <!--@include js/auto-record-core.js-->
+<!--@include js/collectors-core.js-->
 <!--@include js/auto-record-worker.js-->
 </script>
 <script>
@@ -480,6 +486,12 @@
 </script>
 <script>
 <!--@include js/health-log.js-->
+</script>
+<script>
+<!--@include js/collectors-core.js-->
+</script>
+<script>
+<!--@include js/collectors.js-->
 </script>
 </body>
 </html>
