@@ -2,7 +2,7 @@
 // Auto-record (view): while armed it listens to ONE price stream (Binance mark price, about 1 message a second) and nothing else: no other feeds,
 // no Reader engine, no drawing. When AUTOREC says the market has turned volatile it connects the app and starts the normal recording; when it
 // has been calm long enough (or the time limit hits) it stops, saves the file, and disconnects again if it was the one who connected.
-const AR = {on:false, ws:null, gen:0, h:null, st:null, cfg:null, timer:null, lock:null, byUs:false, t0:0, lastMsg:0, runs:0, drops:[]};
+const AR = {on:false, ws:null, gen:0, h:null, st:null, cfg:null, timer:null, lock:null, byUs:false, t0:0, lastMsg:0, runs:0, drops:[], worker:null, volAt:0, unlock:null, v:null};
 const ar$ = id => document.getElementById(id);
 const AR_FIELDS = {arTrigRatio:"trigRatio", arTrigSigma:"trigSigma", arExitRatio:"exitRatio", arExitSigma:"exitSigma", arCalmMin:"calmMin", arMaxMin:"maxMin", arCooldown:"cooldownMin"};
 const arCfgFromUi = () => { const c = {}; for (const id in AR_FIELDS){ const v = +ar$(id).value; if (v > 0) c[AR_FIELDS[id]] = v; } c.rearm = ar$("arRearm").checked; return Object.assign({}, AUTOREC.DEFAULTS, c); };
@@ -29,6 +29,23 @@ function arOpen() {
   ws.onclose = () => { if (AR.on && gen === AR.gen) AR.drops = AR.drops.concat({at:Date.now(), upMs:Date.now() - opened, silentMs:Date.now() - AR.lastMsg}).slice(-20);      // kept so a pattern in the drops can be read afterwards
     if (AR.on && gen === AR.gen) setTimeout(() => { if (AR.on && gen === AR.gen) arOpen(); }, 5000); };
 }
+// The price feed in a Web Worker (auto-record-worker.js): its socket and timers are not slowed or frozen with a hidden tab the way the page's are.
+// Falls back to the page's own socket (arOpen) when workers are unavailable.
+function arStartFeed() {
+  let w;
+  try { const src = ar$("arWorkerSrc").textContent, u = URL.createObjectURL(new Blob([src], {type:"text/javascript"})); w = new Worker(u); URL.revokeObjectURL(u); }
+  catch { AR.worker = null; return arOpen(); }
+  AR.worker = w; AR.volAt = 0; AR.lastMsg = Date.now();
+  w.onmessage = ev => {
+    if (w !== AR.worker) return; const m = ev.data;
+    if (m.t === "vol") { AR.v = m.v; AR.lastMsg = m.lastMsg; AR.volAt = Date.now(); AR.ws = {readyState:m.ws, close:() => w.postMessage({t:"close"})}; }
+    else if (m.t === "drop") AR.drops = AR.drops.concat(m.d).slice(-20);      // kept so a pattern in the drops can be read afterwards
+  };
+  w.onerror = () => { if (w !== AR.worker) return; AR.worker = null; try { w.terminate(); } catch {} arOpen(); };      // the worker failed: do the same job on the page
+  w.postMessage({t:"start", url:arUrl(), cfg:AR.cfg});
+}
+// A page that holds a Web Lock is not frozen by the browser while hidden; hold one while armed.
+function arKeepAlive() { try { if (navigator.locks) navigator.locks.request("sv-armed", {mode:"shared"}, () => new Promise(res => { AR.unlock = res; })); } catch {} }
 async function arLock() { try { if (navigator.wakeLock && !AR.lock) { AR.lock = await navigator.wakeLock.request("screen"); AR.lock.onrelease = () => { AR.lock = null; }; } } catch {} }
 
 function arToggle() {
@@ -36,13 +53,17 @@ function arToggle() {
   if (connected){ arMsg("Disconnect first (the Disconnect button at the top): while it waits the app should listen to one stream only."); return; }
   AR.cfg = arCfgFromUi(); store.set("ar.cfg", AR.cfg);
   AR.on = true; AR.gen++; AR.h = AUTOREC.createHistory(); AR.st = {mode:"waiting"}; AR.byUs = false; AR.t0 = Date.now(); AR.runs = 0; AR.drops = [];
-  arOpen(); arLock(); AR.timer = setInterval(arTick, 5000);
+  arStartFeed(); arKeepAlive(); arLock(); AR.timer = setInterval(arTick, 5000);
   ar$("arArm").textContent = "Disarm"; arMsg("Armed. It needs 15 minutes of prices to know what a normal hour looks like before it can judge."); arTick();
 }
 function arTick() {
   if (!AR.on) return;
-  if (AR.ws && Date.now() - AR.lastMsg > 15000) try { AR.ws.close(); } catch {}     // a socket that went silent without closing: close it so onclose reopens it
-  const now = Date.now(), v = AR.v = AUTOREC.vol(AR.h, AR.cfg, now);      // AR.v is read by the header status (status-bar.js)
+  const now = Date.now(); let v;
+  if (AR.worker) { v = AR.v || AUTOREC.vol(AUTOREC.createHistory(), AR.cfg, now); if (now - AR.volAt > 20000) v = Object.assign({}, v, {ready:false}); }      // the worker's reading; if it has gone quiet the page cannot judge
+  else {
+    if (AR.ws && now - AR.lastMsg > 15000) try { AR.ws.close(); } catch {}     // a socket that went silent without closing: close it so onclose reopens it
+    v = AR.v = AUTOREC.vol(AR.h, AR.cfg, now);      // AR.v is read by the header status (status-bar.js)
+  }
   if (AR.st.mode === "recording" && !RT.rec){
     if (AR.byUs && connected) $("go").click();
     return arFinish("The recording stopped on its own (by hand or at its input limit), so auto-record is off. The session is loaded: use Save session.");
@@ -81,7 +102,9 @@ function arStop(why) {
 }
 function arFinish(msg) {
   AR.on = false; AR.gen++; clearInterval(AR.timer); AR.timer = null;
+  try { if (AR.worker) { AR.worker.postMessage({t:"stop"}); AR.worker.terminate(); } } catch {} AR.worker = null;
   try { if (AR.ws) AR.ws.close(); } catch {} AR.ws = null;
+  if (AR.unlock) { AR.unlock(); AR.unlock = null; }
   try { if (AR.lock) AR.lock.release(); } catch {} AR.lock = null;
   ar$("arArm").textContent = "Arm"; ar$("arStat").textContent = "off"; arMsg(msg);
 }
