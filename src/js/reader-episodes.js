@@ -15,7 +15,7 @@ const READER_EPISODES = (() => {
     horizons:["fast","mid"], famHorizons:{exhaustion:["mid"]}, families:{absorption:true, exhaustion:true, burst:true, wall:true},
     // evidence cut-offs that used to be written inline; now named so they can be measured and proposed for revision
     recentShare:.55, recentPace:.5, crossShare:.6, crossZ:2, burstLiq:2, burstSweeps:3,
-    exhDecay:.5, exhWasZ:1.5, exhWasShare:.55, exhGap:1, exhSize:.75,
+    exhDecay:.5, exhWasZ:1.5, exhWasShare:.55, exhGap:1, exhNear:1, exhSize:.75,
     // after-the-fact layers: what price did after an episode faded, and how far apart episodes may be to count as one phenomenon
     absConc:.2, exhCount:.5, wallReposts:2, wallDip:.7, wallBack:.9,
     outcomeLookMs:30000, outcomeFlatSigma:.5, groupGapMs:10000,
@@ -110,20 +110,22 @@ const READER_EPISODES = (() => {
       const rate = (side==="buy" ? h.buy : h.sell)/secs, was = (side==="buy" ? prev.buy : prev.sell)/secs, zWas = ctx.robustZ(was, vn, side, 1);
       const ratio = was > 0 ? rate/was : 1, prog = progress(vn, h, side), late = lateProgress(vn, h, side), wasShare = prev.buy+prev.sell > 0 ? (side==="buy" ? prev.buy : prev.sell)/(prev.buy+prev.sell) : 0;
       const ext = side==="buy" ? Math.max(h.hi, prev.hi) : Math.min(h.lo, prev.lo), prior = side==="buy" ? ctx.priorHigh(vn, 2*count) : ctx.priorLow(vn, 2*count);
+      const away = Math.max(0, (side==="buy" ? ext-h.close : h.close-ext)/ext*1e4/sig);      // how far price has already come back from that extreme, now
       const gap = Number.isFinite(prior) ? (side==="buy" ? prior-ext : ext-prior)/ext*1e4/sig : 0;
       const countRatio = prev.n > 0 ? h.n/prev.n : null, sizeNow = h.n ? (h.buy+h.sell)/h.n : 0, sizeWas = prev.n ? (prev.buy+prev.sell)/prev.n : 0, poke = v.lastPokeFail && v.lastPokeFail.side===(side==="buy" ? "high" : "low") && t-v.lastPokeFail.t <= E().pokeMs;
       const items = [
         item("decay", "aggression vs the window before", ratio <= E().exhDecay, 2.5, pct(ratio), true),
         item("was", "it was elevated before", zWas >= E().exhWasZ, 1.5, "z "+zWas.toFixed(1), true),
         item("dominant", "it was the dominant side before", wasShare >= E().exhWasShare, 1, pct(wasShare), true),
-        item("extreme", "near the 5-minute extreme", gap <= E().exhGap, 1.5, gap <= 0 ? "new extreme" : gap.toFixed(1)+"σ away"),
+        item("extreme", "made a new 5-minute extreme", gap <= E().exhGap, 1.5, gap <= 0 ? "new extreme" : gap.toFixed(1)+"σ away"),
+        item("atExtreme", "price still near that extreme", away <= E().exhNear, 1.5, away.toFixed(1)+"σ off it", true),
         item("stalled", "price progress with the aggressor (latest seconds)", late <= cfg.absorbSigma, 1.5, sgn(late)+"σ", true),
         item("poke", "recent failed poke", !!poke, 1.5, poke ? "yes" : "no"),
         countRatio == null ? na("count", "trade count falling") : item("count", "trade count vs the window before", countRatio <= E().exhCount, 1, pct(countRatio)),
         item("size", "average trade size shrinking", sizeWas > 0 && sizeNow <= E().exhSize*sizeWas, 1, sizeWas > 0 ? pct(sizeNow/sizeWas) : "-"),
       ];
-      return {items, ...scoreOf(items), px:h.close, facts:{ratio, zWas, gap, prog, poke:!!poke, side, open:h.open, secs},
-        quants:{decay:ratio, zWas, wasShare, gap, late, sizeRatio:sizeWas > 0 ? sizeNow/sizeWas : null, countRatio}};
+      return {items, ...scoreOf(items), px:h.close, facts:{ratio, zWas, gap, away, prog, poke:!!poke, side, open:h.open, secs},
+        quants:{decay:ratio, zWas, wasShare, gap, away, late, sizeRatio:sizeWas > 0 ? sizeNow/sizeWas : null, countRatio}};
     }
 
     // ---- aggression burst: a surge of one side's flow, with price movement and supporting signs ----
@@ -156,7 +158,7 @@ const READER_EPISODES = (() => {
     function reading(ep){
       const f = ep.facts, a = ep.aggressor;
       if (ep.family==="absorption") return `Aggressive ${who(a)} (${pct(f.share)} of taker flow, z ${zf(f.z)}) are being absorbed by passive ${who(opp(a))}: price ${moved(a, f.prog)}${f.refill != null ? `, ${f.dSide} depth ${pct(f.refill)} refilled` : ""}.`;
-      if (ep.family==="exhaustion") return `Aggressive ${who(a)} have faded to ${pct(f.ratio)} of the previous window's pace${f.gap <= E().exhGap ? `, near the 5-minute ${a==="buy" ? "high" : "low"}` : ""}${f.poke ? ", after a failed poke" : ""}; price ${moved(a, f.prog)}.`;
+      if (ep.family==="exhaustion") return `Aggressive ${who(a)} have faded to ${pct(f.ratio)} of the previous window's pace${f.away <= E().exhNear ? `, near the 5-minute ${a==="buy" ? "high" : "low"}` : ""}${f.poke ? ", after a failed poke" : ""}; price ${moved(a, f.prog)}.`;
       if (ep.family==="burst") return `Aggressive ${who(a)}: $${money(f.notional)} in ${f.secs.toFixed(0)} s (z ${zf(f.z)}), price ${moved(a, f.prog)}${f.liq ? `, ${f.liq} liquidations` : ""}${f.sweeps ? `, ${f.sweeps} sweeps` : ""}.`;
       const w = ep.wall; return `${w.side==="bid" ? "Bid" : "Ask"} wall at ${w.px}, ${w.ratio.toFixed(1)}x the median level, ${Math.round((ep.tUpdate-ep.tStart)/1000)} s old, ${pct(w.size/w.peak)} of its peak left${w.tradedFrac != null ? `; ${pct(w.tradedFrac)} of the size that left was traded through (the rest was pulled)` : ""}.`;
     }

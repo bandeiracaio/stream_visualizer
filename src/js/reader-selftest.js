@@ -51,6 +51,11 @@ const READER_SELFTEST=(()=>{
     const big=run({wallMinUsd:1e9}),zero=run({wallMinUsd:0});
     return{ok:big===0&&zero===1,detail:JSON.stringify({big,zero})};
   });
+  add("exhaustion: only counts while price is still near the extreme; after the price has already come back it does not fire (a wide setting restores it)",E=>{
+    const run=(cfg,back)=>{const e=E.create({ep:Object.assign({famHorizons:{exhaustion:["fast"]}},cfg)}),a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:14,seed:31,params:()=>({rate:200,buyP:.9,driftBps:6})});sim(e,{t0:b.t,mid0:b.mid,seconds:40,seed:32,params:()=>({rate:12,vol:.05,driftBps:back?-14:0})});return eps(e,"exhaustion",p=>p.aggressor==="buy").length;};
+    const near=run({},false),back=run({},true),wide=run({exhNear:1e9},true);
+    return{ok:near>0&&back===0&&wide>0,detail:JSON.stringify({near,back,wide})};
+  });
   add("flickering walls (a few seconds) do not become episodes",E=>{
     const e=E.create(),a=calm(e);let t=a.t,mid=a.mid;
     for(let i=0;i<4;i++){const w=sim(e,{t0:t,mid0:mid,seconds:6,seed:50+i,params:()=>({vol:0,bidWalls:[{idx:12,size:6}]})}),g=sim(e,{t0:w.t,mid0:w.mid,seconds:3,seed:60+i,params:()=>({vol:0})});t=g.t;mid=g.mid;}

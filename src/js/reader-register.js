@@ -37,7 +37,7 @@ const READER_REGISTER = (() => {
     ["refill","passive depth refilled",""], ["recentShare","aggressor share in the latest seconds",""], ["recentPace","pace now vs the window",""],
     ["liq","liquidations in the window","n"], ["sweeps","multi-level sweeps in the window","n"], ["crossZ","other venue's flow (z)",""],
     ["decay","aggression vs the window before",""], ["zWas","flow in the window before (z)",""], ["wasShare","dominant side's share before",""],
-    ["gap","distance from the 5-minute extreme","sigma"], ["late","price progress, latest seconds","sigma"], ["sizeRatio","trade size vs the window before",""],
+    ["gap","distance from the 5-minute extreme","sigma"], ["away","price distance from that extreme now","sigma"], ["late","price progress, latest seconds","sigma"], ["sizeRatio","trade size vs the window before",""],
     ["conc","largest single trade as a share of the flow",""], ["countRatio","trade count vs the window before",""]];
   for (const hz of ["fast", "mid"]) for (const [id, label, unit] of QDEF) VARS.push({id:id + "." + hz, label:label + " (" + hz + ")", unit, prior:null, q:id, hz});
   VARS.push({id:"wallMult", label:"largest book level vs the median level", unit:"x", prior:null, q:"wallMult"});
@@ -62,7 +62,7 @@ const READER_REGISTER = (() => {
     {k:"crossShare", at:"ep", q:"share", fams:["absorption"], label:"other venue agrees at share"}, {k:"crossZ", at:"ep", q:"crossZ", fams:["burst"], label:"other venue agrees at z"},
     {k:"burstLiq", at:"ep", q:"liq", fams:["burst"], int:true, label:"liquidations count as many at"}, {k:"burstSweeps", at:"ep", q:"sweeps", fams:["burst"], int:true, label:"sweeps count as many at"},
     {k:"exhDecay", at:"ep", q:"decay", fams:["exhaustion"], label:"aggression has faded to"}, {k:"exhWasZ", at:"ep", q:"zWas", fams:["exhaustion"], label:"it was elevated before at z"},
-    {k:"exhWasShare", at:"ep", q:"wasShare", fams:["exhaustion"], label:"it was the dominant side before at share"}, {k:"exhGap", at:"ep", q:"gap", fams:["exhaustion"], label:"near the 5-minute extreme within (sigma)"},
+    {k:"exhWasShare", at:"ep", q:"wasShare", fams:["exhaustion"], label:"it was the dominant side before at share"}, {k:"exhGap", at:"ep", q:"gap", fams:["exhaustion"], label:"a new 5-minute extreme within (sigma)"}, {k:"exhNear", at:"ep", q:"away", fams:["exhaustion"], label:"price still near that extreme within (sigma)"},
     {k:"exhSize", at:"ep", q:"sizeRatio", fams:["exhaustion"], label:"trade size is shrinking under"}, {k:"wallRatio", at:"cfg", q:"wallMult", fams:["wall"], label:"a wall is big at (x median level)"},
     {k:"absConc", at:"ep", q:"conc", fams:["absorption"], label:"absorption: flow is spread over many fills (largest trade under)"}, {k:"exhCount", at:"ep", q:"countRatio", fams:["exhaustion"], label:"exhaustion: trade count has fallen to"},
     {k:"wallReposts", at:"ep", q:"reposts", fams:["wall"], int:true, label:"a wall counts as refilled after this many re-posts"},
