@@ -11,7 +11,7 @@
 const READER_EPISODES = (() => {
   const DEFAULTS = {
     enterScore:.7, formScore:.5, exitScore:.45, enterHoldMs:2000, endHoldMs:4000, resumeMs:20000,
-    keepEpisodes:300, wallFadeFrac:.6, wallStaleMs:30000, wallEpisodeMs:60000, wallMinMult:1.5, keepWalls:300, wallMaxActive:2, minTradesFast:5, minTradesMid:12, refreshMs:10000, pokeMs:30000, traceCap:240,
+    keepEpisodes:300, wallFadeFrac:.6, wallStaleMs:30000, wallEpisodeMs:60000, wallMinMult:1.5, keepWalls:300, wallMaxActive:2, wallMergeBps:6, wallMergeMs:90000, wallMinUsd:0, minTradesFast:5, minTradesMid:12, refreshMs:10000, pokeMs:30000, traceCap:240,
     horizons:["fast","mid"], famHorizons:{exhaustion:["mid"]}, families:{absorption:true, exhaustion:true, burst:true, wall:true},
     // evidence cut-offs that used to be written inline; now named so they can be measured and proposed for revision
     recentShare:.55, recentPace:.5, crossShare:.6, crossZ:2, burstLiq:2, burstSweeps:3,
@@ -251,6 +251,10 @@ const READER_EPISODES = (() => {
         const c = E(); if (!c.families.wall || !ctx.isCalibrated() || t-w.born < c.wallEpisodeMs) return;
         let n = 0; for (const o of walls.values()) if (o.venue===vn && o.wall.side===w.side) n++;
         if (n >= c.wallMaxActive || ratio < ctx.th("wallRatio")*c.wallMinMult) return;
+        if (w.peak*w.px < c.wallMinUsd) return;                                                  // too small to matter (a thin median level inflates the multiple)
+        const near = o => o.venue===vn && o.wall.side===w.side && Math.abs(o.wall.px-w.px)/w.px*1e4 <= c.wallMergeBps;
+        for (const o of walls.values()) if (near(o)) return;      // one resting region seen at several nearby prices is one episode
+        for (let i = episodes.length-1, k = 0; i >= 0 && k < 40; i--){ const o = episodes[i]; if (o.family!=="wall") continue; k++; if (o.tEnd != null && t-o.tEnd <= c.wallMergeMs && near(o)) return; }      // and so is one that re-appears nearby right after the last one ended
         ep = wallOpen(vn, t, w, ratio, mid); fresh = true;
       }
       const x = ep.wall; x.size = w.size; x.peak = w.peak; x.ratio = ratio; x.reposts = w.reposts || 0; ep.tSeen = t; ep.tUpdate = t;

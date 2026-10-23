@@ -41,6 +41,16 @@ const READER_SELFTEST=(()=>{
     const x=eps(e,"wall")[0];
     return epResult(!!x&&x.passive==="buy"&&x.stage==="ended"&&x.outcome==="pulled"&&x.tDetected-x.tStart>=60000&&eps(e,"wall").length===1&&x.wall.size<x.wall.peak*.5,e,"exactly one bid wall episode, started when the wall appeared (>= 60 s before detection), ended pulled");
   });
+  add("wall episodes: the same resting region re-appearing nearby after the last wall ended is not a second episode; a distant one, or one with merging off, is",E=>{
+    const run=(idx,cfg)=>{const e=E.create(cfg?{ep:cfg}:{}),a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:75,seed:11,params:()=>({vol:0,bidWalls:[{idx:12,size:6}]})}),g=sim(e,{t0:b.t,mid0:b.mid,seconds:4,seed:12,params:()=>({vol:0})});sim(e,{t0:g.t,mid0:g.mid,seconds:75,seed:13,params:()=>({vol:0,bidWalls:[{idx,size:6}]})});return eps(e,"wall").length;};
+    const near=run(13),tight=run(13,{wallMergeBps:.03}),far=run(16,{wallMergeBps:.03}),off=run(13,{wallMergeBps:0,wallMergeMs:0});      // the simulated book's levels are 0.1 apart on 82000, so a tighter merge distance stands in for a distant wall
+    return{ok:near===1&&tight===1&&far===2&&off===2,detail:JSON.stringify({near,tight,far,off})};
+  });
+  add("wall episodes: a wall below the minimum notional does not open an episode",E=>{
+    const run=cfg=>{const e=E.create({ep:cfg}),a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:75,seed:11,params:()=>({vol:0,bidWalls:[{idx:12,size:6}]})});sim(e,{t0:b.t,mid0:b.mid,seconds:4,seed:12,params:()=>({vol:0})});return eps(e,"wall").length;};
+    const big=run({wallMinUsd:1e9}),zero=run({wallMinUsd:0});
+    return{ok:big===0&&zero===1,detail:JSON.stringify({big,zero})};
+  });
   add("flickering walls (a few seconds) do not become episodes",E=>{
     const e=E.create(),a=calm(e);let t=a.t,mid=a.mid;
     for(let i=0;i<4;i++){const w=sim(e,{t0:t,mid0:mid,seconds:6,seed:50+i,params:()=>({vol:0,bidWalls:[{idx:12,size:6}]})}),g=sim(e,{t0:w.t,mid0:w.mid,seconds:3,seed:60+i,params:()=>({vol:0})});t=g.t;mid=g.mid;}
