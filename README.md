@@ -57,9 +57,9 @@ The Reader turns streams of trades and book updates into **episodes**: one marke
 | Family | What it looks for |
 |---|---|
 | **Absorption** | One side hits hard, price barely moves, the passive side refills. |
-| **Exhaustion** | A previously dominant aggressor fades near an extreme while trade size and count shrink. |
+| **Exhaustion** | A previously dominant aggressor fades near an extreme while trade size and count shrink. It only fires while price is still within 1 sigma of that extreme (from v046). |
 | **Aggression burst** | Abnormal one-sided flow with price actually moving and the other venue agreeing. |
-| **Wall** | A large resting level appears, gets re-posted, eaten or pulled. |
+| **Wall** | A large resting level appears, gets re-posted, eaten or pulled. Walls under $100k are ignored, and one resting region seen at nearby prices (6 bps) or re-appearing within 90 s of the last wall is one episode (from v044/v045). |
 
 Each episode reports when it was *detected*, a *back-dated start*, and a checklist of the evidence that did or did not hold, across fast and mid horizons and both venues.
 

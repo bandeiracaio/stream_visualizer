@@ -22,6 +22,12 @@
 
 **Aggressor / passive side**: neutral participant language. No bull/bear.
 
+**Z-score (flow)**: how far a venue's current taker flow on one side is from its own baseline, in robust spreads. The yardstick is the larger of the MAD, 10% of the median, and 10% of the other side's median (so a side that has hardly traded is not scored against nothing); the result is capped at 50 (v047).
+
+**Wall region**: one resting wall seen at several nearby prices. Reported as a single wall episode: a new wall within 6 bps of an active one, or within 90 s of the last one's end, does not open another (v044). Walls under $100k notional are ignored (v045).
+
+**Extreme (exhaustion)**: two separate checks. "Made a new 5-minute extreme" is evidence; "price still near that extreme" (within 1 sigma of it, measured when the episode fires) is required (v046).
+
 **Sigma**: the scale of normal price movement, in bps per root second (the MAD of overlapping 15-second returns divided by the square root of 15). Price progress and distances are measured in multiples of it (see `docs/adr/0004`).
 
 **Expectation**: a shape a measured quantity must have if our assumption about it is right, written in advance and checked against everything seen so far (for example, price progress in sigmas should have a typical move of about 0.7 and tails near 1.6). It catches an assumption that was wrong from the start, which drift never does.
