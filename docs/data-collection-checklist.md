@@ -11,7 +11,7 @@ For the first real collection weeks. Numbers come from the code defaults (`reade
 
 ## Before leaving the app running
 
-1. Open the latest `stream-visualizer_vNNN.html` (check the version in the app against the newest file in the repo root).
+1. Open the latest `stream-visualizer_vNNN.html` (the version is the small tag next to the title, `vNNN`, or `dev` in a dev build; compare it with the newest file in the repo root. A page that is behind shows a "newer version" bar).
 2. Leave **warm-up** to finish (the Reader shows calibrating until it has enough data); nothing is recorded in the baselines before that.
 3. Keep the tab **visible**: its own Chrome window, in front, not minimized, not covered, not behind another tab, screen awake and the computer plugged in and set not to sleep. A hidden tab has its timers slowed to once a minute and can be frozen by the browser (seen on 2026-10-22: freezes of about 55 s a minute, price stream dropping every 2 minutes, learning restarting, and a recording that held 5 minutes of data in an hour). Chrome: turn off Memory Saver (`chrome://settings/performance`); the flags `chrome://flags` *Calculate window occlusion* and *Intensive wake up throttling* may also matter. The wake lock only works while the tab is visible.
 4. For jumps in activity, **arm auto-record at least 15 minutes ahead** (it needs 15 minutes of prices for its hour baseline). It starts at 1.8x the hour's sigma (above the 0.4 floor) or above 1.2 bps per root second, stops after 5 calm minutes or 60 minutes, then downloads the file.
@@ -25,12 +25,35 @@ For the first real collection weeks. Numbers come from the code defaults (`reade
 - Since v050 the price feed runs in a Web Worker and the armed page holds a Web Lock, so a hidden tab should keep learning; the recording itself still runs on the page and needs the visible window.
 - Send the Health log (Download log) along with any recording that has holes.
 
+## Collectors (since v053): data beyond the Reader's inputs
+
+Collectors write records `["c", name, t, payload]` to a rolling 24 h tape on the device (IndexedDB `sv-tape`), and every saved session carries the matching slice as `ext` (from a minute before it started, newest records first, at most 8 MB). The Reader never sees them: they cannot change a detection (checked by byte-comparing detections on simulated sessions, v053 against v060). Nothing in the app analyses them yet; they are there to be read afterwards. Specs and exact record shapes: `.scratch/collectors/01-collectors.md`.
+
+**Always on while the page is open** (they run in a worker, so a hidden tab does not slow them):
+- `telemetry`: the page's feeds every 10 s while connected, and the worker's price stream while armed (`feeds`, `markPrice`).
+- `derivs`: Binance premium index and open interest, Hyperliquid funding and open interest (every 15 s), long-short and taker ratios (new 5-minute point only), basis every 10 s, every liquidation (`bnDerivs`, `hlCtx`, `ratios`, `basis`, `liq`).
+- `calendar`: funding times, candle closes, US open and close, options expiry, by rule (`cal`). Exchange holidays are not known.
+- `wallets`: the 10 Hyperliquid wallets that traded the most in the coin over 15 minutes: their positions and liquidation prices every 30 s (first reading about 60 s after load), their liquidation fills, and predicted funding across venues (`walletsTop`, `hlLiq`, `fundPred`). Full wallet addresses are in these records.
+- `options`: Deribit volatility index every 10 s and an option chain summary every 120 s, **BTC and ETH only** (`dvol`, `optChain`).
+
+**Only while connected and recording**:
+- `book`: depth within 1 / 5 / 10 / 20 bps, spread, touch size, size added and removed (`bookBn`, `bookHl`). Runs on the page, so a hidden tab thins it out.
+- `venues`: Coinbase, Bybit, OKX, Binance spot and the majors' marks, once a second (`venues`). The page tells the worker when a recording starts or stops, so a hidden tab may start it a few seconds late.
+
+Things to know:
+- The collectors follow the **Symbol** box. Changing the symbol, or a switch, restarts the worker (the wallet ranking starts over). For a coin other than BTC, some venues do not list it and its sources are simply missing; `options` stays idle unless the coin is BTC or ETH.
+- Switches, the record count, **Download tape** and **Clear tape** are in the Reader tab under Health log ("Collectors"). A file from Download tape is `tape_*.json`; keep it out of git (`.gitignore` covers `tape_*.json`, `health_*.json` and recordings).
+- Rough size on the device (estimates from short live runs, not yet measured over a day): derivatives about 4 MB a day, wallets 3 to 5 MB, options about 2 MB, telemetry more while the app is connected; plus about 2 MB an hour each for `book` and `venues` while recording. A recording of an hour carries roughly 4 to 5 MB of `ext`.
+- To check it is working: the Collectors line shows the record count growing; a source that fails writes `collector error` to the Health log, at most once per 5 minutes per source. Download the tape and look at the record names above.
+- A frozen page cannot write to the tape: the worker keeps collecting and the page writes the records when it thaws, with their own times.
+- The first real `hlLiq` record (a liquidation of a followed wallet) is worth checking by eye: its shape comes from Hyperliquid's documentation and has only been tested with a made-up message.
+
 ## After a session
 
 1. Reader tab: check the **Sessions** list shows the session as counted, and that no variable is stuck on `prior` that should be `learned`.
 2. Look at any **drift flag**: acknowledge it if it is real market change, undo it if it was an anomaly (a test run, an outage).
 3. Use agree / disagree / missed labels on episodes you watched; they are the only ground truth the replay can be judged against.
-4. Keep the downloaded recording files together (they replay against the stored baseline snapshot, ADR 0002).
+4. Keep the downloaded recording files together (they replay against the stored baseline snapshot, ADR 0002). The collector data travels inside each file as `ext`.
 
 ## Weekly review
 
@@ -43,4 +66,5 @@ For the first real collection weeks. Numbers come from the code defaults (`reade
 ## What not to expect yet
 
 - A proposal from fewer than ~8 counted sessions, or from one market regime only.
+- Any use of the collector data inside the app. The judgement of whether a collector is worth keeping (coverage, variance, whether it leads the next 5 minutes of volatility or movement) needs a few weeks of recordings and an offline script that does not exist yet.
 - Anything about Hyperliquid tails or the fast sigma component until a recording contains a real jump in activity (the motivation for auto-record).
