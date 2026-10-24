@@ -15,7 +15,7 @@ const arDur = ms => { const m = Math.floor(ms/60000); return ms < 60000 ? Math.r
   ar$("arRearm").checked = !saved || saved.rearm !== false; ar$("arRearm").onchange = () => store.set("ar.cfg", arCfgFromUi());
   ar$("arArm").onclick = arToggle;
   ar$("arHdr").onclick = () => {      // the same switch from the header: arms with the settings of the Reader tab and shows the answer here for a few seconds
-    arToggle(); const m = ar$("arMsg").textContent, box = ar$("arHdrMsg"); box.textContent = m.length > 140 ? m.slice(0, 137) + "…" : m;
+    arToggle(); const full = ar$("arMsg").textContent, m = /^Disconnect first/.test(full) ? "Disconnect first, then press Arm." : full.split(/(?<=\.)\s/)[0], box = ar$("arHdrMsg"); box.textContent = m.length > 140 ? m.slice(0, 137) + "…" : m;      // the first sentence only: "Armed." / "Disarmed." / the reason it refused (a phone header must not grow for long)
     clearTimeout(arInit.t); arInit.t = setTimeout(() => { box.textContent = ""; }, 9000);
   };
   document.addEventListener("visibilitychange", () => { if (AR.on && document.visibilityState === "visible") arLock(); });     // the screen lock is dropped when the tab is hidden
