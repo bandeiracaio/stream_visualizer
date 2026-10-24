@@ -787,6 +787,51 @@ const READER_SELFTEST=(()=>{
     const n=STATUS.newer;
     return{ok:n("v040","v041")&&!n("v040","v040")&&!n("v041","v040")&&n("v099","v100")&&!n("dev","v041")&&!n("v040","")&&!n("v040",null)&&!n("v040","latest"),detail:"version comparison"};
   });
+  add("history: Binance orders, fills, income and the account are turned into the common rows, odd values included",E=>{
+    const o=HIST.order({orderId:7,time:1000,updateTime:2000,symbol:"BTCUSDT",side:"BUY",type:"LIMIT",price:"82000.5",origQty:"0.010",executedQty:"0.004",avgPrice:"82000.50",status:"PARTIALLY_FILLED",reduceOnly:true,timeInForce:"GTC"});
+    const o2=HIST.order({orderId:8,time:"x",symbol:null,price:"",origQty:undefined});
+    const f=HIST.fill({id:5,orderId:7,time:3000,symbol:"BTCUSDT",side:"SELL",price:"82010",qty:"0.004",commission:"0.0131",commissionAsset:"USDT",realizedPnl:"-1.5",maker:true});
+    const i=HIST.income({tranId:9,time:4000,symbol:"",incomeType:"FUNDING_FEE",income:"-0.25",asset:"USDT",info:"FUNDING_FEE"});
+    const a=HIST.account({account:{canTrade:true,feeTier:2,multiAssetsMargin:false,assets:[{asset:"USDT",walletBalance:"100.5",availableBalance:"90",unrealizedProfit:"1.25",marginBalance:"101.75"},{asset:"BNB",walletBalance:"0",availableBalance:"0",unrealizedProfit:"0",marginBalance:"0"},{asset:"BTC",walletBalance:"0.001",availableBalance:"0.001",unrealizedProfit:"0",marginBalance:"0.001"}]},
+      positions:[{symbol:"BTCUSDT",positionAmt:"-0.02",entryPrice:"82000",markPrice:"81900",unRealizedProfit:"2",leverage:"10",marginType:"cross",liquidationPrice:"0",positionSide:"BOTH"},{symbol:"ETHUSDT",positionAmt:"0.000",entryPrice:"0",markPrice:"3000",unRealizedProfit:"0",leverage:"20",marginType:"cross",liquidationPrice:"0"}],
+      dual:{dualSidePosition:false},rate:{makerCommissionRate:"0.000200",takerCommissionRate:"0.000500"}});
+    const none=HIST.account(null),partial=HIST.account({positions:"nope"});
+    const ok=o.id===7&&o.price===82000.5&&o.qty===.01&&o.filled===.004&&o.status==="PARTIALLY_FILLED"&&o.reduce===true&&o2.t===0&&o2.symbol===""&&o2.price===0&&o2.qty===0
+      &&f.fee===.0131&&f.pnl===-1.5&&f.maker===true&&f.feeAsset==="USDT"&&i.amount===-.25&&i.type==="FUNDING_FEE"
+      &&a.assets.length===2&&a.assets[1].asset==="BTC"&&a.positions.length===1&&a.positions[0].qty===-.02&&a.positions[0].liq===null&&a.positions[0].marginType==="cross"&&a.positions[0].lev===10
+      &&a.mode.hedge===false&&a.mode.multiAssets===false&&a.canTrade===true&&a.feeTier===2&&a.fees.maker===.0002&&a.fees.taker===.0005
+      &&none.assets.length===0&&none.mode.hedge===null&&none.canTrade===null&&none.fees===null&&partial.positions.length===0;
+    return{ok,detail:JSON.stringify({o,o2,a})};
+  });
+  add("history: income totals by type inside a period, fill totals and order status counts",E=>{
+    const rows=[{t:100,type:"REALIZED_PNL",amount:5,asset:"USDT"},{t:200,type:"COMMISSION",amount:-.5,asset:"USDT"},{t:300,type:"REALIZED_PNL",amount:-2,asset:"USDT"},{t:400,type:"FUNDING_FEE",amount:-.1,asset:"BNB"},{t:500,type:"COMMISSION",amount:-.2,asset:"USDT"}];
+    const all=HIST.totals(rows),part=HIST.totals(rows,200,500),empty=HIST.totals([]),none=HIST.totals(null);
+    const ft=HIST.fillTotals([{qty:2,price:100,fee:.1,pnl:3},{qty:1,price:50,fee:.05,pnl:-1}]),sc=HIST.statusCounts([{status:"FILLED"},{status:"CANCELED"},{status:"FILLED"}]);
+    const ok=all.n===5&&Math.abs(all.total-2.2)<1e-9&&Math.abs(all.byType.REALIZED_PNL.amount-3)<1e-9&&all.byType.REALIZED_PNL.n===2&&all.assets.join()==="BNB,USDT"
+      &&part.n===3&&part.byType.COMMISSION.n===1&&part.byType.REALIZED_PNL.n===1&&empty.n===0&&empty.total===0&&none.n===0
+      &&ft.n===2&&ft.volume===250&&Math.abs(ft.fee-.15)<1e-9&&ft.pnl===2&&sc.FILLED===2&&sc.CANCELED===1;
+    return{ok,detail:JSON.stringify({all,part,ft,sc})};
+  });
+  add("history: a long period is cut into pieces under 7 days that cover it without a gap, and repeated rows count once",E=>{
+    const to=1.7e12,from=to-30*HIST.DAY,p=HIST.pieces(from,to);
+    let gap=false;for(let k=1;k<p.length;k++)if(p[k][1]+1!==p[k-1][0])gap=true;
+    const short=HIST.pieces(to-1000,to),same=HIST.pieces(to,to),back=HIST.pieces(to,to-5);
+    const m=HIST.merge([{id:1,t:10},{id:2,t:30},{id:1,t:10},{id:3,t:20},{id:null,t:5},{t:4}]);
+    const ok=p.length===5&&p[0][1]===to&&p[p.length-1][0]===from&&!gap&&p.every(x=>x[1]-x[0]<7*HIST.DAY)&&short.length===1&&short[0][0]===to-1000&&same.length===0&&back.length===0
+      &&m.map(r=>r.t).join()==="30,20,10,5,4";
+    return{ok,detail:JSON.stringify({n:p.length,gap,m})};
+  });
+  add("history: CSV quotes commas, quotes and line breaks and defuses a text cell a spreadsheet would run as a formula",E=>{
+    const NL=String.fromCharCode(10),CR=String.fromCharCode(13),CRLF=CR+NL;
+    const csv=HIST.toCsv([{a:"x,y",b:'say "hi"',c:-1.5,d:"=1+1"},{a:"two"+NL+"lines",b:null,c:0,d:"@SUM"},{a:"-ok",b:undefined,c:2,d:"+3"}],[["a","A"],["b","B"],["c","C"],["d","D"]]);
+    const lines=csv.split(CRLF),first=csv.indexOf("two"),q='"';
+    const ok=lines[0]==="A,B,C,D"&&lines[1]===q+"x,y"+q+","+q+'say ""hi""'+q+",-1.5,'=1+1"&&csv.slice(first-1,first+10)===q+"two"+NL+"lines"+q&&csv.includes(",0,'@SUM")&&csv.includes("-ok,,2,'+3")&&csv.endsWith(CRLF)&&HIST.toCsv([],[["a","A"]])==="A"+CRLF;
+    return{ok,detail:JSON.stringify(csv)};
+  });
+  add("history: the simulated log keeps only the newest rows once it is over its cap",E=>{
+    const a=[];for(let k=0;k<HIST.LOG_CAP+25;k++)HIST.push(a,{k});
+    return{ok:a.length===HIST.LOG_CAP&&a[0].k===25&&a[a.length-1].k===HIST.LOG_CAP+24,detail:`${a.length} rows, first ${a[0].k}`};
+  });
   add("autorec: after a recording it stays armed but waits out the cooldown, then starts again on the next jump",E=>{
     const A=AUTOREC,r=rng(9),h=A.createHistory(),cfg={cooldownMin:10};let px=82000,t=T0,st={mode:"waiting"};const ev=[];
     const run=(secs,vol)=>{for(let i=0;i<secs;i++){px*=1+(r()-.5)*2*vol/1e4;t+=1000;A.push(h,t,px);if(i%5===4){const v=A.vol(h,cfg),o=A.step(st,v,t,cfg);st=o.st;if(o.action){ev.push({a:o.action,why:o.why,t});if(o.action==="stop")st=A.afterStop(t,cfg);}}}};

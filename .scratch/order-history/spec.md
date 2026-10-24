@@ -1,6 +1,6 @@
 # Order history and account info
 
-Status: ready-for-agent (agreed in a grilling session, 2026-10-24)
+Status: in progress. Step 1 (core and simulated history) built in v071; steps 2 and 3 open. Agreed in a grilling session, 2026-10-24.
 
 ## Goal
 The Trade area shows only what is open right now: the USDT wallet, positions of the selected asset, open orders and the last 30 fills of that asset.
@@ -25,6 +25,8 @@ Add a way to look back: every order with its final status, every fill, income (r
 
 ## Facts checked
 - `fapi.binance.com` and `demo-fapi.binance.com` both answer CORS preflights for the `x-mbx-apikey` header from any origin (checked 2026-10-24 with the Pages origin), so signed GETs from the hosted page can work. Not yet tried with real keys.
+
+- Checked against the Binance USD-M futures docs on 2026-10-24: `GET /fapi/v2/account` (weight 5) is the one that has `canTrade`, `feeTier`, `multiAssetsMargin` and the per-asset `assets`; v3 drops the first three, so use v2. `allOrders` (weight 5): `symbol` is optional in the docs, a window must be under 7 days, 1000 rows max, orders older than 90 days are not returned, and cancelled / expired orders with no fill older than 3 days are dropped. `userTrades` (weight 5): `symbol` required, 7-day window, 3 months, 1000 rows, `fromId` cannot be combined with a time window. `income` (weight 30): all symbols, 7 days by default, 3 months of history, 1000 rows; the docs page shows only some of the income types, so show whatever type string comes back. Still to check in step 2: `positionSide/dual` and `commissionRate`.
 
 ## Data (verify each against Binance's USD-M futures docs at build time; fix this list if they differ)
 - Account info: `GET /fapi/v2/balance` (all assets), `GET /fapi/v2/account` (can trade, fee tier, multi-assets mode), `GET /fapi/v2/positionRisk` (leverage, margin type per position), `GET /fapi/v1/positionSide/dual` (hedge or one-way), `GET /fapi/v1/commissionRate?symbol=`.

@@ -13,7 +13,7 @@ const src = p => path.join(root, "src", p);
 const read = p => fs.readFileSync(src(p), "utf8");
 
 function selfTest() {
-  const code = read("js/reader-drift.js") + "\n" + read("js/reader-proposals.js") + "\n" + read("js/reader-register.js") + "\n" + read("js/reader-episodes.js") + "\n" + read("js/reader-engine.js") + "\n" + read("js/reader-landscape.js") + "\n" + read("js/auto-record-core.js") + "\n" + read("js/status-core.js") + "\n" + read("js/session-quality.js") + "\n" + read("js/collectors-core.js") + "\n" + read("js/reader-selftest.js") + "\n;READER_SELFTEST.run(READER_ENGINE);";
+  const code = read("js/reader-drift.js") + "\n" + read("js/reader-proposals.js") + "\n" + read("js/reader-register.js") + "\n" + read("js/reader-episodes.js") + "\n" + read("js/reader-engine.js") + "\n" + read("js/reader-landscape.js") + "\n" + read("js/auto-record-core.js") + "\n" + read("js/status-core.js") + "\n" + read("js/session-quality.js") + "\n" + read("js/history-core.js") + "\n" + read("js/collectors-core.js") + "\n" + read("js/reader-selftest.js") + "\n;READER_SELFTEST.run(READER_ENGINE);";
   const results = vm.runInNewContext(code, {}, { timeout: 120000 });
   const bad = results.filter(r => !r.ok);
   for (const r of results) console.log((r.ok ? "  pass  " : "  FAIL  ") + r.name + (r.ok ? "" : "\n        " + r.detail));
