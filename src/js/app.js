@@ -483,7 +483,7 @@ function renderLog(){
   const lines = (f ? logLines.filter(l=>l.id===f) : logLines).slice(-150);
   const esc = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;");
   const box = $("log"), atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 20;
-  box.innerHTML = lines.map(l=>`${hhmmss(l.t)} <span style="color:${LOG_COLOR[l.id]||"inherit"}">${l.id.padEnd(13)}${l.bf?'<span class="bf">[replay] </span>':""}${esc(l.raw.length>220?l.raw.slice(0,220)+"…":l.raw)}</span>`).join("\n");
+  box.innerHTML = lines.map(l=>`${hhmmss(l.t)} <span style="color:${LOG_COLOR[l.id]||"inherit"}">${l.id.padEnd(14)}${l.bf?'<span class="bf">[replay] </span>':""}${esc(l.raw.length>220?l.raw.slice(0,220)+"…":l.raw)}</span>`).join("\n");
   if (atBottom) box.scrollTop = box.scrollHeight;
 }
 function renderInspector(){
