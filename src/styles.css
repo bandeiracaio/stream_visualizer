@@ -1,21 +1,28 @@
 :root{
-  --bg:#0d1014;--panel:#151a20;--panel2:#1b2129;--line:#262e38;--text:#d6dde6;--dim:#7d8a99;
-  --buy:#2fbf71;--sell:#e5534b;--warn:#d9a43b;--bn:#f0b90b;--hl:#5fd4c4;--accent:#7aa2f7;
+  --bg:#07090b;--panel:#0c1014;--panel2:#11161b;--canvas:#06080a;
+  --line:#26303a;                 /* hairlines between things */
+  --edge:#5f6e7d;                 /* the border of a control: at least 3:1 against every surface */
+  --text:#dbe3ea;--dim:#93a3af;
+  --buy:#3ddc84;--sell:#ff6b66;--warn:#ff8a4c;--bn:#f0b90b;--hl:#5fd4c4;--accent:#ffb454;
+  --ink:#07090b;                  /* text on an accent, buy, sell or warning fill */
   --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --r:2px;
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font:13px/1.4 system-ui,-apple-system,Segoe UI,sans-serif}
-header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding:8px 12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-h1{font-size:15px;margin:0 6px 0 0;font-weight:600}
-input,select,button{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:5px 8px}
+body{margin:0;background:var(--bg);color:var(--text);font:12.5px/1.45 var(--mono);font-variant-numeric:tabular-nums}
+header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding:6px 12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+h1{font-size:13px;margin:0 6px 0 0;font-weight:600;letter-spacing:.6px;text-transform:uppercase}
+input,select,button{font:inherit;color:var(--text);background:transparent;border:1px solid var(--edge);border-radius:var(--r);padding:4px 8px}
+input:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+button:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}button:disabled{opacity:.45;cursor:default}
 input[type=text]{width:64px;text-transform:uppercase;font-family:var(--mono)}
-button{cursor:pointer}button.primary{background:var(--accent);color:#0d1014;border-color:var(--accent);font-weight:600}
+button{cursor:pointer}button.primary{background:var(--accent);color:var(--ink);border-color:var(--accent);font-weight:600}button.primary:hover:not(:disabled){color:var(--ink);opacity:.9}
 button.on{border-color:var(--accent);color:var(--accent)}
 #arHdr.on{border-color:var(--warn);color:var(--warn)}#arHdrMsg{max-width:100%}#arHdrMsg:empty{display:none}
 .stat{font-family:var(--mono);color:var(--dim);font-size:12px}.stat b{color:var(--text);font-weight:600}
-nav{display:flex;gap:4px;overflow-x:auto;width:100%;padding-top:2px}
+nav{display:flex;gap:4px;overflow-x:auto;width:100%;padding-top:2px;scrollbar-width:none}
 nav button{flex:none;padding:4px 10px;font-size:12px}
-nav button.act{background:var(--accent);color:#0d1014;border-color:var(--accent);font-weight:600}
+nav button.act{color:var(--accent);border-color:var(--accent);font-weight:600}
 #alerts{width:100%;font-family:var(--mono);font-size:11.5px;color:var(--warn)}
 #alerts:empty{display:none}
 main{padding:10px 12px;display:grid;gap:10px;grid-template-columns:minmax(0,1fr)}
@@ -66,7 +73,7 @@ section.tcontainer{background:none;border:none;padding:0}
 .acc-card input{width:100%}.acc-card.live{border-color:#7a2a26}.acc-card.live h3{color:var(--sell)}
 .acc-msg{font-size:12px;min-height:16px}
 #accBadge{font-family:var(--mono);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px}
-#accBadge.sim{background:#3a4250;color:#d6dde6}#accBadge.demo{background:var(--accent);color:#0d1014}#accBadge.live{background:var(--sell);color:#fff}
+#accBadge.sim{background:#3a4552;color:var(--text)}#accBadge.demo{background:var(--accent);color:var(--ink)}#accBadge.live{background:var(--sell);color:var(--ink)}
 .tk-side{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .tk-side button{padding:8px;font-weight:600}.tk-side .buy.act{background:var(--buy);color:#0d1014;border-color:var(--buy)}.tk-side .sell.act{background:var(--sell);color:#fff;border-color:var(--sell)}
 .ticket{display:flex;flex-direction:column;gap:8px}.ticket input[type=number]{width:120px}
@@ -93,24 +100,25 @@ section.tcontainer{background:none;border:none;padding:0}
 .rd-det{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px}.rd-det label{display:flex;gap:6px;align-items:center;font-size:12px}
 .chip{padding:2px 8px;font-size:11px}.chip.on{border-color:var(--accent);color:var(--accent)}
 /* ---- navigation: groups (top on PC, bottom bar on phone) + sub-views ---- */
-#groups button{display:flex;align-items:center;gap:8px;padding:8px 12px;font-size:13px;text-align:left;white-space:nowrap}
+#groups button{display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12px;text-align:left;white-space:nowrap;text-transform:uppercase;letter-spacing:.6px;color:var(--dim)}
 #groups button svg{flex:none}
 /* PC: the six areas are a left sidebar under the header */
 @media(min-width:701px){
-  #groups{position:fixed;left:0;top:var(--hh,52px);bottom:0;z-index:4;width:132px;flex-direction:column;gap:2px;padding:8px 6px;overflow-y:auto;overflow-x:hidden;background:var(--panel);border-right:1px solid var(--line)}
-  #groups button{width:100%;border-color:transparent;background:transparent}
-  #groups button.act{background:var(--accent);border-color:var(--accent)}
+  #groups{position:fixed;left:0;top:var(--hh,52px);bottom:0;z-index:4;width:132px;flex-direction:column;gap:2px;padding:8px 6px;overflow-y:auto;overflow-x:hidden;background:var(--bg);border-right:1px solid var(--line)}
+  #groups button{width:100%;border-color:transparent;border-left:2px solid transparent;border-radius:0}
+  #groups button:hover{border-color:transparent;border-left-color:var(--accent);color:var(--accent)}
+  #groups button.act{background:var(--panel2);color:var(--accent);border-left-color:var(--accent)}
   main{margin-left:132px}
 }
 #groups button{position:relative}
 #groups .badge{margin-left:auto}
-.hs-tabs button.act{background:var(--accent);color:#0d1014;border-color:var(--accent);font-weight:600}
+.hs-tabs button.act{color:var(--accent);border-color:var(--accent);font-weight:600}
 .hs-more{color:var(--dim);font-size:11px;margin-top:4px}
 .chips-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
 #views{padding-top:0}
 #views[hidden],#sheet[hidden]{display:none}
-#views button{padding:3px 11px;font-size:12px;border-radius:999px;background:transparent;color:var(--dim)}
-#views button.act{background:var(--panel2);color:var(--accent);border-color:var(--accent);font-weight:600}
+#views button{padding:3px 10px;font-size:11px;border-radius:var(--r);background:transparent;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
+#views button.act{color:var(--accent);border-color:var(--accent);font-weight:600}
 /* ---- header: always-visible essentials, the rest in the settings sheet ---- */
 .pill{display:inline-flex;gap:4px;align-items:center;max-width:40vw;white-space:nowrap}
 .pill b{overflow:hidden;text-overflow:ellipsis}
@@ -118,7 +126,7 @@ section.tcontainer{background:none;border:none;padding:0}
 #liveChips{display:contents}
 #liveChips .chip{white-space:nowrap}
 .sb-ok{color:var(--buy);border-color:var(--buy)}.sb-warn{color:var(--warn);border-color:var(--warn)}.sb-bad{color:var(--sell);border-color:var(--sell)}.sb-info{color:var(--accent);border-color:var(--accent)}
-#updBar{flex:1 0 100%;display:flex;gap:8px;align-items:center;background:var(--panel2);border:1px solid var(--accent);border-radius:6px;padding:4px 8px;font-size:12px}
+#updBar{flex:1 0 100%;display:flex;gap:8px;align-items:center;background:var(--panel2);border:1px solid var(--accent);border-radius:var(--r);padding:4px 8px;font-size:12px}
 #updBar[hidden]{display:none}
 #ver{font-size:9px;font-weight:400;color:var(--dim);margin-left:4px}
 #updBar span{flex:1}
@@ -138,10 +146,17 @@ section.collapsed > .pbody{height:0;overflow:hidden;visibility:hidden}
 /* ---- touch / phone ---- */
 @media(pointer:coarse){input,select{font-size:16px}button{min-height:36px}}
 @media(max-width:700px){
+  body{font-size:14px}
   h1{display:none}
-  header{padding:6px 10px;gap:6px}
-  #groups{position:fixed;left:0;right:0;bottom:0;z-index:7;width:auto;gap:4px;padding:6px 6px calc(6px + env(safe-area-inset-bottom));background:var(--panel);border-top:1px solid var(--line)}
-  #groups button{flex:1;flex-direction:column;justify-content:center;gap:2px;padding:6px 0 4px;font-size:10.5px;min-height:48px;text-align:center}
+  header{padding:6px 10px;gap:5px}
+  header input,header select,header button{min-height:40px;padding:4px 10px}
+  input,select,button{min-height:44px}
+  .chip,#views button,.rm,.tt button,.eplab button,.lsview button{min-height:36px}      /* small controls inside panels */
+  .pill{max-width:none}
+  #groups{position:fixed;left:0;right:0;bottom:0;z-index:7;width:auto;gap:2px;padding:6px 4px calc(6px + env(safe-area-inset-bottom));background:var(--bg);border-top:1px solid var(--line)}
+  #groups button{flex:1 1 0;min-width:0;flex-direction:column;justify-content:center;gap:2px;padding:6px 0 4px;font-size:10.5px;min-height:56px;text-align:center;text-transform:none;letter-spacing:0;border-color:transparent;border-top:2px solid transparent;border-radius:0}
+  #groups button:hover{border-color:transparent}
+  #groups button.act{border-top-color:var(--accent);background:transparent}
   #groups .badge{position:absolute;top:2px;left:calc(50% + 6px);margin:0;padding:0 5px;font-size:10px}
   main{padding:8px 8px calc(78px + env(safe-area-inset-bottom))}
   .books{grid-template-columns:1fr}
@@ -195,7 +210,7 @@ td.up{color:var(--buy)}td.dn{color:var(--sell)}
 .rg th,.rg td{text-align:left;padding:3px 6px;border-bottom:1px solid #1e252e;vertical-align:top}
 .rg th{color:#7d8a99;font-weight:500}
 .rg-claims{margin:6px 0 0;padding-left:18px;font-size:12px}
-.badge{margin-left:6px;padding:0 6px;border-radius:9px;background:var(--sell,#e5534b);color:#fff;font-size:11px}
+.badge{margin-left:6px;padding:0 6px;border-radius:var(--r);background:var(--sell);color:var(--ink);font-size:11px;font-weight:700}
 .rv-row{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;padding:6px 0;border-bottom:1px solid #1e252e;font-size:12px}
 .rv-row .grow{flex:1 1 220px}
 .rv-tbl{width:100%;border-collapse:collapse;font-size:12px}
