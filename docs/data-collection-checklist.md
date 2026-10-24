@@ -33,7 +33,7 @@ Collectors write records `["c", name, t, payload]` to a rolling 24 h tape on the
 - `telemetry`: the page's feeds every 10 s while connected, and the worker's price stream while armed (`feeds`, `markPrice`).
 - `derivs`: Binance premium index and open interest, Hyperliquid funding and open interest (every 15 s), long-short and taker ratios (new 5-minute point only), basis every 10 s, every liquidation (`bnDerivs`, `hlCtx`, `ratios`, `basis`, `liq`).
 - `calendar`: funding times, candle closes, US open and close, options expiry, by rule (`cal`). Exchange holidays are not known.
-- `wallets`: the 10 Hyperliquid wallets that traded the most in the coin over 15 minutes: their positions and liquidation prices every 30 s (first reading about 60 s after load), their liquidation fills, and predicted funding across venues (`walletsTop`, `hlLiq`, `fundPred`). Full wallet addresses are in these records.
+- `wallets`: the 10 Hyperliquid wallets that traded the most in the coin over 15 minutes: their positions and liquidation prices every 30 s (first reading about 60 s after load), fills of theirs that carry a liquidation flag (see below), and predicted funding across venues (`walletsTop`, `hlLiq`, `fundPred`). Full wallet addresses are in these records.
 - `options`: Deribit volatility index every 10 s and an option chain summary every 120 s, **BTC and ETH only** (`dvol`, `optChain`).
 
 **Only while connected and recording** (`book`) or **while recording or auto-record is armed** (`venues`):
@@ -46,7 +46,7 @@ Things to know:
 - Rough size on the device (estimates from short live runs, not yet measured over a day): derivatives about 4 MB a day, wallets 3 to 5 MB, options about 2 MB, telemetry more while the app is connected; plus about 2 MB an hour each for `book` and `venues` while recording. A recording of an hour carries roughly 4 to 5 MB of `ext`.
 - To check it is working (v064): each collector has a line under its switch in the Collectors list (Reader tab, under Health log): `N on the tape · last 3 s ago` in green is writing; amber means its last record is more than three times later than it should be (`slower than expected`) or nothing has been written long after the page opened; a plain grey line says why it is not expected to write now (`waits for a recording`, `waits for the app connected and recording`, `Deribit lists BTC and ETH only`, `off`). The calendar line says `starting…` until the first 15-minute mark. A source that fails also writes `collector error` to the Health log, at most once per 5 minutes per source. Download the tape and look at the record names above.
 - A frozen page cannot write to the tape: the worker keeps collecting and the page writes the records when it thaws, with their own times.
-- The first real `hlLiq` record (a liquidation of a followed wallet) is worth checking by eye: its shape comes from Hyperliquid's documentation and has only been tested with a made-up message.
+- `hlLiq` was checked on real data (2026-10-24): the shape is as documented, but in all 11 records the followed wallet (`w`) is **not** the liquidated one (`liquidated`): it is the wallet taking the other side of a liquidation, in any coin (PUMP, HYPE, NEAR so far, not BTC). So `hlLiq` is a partial feed of Hyperliquid liquidations (those where a followed wallet is the counterparty), not a log of the followed wallets being liquidated.
 
 ## Reading the collector data afterwards
 
