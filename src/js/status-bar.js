@@ -16,7 +16,18 @@ function sbSnapshot() {
   const rec = RT.rec ? {on:true, ms:now - RT.rec.t0, n:READER.recording().n} : {on:false};
   return {connected, paused, online:navigator.onLine, venues, ar, rec, kept:typeof RC !== "undefined" ? RC.rows.length : 0};
 }
+// phone header: a venue pill shows a coloured dot instead of its long text (styles.css); the state is classified here, the full text stays in the title
+function sbPills() {
+  for (const [id, tag] of [["bnState", "BN"], ["hlState", "HL"]]) {
+    const b = sb$(id), p = b && b.parentElement; if (!p) continue;
+    const t = b.textContent.trim(), m = /^(\d+)\/(\d+) sockets$/.exec(t);
+    const st = t === "off" ? "off" : m ? (m[1] === m[2] ? "ok" : "warn") : t === "connected" || t === "REST only" ? "ok" : /fail|blocked/.test(t) ? "bad" : "warn";
+    if (p.dataset.st !== st) p.dataset.st = st;
+    if (p.title !== tag + " " + t) p.title = tag + " " + t;
+  }
+}
 function sbRender() {
+  try { sbPills(); } catch {}
   let html = "";
   try { html = STATUS.chips(sbSnapshot()).map(c => `<span class="chip sb-${c.tone}" title="${c.title.replace(/"/g, "&quot;")}">${c.text}</span>`).join(""); } catch {}
   const el = sb$("liveChips"); if (el && el.innerHTML !== html) el.innerHTML = html;

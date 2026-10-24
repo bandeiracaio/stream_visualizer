@@ -152,11 +152,19 @@ section.collapsed > .pbody{height:0;overflow:hidden;visibility:hidden}
 @media(max-width:700px){
   body{font-size:14px}
   h1{display:none}
-  header{padding:6px 10px;gap:5px}
-  header input,header select,header button{min-height:40px;padding:4px 10px}
+  /* the header is two rows on a phone: controls and status, then the views; it was three (about 160 px) */
+  header{padding:5px 8px;gap:4px}
+  header input,header select,header button{min-height:44px;padding:4px 7px;font-size:12.5px}
+  #cog{padding:4px 6px}
+  #accBadge{padding:1px 4px;font-size:10px}
+  #arHdrMsg{position:absolute;top:100%;left:0;right:0;z-index:6;max-width:none;background:var(--panel2);border-bottom:1px solid var(--accent);padding:6px 10px}      /* the answer to Arm floats under the header instead of pushing the page down */
   input,select,button{min-height:44px}
   .chip,#views button,.rm,.tt button,.eplab button,.lsview button{min-height:36px}      /* small controls inside panels */
-  .pill{max-width:none}
+  .pill{gap:2px;font-size:10.5px}
+  .pill b{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}      /* the text stays for screen readers; the dot below is what is seen */
+  .pill::after{content:"";width:10px;height:10px;border-radius:50%;flex:none;background:var(--warn)}
+  .pill[data-st=ok]::after{background:var(--buy)}.pill[data-st=bad]::after{background:var(--sell)}
+  .pill[data-st=off]::after{background:transparent;border:2px solid var(--dim)}
   #groups{position:fixed;left:0;right:0;bottom:0;z-index:7;width:auto;gap:2px;padding:6px 4px calc(6px + env(safe-area-inset-bottom));background:var(--bg);border-top:1px solid var(--line)}
   #groups button{flex:1 1 0;min-width:0;flex-direction:column;justify-content:center;gap:2px;padding:6px 0 4px;font-size:10.5px;min-height:56px;text-align:center;text-transform:none;letter-spacing:0;border-color:transparent;border-top:2px solid transparent;border-radius:0}
   #groups button:hover{border-color:transparent}
