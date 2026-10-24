@@ -26,6 +26,14 @@ const HIST = (() => {
       fees:rate.makerCommissionRate == null ? null : {maker:num(rate.makerCommissionRate), taker:num(rate.takerCommissionRate)}};
   }
 
+  // the simulated account (simSnapshot() in app.js) in the same shape; its fees are the broker's own (maker 0.02%, taker 0.05%)
+  function simAccount(snap, fees) {
+    const b = (snap && snap.balance) || {};
+    return {assets:[{asset:"USDT", wallet:num(b.wallet), available:num(b.available), upnl:num(b.upnl), margin:num(b.wallet) + num(b.upnl)}],
+      positions:((snap && snap.positions) || []).map(p => ({symbol:str(p.symbol), qty:num(p.qty), entry:num(p.entry), mark:num(p.mark), upnl:num(p.upnl), lev:num(p.lev), marginType:"simulated", liq:null, side:"BOTH"})),
+      mode:{hedge:false, multiAssets:false}, canTrade:true, feeTier:null, fees:fees ? {maker:num(fees.maker), taker:num(fees.taker)} : null};
+  }
+
   // ---- totals
   // income inside [from, to): per type {n, amount}, the sum of all, and the assets seen (amounts of different assets must not be read as one number)
   function totals(rows, from, to) {
@@ -67,5 +75,5 @@ const HIST = (() => {
   const LOG_CAP = 5000;
   const push = (arr, row) => { arr.push(row); if (arr.length > LOG_CAP) arr.shift(); return row; };
 
-  return {DAY, WINDOW, LOG_CAP, order, fill, income, account, totals, fillTotals, statusCounts, pieces, merge, toCsv, push};
+  return {DAY, WINDOW, LOG_CAP, order, fill, income, account, simAccount, totals, fillTotals, statusCounts, pieces, merge, toCsv, push};
 })();

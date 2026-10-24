@@ -410,6 +410,14 @@
     <div class="note">Keys stay only in this page's memory: never saved, only ever sent to Binance, and gone when you refresh or log out. Use keys with USD-M futures trading enabled and <b>withdrawals disabled</b>. Orders are one-way mode (not hedge mode), on the asset selected in the header (e.g. BTC → BTCUSDT). If Binance or the browser refuses signed requests from a local file, the error is shown here.</div>
   </section>
 
+  <section data-tab="accinfo" class="full">
+    <h2>Account info <span class="ctl"><button id="aiRefresh">Refresh</button></span></h2>
+    <div class="headline" id="aiHead">No account connected.</div>
+    <div id="aiErr"></div>
+    <div id="aiBody"></div>
+    <div class="note">Read-only: this view only asks Binance for information and never places or cancels anything. It loads when you open it and when you press Refresh (not on a timer, to stay inside Binance's request limits). The simulated account shows its own balance, fees and positions.</div>
+  </section>
+
   <section data-tab="market">
     <h2>Market state</h2>
     <div class="metrics" id="metrics"></div>
@@ -494,6 +502,9 @@
 </script>
 <script>
 <!--@include js/reader-tools.js-->
+</script>
+<script>
+<!--@include js/account-info.js-->
 </script>
 <script>
 <!--@include js/reader-landscape-view.js-->

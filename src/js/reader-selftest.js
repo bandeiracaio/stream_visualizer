@@ -803,6 +803,12 @@ const READER_SELFTEST=(()=>{
       &&none.assets.length===0&&none.mode.hedge===null&&none.canTrade===null&&none.fees===null&&partial.positions.length===0;
     return{ok,detail:JSON.stringify({o,o2,a})};
   });
+  add("history: the simulated account is shown in the same shape as a Binance one",E=>{
+    const a=HIST.simAccount({balance:{wallet:10004.5,available:9900,upnl:-3.5},positions:[{symbol:"BTCUSDT",qty:-0.5,entry:100,mark:101,upnl:-0.5,liq:null,lev:"10 (sim)"}]},{maker:.0002,taker:.0005}),e=HIST.simAccount(null,null);
+    const ok=a.assets.length===1&&a.assets[0].asset==="USDT"&&a.assets[0].margin===10001&&a.positions[0].lev===10&&a.positions[0].qty===-.5&&a.positions[0].marginType==="simulated"&&a.mode.hedge===false&&a.canTrade===true&&a.fees.taker===.0005&&a.feeTier===null
+      &&e.assets[0].wallet===0&&e.positions.length===0&&e.fees===null;
+    return{ok,detail:JSON.stringify(a)};
+  });
   add("history: income totals by type inside a period, fill totals and order status counts",E=>{
     const rows=[{t:100,type:"REALIZED_PNL",amount:5,asset:"USDT"},{t:200,type:"COMMISSION",amount:-.5,asset:"USDT"},{t:300,type:"REALIZED_PNL",amount:-2,asset:"USDT"},{t:400,type:"FUNDING_FEE",amount:-.1,asset:"BNB"},{t:500,type:"COMMISSION",amount:-.2,asset:"USDT"}];
     const all=HIST.totals(rows),part=HIST.totals(rows,200,500),empty=HIST.totals([]),none=HIST.totals(null);

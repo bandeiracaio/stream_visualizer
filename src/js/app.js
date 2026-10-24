@@ -1104,9 +1104,9 @@ function renderViz(){
 $("vwin").onchange = $("profVenue").onchange = () => { if (visible("viz")) renderViz(); };
 
 // ---------- tabs ----------
-const TABS = [["overview","Overview"],["charts","Charts"],["micro","Microstructure"],["viz","Visuals"],["tape","Tape"],["market","Market"],["reader","Episodes"],["signals","Signals"],["drift","Drift"],["assumptions","Assumptions"],["record","Record"],["saved","Saved"],["healthlog","Health log"],["collectors","Collectors"],["replay","Replay and labels"],["trading","Trading"],["accounts","Accounts"],["streams","Streams"],["health","Feed health"],["raw","Raw"],["engine","Engine"]];
+const TABS = [["overview","Overview"],["charts","Charts"],["micro","Microstructure"],["viz","Visuals"],["tape","Tape"],["market","Market"],["reader","Episodes"],["signals","Signals"],["drift","Drift"],["assumptions","Assumptions"],["record","Record"],["saved","Saved"],["healthlog","Health log"],["collectors","Collectors"],["replay","Replay and labels"],["trading","Trading"],["accounts","Accounts"],["accinfo","Account info"],["streams","Streams"],["health","Feed health"],["raw","Raw"],["engine","Engine"]];
 // Six areas by what you are doing; an area with several views shows them as a sub-row. A "view" is what data-tab on a <section> names.
-const GROUPS = [["now","Now",["overview","charts","micro","viz","tape","market"]],["reader","Reader",["reader","signals"]],["review","Review",["replay","drift","assumptions"]],["rec","Recordings",["record","saved","healthlog","collectors"]],["trade","Trade",["trading","accounts"]],["system","System",["streams","health","raw","engine"]]];
+const GROUPS = [["now","Now",["overview","charts","micro","viz","tape","market"]],["reader","Reader",["reader","signals"]],["review","Review",["replay","drift","assumptions"]],["rec","Recordings",["record","saved","healthlog","collectors"]],["trade","Trade",["trading","accounts","accinfo"]],["system","System",["streams","health","raw","engine"]]];
 const READER_VIEWS = ["reader","signals","replay","drift","assumptions","record","saved","healthlog","collectors","engine"];   // all drawn by renderReader
 const GICON = {now:"M3 12h4l3-8 4 16 3-8h4", reader:"M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 9a3 3 0 100 6 3 3 0 000-6z", review:"M4 6l2 2 3-3M4 14l2 2 3-3M13 7h8M13 15h8", rec:"M12 4a8 8 0 100 16 8 8 0 000-16zM12 9a3 3 0 100 6 3 3 0 000-6z", trade:"M7 4v16M7 4L4 7M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3", system:"M4 7h8M18 7h2M4 17h2M10 17h10M14 4v6M8 14v6"};
 const groupOf = v => GROUPS.find(g=>g[2].includes(v)) || GROUPS[0];
@@ -1338,7 +1338,7 @@ function buildModCatalog(){
 function tagViewSections(){
   let i = 0;
   document.querySelectorAll("main > section").forEach(sec=>{
-    const t = sec.dataset.tab; if (!t || t==="trading" || t==="accounts" || sec.classList.contains("ph")) return;
+    const t = sec.dataset.tab; if (!t || t==="trading" || t==="accounts" || t==="accinfo" || sec.classList.contains("ph")) return;
     const h2 = sec.querySelector("h2"); if (!h2) return;
     sec.dataset.mid = "v-"+(i++); sec.dataset.title = (h2.childNodes[0].textContent || "").trim() || "panel";
   });

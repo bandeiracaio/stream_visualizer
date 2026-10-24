@@ -1,6 +1,6 @@
 # Order history and account info
 
-Status: in progress. Step 1 (core and simulated history) built in v071; steps 2 and 3 open. Agreed in a grilling session, 2026-10-24.
+Status: in progress. Steps 1 (core and simulated history, v071) and 2 (Account info view, v072) built; step 3 open. Agreed in a grilling session, 2026-10-24.
 
 ## Goal
 The Trade area shows only what is open right now: the USDT wallet, positions of the selected asset, open orders and the last 30 fills of that asset.
@@ -26,7 +26,7 @@ Add a way to look back: every order with its final status, every fill, income (r
 ## Facts checked
 - `fapi.binance.com` and `demo-fapi.binance.com` both answer CORS preflights for the `x-mbx-apikey` header from any origin (checked 2026-10-24 with the Pages origin), so signed GETs from the hosted page can work. Not yet tried with real keys.
 
-- Checked against the Binance USD-M futures docs on 2026-10-24: `GET /fapi/v2/account` (weight 5) is the one that has `canTrade`, `feeTier`, `multiAssetsMargin` and the per-asset `assets`; v3 drops the first three, so use v2. `allOrders` (weight 5): `symbol` is optional in the docs, a window must be under 7 days, 1000 rows max, orders older than 90 days are not returned, and cancelled / expired orders with no fill older than 3 days are dropped. `userTrades` (weight 5): `symbol` required, 7-day window, 3 months, 1000 rows, `fromId` cannot be combined with a time window. `income` (weight 30): all symbols, 7 days by default, 3 months of history, 1000 rows; the docs page shows only some of the income types, so show whatever type string comes back. Still to check in step 2: `positionSide/dual` and `commissionRate`.
+- Checked against the Binance USD-M futures docs on 2026-10-24: `GET /fapi/v2/account` (weight 5) is the one that has `canTrade`, `feeTier`, `multiAssetsMargin` and the per-asset `assets`; v3 drops the first three, so use v2. `allOrders` (weight 5): `symbol` is optional in the docs, a window must be under 7 days, 1000 rows max, orders older than 90 days are not returned, and cancelled / expired orders with no fill older than 3 days are dropped. `userTrades` (weight 5): `symbol` required, 7-day window, 3 months, 1000 rows, `fromId` cannot be combined with a time window. `income` (weight 30): all symbols, 7 days by default, 3 months of history, 1000 rows; the docs page shows only some of the income types, so show whatever type string comes back. `GET /fapi/v1/positionSide/dual` (weight 30, `dualSidePosition`) confirmed in step 2. `commissionRate` (weight 20) and the `positionRisk` fields (`marginType`, `leverage`, `liquidationPrice`) could not be read from the docs page in step 2 (the page came back truncated); the view reads them defensively and shows a failed call as its own error line. Check them against a real demo key when one is available.
 
 ## Data (verify each against Binance's USD-M futures docs at build time; fix this list if they differ)
 - Account info: `GET /fapi/v2/balance` (all assets), `GET /fapi/v2/account` (can trade, fee tier, multi-assets mode), `GET /fapi/v2/positionRisk` (leverage, margin type per position), `GET /fapi/v1/positionSide/dual` (hedge or one-way), `GET /fapi/v1/commissionRate?symbol=`.
@@ -52,6 +52,9 @@ Today `SIM.fills` keeps the last 50 and orders vanish when filled or cancelled. 
 1. **Core and simulated history.** `history-core.js` with normalisers, totals, CSV and self-tests; the paper broker records its log. No new screen yet.
 2. **Account info view.** Trade > Account info: balances, positions with leverage and margin type, modes, fee rates, permissions. Refresh button; error line per failed call.
 3. **History view.** Trade > History: Orders / Fills / Income tabs, symbol picker with quick picks, period (1 day, 7 days, 30 days, 90 days), totals for the period, Refresh, Download CSV.
+
+## Built in step 2 (v072)
+`src/js/account-info.js` and a section in Trade (view id `accinfo`, not offered as a movable Trading panel). Four independent GETs per refresh (about 60 request weight): account, positionRisk, positionSide/dual, commissionRate for the header asset. Tested with a stubbed network (only GET issued, one failing call isolated, hostile asset name shown as text); not yet with a real demo or live key.
 
 ## Out of scope
 - Spot, margin, transfers, coin-margined futures; placing or cancelling from these views; automatic background syncing; saving history to disk or IndexedDB (a later step if wanted).
