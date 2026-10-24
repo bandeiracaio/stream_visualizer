@@ -15,10 +15,9 @@
   <h1>Live Stream Visualizer <small id="ver"></small></h1>
   <button id="go" class="primary">Connect</button>
   <button id="pause">Pause</button>
-  <button id="arHdr" title="Auto-record: watch the price and record when the market gets volatile (settings: Reader tab, Session, replay and labels)">Arm</button><span id="arHdrMsg" class="stat"></span>
+  <button id="arHdr" title="Auto-record: watch the price and record when the market gets volatile (settings: Recordings tab)">Arm</button><span id="arHdrMsg" class="stat"></span>
   <span class="stat pill">BN <b id="bnState">off</b></span>
   <span class="stat pill">HL <b id="hlState">off</b></span>
-  <span id="liveChips"></span>
   <span id="accBadge"></span>
   <button id="cog" title="Settings" aria-expanded="false">⚙ <span id="symLbl">BTC</span></button>
   <div id="alerts"></div>
@@ -262,7 +261,7 @@
     <div id="epDone" class="eplist"></div>
   </section>
 
-  <section data-tab="reader" class="full">
+  <section data-tab="drift" class="full">
     <h2>Drift review</h2>
     <div id="rvSummary" class="note" style="margin-top:0"></div>
     <div id="rvNeeds"></div>
@@ -275,7 +274,7 @@
     <div class="row" style="margin-top:8px"><button id="rvReport">Export review report</button></div>
   </section>
 
-  <section data-tab="reader" class="full">
+  <section data-tab="assumptions" class="full">
     <h2>What the Reader assumes</h2>
     <div class="note" style="margin-top:0">Measured from the live feed and kept on this device. For now it only watches: nothing here changes what the Reader detects.</div>
     <div id="rgList" class="rd-det"></div>
@@ -283,7 +282,7 @@
     <div id="rgMsg" class="note"></div>
   </section>
 
-  <section data-tab="reader" class="full">
+  <section data-tab="record" class="full">
     <h2>Session, replay and labels</h2>
     <div class="row"><button id="rtRec">Record</button><span id="rtStat" class="stat">not recording</span></div>
     <div class="rt-h">Auto-record when the market gets volatile</div>
@@ -329,12 +328,12 @@
     <div class="note">Record a session while connected, save it, then replay it with different thresholds to compare. Tap Agree or Disagree on an episode (open its card) to label it. Labels are matched by time, so they still apply when thresholds change. Everything stays on this device.</div>
   </section>
 
-  <section data-tab="reader" class="full">
+  <section data-tab="signals" class="full">
     <h2>Signals (one-off detectors) <span class="ctl"><span id="rdChips"></span> min strength <input id="rdMin" type="range" min="0" max="1" step="0.05" value="0" style="width:90px"></span></h2>
     <div class="tape" style="height:420px"><table id="rdFeed" class="rd-feed"></table></div>
   </section>
 
-  <section data-tab="reader">
+  <section data-tab="signals">
     <h2>Detectors</h2>
     <div class="note" style="margin:0 0 6px">Episode families</div>
     <div id="epFamilies" class="rd-det" style="margin-bottom:10px"></div>
@@ -342,7 +341,7 @@
     <div id="rdDetectors" class="rd-det"></div>
   </section>
 
-  <section data-tab="reader">
+  <section data-tab="engine">
     <h2>Engine health</h2>
     <div class="metrics" id="rdHealth"></div>
   </section>
@@ -413,6 +412,7 @@
 
   <section data-tab="health" class="full">
     <h2>Feed health</h2>
+    <div class="chips-row"><span id="liveChips"></span></div>
     <div class="hk" id="healthKeys"></div>
     <div style="overflow-x:auto"><table class="health" id="health"></table></div>
     <div class="note">Latency = (receive time + clock offset) − exchange event time. The offset is measured against Binance's server clock (NTP-style, lowest round-trip of 5 samples, refreshed every minute), so these numbers are not skewed by your device clock. Late = corrected latency above 1s. A stream is flagged silent when it exceeds its normal gap.</div>

@@ -1,6 +1,6 @@
 # App reorganization: six areas by what you are doing
 
-Status: ready-for-agent (agreed in a grilling session, 2026-10-24)
+Status: in progress. Step 1 (navigation shell) built in v068; steps 2 and 3 open. Agreed in a grilling session, 2026-10-24.
 
 ## Goal
 The app is hard to find things in: 12 views in 5 groups organised by data type, overlapping names (Reader, Raw, Streams, Health, Collectors, Saved

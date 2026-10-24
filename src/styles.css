@@ -93,7 +93,18 @@ section.tcontainer{background:none;border:none;padding:0}
 .rd-det{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px}.rd-det label{display:flex;gap:6px;align-items:center;font-size:12px}
 .chip{padding:2px 8px;font-size:11px}.chip.on{border-color:var(--accent);color:var(--accent)}
 /* ---- navigation: groups (top on PC, bottom bar on phone) + sub-views ---- */
-#groups button{padding:6px 14px;font-size:13px}
+#groups button{display:flex;align-items:center;gap:8px;padding:8px 12px;font-size:13px;text-align:left;white-space:nowrap}
+#groups button svg{flex:none}
+/* PC: the six areas are a left sidebar under the header */
+@media(min-width:701px){
+  #groups{position:fixed;left:0;top:var(--hh,52px);bottom:0;z-index:4;width:132px;flex-direction:column;gap:2px;padding:8px 6px;overflow-y:auto;overflow-x:hidden;background:var(--panel);border-right:1px solid var(--line)}
+  #groups button{width:100%;border-color:transparent;background:transparent}
+  #groups button.act{background:var(--accent);border-color:var(--accent)}
+  main{margin-left:132px}
+}
+#groups button{position:relative}
+#groups .badge{margin-left:auto}
+.chips-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
 #views{padding-top:0}
 #views[hidden],#sheet[hidden]{display:none}
 #views button{padding:3px 11px;font-size:12px;border-radius:999px;background:transparent;color:var(--dim)}
@@ -128,7 +139,8 @@ section.collapsed > .pbody{height:0;overflow:hidden;visibility:hidden}
   h1{display:none}
   header{padding:6px 10px;gap:6px}
   #groups{position:fixed;left:0;right:0;bottom:0;z-index:7;width:auto;gap:4px;padding:6px 6px calc(6px + env(safe-area-inset-bottom));background:var(--panel);border-top:1px solid var(--line)}
-  #groups button{flex:1;padding:10px 2px;font-size:12px;min-height:40px}
+  #groups button{flex:1;flex-direction:column;justify-content:center;gap:2px;padding:6px 0 4px;font-size:10.5px;min-height:48px;text-align:center}
+  #groups .badge{position:absolute;top:2px;left:calc(50% + 6px);margin:0;padding:0 5px;font-size:10px}
   main{padding:8px 8px calc(78px + env(safe-area-inset-bottom))}
   .books{grid-template-columns:1fr}
   #tgrid{grid-template-columns:minmax(0,1fr)}

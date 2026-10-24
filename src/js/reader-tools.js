@@ -154,7 +154,7 @@ function rtScore(){
 
 // ---------- timeline ----------
 function rtTimeline(s){
-  const cv = rt$("tlCv"), eng = RD(), now = s.now; if (!now) return;
+  const cv = rt$("tlCv"), eng = RD(), now = s.now; if (!now || !cv.clientWidth) return;   // timeline is on another view: nothing to draw
   const win = +rt$("tlWin").value, ph = eng.priceHistory("bn").length ? eng.priceHistory("bn") : eng.priceHistory("hl"), eps = eng.episodeGroups();
   let t0 = win > 0 ? now-win : Math.min(ph.length ? ph[0][0] : now, eps.length ? eps[0].tStart : now); if (!(now-t0 > 1000)) t0 = now-60000;
   const vis = eps.filter(e => (e.tEnd || now) >= t0 && e.tStart <= now), rowOf = new Map();
@@ -277,8 +277,11 @@ rt$("rvNeeds").onclick = e => {
   rgPersist(); RT.last.rv = null; rvRender(); rvBadge();
 };
 function rvBadge(){
-  const rv = READER.register.review(), n = rv.unacked + (rv.scale.ok ? 0 : 1), g = document.querySelector('#groups button[data-g="reader"]'); if (!g) return;
-  const want = n ? `Reader<span class="badge">${n}</span>` : "Reader"; if (g.innerHTML !== want) g.innerHTML = want;
+  const rv = READER.register.review(), n = rv.unacked + (rv.scale.ok ? 0 : 1), g = document.querySelector('#groups button[data-g="review"]'); if (!g) return;
+  let b = g.querySelector(".badge");
+  if (!n){ if (b) b.remove(); return; }
+  if (!b){ b = document.createElement("span"); b.className = "badge"; g.appendChild(b); }
+  if (b.textContent !== String(n)) b.textContent = String(n);
 }
 setInterval(rvBadge, 5000); setTimeout(rvBadge, 800);
 function rvReportText(){

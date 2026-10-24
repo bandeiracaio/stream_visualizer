@@ -1104,9 +1104,11 @@ function renderViz(){
 $("vwin").onchange = $("profVenue").onchange = () => { if (visible("viz")) renderViz(); };
 
 // ---------- tabs ----------
-const TABS = [["overview","Overview"],["charts","Charts"],["micro","Micro"],["reader","Reader"],["viz","Visualizations"],["trading","Trading"],["accounts","Accounts"],["market","Market"],["tape","Tape"],["streams","Streams"],["health","Health"],["raw","Raw"]];
-// Five groups; a group with several views shows them as a sub-row. A "view" is what data-tab on a <section> names.
-const GROUPS = [["live","Live",["overview","charts","micro","viz","tape"]],["reader","Reader",["reader"]],["trade","Trade",["trading","accounts"]],["market","Market",["market"]],["diag","Diagnostics",["streams","health","raw"]]];
+const TABS = [["overview","Overview"],["charts","Charts"],["micro","Microstructure"],["viz","Visuals"],["tape","Tape"],["market","Market"],["reader","Episodes"],["signals","Signals"],["drift","Drift"],["assumptions","Assumptions"],["record","Record"],["trading","Trading"],["accounts","Accounts"],["streams","Streams"],["health","Feed health"],["raw","Raw"],["engine","Engine"]];
+// Six areas by what you are doing; an area with several views shows them as a sub-row. A "view" is what data-tab on a <section> names.
+const GROUPS = [["now","Now",["overview","charts","micro","viz","tape","market"]],["reader","Reader",["reader","signals"]],["review","Review",["drift","assumptions"]],["rec","Recordings",["record"]],["trade","Trade",["trading","accounts"]],["system","System",["streams","health","raw","engine"]]];
+const READER_VIEWS = ["reader","signals","drift","assumptions","record","engine"];   // all drawn by renderReader
+const GICON = {now:"M3 12h4l3-8 4 16 3-8h4", reader:"M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 9a3 3 0 100 6 3 3 0 000-6z", review:"M4 6l2 2 3-3M4 14l2 2 3-3M13 7h8M13 15h8", rec:"M12 4a8 8 0 100 16 8 8 0 000-16zM12 9a3 3 0 100 6 3 3 0 000-6z", trade:"M7 4v16M7 4L4 7M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3", system:"M4 7h8M18 7h2M4 17h2M10 17h10M14 4v6M8 14v6"};
 const groupOf = v => GROUPS.find(g=>g[2].includes(v)) || GROUPS[0];
 let tab = "overview";
 function setTab(t){
@@ -1119,8 +1121,9 @@ function setTab(t){
   dirty = true; renderSlow();
 }
 const visible = name => tab===name || (tab==="trading" && !!document.querySelector(`#tgrid section[data-home="${name}"]`));
-$("groups").innerHTML = GROUPS.map(([id,l])=>`<button data-g="${id}">${l}</button>`).join("");
+$("groups").innerHTML = GROUPS.map(([id,l])=>`<button data-g="${id}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${GICON[id]}"/></svg><span>${l}</span></button>`).join("");
 $("groups").onclick = e => { const b = e.target.closest("button"); if (!b) return; const g = GROUPS.find(x=>x[0]===b.dataset.g), last = store.get("lastView", {})[g[0]]; setTab(g[2].includes(last) ? last : g[2][0]); window.scrollTo(0, 0); };
+{ const hdr = document.querySelector("header"), setHH = () => document.documentElement.style.setProperty("--hh", hdr.offsetHeight + "px"); setHH(); if (window.ResizeObserver) new ResizeObserver(setHH).observe(hdr); }   // the PC sidebar starts under the header
 $("views").onclick = e => { const b = e.target.closest("button"); if (b) setTab(b.dataset.t); };
 
 
@@ -1523,7 +1526,7 @@ let lastOv = 0, lastFast = 0, lastChart = 0, lastMicro = 0, lastViz = 0, lastTra
     if (visible("charts") && ts - lastChart > 100){ lastChart = ts; drawBubbles(); drawCvd(); }
     if (visible("micro") && ts - lastMicro > 250){ lastMicro = ts; renderMicro(); }
     if (visible("viz") && ts - lastViz > 400){ lastViz = ts; renderViz(); }
-    if (visible("reader") && ts - lastReader > 250){ lastReader = ts; renderReader(); }
+    if (READER_VIEWS.some(visible) && ts - lastReader > 250){ lastReader = ts; renderReader(); }
     if (tab==="trading" && ts - lastTrade > 400){ lastTrade = ts; renderTrading(); }
     if (dirty && ts - lastFast > 150){
       dirty = false; lastFast = ts;
