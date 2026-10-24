@@ -1,6 +1,6 @@
 # Visual restyle
 
-Status: direction chosen: B, Terminal (2026-10-24). Release 1 (tokens, controls, header, navigation) in v074; release 2 (panels) open. The accent question was left to me with contrast as the priority: amber accent kept, warnings moved to a redder orange.
+Status: direction chosen: B, Terminal (2026-10-24). Built: release 1 (tokens, controls, header, navigation) in v074 and release 2 (panels, last hard-coded colours) in v075. The accent question was left to me with contrast as the priority: amber accent kept, warnings moved to a redder orange.
 
 ## Goal
 The layout is now organised (see `.scratch/app-reorganization/spec.md`). The look is not: 12 to 13 px text, dim grey headings, flat panels, inconsistent buttons. Restyle without changing what anything does.
@@ -34,3 +34,10 @@ Build and open: `node build.mjs && node .scratch/restyle/prototype/make.mjs`, th
 
 ## Chosen palette (v074; contrast against the three surfaces, WCAG ratios)
 text #dbe3ea 14:1; dim #93a3af 7:1 (was 5:1); accent #ffb454 10:1; buy #3ddc84 10:1; sell #ff6b66 6.5:1; warn #ff8a4c 7.8:1; control edge #5f6e7d 3.5:1 (the 3:1 a control border needs); dark ink #07090b on every fill 7 to 11:1. `.badge` and the live-account badge now use dark ink on the sell fill (white on it was 3:1). Focus ring: 2 px accent outline on every control. Everything is a token in `:root`; panels still to move to tokens in release 2: the canvas and log backgrounds (`#0a0d10`), the review table borders (`#1e252e`), the live-account card border (`#7a2a26`).
+
+## Contrast audit (v075)
+A script in the page compared every visible text node with its real background (layers, transparency and opacity included) on every view, with live data, a replayed recording, the simulated account, an opened episode card and the settings sheet. After the fixes nothing is under 4.5:1 (3:1 for large text); the only things that were were disabled buttons and the cards of streams switched off, both dimmed by opacity, so their opacity was raised. Not covered: text drawn inside the canvases (charts, timeline, landscape), which still uses the colours set in `app.js`.
+
+## Still open
+- The phone header is about 140 px (three rows: controls, status, view row). A shorter header would need the status text shortened in `app.js` (a display change, not CSS).
+- Chart canvases keep their own palette (next to this look, the blue and teal lines are the main mismatch).
