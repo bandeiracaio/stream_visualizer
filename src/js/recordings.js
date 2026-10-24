@@ -55,7 +55,7 @@ rc$("rcList").onclick = async e => {
   try {
     if (act === "share") { const f = rcShareable(r); if (f) await navigator.share({files:[f], title:r.name}); }
     else if (act === "dl") rtDownload(r.blob, r.name);
-    else if (act === "open") { rtSetSession(await rtReadSessionFile(rcFile(r))); rtMsg(`Loaded ${r.name}. Replay it from here.`); }
+    else if (act === "open") { rtSetSession(await rtReadSessionFile(rcFile(r))); rtMsg(`Loaded ${r.name}. Replay it under Review, Replay and labels.`); }
     else if (act === "del") { await rcTx("readwrite", st => st.delete(name)); rcRender(); }
   } catch (err) { if (!err || err.name !== "AbortError") rtMsg("Could not do that: " + (err && err.message || err)); }      // AbortError = the share sheet was closed
 };

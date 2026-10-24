@@ -9,7 +9,7 @@ const RT_SHORT = {absorption:"absorb", exhaustion:"exhaust", burst:"burst", wall
 const RT_TUNE = [["enterScore","enter score",.05],["exitScore","exit score",.05],["enterHoldMs","confirm hold (ms)",500],["endHoldMs","end hold (ms)",500],["resumeMs","resume window (ms)",1000],
   ["wallEpisodeMs","wall must stand (ms)",1000],["wallMaxActive","max walls per side",1],["minTradesFast","min trades, fast",1],["minTradesMid","min trades, mid",1]];
 const rtDur = ms => { const s = Math.round(ms/1000); return s >= 3600 ? `${Math.floor(s/3600)}h ${Math.floor(s%3600/60)}m` : s >= 60 ? `${Math.floor(s/60)}m ${String(s%60).padStart(2,"0")}s` : s+"s"; };
-const rtMsg = t => { rt$("rtMsg").textContent = t; };
+const rtMsg = t => { document.querySelectorAll(".rtmsg").forEach(el => { el.textContent = t; }); };   // the same line shows in Record, Saved and Replay
 const rtSide = ep => ep.aggressor || (ep.wall && ep.wall.side) || "";
 
 // ---------- thresholds ----------
@@ -73,7 +73,7 @@ rt$("rtSave").onclick = async () => {
   const blob = gz ? await new Response(new Blob([text]).stream().pipeThrough(new CompressionStream("gzip"))).blob() : new Blob([text], {type:"application/json"});
   rtDownload(blob, name);
   const kept = typeof rcKeep === "function" ? await rcKeep(name, blob, {sym:s.sym, startedAt:s.startedAt, quality}) : false;      // a copy stays on the device (recordings.js)
-  rtMsg("Saved" + (quality.verdict === "complete" ? "" : ` (${SQ.line(quality)})`) + "." + (kept ? " A copy is kept on this device (Saved recordings below)." : "") + " Load it later (or on another device) with Load session.");
+  rtMsg("Saved" + (quality.verdict === "complete" ? "" : ` (${SQ.line(quality)})`) + "." + (kept ? " A copy is kept on this device (Recordings, Saved)." : "") + " Load it later (or on another device) with Load session.");
 };
 rt$("rtLoadBtn").onclick = () => rt$("rtLoad").click();
 async function rtReadSessionFile(f){

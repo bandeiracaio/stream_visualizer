@@ -283,7 +283,7 @@
   </section>
 
   <section data-tab="record" class="full">
-    <h2>Session, replay and labels</h2>
+    <h2>Record</h2>
     <div class="row"><button id="rtRec">Record</button><span id="rtStat" class="stat">not recording</span></div>
     <div class="rt-h">Auto-record when the market gets volatile</div>
     <div class="rd-det" id="arCfg">
@@ -300,23 +300,42 @@
     <div id="arMsg" class="note">While armed the app listens to one price stream only and does nothing else; it connects everything and starts recording when the market turns volatile, then saves the file when it calms down. Disconnect first, and keep this tab open and the screen on (it is the page that records).</div>
     <div class="row" style="margin-top:8px">
       <button id="rtSave" disabled>Save session</button><button id="rtLoadBtn">Load session</button><input id="rtLoad" type="file" accept=".json,.gz,application/json,application/gzip" hidden>
-      <button id="rtReplay" disabled>Replay with current settings</button><button id="rtLive" disabled>Back to live</button>
     </div>
-    <div id="rtMsg" class="note"></div>
-    <div class="note" style="margin-top:8px"><b>Saved recordings</b> (kept on this device; share one to mail it to yourself)</div>
+    <div class="note rtmsg"></div>
+  </section>
+
+  <section data-tab="saved" class="full">
+    <h2>Saved recordings</h2>
+    <div class="note">Saved recordings (kept on this device; share one to mail it to yourself)</div>
     <div id="rcList"></div>
-    <details class="note" style="margin-top:8px"><summary id="hlSum">Health log</summary>
+    <div class="note rtmsg"></div>
+  </section>
+
+  <section data-tab="healthlog" class="full">
+    <h2>Health log</h2>
+    <div id="hlSum" class="stat"></div>
       <div class="note">A black box that survives a reload: the tab hidden or frozen, the computer asleep, a venue going silent, the price stream dropping, the screen lock lost, learning starting over. Send it with a recording that has holes in it.</div>
       <div class="row"><button id="hlSave">Download log</button><button id="hlClear">Clear</button></div>
       <div id="hlList"></div>
-    </details>
-    <details class="note" style="margin-top:8px"><summary id="colSum">Collectors</summary>
+  </section>
+
+  <section data-tab="collectors" class="full">
+    <h2>Collectors</h2>
+    <div id="colSum" class="stat"></div>
       <div class="note">Data kept for later analysis that no detector uses yet. It sits on a 24 h tape on this device and is attached to every saved recording; it never changes a detection.</div>
       <div id="colList"></div>
       <div class="row"><button id="colSave">Download tape</button><button id="colClear">Clear tape</button></div>
-    </details>
+  </section>
+
+  <section data-tab="replay" class="full">
+    <h2>Replay and labels</h2>
+    <div class="note">Load a session in Recordings (Record, Load session) or open one from Recordings (Saved). Replay it here with the thresholds below to compare.</div>
     <div class="rt-h">Episode thresholds (used live and in replays)</div>
     <div id="rtTune" class="rd-det"></div>
+    <div class="row" style="margin-top:8px">
+      <button id="rtReplay" disabled>Replay with current settings</button><button id="rtLive" disabled>Back to live</button>
+    </div>
+    <div class="note rtmsg"></div>
     <div class="rt-h">Your labels</div>
     <div class="row">
       <span class="stat">Saw something it missed?</span>

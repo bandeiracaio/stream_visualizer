@@ -145,7 +145,7 @@ function lsRender() {
   const sec = ls$("lsSection"); if (!sec || !visible("reader")) return;
   const cv = ls$("lsCv"), cv2 = ls$("lsCv2"), split = LV.venue === "split", src = lsSource();
   lsLayout(split);
-  if (!src){ const {ctx, w, h} = prep(cv); emptyMsg(ctx, w, h, LV.src === "session" ? "Load a recorded session (Session, replay and labels) to walk through it." : "Connect to see the landscape."); ls$("lsRead").textContent = ""; lsControls(null); LV.cache = null; return; }
+  if (!src){ const {ctx, w, h} = prep(cv); emptyMsg(ctx, w, h, LV.src === "session" ? "Load a recorded session (Recordings, Record) to walk through it." : "Connect to see the landscape."); ls$("lsRead").textContent = ""; lsControls(null); LV.cache = null; return; }
   const live = LV.src === "live" && LV.t == null, tNow = lsPlayhead(src);
   const key = READER_LANDSCAPE.cacheKey({src: LV.src, venue: LV.venue, spanMs: LV.spanMs, tNow, live, sessId: src === LV.sess ? LV.sessId : null, trades});
   let c = LV.cache;

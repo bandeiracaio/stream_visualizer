@@ -27,7 +27,7 @@ const STATUS = (() => {
       if (a.wake === false) out.push({id:"wake", text:"screen may sleep", tone:"warn", title:"The screen wake lock is not held; a sleeping device ends the wait"});
     }
     if (i.rec && i.rec.on && !(a.on && a.mode === "recording")) out.push({id:"rec", text:"REC " + dur(i.rec.ms) + " · " + (i.rec.n || 0).toLocaleString() + " inputs", tone:"bad", title:"A recording is running"});
-    if (i.kept > 0) out.push({id:"kept", text:i.kept + " saved", tone:"info", title:"Recordings kept on this device (Reader tab, Saved recordings)"});
+    if (i.kept > 0) out.push({id:"kept", text:i.kept + " saved", tone:"info", title:"Recordings kept on this device (Recordings, Saved)"});
     return out;
   }
   const num = v => { const m = /^v(\d+)$/.exec(String(v || "")); return m ? +m[1] : null; };
