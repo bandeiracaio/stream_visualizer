@@ -301,6 +301,29 @@ const COLLECT = (() => {
     return {u:u == null ? null : round(u, 2), exps, tot};
   }
 
+  // ---- status of each collector, for the list in the Reader tab (view: collectors.js)
+  // which collector writes which record name; how often (ms) a collector writes while it is working (three times that late is "slow")
+  const OWNER = {feeds:"telemetry", markPrice:"telemetry", bnDerivs:"derivs", hlCtx:"derivs", ratios:"derivs", basis:"derivs", liq:"derivs", cal:"calendar", walletsTop:"wallets", hlLiq:"wallets", fundPred:"wallets",
+                 dvol:"options", optChain:"options", venues:"venues", bookBn:"book", bookHl:"book"};
+  const EXPECT_MS = {telemetry:30000, derivs:60000, calendar:900000, wallets:180000, options:60000, venues:10000, book:10000};
+  const ownerOf = name => OWNER[name] || null;
+  // records -> {collectorId: {n, last}} (last = the newest record time)
+  function tally(recs) {
+    const out = {};
+    for (const r of recs) { const id = isRec(r) && OWNER[r[1]]; if (!id) continue; const s = out[id] || (out[id] = {n:0, last:0}); s.n++; if (r[2] > s.last) s.last = r[2]; }
+    return out;
+  }
+  function ageText(ms) { return ms < 90000 ? Math.max(0, Math.round(ms/1000)) + " s" : ms < 5400000 ? Math.round(ms/60000) + " min" : round(ms/3600000, 1) + " h"; }
+  // one line of status: o = {on (switch), why (text when it cannot be working now, else null), n (records on the tape), ageMs (since its last record, null if none), expectMs, sinceMs (page open for)}
+  // -> {text, tone: "ok" | "warn" | "info" | "idle" | "off"}
+  function health(o) {
+    if (!o.on) return {text:"off", tone:"off"};
+    const n = o.n ? o.n.toLocaleString("en-US") + " on the tape" : "";
+    if (o.why) return {text:o.why + (n ? " · " + n : ""), tone:"idle"};
+    if (o.ageMs == null) return o.sinceMs > o.expectMs*3 + 60000 ? {text:"nothing written yet: check the Health log", tone:"warn"} : {text:"starting…", tone:"info"};
+    return o.ageMs <= o.expectMs*3 ? {text:n + " · last " + ageText(o.ageMs) + " ago", tone:"ok"} : {text:n + " · last " + ageText(o.ageMs) + " ago, slower than expected", tone:"warn"};
+  }
+
   // tape helpers on arrays of records
   const prune = (recs, nowMs, keepMs) => recs.filter(r => r[2] >= nowMs - (keepMs == null ? TAPE_MS : keepMs));
   const slice = (recs, t0, t1) => recs.filter(r => r[2] >= t0 && r[2] <= t1);
@@ -310,5 +333,5 @@ const COLLECT = (() => {
     for (let i = recs.length - 1; i >= 0; i--) { const b = JSON.stringify(recs[i]).length + 1; if (size + b > lim) break; size += b; out.push(recs[i]); }
     return out.reverse();
   }
-  return {REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, due, calendar, deribitCoin, optName, optionsChain, walletTracker, walletPosition, walletChanged, liqFills, predictedFunding, WALLET_TOP, WALLET_REFRESH_MS, MAJORS, venueSubs, venueParse, venueApply, venueRecord, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
+  return {REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, due, calendar, OWNER, EXPECT_MS, ownerOf, tally, ageText, health, deribitCoin, optName, optionsChain, walletTracker, walletPosition, walletChanged, liqFills, predictedFunding, WALLET_TOP, WALLET_REFRESH_MS, MAJORS, venueSubs, venueParse, venueApply, venueRecord, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
 })();

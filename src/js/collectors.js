@@ -2,7 +2,7 @@
 // Collectors (view): samples that no detector uses yet, kept on a rolling 24 h tape (IndexedDB "sv-tape") and attached to every saved session
 // as `ext`. This file runs the page-side collector (self-telemetry of the page's own feeds), receives the worker's records, owns the tape and the
 // switches. Read-only: it only looks at the app's state and never touches a feed, a recording or a detection. Loaded after health-log.js.
-const CL = {cfg:store.get("col.cfg", {}) || {}, db:null, prev:null, prevAt:0, adds:0, count:0};
+const CL = {cfg:store.get("col.cfg", {}) || {}, db:null, prev:null, prevAt:0, adds:0, count:0, stat:{}, t0:Date.now()};
 const cl$ = id => document.getElementById(id);
 const colOn = id => CL.cfg[id] != null ? !!CL.cfg[id] : (COLLECT.REGISTRY.find(x => x.id === id) || {on:false}).on;
 const colWorkerCfg = () => ({telemetry:colOn("telemetry")});
@@ -20,14 +20,14 @@ const colReq = (mode, fn) => colOpen().then(db => new Promise((ok, no) => {
 }));
 async function colAdd(r) {
   if (!COLLECT.isRec(r)) return;
-  try { await colReq("readwrite", st => st.add(r)); CL.count++; if (++CL.adds % 360 === 0) colPrune(); colRender(); } catch {}      // a full or blocked store only costs the tape, never the app
+  try { await colReq("readwrite", st => st.add(r)); CL.count++; if (++CL.adds % 360 === 0) colPrune(); const o = COLLECT.ownerOf(r[1]); if (o) { const s = CL.stat[o] || (CL.stat[o] = {n:0, last:0}); s.n++; s.last = Date.now(); } } catch {}      // a full or blocked store only costs the tape, never the app
 }
 const colAll = () => colReq("readonly", st => st.getAll()).then(a => a || []);
 async function colPrune() {
   try {
     const cutoff = Date.now() - COLLECT.TAPE_MS;
     await colReq("readwrite", st => { const rq = st.openCursor(); rq.onsuccess = () => { const c = rq.result; if (c && c.value[2] < cutoff) { c.delete(); c.continue(); } }; return rq; });
-    CL.count = (await colAll()).length; colRender();
+    const all = await colAll(); CL.count = all.length; colTally(all);
   } catch {}
 }
 // the records for a session that started at t0, from leadMs before it (a minute by default; auto-recordings ask for 30 minutes, like their `pre` prices), newest within the file budget
@@ -114,18 +114,41 @@ async function colBookCoarse() {      // Hyperliquid l2Book aggregated to 4 sign
 }
 setInterval(colBookTick, 1000); setInterval(colBookCoarse, 2000);
 
-// ---- the list under the Health log
+// ---- the list under the Health log: a switch per collector and, under it, whether it is writing (records on the tape, time since the last one)
+// colTally: counts and newest record per collector from the tape (kept by colAdd from then on)
+function colTally(all) { const t = COLLECT.tally(all); for (const id in t) { const s = CL.stat[id] || (CL.stat[id] = {n:0, last:0}); s.n = t[id].n; s.last = Math.max(s.last, t[id].last); } for (const id in CL.stat) if (!t[id]) CL.stat[id].n = 0; }
+// null when the collector should be writing right now, otherwise why it is not expected to
+function colWhy(id) {
+  switch (id) {
+    case "telemetry": return connected || AR.on ? null : "waits for the app to be connected or armed";
+    case "options": return !COLLECT.deribitCoin(cl$("sym").value.trim()) ? "Deribit lists BTC and ETH only" : CL.worker ? null : "worker not running";
+    case "venues": return CL.worker ? (colWatching() ? null : "waits for a recording or auto-record armed") : "worker not running";
+    case "book": return colBookOn() ? null : "waits for the app connected and recording";
+    default: return CL.worker ? null : "worker not running";
+  }
+}
+function colStatus() {
+  const sum = cl$("colSum"); if (!sum) return;
+  sum.textContent = `Collectors: ${CL.count} records on the tape`;
+  const now = Date.now();
+  for (const c of COLLECT.REGISTRY) {
+    const el = cl$("colSt-" + c.id); if (!el) continue;
+    const s = CL.stat[c.id], h = COLLECT.health({on:colOn(c.id), why:colWhy(c.id), n:s ? s.n : 0, ageMs:s && s.last ? now - s.last : null, expectMs:COLLECT.EXPECT_MS[c.id] || 60000, sinceMs:now - CL.t0});
+    el.textContent = h.text; el.className = "stat" + (h.tone === "ok" || h.tone === "warn" || h.tone === "info" ? " sb-" + h.tone : "");
+  }
+}
 function colRender() {
   const box = cl$("colList"); if (!box) return;
-  cl$("colSum").textContent = `Collectors: ${CL.count} records on the tape`;
-  box.innerHTML = COLLECT.REGISTRY.map(c => `<label class="stat" style="display:block"><input type="checkbox" data-col="${c.id}"${colOn(c.id) ? " checked" : ""}> ${c.label}</label>`).join("");
+  box.innerHTML = COLLECT.REGISTRY.map(c => `<div style="margin:3px 0"><label class="stat" style="display:block"><input type="checkbox" data-col="${c.id}"${colOn(c.id) ? " checked" : ""}> ${c.label}</label><span id="colSt-${c.id}" class="stat" style="margin-left:22px"></span></div>`).join("");
+  colStatus();
 }
+setInterval(colStatus, 1000);
 cl$("colList").onchange = e => { const id = e.target.dataset && e.target.dataset.col; if (!id) return; CL.cfg[id] = e.target.checked; store.set("col.cfg", CL.cfg); colWorkerSync(); if (AR.on && AR.worker) AR.worker.postMessage({t:"cfg", cfg:Object.assign({}, AR.cfg, {collectors:colWorkerCfg()})}); };
 cl$("colSave").onclick = async () => {
   const text = JSON.stringify({kind:"sv-tape", v:1, version:APP_VERSION, at:Date.now(), records:await colAll()});
   rtDownload(new Blob([text], {type:"application/json"}), "tape_" + new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "") + ".json");
 };
-cl$("colClear").onclick = async () => { try { await colReq("readwrite", st => st.clear()); CL.count = 0; } catch {} colRender(); };
-colAll().then(a => { CL.count = a.length; colRender(); colPrune(); }, () => colRender());
+cl$("colClear").onclick = async () => { try { await colReq("readwrite", st => st.clear()); CL.count = 0; CL.stat = {}; } catch {} colStatus(); };
+colAll().then(a => { CL.count = a.length; colTally(a); colStatus(); colPrune(); }, () => colStatus());
 colRender();
 colWorkerSync();

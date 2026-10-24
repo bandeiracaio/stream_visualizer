@@ -185,6 +185,19 @@ const READER_SELFTEST=(()=>{
       &&COLLECT.optionsChain([],now)===null&&COLLECT.optionsChain(null,now)===null&&COLLECT.optionsChain([mk("23OCT26",100,"C",30,1,1,100)],now)===null
       &&COLLECT.deribitCoin("btc")==="BTC"&&COLLECT.deribitCoin("ETH")==="ETH"&&COLLECT.deribitCoin("sol")===null&&COLLECT.REGISTRY.some(x=>x.id==="options"&&x.speed==="slow"),detail:J({u:c.u,e,e2,tot:c.tot,names:c.exps.map(x=>x.x)})};
   });
+  add("collectors: status lines: records are attributed to their collector, and a quiet or idle collector is told apart from a working one",E=>{
+    const J=JSON.stringify,R=COLLECT.rec,recs=[R("feeds",100,{}),R("feeds",300,{}),R("markPrice",200,{}),R("bookBn",50,{}),R("venues",70,{}),R("nope",999,{}),["t",{}],["c","cal"],R("cal",400,{})];
+    const t=COLLECT.tally(recs),H=COLLECT.health;
+    const ok=H({on:true,why:null,n:1234,ageMs:3000,expectMs:60000,sinceMs:1e6}),slow=H({on:true,why:null,n:5,ageMs:400000,expectMs:60000,sinceMs:1e6});
+    const idle=H({on:true,why:"waits for a recording",n:0,ageMs:null,expectMs:10000,sinceMs:1e6}),idleN=H({on:true,why:"waits for a recording",n:2500,ageMs:9e6,expectMs:10000,sinceMs:1e6});
+    const start=H({on:true,why:null,n:0,ageMs:null,expectMs:60000,sinceMs:20000}),silent=H({on:true,why:null,n:0,ageMs:null,expectMs:60000,sinceMs:400000}),off=H({on:false,why:null,n:9,ageMs:1,expectMs:1,sinceMs:1});
+    const owners=Object.values(COLLECT.OWNER);
+    return{ok:J(t.telemetry)==='{"n":3,"last":300}'&&t.book.n===1&&t.venues.last===70&&t.calendar.n===1&&Object.keys(t).length===4&&COLLECT.ownerOf("hlLiq")==="wallets"&&COLLECT.ownerOf("zzz")===null
+      &&ok.tone==="ok"&&ok.text==="1,234 on the tape · last 3 s ago"&&slow.tone==="warn"&&/slower than expected/.test(slow.text)&&idle.tone==="idle"&&idle.text==="waits for a recording"&&idleN.text==="waits for a recording · 2,500 on the tape"
+      &&start.tone==="info"&&silent.tone==="warn"&&off.tone==="off"&&off.text==="off"
+      &&COLLECT.ageText(4000)==="4 s"&&COLLECT.ageText(120000)==="2 min"&&COLLECT.ageText(7200000)==="2 h"
+      &&COLLECT.REGISTRY.every(c=>owners.includes(c.id)&&COLLECT.EXPECT_MS[c.id]>0),detail:J({t,ok,slow,idle,idleN,start,silent,off})};
+  });
   add("collectors: records among the inputs change no detection and no session quality",E=>{
     const e=E.create();e.startRecording();const a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:21,params:()=>burstSell});sim(e,{t0:b.t,mid0:b.mid,seconds:40,seed:22});
     const inputs=e.stopRecording(),mixed=[];inputs.forEach((r,i)=>{mixed.push(r);if(i%40===0)mixed.push(COLLECT.rec("feeds",T0+i,{src:"page",feeds:{bn:{n:1}}}));});
