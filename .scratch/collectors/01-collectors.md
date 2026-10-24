@@ -1,6 +1,6 @@
 # Collectors: data we do not collect yet
 
-Status: agreed (2026-10-23). Framework and F self-telemetry built in v053; A derivatives context and the always-on worker built in v055; G calendar tags (rules only) in v056; B book depth summaries in v057; C extra venues in v058; E Hyperliquid wallet layer in v059.
+Status: agreed (2026-10-23). Framework and F self-telemetry built in v053; A derivatives context and the always-on worker built in v055; G calendar tags (rules only) in v056; B book depth summaries in v057; C extra venues in v058; E Hyperliquid wallet layer in v059; D options and volatility in v060 (the last on the list: all seven are built).
 
 ## Goal
 Collect possibly useful data the app does not collect today, even where there is no event type or movement to attach it to yet. Log first,
@@ -113,3 +113,20 @@ All public WebSockets, no key. A browser page and a worker connect to every one 
 - **`fundPred`** every 60 s: `{Bin:[rate, next time, interval h], Hl:[...], Bybit:[...]}` for the coin.
 - Cost: about 60 request weight a minute of the 1200 allowed. Size: measured about 1.5 KB per `walletsTop` record, so 3 to 5 MB a day when the wallets are busy (more than first estimated: the 42-character address is a quarter of each row).
 - **Hygiene:** addresses live only in data files. `.gitignore` now also covers `tape_*.json` and `health_*.json` (recordings and registers were already covered).
+
+## Verified endpoints for collector D, options and volatility (checked live 2026-10-23)
+Deribit's public API, no key. REST under `https://www.deribit.com/api/v2/public/`; the CORS header echoes the page's `Origin` (a request without an Origin, such as curl, shows none; it worked from a Chrome page on localhost). WebSocket `wss://www.deribit.com/ws/api/v2` (JSON-RPC, no CORS issue).
+- `get_book_summary_by_currency?currency=BTC&kind=option`: every listed option (930 for BTC, 12 expiries): `instrument_name` (`BTC-27NOV26-73000-P`), `mark_iv` (percent), `bid_price`, `ask_price`, `open_interest` and `volume` (coins), `underlying_price` (the expiry's forward), `estimated_delivery_price` (the index). 415 KB of JSON, sent compressed over HTTP. There are no greeks in it (those need one `ticker` call per instrument), so skew is taken by moneyness, not by delta.
+- Channels `deribit_volatility_index.btc_usd` (DVOL, the 30-day implied vol index, a push every few seconds) and `deribit_price_index.btc_usd`. Same for `eth_usd`.
+- Not used: `get_instruments` (812 KB, not needed), `get_volatility_index_data` (history; the push is enough), `ticker` per instrument (greeks, bid / ask IV).
+- Options and a volatility index exist for BTC and ETH only here; for any other coin the collector writes one Health log note and stays idle.
+
+## Built in v060 (collector D, options and volatility)
+- **Always on** in the worker (slow collector), switch "options". One socket for the two index channels, one request every 120 s for the chain.
+- **`dvol`** every 10 s: `{vol (DVOL, percent), idx (Deribit index price), vAge, iAge (ms since each was last pushed)}`.
+- **`optChain`** every 120 s: `{u (index), exps:[...], tot}`. For the 5 nearest expiries still to come: `x` (label, e.g. `27NOV26`; expiry is 08:00 UTC), `dte` (days), `f` (forward), `atm` (implied vol at the strike nearest the forward, call and put averaged), `s` (out-of-the-money implied vol at -10, -5, +5, +10 % of the forward: a put below, a call above, nearest listed strike within 3 %, otherwise null), `oc` / `op` (call / put open interest, coins), `vc` / `vp` (call / put 24 h volume, coins), `pin` (the 5 strikes with the most open interest, call plus put, `[strike, coins]`). `tot` adds `oc`, `op`, `vc`, `vp` over every expiry.
+- About 1.2 KB a chain record, so about 1 MB a day, plus `dvol` about 0.9 MB a day. The chain download is about 400 KB uncompressed every 120 s (compressed on the wire).
+- A request that fails or is rate limited rests that source for 5 minutes (HTTP 429), and is noted in the Health log at most once per 5 minutes.
+
+## Status
+All seven candidates (F, A, G, B, C, E, D) are built. The remaining step in the spec is the monthly judgement: coverage, variance, and whether each collector leads the next 5 minutes of volatility or movement; drop the ones that show nothing.

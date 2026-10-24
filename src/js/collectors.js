@@ -49,8 +49,8 @@ setInterval(colSample, 10000);
 // ---- the always-on worker (collectors-worker.js): derivatives context and calendar tags. It runs whether or not auto-record is armed, in a worker so a hidden tab
 // does not slow it. Its records come here and go onto the tape; a record posted while the page is frozen is written when the page thaws.
 function colWorkerSync() {
-  const sym = cl$("sym").value.trim().toLowerCase(), wants = {derivs:colOn("derivs"), calendar:colOn("calendar"), venues:colOn("venues"), wallets:colOn("wallets")}, key = sym + "|" + wants.derivs + "|" + wants.calendar + "|" + wants.venues + "|" + wants.wallets;
-  const want = (wants.derivs || wants.calendar || wants.venues || wants.wallets) && !!sym;
+  const sym = cl$("sym").value.trim().toLowerCase(), wants = {derivs:colOn("derivs"), calendar:colOn("calendar"), venues:colOn("venues"), wallets:colOn("wallets"), options:colOn("options")}, key = sym + "|" + wants.derivs + "|" + wants.calendar + "|" + wants.venues + "|" + wants.wallets + "|" + wants.options;
+  const want = (wants.derivs || wants.calendar || wants.venues || wants.wallets || wants.options) && !!sym;
   if (CL.worker && (!want || CL.workerKey !== key)) { try { CL.worker.postMessage({t:"stop"}); CL.worker.terminate(); } catch {} CL.worker = null; }
   if (!want || CL.worker) return;
   let w;

@@ -11,6 +11,7 @@ const COLLECT = (() => {
     {id:"book", label:"Book depth (while recording): depth within 1 / 5 / 10 / 25 bps, spread, touch size, size added and removed per side (Binance, Hyperliquid)", speed:"fast", on:true},
     {id:"venues", label:"Extra venues (while recording): Coinbase, Bybit and OKX quotes, Binance spot, perp marks and indexes, and the ETH / SOL / BNB / XRP / DOGE marks", speed:"fast", on:true},
     {id:"wallets", label:"Hyperliquid wallets: position and liquidation price of the 10 biggest traders, their liquidation fills, predicted funding across venues", speed:"slow", on:true},
+    {id:"options", label:"Options and volatility (Deribit, BTC and ETH): volatility index, at-the-money implied vol, skew, open interest and busiest strikes by expiry", speed:"slow", on:true},
   ];
   const TAPE_MS = 24*3600*1000, FILE_BUDGET = 8*1024*1024;      // the rolling tape keeps 24 h; one session file takes at most about 8 MB of them (5 MB until v058: book depth and the extra venues fill about 2 MB an hour each while recording)
   const round = (x, d) => Math.round(x*Math.pow(10, d))/Math.pow(10, d);
@@ -42,7 +43,7 @@ const COLLECT = (() => {
 
   // ---- derivatives context (collector "derivs", run by collectors-worker.js). Readers of the public endpoints; each returns null for an answer that is not usable.
   // Verified live 2026-10-23, see .scratch/collectors/01-collectors.md.
-  const EVERY = {prem:15000, hl:15000, ratios:60000, basis:10000, wallets:30000, funding:60000}, BACKOFF_MS = 300000;      // polling spacing per source; a rate-limited source rests this long
+  const EVERY = {prem:15000, hl:15000, ratios:60000, basis:10000, wallets:30000, funding:60000, options:120000, dvol:10000}, BACKOFF_MS = 300000;      // polling spacing per source; a rate-limited source rests this long
   const num = x => { const n = +x; return x != null && x !== "" && Number.isFinite(n) ? n : null; };
   const due = (last, now, every) => !last || now - last >= every;
   function premium(j) {
@@ -248,6 +249,58 @@ const COLLECT = (() => {
     return Object.keys(out).length ? out : null;
   }
 
+  // ---- options and volatility (collector "options", run by collectors-worker.js). Deribit's public API, no key. Implied vols are in percent, as Deribit gives them.
+  const MON = {JAN:0, FEB:1, MAR:2, APR:3, MAY:4, JUN:5, JUL:6, AUG:7, SEP:8, OCT:9, NOV:10, DEC:11};
+  const deribitCoin = sym => { const c = String(sym || "").toUpperCase(); return c === "BTC" || c === "ETH" ? c : null; };      // the coins with options and a volatility index there
+  // "BTC-27NOV26-73000-P" -> expiry label, expiry time (08:00 UTC on the day, Deribit's rule), strike and C / P
+  function optName(n) {
+    const m = /^([A-Z]+)-(\d{1,2})([A-Z]{3})(\d{2})-(\d+(?:\.\d+)?)-([CP])$/.exec(String(n)); if (!m || !(m[3] in MON)) return null;
+    return {x:m[2] + m[3] + m[4], t:Date.UTC(2000 + +m[4], MON[m[3]], +m[2], 8), k:+m[5], cp:m[6]};
+  }
+  // get_book_summary_by_currency (kind option) -> the index and, for the nExp nearest expiries still to come: forward `f`, days to expiry `dte`, at-the-money implied vol `atm`
+  // (the strike nearest the forward, call and put averaged), the out-of-the-money implied vol at -10 / -5 / +5 / +10 % of the forward `s` (a put below, a call above, the
+  // nearest listed strike within 3 %, else null), call / put open interest `oc` / `op` and 24 h volume `vc` / `vp` (coins), and the 5 strikes with the most open interest `pin`.
+  // `tot` adds open interest and volume over every expiry.
+  function optionsChain(list, nowMs, nExp) {
+    nExp = nExp || 5; const by = new Map(), tot = {oc:0, op:0, vc:0, vp:0}; let u = null;
+    for (const s of Array.isArray(list) ? list : []) {
+      const o = s && optName(s.instrument_name); if (!o || o.t <= nowMs) continue;
+      if (u == null) u = num(s.estimated_delivery_price);
+      const oi = num(s.open_interest) || 0, vol = num(s.volume) || 0;
+      let e = by.get(o.t); if (!e) by.set(o.t, e = {x:o.x, t:o.t, f:null, opts:[]});
+      if (e.f == null) e.f = num(s.underlying_price);
+      e.opts.push({k:o.k, cp:o.cp, iv:num(s.mark_iv), oi, vol});
+      if (o.cp === "C") { tot.oc += oi; tot.vc += vol; } else { tot.op += oi; tot.vp += vol; }
+    }
+    const exps = [...by.values()].sort((a, b) => a.t - b.t).slice(0, nExp).map(e => {
+      const F = e.f, r = {x:e.x, dte:round((e.t - nowMs)/86400000, 2), f:F == null ? null : round(F, 2), atm:null, s:{}, oc:0, op:0, vc:0, vp:0, pin:[]};
+      const byK = new Map();
+      for (const o of e.opts) {
+        if (o.cp === "C") { r.oc += o.oi; r.vc += o.vol; } else { r.op += o.oi; r.vp += o.vol; }
+        byK.set(o.k, (byK.get(o.k) || 0) + o.oi);
+      }
+      if (F != null && F > 0) {
+        let best = null;
+        for (const k of byK.keys()) {
+          const c = e.opts.find(o => o.k === k && o.cp === "C" && o.iv != null), p = e.opts.find(o => o.k === k && o.cp === "P" && o.iv != null);
+          if (c && p && (best == null || Math.abs(k - F) < Math.abs(best.k - F))) best = {k, iv:(c.iv + p.iv)/2};
+        }
+        r.atm = best ? round(best.iv, 2) : null;
+        for (const m of [-10, -5, 5, 10]) {
+          const want = F*(1 + m/100), pool = e.opts.filter(o => o.cp === (m < 0 ? "P" : "C") && o.iv != null);
+          let near = null; for (const o of pool) if (near == null || Math.abs(o.k - want) < Math.abs(near.k - want)) near = o;
+          r.s[m] = near && Math.abs(near.k - want) <= 0.03*F ? round(near.iv, 2) : null;
+        }
+      }
+      for (const k of ["oc", "op", "vc", "vp"]) r[k] = round(r[k], 1);
+      r.pin = [...byK].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, v]) => [k, round(v, 1)]);
+      return r;
+    });
+    if (!exps.length) return null;
+    for (const k in tot) tot[k] = round(tot[k], 1);
+    return {u:u == null ? null : round(u, 2), exps, tot};
+  }
+
   // tape helpers on arrays of records
   const prune = (recs, nowMs, keepMs) => recs.filter(r => r[2] >= nowMs - (keepMs == null ? TAPE_MS : keepMs));
   const slice = (recs, t0, t1) => recs.filter(r => r[2] >= t0 && r[2] <= t1);
@@ -257,5 +310,5 @@ const COLLECT = (() => {
     for (let i = recs.length - 1; i >= 0; i--) { const b = JSON.stringify(recs[i]).length + 1; if (size + b > lim) break; size += b; out.push(recs[i]); }
     return out.reverse();
   }
-  return {REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, due, calendar, walletTracker, walletPosition, walletChanged, liqFills, predictedFunding, WALLET_TOP, WALLET_REFRESH_MS, MAJORS, venueSubs, venueParse, venueApply, venueRecord, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
+  return {REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, due, calendar, deribitCoin, optName, optionsChain, walletTracker, walletPosition, walletChanged, liqFills, predictedFunding, WALLET_TOP, WALLET_REFRESH_MS, MAJORS, venueSubs, venueParse, venueApply, venueRecord, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
 })();

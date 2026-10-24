@@ -6,8 +6,9 @@
 // scheduled instant (COLLECT.calendar, by rule, no network). Collector "venues" (fast, only while a recording is on): sockets to Coinbase, Bybit, OKX, Binance spot and the majors' marks, one record a second.
 // Collector "wallets": the 10 Hyperliquid wallets that traded the most in this coin over 15 minutes, their positions (30 s), their liquidation fills,
 // and the predicted funding across venues (60 s).
-// The page says which collectors are on in the start message: {t:"start", sym, want:{derivs, calendar, venues, wallets}, rec}, and tells when a recording starts or stops: {t:"rec", on}.
-let on = false, gen = 0, sym = "btc", want = {}, ws = null, lastMsg = 0, timer = null, mk = null, prevRatios = null, lastCal = 0, recOn = false, vOn = false, vGen = 0, vSock = {}, vState = {}, lastVen = 0, lastPing = 0, wtr = null, wsk = null, wTracked = new Map(), wGen = 0, startAt = 0;
+// Collector "options" (BTC and ETH only): Deribit's volatility index and index price (pushed, sampled every 10 s) and the whole option chain summarised every 120 s.
+// The page says which collectors are on in the start message: {t:"start", sym, want:{derivs, calendar, venues, wallets, options}, rec}, and tells when a recording starts or stops: {t:"rec", on}.
+let on = false, gen = 0, sym = "btc", want = {}, ws = null, lastMsg = 0, timer = null, mk = null, prevRatios = null, lastCal = 0, recOn = false, vOn = false, vGen = 0, vSock = {}, vState = {}, lastVen = 0, lastPing = 0, wtr = null, wsk = null, wTracked = new Map(), wGen = 0, startAt = 0, dsk = null, dGen = 0, dState = {}, optOn = false;
 const last = {}, busy = {}, hold = {}, said = {};
 const BN = "https://fapi.binance.com", HLI = "https://api.hyperliquid.xyz/info";
 const post = m => self.postMessage(m);
@@ -112,6 +113,44 @@ async function pollFunding() {
 function walletsStart() { wGen++; wtr = COLLECT.walletTracker(); wTracked = new Map(); wOpen(); }
 function walletsStop() { wGen++; wtr = null; wTracked = new Map(); if (wsk) try { wsk.w.close(); } catch {} wsk = null; }
 
+// ---- options and volatility (Deribit): the volatility and price index arrive on a socket; the chain is a request (about 400 KB, sent compressed)
+function dOpen() {
+  const g = dGen, c = sym.toLowerCase(); let w;
+  try { w = new WebSocket("wss://www.deribit.com/ws/api/v2"); } catch (e) { say("options", e); return; }
+  dsk = {w, last:Date.now()};
+  w.onopen = () => { try { w.send(JSON.stringify({jsonrpc:"2.0", id:1, method:"public/subscribe", params:{channels:["deribit_volatility_index." + c + "_usd", "deribit_price_index." + c + "_usd"]}})); } catch {} };
+  w.onmessage = ev => {
+    if (!dsk || dsk.w !== w) return;
+    const now = dsk.last = Date.now(); let j; try { j = JSON.parse(ev.data); } catch { return; }
+    const p = j.method === "subscription" && j.params; if (!p || !p.data) return;
+    if (/volatility_index/.test(p.channel)) { dState.vol = +p.data.volatility; dState.vAt = now; }
+    else if (/price_index/.test(p.channel)) { dState.idx = +p.data.price; dState.iAt = now; }
+  };
+  w.onclose = () => { if (!on || g !== dGen) return; say("options socket", "closed, reopening"); setTimeout(() => { if (on && g === dGen) dOpen(); }, 5000); };
+}
+async function pollOptions() {
+  const g = gen, t = Date.now(), j = await getJson("options", "https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=" + COLLECT.deribitCoin(sym) + "&kind=option");
+  if (!on || g !== gen) return;
+  const c = COLLECT.optionsChain(j && j.result, t); if (!c) throw new Error("no usable option chain");
+  col("optChain", t, c);
+}
+function optionsStart() {
+  dGen++; dState = {}; optOn = false;
+  if (!COLLECT.deribitCoin(sym)) { say("options", "Deribit has options for BTC and ETH only, not " + sym.toUpperCase()); return; }
+  optOn = true; dOpen();
+}
+function optionsStop() { dGen++; optOn = false; if (dsk) try { dsk.w.close(); } catch {} dsk = null; dState = {}; }
+function optionsTick(now) {
+  if (!optOn) return;
+  if (dsk && now - dsk.last > 60000) try { dsk.w.close(); } catch {}      // the volatility index pushes every few seconds, so a minute of silence is a dead socket
+  if (now - (last.dping || 0) >= 30000) { last.dping = now; if (dsk && dsk.w.readyState === 1) try { dsk.w.send(JSON.stringify({jsonrpc:"2.0", id:2, method:"public/test"})); } catch {} }
+  if (COLLECT.due(last.dvol, now, COLLECT.EVERY.dvol) && (dState.vol != null || dState.idx != null)) {
+    last.dvol = now;
+    col("dvol", now, {vol:Number.isFinite(dState.vol) ? dState.vol : null, idx:Number.isFinite(dState.idx) ? dState.idx : null, vAge:dState.vAt ? now - dState.vAt : null, iAge:dState.iAt ? now - dState.iAt : null});
+  }
+  if (COLLECT.due(last.options, now, COLLECT.EVERY.options)) { last.options = now; run("options", pollOptions); }
+}
+
 // ---- extra venues: open only while a recording is on (and the collector is), close when it stops
 function vOpen(v) {
   const g = vGen; let w;
@@ -152,6 +191,7 @@ function tick() {
     if (now - startAt >= 60000 && COLLECT.due(last.wallets, now, COLLECT.EVERY.wallets)) { last.wallets = now; run("wallets", pollWallets); }
     if (COLLECT.due(last.fundPred, now, COLLECT.EVERY.funding)) { last.fundPred = now; run("fundPred", pollFunding); }
   }
+  if (want.options) optionsTick(now);
   if (!want.derivs) return;
   const E = COLLECT.EVERY;
   if (COLLECT.due(last.prem, now, E.prem)) { last.prem = now; run("bnDerivs", pollPremium); }
@@ -161,7 +201,7 @@ function tick() {
 }
 self.onmessage = ev => {
   const m = ev.data;
-  if (m.t === "start") { on = true; gen++; venuesClose(); walletsStop(); sym = String(m.sym || "btc"); want = m.want || {derivs:true}; recOn = !!m.rec; mk = null; prevRatios = null; lastCal = Date.now(); for (const k of [last, busy, hold, said]) for (const i in k) delete k[i]; startAt = Date.now(); if (want.derivs) open(); if (want.wallets) walletsStart(); venuesSync(); clearInterval(timer); timer = setInterval(tick, 1000); tick(); }
+  if (m.t === "start") { on = true; gen++; venuesClose(); walletsStop(); optionsStop(); sym = String(m.sym || "btc"); want = m.want || {derivs:true}; recOn = !!m.rec; mk = null; prevRatios = null; lastCal = Date.now(); for (const k of [last, busy, hold, said]) for (const i in k) delete k[i]; startAt = Date.now(); if (want.derivs) open(); if (want.wallets) walletsStart(); if (want.options) optionsStart(); venuesSync(); clearInterval(timer); timer = setInterval(tick, 1000); tick(); }
   else if (m.t === "rec") { recOn = !!m.on; venuesSync(); }
-  else if (m.t === "stop") { venuesClose(); walletsStop(); on = false; gen++; clearInterval(timer); try { if (ws) ws.close(); } catch {} ws = null; }
+  else if (m.t === "stop") { venuesClose(); walletsStop(); optionsStop(); on = false; gen++; clearInterval(timer); try { if (ws) ws.close(); } catch {} ws = null; }
 };

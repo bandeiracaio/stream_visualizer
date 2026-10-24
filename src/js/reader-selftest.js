@@ -170,6 +170,21 @@ const READER_SELFTEST=(()=>{
       &&lf.length===1&&lf[0].coin==="ETH"&&lf[0].w==="0xabc"&&lf[0].liquidated==="0xabc"&&lf[0].mark===3001&&lf[0].px===3000.5&&snap.length===0&&other.every(x=>x.length===0)
       &&J(pf)==='{"Bin":[0.00005,1792800000000,4],"Hl":[0.0000125,1792796400000,1]}'&&COLLECT.predictedFunding([],"BTC")===null&&COLLECT.predictedFunding([["ETH",[]]],"BTC")===null&&COLLECT.REGISTRY.some(c=>c.id==="wallets"&&c.speed==="slow"),detail:J({top,all,later,pos,flat,lf,pf})};
   });
+  add("collectors: options chain: expiry names, at-the-money vol, skew by moneyness, open interest and busiest strikes per expiry",E=>{
+    const J=JSON.stringify,now=Date.UTC(2026,9,24,8,0,0);
+    const mk=(exp,k,cp,iv,oi,vol,F)=>({instrument_name:"BTC-"+exp+"-"+k+"-"+cp,mark_iv:iv,open_interest:oi,volume:vol,underlying_price:F,estimated_delivery_price:81000});
+    const ks=[80,90,95,100,105,110,120],puts={80:60,90:50,95:45,100:39,105:37,110:38,120:44},calls={80:55,90:48,95:44,100:41,105:38,110:39,120:45};
+    const chain=[];for(const k of ks){chain.push(mk("27OCT26",k,"P",puts[k],k===90?30:1,2,100));chain.push(mk("27OCT26",k,"C",calls[k],k===110?20:2,3,100));}
+    chain.push(mk("30OCT26",100,"C",33,5,1,102),mk("30OCT26",100,"P",31,6,1,102),mk("23OCT26",100,"C",99,9,9,100),{instrument_name:"BTC-PERPETUAL"},{instrument_name:"BTC-27OCT26-x-C"},null);
+    for(const x of ["1NOV26","2NOV26","3NOV26","4NOV26","5NOV26"])chain.push(mk(x,100,"C",30,1,1,100));
+    const c=COLLECT.optionsChain(chain,now),e=c.exps[0],e2=c.exps[1];
+    const on=COLLECT.optName("BTC-5NOV26-73000.5-P"),bad=[COLLECT.optName("BTC-PERPETUAL"),COLLECT.optName("BTC-27XXX26-1-C"),COLLECT.optName(null)];
+    return{ok:c.u===81000&&c.exps.length===5&&J(c.exps.map(x=>x.x))==='["27OCT26","30OCT26","1NOV26","2NOV26","3NOV26"]'&&e.dte===3&&e.f===100&&e.atm===40&&e.s["-10"]===50&&e.s["-5"]===45&&e.s["5"]===38&&e.s["10"]===39
+      &&e.op===30+1*6&&e.oc===2*6+20&&e.vp===14&&e.vc===21&&J(e.pin[0])==='[90,32]'&&J(e.pin[1])==='[110,21]'&&e.pin.length===5
+      &&e2.dte===6&&e2.atm===32&&e2.s["-10"]===null&&e2.s["5"]===null&&c.tot.oc>0&&c.tot.op===36+6&&on.k===73000.5&&on.cp==="P"&&on.t===Date.UTC(2026,10,5,8)&&bad.every(x=>x===null)
+      &&COLLECT.optionsChain([],now)===null&&COLLECT.optionsChain(null,now)===null&&COLLECT.optionsChain([mk("23OCT26",100,"C",30,1,1,100)],now)===null
+      &&COLLECT.deribitCoin("btc")==="BTC"&&COLLECT.deribitCoin("ETH")==="ETH"&&COLLECT.deribitCoin("sol")===null&&COLLECT.REGISTRY.some(x=>x.id==="options"&&x.speed==="slow"),detail:J({u:c.u,e,e2,tot:c.tot,names:c.exps.map(x=>x.x)})};
+  });
   add("collectors: records among the inputs change no detection and no session quality",E=>{
     const e=E.create();e.startRecording();const a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:21,params:()=>burstSell});sim(e,{t0:b.t,mid0:b.mid,seconds:40,seed:22});
     const inputs=e.stopRecording(),mixed=[];inputs.forEach((r,i)=>{mixed.push(r);if(i%40===0)mixed.push(COLLECT.rec("feeds",T0+i,{src:"page",feeds:{bn:{n:1}}}));});
