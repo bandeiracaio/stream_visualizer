@@ -21,6 +21,9 @@ const S = {};
 function freshStats(){ return {total:0,cur:0,bytes:0,rates:new Array(60).fill(0),lats:[],late:0,maxLat:null,last:0,payload:null}; }
 for (const d of STREAMS) S[d.id] = Object.assign({def:d, on:!d.off}, freshStats());
 const HL_CHANNEL = {trades:"hl.trades", l2Book:"hl.l2Book", bbo:"hl.bbo", activeAssetCtx:"hl.ctx", candle:"hl.candle"};
+// Text colour of each stream in the Raw messages log (and in its filter list): warm colours are Binance, cool colours are Hyperliquid.
+const LOG_COLOR = {"bn.trade":"#f0b90b", "bn.aggTrade":"#c9a227", "bn.depth":"#ff8a3d", "bn.bookTicker":"#ffb4a2", "bn.markPrice":"#e07be0", "bn.forceOrder":"#ff5c5c", "bn.ticker":"#a89984", "bn.kline":"#8a7f60", "bn.oi":"#ffd9a0",
+                   "hl.trades":"#5fd4c4", "hl.l2Book":"#4da6ff", "hl.bbo":"#9ad1ff", "hl.ctx":"#7be08f", "hl.candle":"#b19cff"};
 
 // ---------- helpers ----------
 const $ = id => document.getElementById(id);
@@ -401,7 +404,7 @@ function buildCards(){
     el.classList.toggle("off", !S[d.id].on);
     el.onclick = () => { selected = d.id; document.querySelectorAll(".card").forEach(c=>c.classList.remove("sel")); el.classList.add("sel"); $("logFilter").value = d.id; renderInspector(); renderLog(); };
     box.appendChild(el);
-    const o = document.createElement("option"); o.value=d.id; o.textContent=`${d.v.toUpperCase()} ${d.name}`; $("logFilter").appendChild(o);
+    const o = document.createElement("option"); o.value=d.id; o.textContent=`${d.v.toUpperCase()} ${d.name}`; o.style.color = LOG_COLOR[d.id] || ""; $("logFilter").appendChild(o);
   }
 }
 const reconnectTimers = {};
@@ -480,7 +483,7 @@ function renderLog(){
   const lines = (f ? logLines.filter(l=>l.id===f) : logLines).slice(-150);
   const esc = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;");
   const box = $("log"), atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 20;
-  box.innerHTML = lines.map(l=>`${hhmmss(l.t)} <span class="s">${l.id.padEnd(13)}</span>${l.bf?'<span class="bf">[replay] </span>':""}${esc(l.raw.length>220?l.raw.slice(0,220)+"…":l.raw)}`).join("\n");
+  box.innerHTML = lines.map(l=>`${hhmmss(l.t)} <span style="color:${LOG_COLOR[l.id]||"inherit"}">${l.id.padEnd(13)}${l.bf?'<span class="bf">[replay] </span>':""}${esc(l.raw.length>220?l.raw.slice(0,220)+"…":l.raw)}</span>`).join("\n");
   if (atBottom) box.scrollTop = box.scrollHeight;
 }
 function renderInspector(){
