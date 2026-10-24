@@ -48,6 +48,14 @@ Things to know:
 - A frozen page cannot write to the tape: the worker keeps collecting and the page writes the records when it thaws, with their own times.
 - The first real `hlLiq` record (a liquidation of a followed wallet) is worth checking by eye: its shape comes from Hyperliquid's documentation and has only been tested with a made-up message.
 
+## Reading the collector data afterwards
+
+`node analyze-collectors.mjs tape_*.json session_*.json.gz` (from the repo root; add `--fields` for every numeric field, `--horizon 600` for a 10-minute look-ahead, `--json` for machine output). Per file it prints:
+- **Coverage** per collector: records, share of minutes with data, longest gap, and how many gaps were within three times the usual interval. Low numbers mean the page was frozen or the collector was off.
+- **Lead-in** (sessions only): how many minutes before the start each collector's data reaches. An auto-recording should show about 30; it is flagged when under 25.
+- **Fields that never change**: a collector reading a constant tells you nothing (some are expected, for example a funding rate that does not move for hours).
+- **Lead test**: each feature (volatility index, funding, basis, book imbalance, cross-venue price gaps, option skew...) against the volatility and absolute move of the Binance mark over the next 5 minutes, as a rank correlation. Descriptive only: the windows overlap, so there is no significance, and a few hours prove nothing. It needs the `basis` collector for at least 20 minutes (a tape from a long day is best). This is the first look for the monthly judgement; a feature near zero over weeks is a candidate to drop.
+
 ## After a session
 
 1. Reader tab: check the **Sessions** list shows the session as counted, and that no variable is stuck on `prior` that should be `learned`.
