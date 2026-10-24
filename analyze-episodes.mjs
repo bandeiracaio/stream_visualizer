@@ -6,7 +6,8 @@
 //   1. overview: groups per family and side, their outcomes, and how many you labelled;
 //   2. context: per family, which features were unusually high or low when it fired (median percentile far from 50);
 //   3. labels: per family, the mean percentile of the features in the groups you agreed with against those you disagreed with (permutation test, corrected for the number of features);
-//   4. outcomes: the same for the two most common outcomes of a family.
+//   4. results: the same for the two most common results of a family. A wall's result is how it ended (pulled, eaten, left...); for the other families every episode simply "faded", so the result is what the
+//      price did afterwards: resolved with the aggressor, against it, or flat (the engine's `resolution`).
 // Descriptive and small-sample by nature: it never says "keep"; it says where to look. A few dozen labelled groups per family are needed before 3 and 4 print anything.
 // Usage:  node analyze-episodes.mjs SESSION... [--labels reader_labels.json] [--tape tape_*.json]... [--cfg cfg.json] [--all] [--json]      |      --selftest
 //   SESSION is a session_*.json.gz (it must carry `ext`, so it was saved with v053 or later). --tape adds collector data to the reference only (a whole night is a better
@@ -81,7 +82,7 @@ export function analyzeEpisodes(sessions, labels, refRecords, cfg, E, plan = PLA
     for (const g of e.episodeGroups()) {
       const ctx = {};
       for (const f in FEATURES) { const v = valueAt(by, f, g.tDetected), r = ref[f]; if (v != null && r && r.length >= plan.minRefValues) ctx[f] = +percentile(r, v).toFixed(1); }
-      rows.push({ session:s.file, family:g.family, side:rtSide(g) || "-", venue:g.venues && g.venues.length > 1 ? "any" : g.venue, tDetected:g.tDetected, tStart:g.tStart, tEnd:g.tEnd || g.tUpdate, outcome:g.outcome || "-", resolution:g.resolution || "-", label:labelFor(labels, g), ctx });
+      rows.push({ session:s.file, family:g.family, side:rtSide(g) || "-", venue:g.venues && g.venues.length > 1 ? "any" : g.venue, tDetected:g.tDetected, tStart:g.tStart, tEnd:g.tEnd || g.tUpdate, outcome:g.outcome || "-", resolution:g.resolution || "-", result:g.family === "wall" ? (g.outcome || "-") : (g.resolution || "-"), label:labelFor(labels, g), ctx });
     }
   });
   const families = {};
@@ -89,7 +90,7 @@ export function analyzeEpisodes(sessions, labels, refRecords, cfg, E, plan = PLA
   const out = {};
   for (const fam in families) {
     const g = families[fam], o = { n:g.length, sides:{}, outcomes:{}, labelled:{ agree:0, disagree:0, none:0 }, context:[], labelContrast:[], outcomeContrast:[] };
-    for (const r of g) { o.sides[r.side] = (o.sides[r.side] || 0) + 1; o.outcomes[r.outcome] = (o.outcomes[r.outcome] || 0) + 1; o.labelled[r.label || "none"]++; }
+    for (const r of g) { o.sides[r.side] = (o.sides[r.side] || 0) + 1; o.outcomes[r.result] = (o.outcomes[r.result] || 0) + 1; o.labelled[r.label || "none"]++; }
     for (const f in FEATURES) {
       const vals = g.filter(r => r.ctx[f] != null).map(r => r.ctx[f]);
       if (vals.length >= plan.minGroups) { const m = median(vals); o.context.push({ feature:f, n:vals.length, median:+m.toFixed(1), flag:Math.abs(m - 50) >= plan.contextFlag }); }
@@ -98,7 +99,7 @@ export function analyzeEpisodes(sessions, labels, refRecords, cfg, E, plan = PLA
     }
     const top = Object.entries(o.outcomes).sort((a, b) => b[1] - a[1]).slice(0, 2).map(x => x[0]);
     if (top.length === 2) for (const f in FEATURES) {
-      const x = g.filter(r => r.outcome === top[0] && r.ctx[f] != null).map(r => r.ctx[f]), y = g.filter(r => r.outcome === top[1] && r.ctx[f] != null).map(r => r.ctx[f]);
+      const x = g.filter(r => r.result === top[0] && r.ctx[f] != null).map(r => r.ctx[f]), y = g.filter(r => r.result === top[1] && r.ctx[f] != null).map(r => r.ctx[f]);
       if (x.length >= plan.minPerLabel && y.length >= plan.minPerLabel) { const c = contrast(x, y, plan.permutations, plan.seed + 1); o.outcomeContrast.push(Object.assign({ feature:f, a:top[0], b:top[1], suggestive:c.p <= plan.alpha/nF }, c)); }
     }
     o.context.sort((a, b) => Math.abs(b.median - 50) - Math.abs(a.median - 50));
@@ -123,7 +124,7 @@ function print(r, all) {
     if (!o.labelContrast.length) L("   not enough labels (need " + PLAN.minPerLabel + " agree and " + PLAN.minPerLabel + " disagree with the same feature)");
     for (const c of o.labelContrast.slice(0, all ? 99 : 6)) L("   " + c.feature.padEnd(32) + (c.diff >= 0 ? "+" : "") + String(c.diff).padEnd(7) + "p " + String(c.p).padEnd(8) + "n " + c.na + "/" + c.nb + (c.suggestive ? "   suggestive" : ""));
     if (o.outcomeContrast.length) {
-      L("   OUTCOMES: " + o.outcomeContrast[0].a + " vs " + o.outcomeContrast[0].b);
+      L("   RESULTS: " + o.outcomeContrast[0].a + " vs " + o.outcomeContrast[0].b);
       for (const c of o.outcomeContrast.slice(0, all ? 99 : 6)) L("   " + c.feature.padEnd(32) + (c.diff >= 0 ? "+" : "") + String(c.diff).padEnd(7) + "p " + String(c.p).padEnd(8) + "n " + c.na + "/" + c.nb + (c.suggestive ? "   suggestive" : ""));
     }
   }

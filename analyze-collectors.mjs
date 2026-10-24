@@ -25,7 +25,7 @@ export function readInput(file) {
   if (j.kind === "sv-tape") return { file, kind:"tape", version:j.version, records:(j.records || []).filter(COLLECT.isRec), t0:null, t1:null };
   if (j.kind === "sv-session") {
     const recs = (j.ext || []).filter(COLLECT.isRec), times = (j.inputs || []).map(r => r[0] === "t" ? r[1] && r[1].t : r[2]).filter(Number.isFinite);
-    const end = times.length ? Math.max(...times) : (recs.length ? recs[recs.length - 1][2] : j.startedAt);
+    let end = recs.length ? recs[recs.length - 1][2] : j.startedAt; if (times.length) { end = -Infinity; for (const t of times) if (t > end) end = t; }      // a loop: a long recording has more inputs than Math.max can take as arguments
     return { file, kind:"session", sym:j.sym, auto:!!j.pre, records:recs, t0:j.startedAt, t1:end, quality:j.quality || null, inputs:j.inputs || [] };
   }
   throw new Error(file + ": not a tape or a session (kind " + j.kind + ")");
@@ -238,8 +238,8 @@ function print(r, showFields) {
   L("\n   COVERAGE".padEnd(26) + "records   minutes with data   longest gap   on time (gaps <= 3x usual)");
   for (const o of Object.keys(COLLECT.EXPECT_MS)) { const c = r.coverage.owners[o]; L("   " + o.padEnd(22) + (c ? String(c.n).padEnd(10) + (c.minutesPct + "%").padEnd(22) + dur(c.maxGapMs).padEnd(14) + (c.onTimePct == null ? "-" : c.onTimePct + "%") : "none")); }
   if (r.leadIn) {
-    L("\n   LEAD-IN (minutes of data before the start; an auto-recording should reach 30)");
-    for (const o of Object.keys(COLLECT.EXPECT_MS)) { const v = r.leadIn[o]; if (v == null) continue; L("   " + o.padEnd(22) + v + (r.auto && v < 25 ? "   short for an auto-recording" : "")); }
+    L("\n   LEAD-IN (minutes of data before the start; an auto-recording should reach 30 for the always-on collectors; venues start when armed and book depth when recording starts, so they are not flagged)");
+    for (const o of Object.keys(COLLECT.EXPECT_MS)) { const v = r.leadIn[o]; if (v == null) continue; L("   " + o.padEnd(22) + v + (r.auto && v < 25 && (COLLECT.REGISTRY.find(c => c.id === o) || {}).speed === "slow" ? "   short for an auto-recording" : "")); }
   }
   L("\n   FIELDS that never change: " + (r.constants.length ? "" : "none"));
   for (const c of r.constants) L("   " + c);
