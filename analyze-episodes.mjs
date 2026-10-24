@@ -1,7 +1,8 @@
 // Offline analysis: what did the collectors read when the Reader detected something, and does it differ between the episodes you agreed with and the ones you disagreed with?
 // Replays each saved session through the Reader engine (the same code the app runs, default thresholds unless --cfg), takes the episode GROUPS (one per event: the fast and mid readings of
 // one thing are one group, like the labels), and for every group looks up the newest collector record of each feature at the moment it was detected. A value is turned into a percentile
-// against everything the collectors read in the data given (so "at 90" means: the feature was higher than 90% of the time). Then:
+// against everything the collectors read in the data given. The value compared is the feature's DEVIATION from its own mean of the previous 30 minutes, so "at 90" means: it had risen more than 90% of the time
+// (a level that drifts all night, such as funding or open interest, would otherwise put every episode of one recording at the same extreme and say nothing about the episode). Then:
 //   1. overview: groups per family and side, their outcomes, and how many you labelled;
 //   2. context: per family, which features were unusually high or low when it fired (median percentile far from 50);
 //   3. labels: per family, the mean percentile of the features in the groups you agreed with against those you disagreed with (permutation test, corrected for the number of features);
@@ -14,10 +15,10 @@ import fs from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
-import { readInput, FEATURES, rng } from "./analyze-collectors.mjs";
+import { readInput, FEATURES, rng, featureSeries } from "./analyze-collectors.mjs";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
-export const PLAN = { minGroups:5, minPerLabel:6, minRefValues:50, permutations:999, seed:4242, alpha:0.05, contextFlag:15, stepMs:10000 };
+export const PLAN = { minGroups:5, minPerLabel:6, minRefValues:50, permutations:999, seed:4242, alpha:0.05, contextFlag:15, stepMs:10000, detrendSec:1800 };
 const COLLECT = vm.runInNewContext(fs.readFileSync(path.join(root, "src/js/collectors-core.js"), "utf8") + "\n;COLLECT", {});
 
 function loadEngine(extra = []) {
@@ -37,21 +38,19 @@ export function labelFor(labels, ep) { for (let i = labels.length - 1; i >= 0; i
 const num = x => (typeof x === "number" && Number.isFinite(x) ? x : null);
 function indexExt(records) { const by = {}; for (const r of records) (by[r[1]] ||= []).push(r); for (const k in by) by[k].sort((a, b) => a[2] - b[2]); return by; }
 const maxAge = f => f.startsWith("ratios.") ? 900000 : Math.max(3*(COLLECT.EXPECT_MS[COLLECT.ownerOf(FEATURES[f][0])] || 60000), 120000);
+// the feature's DEVIATION from its own mean of the previous 30 minutes at the newest reading at or before t (null when there is none, it is stale, or fewer than 5 earlier readings exist).
+// Levels that drift all night (funding, open interest, a volatility index) would otherwise put every episode of a recording at the same extreme percentile and say nothing about the episode.
 function valueAt(by, f, t) {
-  const rows = by[FEATURES[f][0]]; if (!rows || !rows.length) return null;
-  let lo = 0, hi = rows.length; while (lo < hi) { const m = (lo + hi) >> 1; if (rows[m][2] <= t) lo = m + 1; else hi = m; }
-  for (let i = lo - 1; i >= 0 && t - rows[i][2] <= maxAge(f); i--) { let x = null; try { x = FEATURES[f][1](rows[i][3] || {}); } catch {} if (num(x) != null) return x; else break; }
-  return null;
+  const ser = (by.__s ||= {})[f] ||= featureSeries(by[FEATURES[f][0]] || [], FEATURES[f][1], PLAN.stepMs, PLAN.detrendSec*1000);
+  let lo = 0, hi = ser.length; while (lo < hi) { const m = (lo + hi) >> 1; if (ser[m].t <= t) lo = m + 1; else hi = m; }
+  const q = ser[lo - 1]; return q && t - q.t <= maxAge(f) ? q.dev : null;
 }
-// every feature's values in the data, one per step at most, sorted: the "usual" a value is compared with
-export function reference(recordSets, step = PLAN.stepMs) {
+// every feature's deviations from its own trailing 30-minute mean in the data, one per step at most, sorted: the "usual" a deviation is compared with
+export function reference(recordSets, step = PLAN.stepMs, winMs = PLAN.detrendSec*1000) {
   const ref = {};
   for (const recs of recordSets) {
     const by = indexExt(recs);
-    for (const f in FEATURES) {
-      let last = -Infinity; const out = (ref[f] ||= []);
-      for (const r of by[FEATURES[f][0]] || []) { if (r[2] - last < step) continue; let x = null; try { x = FEATURES[f][1](r[3] || {}); } catch {} if (num(x) != null) { out.push(x); last = r[2]; } }
-    }
+    for (const f in FEATURES) { const out = (ref[f] ||= []); for (const q of featureSeries(by[FEATURES[f][0]] || [], FEATURES[f][1], step, winMs)) if (q.dev != null) out.push(q.dev); }
   }
   for (const f in ref) ref[f].sort((a, b) => a - b);
   return ref;
@@ -117,7 +116,7 @@ function print(r, all) {
     const o = r.families[fam], lab = o.labelled;
     L("\n-- " + fam.toUpperCase() + ": " + o.n + " groups; sides " + JSON.stringify(o.sides) + "; outcomes " + JSON.stringify(o.outcomes) + "; labelled: " + lab.agree + " agree, " + lab.disagree + " disagree, " + lab.none + " not labelled");
     const ctx = o.context.filter(c => all || c.flag);
-    L("   CONTEXT at detection (median percentile of the feature, 50 = usual" + (all ? "" : "; only those at least " + PLAN.contextFlag + " away") + ")");
+    L("   CONTEXT at detection (median percentile of the feature's deviation from its 30-minute mean, 50 = usual" + (all ? "" : "; only those at least " + PLAN.contextFlag + " away") + ")");
     if (!ctx.length) L("   none" + (o.context.length ? "" : " (fewer than " + PLAN.minGroups + " groups with data)"));
     for (const c of ctx) L("   " + c.feature.padEnd(32) + String(c.median).padEnd(7) + "n " + c.n + (c.flag ? (c.median > 50 ? "   high" : "   low") : ""));
     L("   LABELS: agree vs disagree (difference of mean percentiles; p from " + PLAN.permutations + " shuffles; suggestive below " + PLAN.alpha + "/" + Object.keys(FEATURES).length + ")");
@@ -141,7 +140,7 @@ function selfTest() {
     const recs = [];
     for (let t = t0; t < t0 + 220000; t += 10000) {
       recs.push(R("dvol", t, { vol:50 + rnd()*4 + (t >= g.tDetected - 5000 ? (agree ? 25 : -25) : 0), idx:80000 }));      // differs between agreed and disagreed groups, only around detection
-      recs.push(R("hlCtx", t, { fund:0.0001, oi:1000, prem:rnd()*1e-4 }));      // noise
+      recs.push(R("hlCtx", t, { fund:0.0001, oi:1000 + (t - t0)/200, prem:rnd()*1e-4 }));      // prem is noise; oi only climbs, like a level drifting all night
     }
     sessions.push({ file:"sim" + k, records:recs, inputs });
     labels.push({ verdict:agree ? "agree" : "disagree", family:g.family, venue:"any", side:"sell", t0:g.tStart, t1:g.tEnd || g.tUpdate });
@@ -158,6 +157,7 @@ function selfTest() {
     ["labels were matched to the groups the way the app matches them", f.labelled.agree === K/2 && f.labelled.disagree === K/2 && f.labelled.none === 0],
     ["the feature built to differ between agreed and disagreed groups is found, suggestive", dv && dv.diff > 30 && dv.suggestive && dv.na === K/2 && dv.nb === K/2],
     ["the noise feature is not suggestive", pr && !pr.suggestive],
+    ["a level that only drifts does not look unusual at detection (its deviation is typical)", (((only.families.burst || {}).context || []).find(c => c.feature === "hlCtx.oi") || {}).flag === false],
     ["context: that feature reads far from the usual at detection (median percentile flagged)", ctx && ctx.n === K/2 && ctx.median > 65 && ctx.flag],
     ["percentile: below, inside, above and ties", percentile(ref, 0) === 0 && percentile(ref, 100) === 100 && Math.abs(percentile(ref, 5) - 100*(4 + 1.5)/12) < 1e-9 && percentile([], 1) === null],
     ["contrast: a clear difference is significant, none is not, and the answer repeats", c1.diff > 50 && c1.p <= 0.02 && c2.p > 0.2 && J(contrast([1, 2, 3], [4, 5, 6], 99, 5)) === J(contrast([1, 2, 3], [4, 5, 6], 99, 5)) && contrast([], [1], 9, 1) === null],
