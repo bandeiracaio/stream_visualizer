@@ -14,8 +14,14 @@ const arDur = ms => { const m = Math.floor(ms/60000); return ms < 60000 ? Math.r
   for (const id in AR_FIELDS){ const k = AR_FIELDS[id]; ar$(id).value = saved && saved[k] > 0 ? saved[k] : AUTOREC.DEFAULTS[k]; ar$(id).onchange = () => store.set("ar.cfg", arCfgFromUi()); }
   ar$("arRearm").checked = !saved || saved.rearm !== false; ar$("arRearm").onchange = () => store.set("ar.cfg", arCfgFromUi());
   ar$("arArm").onclick = arToggle;
+  ar$("arHdr").onclick = () => {      // the same switch from the header: arms with the settings of the Reader tab and shows the answer here for a few seconds
+    arToggle(); const m = ar$("arMsg").textContent, box = ar$("arHdrMsg"); box.textContent = m.length > 140 ? m.slice(0, 137) + "…" : m;
+    clearTimeout(arInit.t); arInit.t = setTimeout(() => { box.textContent = ""; }, 9000);
+  };
   document.addEventListener("visibilitychange", () => { if (AR.on && document.visibilityState === "visible") arLock(); });     // the screen lock is dropped when the tab is hidden
 })();
+
+function arLabels() { const t = AR.on ? "Disarm" : "Arm"; ar$("arArm").textContent = ar$("arHdr").textContent = t; ar$("arHdr").classList.toggle("on", AR.on); }
 
 function arUrl() {
   const d = STREAMS.find(x => x.id === "bn.markPrice"), key = $("route").value === "routed" ? d.sock : "legacy", sub = d.sub(bnSym());
@@ -56,7 +62,7 @@ function arToggle() {
   AR.cfg = arCfgFromUi(); store.set("ar.cfg", AR.cfg);
   AR.on = true; AR.gen++; AR.h = AUTOREC.createHistory(); AR.st = {mode:"waiting"}; AR.byUs = false; AR.t0 = Date.now(); AR.runs = 0; AR.drops = [];
   arStartFeed(); arKeepAlive(); arLock(); AR.timer = setInterval(arTick, 5000);
-  ar$("arArm").textContent = "Disarm"; arMsg("Armed. It needs 15 minutes of prices to know what a normal hour looks like before it can judge."); arTick();
+  arLabels(); arMsg("Armed. It needs 15 minutes of prices to know what a normal hour looks like before it can judge."); arTick();
 }
 function arTick() {
   if (!AR.on) return;
@@ -111,5 +117,5 @@ function arFinish(msg) {
   try { if (AR.ws) AR.ws.close(); } catch {} AR.ws = null;
   if (AR.unlock) { AR.unlock(); AR.unlock = null; }
   try { if (AR.lock) AR.lock.release(); } catch {} AR.lock = null;
-  ar$("arArm").textContent = "Arm"; ar$("arStat").textContent = "off"; arMsg(msg);
+  arLabels(); ar$("arStat").textContent = "off"; arMsg(msg);
 }

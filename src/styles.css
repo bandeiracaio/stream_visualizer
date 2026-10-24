@@ -11,6 +11,7 @@ input,select,button{font:inherit;color:var(--text);background:var(--panel2);bord
 input[type=text]{width:64px;text-transform:uppercase;font-family:var(--mono)}
 button{cursor:pointer}button.primary{background:var(--accent);color:#0d1014;border-color:var(--accent);font-weight:600}
 button.on{border-color:var(--accent);color:var(--accent)}
+#arHdr.on{border-color:var(--warn);color:var(--warn)}#arHdrMsg{max-width:100%}#arHdrMsg:empty{display:none}
 .stat{font-family:var(--mono);color:var(--dim);font-size:12px}.stat b{color:var(--text);font-weight:600}
 nav{display:flex;gap:4px;overflow-x:auto;width:100%;padding-top:2px}
 nav button{flex:none;padding:4px 10px;font-size:12px}

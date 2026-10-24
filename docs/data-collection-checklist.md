@@ -15,7 +15,7 @@ For the first real collection weeks. Numbers come from the code defaults (`reade
 2. Leave **warm-up** to finish (the Reader shows calibrating until it has enough data); nothing is recorded in the baselines before that.
 3. Keep the tab **visible**: its own Chrome window, in front, not minimized, not covered, not behind another tab, screen awake and the computer plugged in and set not to sleep. A hidden tab has its timers slowed to once a minute and can be frozen by the browser (seen on 2026-10-22: freezes of about 55 s a minute, price stream dropping every 2 minutes, learning restarting, and a recording that held 5 minutes of data in an hour). Chrome: turn off Memory Saver (`chrome://settings/performance`); the flags `chrome://flags` *Calculate window occlusion* and *Intensive wake up throttling* may also matter. The wake lock only works while the tab is visible.
 4. For jumps in activity, **arm auto-record at least 15 minutes ahead** (it needs 15 minutes of prices for its hour baseline). It starts at 1.8x the hour's sigma (above the 0.4 floor) or above 1.2 bps per root second, stops after 5 calm minutes or 60 minutes, then downloads the file.
-5. The app must be disconnected to arm auto-record; arming opens one price socket only.
+5. The app must be disconnected to arm auto-record; arming opens one price socket only. The **Arm** button is in the header next to Pause (it turns amber and says Disarm while armed; its answer shows next to it for a few seconds) and also in the Reader tab; both use the settings of the Reader tab.
 
 ## Unattended collection: how to tell it worked
 
