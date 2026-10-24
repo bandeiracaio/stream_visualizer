@@ -130,3 +130,9 @@ Deribit's public API, no key. REST under `https://www.deribit.com/api/v2/public/
 
 ## Status
 All seven candidates (F, A, G, B, C, E, D) are built. The remaining step in the spec is the monthly judgement: coverage, variance, and whether each collector leads the next 5 minutes of volatility or movement; drop the ones that show nothing.
+
+## Changed in v063 (context before an auto-recording's trigger)
+- Motivation (user, 2026-10-24): when a recording turns on, the best information possible should be in the file. The collectors cannot feed the Reader engine (by design); what they can do is travel with the recording.
+- **Lead-in:** `colSlice(t0, leadMs)`; a session saved with auto-record's `pre` takes the tape from 30 minutes before the trigger (it was one minute before the start for every session). The slow collectors (derivatives, wallets, options, calendar, telemetry) were already filling the tape all along, so a night recording now carries their 30 minutes of context. A hand-made recording still takes one minute. The newest-first file budget (8 MB) drops the oldest records first if a file runs over.
+- **Venues while armed:** the page tells the worker `{t:"rec", on}` when a recording is on OR auto-record is armed, so the extra venues' sockets are open for the wait and the lead-in has cross-venue quotes. This replaces "only while recording" for `venues`; the cost is the six sockets and about 2 MB an hour on the tape for as long as auto-record is armed (a night is about 15 MB; the tape keeps 24 h).
+- **Book depth stays recording-only:** it reads the app's full Binance book, which only exists with the feeds connected, and an armed app listens to one price stream by design.

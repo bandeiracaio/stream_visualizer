@@ -27,7 +27,7 @@ For the first real collection weeks. Numbers come from the code defaults (`reade
 
 ## Collectors (since v053): data beyond the Reader's inputs
 
-Collectors write records `["c", name, t, payload]` to a rolling 24 h tape on the device (IndexedDB `sv-tape`), and every saved session carries the matching slice as `ext` (from a minute before it started, newest records first, at most 8 MB). The Reader never sees them: they cannot change a detection (checked by byte-comparing detections on simulated sessions, v053 against v060). Nothing in the app analyses them yet; they are there to be read afterwards. Specs and exact record shapes: `.scratch/collectors/01-collectors.md`.
+Collectors write records `["c", name, t, payload]` to a rolling 24 h tape on the device (IndexedDB `sv-tape`), and every saved session carries the matching slice as `ext` (from a minute before it started, or **30 minutes before the trigger for an auto-recording**, like its `pre` prices; newest records first, at most 8 MB). The Reader never sees them: they cannot change a detection (checked by byte-comparing detections on simulated sessions, v053 against v060). Nothing in the app analyses them yet; they are there to be read afterwards. Specs and exact record shapes: `.scratch/collectors/01-collectors.md`.
 
 **Always on while the page is open** (they run in a worker, so a hidden tab does not slow them):
 - `telemetry`: the page's feeds every 10 s while connected, and the worker's price stream while armed (`feeds`, `markPrice`).
@@ -36,9 +36,9 @@ Collectors write records `["c", name, t, payload]` to a rolling 24 h tape on the
 - `wallets`: the 10 Hyperliquid wallets that traded the most in the coin over 15 minutes: their positions and liquidation prices every 30 s (first reading about 60 s after load), their liquidation fills, and predicted funding across venues (`walletsTop`, `hlLiq`, `fundPred`). Full wallet addresses are in these records.
 - `options`: Deribit volatility index every 10 s and an option chain summary every 120 s, **BTC and ETH only** (`dvol`, `optChain`).
 
-**Only while connected and recording**:
+**Only while connected and recording** (`book`) or **while recording or auto-record is armed** (`venues`):
 - `book`: depth within 1 / 5 / 10 / 20 bps, spread, touch size, size added and removed (`bookBn`, `bookHl`). Runs on the page, so a hidden tab thins it out.
-- `venues`: Coinbase, Bybit, OKX, Binance spot and the majors' marks, once a second (`venues`). The page tells the worker when a recording starts or stops, so a hidden tab may start it a few seconds late.
+- `venues`: Coinbase, Bybit, OKX, Binance spot and the majors' marks, once a second (`venues`). The page tells the worker when a recording starts or stops or auto-record is armed or disarmed, so a hidden tab may start it a few seconds late. This is what gives an auto-recording the cross-venue context from before the trigger. `book` cannot do that: it needs the full feeds connected, and an armed app listens to one price stream only.
 
 Things to know:
 - The collectors follow the **Symbol** box. Changing the symbol, or a switch, restarts the worker (the wallet ranking starts over). For a coin other than BTC, some venues do not list it and its sources are simply missing; `options` stays idle unless the coin is BTC or ETH.

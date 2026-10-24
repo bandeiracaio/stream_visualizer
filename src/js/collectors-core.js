@@ -9,7 +9,7 @@ const COLLECT = (() => {
     {id:"derivs", label:"Derivatives context: funding, open interest, basis, liquidations, long/short and taker ratios (Binance, Hyperliquid)", speed:"slow", on:true},
     {id:"calendar", label:"Calendar tags: funding times, 15m / 1h / 4h / daily / weekly / monthly closes, US open and close, options expiry (rules, no network)", speed:"slow", on:true},
     {id:"book", label:"Book depth (while recording): depth within 1 / 5 / 10 / 25 bps, spread, touch size, size added and removed per side (Binance, Hyperliquid)", speed:"fast", on:true},
-    {id:"venues", label:"Extra venues (while recording): Coinbase, Bybit and OKX quotes, Binance spot, perp marks and indexes, and the ETH / SOL / BNB / XRP / DOGE marks", speed:"fast", on:true},
+    {id:"venues", label:"Extra venues (while recording or armed): Coinbase, Bybit and OKX quotes, Binance spot, perp marks and indexes, and the ETH / SOL / BNB / XRP / DOGE marks", speed:"fast", on:true},
     {id:"wallets", label:"Hyperliquid wallets: position and liquidation price of the 10 biggest traders, their liquidation fills, predicted funding across venues", speed:"slow", on:true},
     {id:"options", label:"Options and volatility (Deribit, BTC and ETH): volatility index, at-the-money implied vol, skew, open interest and busiest strikes by expiry", speed:"slow", on:true},
   ];
@@ -155,7 +155,7 @@ const COLLECT = (() => {
     };
   }
 
-  // ---- extra venues (collector "venues", run by collectors-worker.js while a recording is on): the same instrument on other exchanges, to see who moves first and how
+  // ---- extra venues (collector "venues", run by collectors-worker.js while a recording is on or auto-record is armed): the same instrument on other exchanges, to see who moves first and how
   // far apart the prices are. Raw quotes only; the perp-spot basis and the correlation are worked out afterwards. Public sockets, no keys.
   const MAJORS = ["eth", "sol", "bnb", "xrp", "doge"];      // Binance perp marks, for correlation (the symbol being watched is left out)
   // the sockets to open for a coin: {id, url, sub (sent on open), ping (sent every 20 s)}

@@ -3,7 +3,7 @@
 // posts {t:"col", rec} for each record and {t:"note", k, d} for the Health log, and never touches anything else. An error or a rate limit
 // stops only the source concerned. Collector "derivs": Binance premium index + open interest (15 s), Hyperliquid funding / open interest
 // (15 s), long-short and taker ratios (60 s), and from one stream the basis (10 s) and every liquidation. Collector "calendar": a record at every
-// scheduled instant (COLLECT.calendar, by rule, no network). Collector "venues" (fast, only while a recording is on): sockets to Coinbase, Bybit, OKX, Binance spot and the majors' marks, one record a second.
+// scheduled instant (COLLECT.calendar, by rule, no network). Collector "venues" (fast, only while a recording is on or auto-record is armed): sockets to Coinbase, Bybit, OKX, Binance spot and the majors' marks, one record a second.
 // Collector "wallets": the 10 Hyperliquid wallets that traded the most in this coin over 15 minutes, their positions (30 s), their liquidation fills,
 // and the predicted funding across venues (60 s).
 // Collector "options" (BTC and ETH only): Deribit's volatility index and index price (pushed, sampled every 10 s) and the whole option chain summarised every 120 s.
@@ -151,7 +151,7 @@ function optionsTick(now) {
   if (COLLECT.due(last.options, now, COLLECT.EVERY.options)) { last.options = now; run("options", pollOptions); }
 }
 
-// ---- extra venues: open only while a recording is on (and the collector is), close when it stops
+// ---- extra venues: open only while the page says so ({t:"rec"}: a recording is on or auto-record is armed) and the collector is on, close when that stops
 function vOpen(v) {
   const g = vGen; let w;
   try { w = new WebSocket(v.url); } catch (e) { say("venue " + v.id, e); return; }

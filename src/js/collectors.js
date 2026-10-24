@@ -30,9 +30,9 @@ async function colPrune() {
     CL.count = (await colAll()).length; colRender();
   } catch {}
 }
-// the records for a session that started at t0 (a minute before it, so the lead-in is there), newest within the file budget
-async function colSlice(t0) {
-  try { return COLLECT.fit(COLLECT.slice(await colAll(), (t0 || 0) - 60000, Date.now())); } catch { return []; }
+// the records for a session that started at t0, from leadMs before it (a minute by default; auto-recordings ask for 30 minutes, like their `pre` prices), newest within the file budget
+async function colSlice(t0, leadMs) {
+  try { return COLLECT.fit(COLLECT.slice(await colAll(), (t0 || 0) - (leadMs == null ? 60000 : leadMs), Date.now())); } catch { return []; }
 }
 
 // ---- the page's own feeds, every 10 s while connected
@@ -59,11 +59,12 @@ function colWorkerSync() {
   CL.worker = w; CL.workerKey = key;
   w.onmessage = ev => { if (w !== CL.worker) return; const m = ev.data; if (m.t === "col") colAdd(m.rec); else if (m.t === "note") hlNote(m.k, m.d); };
   w.onerror = () => { if (w !== CL.worker) return; CL.worker = null; try { w.terminate(); } catch {} hlNote("collector worker failed", {err:"stopped on an error"}); };      // no retry loop: reload the page
-  CL.recSent = !!RT.rec; w.postMessage({t:"start", sym, want:wants, rec:CL.recSent});
+  CL.recSent = colWatching(); w.postMessage({t:"start", sym, want:wants, rec:CL.recSent});
 }
 cl$("sym").addEventListener("change", colWorkerSync);
-// tell the worker when a recording starts or stops: the extra venues are only listened to while one is on
-setInterval(() => { const on = !!RT.rec; if (CL.worker && CL.recSent !== on) { CL.recSent = on; CL.worker.postMessage({t:"rec", on}); } }, 1000);
+// tell the worker when the extra venues should be listened to: while a recording is on, and while auto-record is armed (so an auto-recording has the lead-in)
+const colWatching = () => !!RT.rec || (typeof AR !== "undefined" && !!AR.on);
+setInterval(() => { const on = colWatching(); if (CL.worker && CL.recSent !== on) { CL.recSent = on; CL.worker.postMessage({t:"rec", on}); } }, 1000);
 
 // ---- book depth summaries (fast collector "book"): only while the app is connected AND recording. Once a second it writes the Binance book (the full
 // local book, about 17 bps either side for BTC) and the Hyperliquid book (the exact 20 levels, plus a bucketed 20 levels every 2 s for the deeper edges).
