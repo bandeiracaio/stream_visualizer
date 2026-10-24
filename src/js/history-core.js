@@ -10,7 +10,7 @@ const HIST = (() => {
   // ---- Binance -> common rows
   const order = o => ({id:o.orderId, t:+o.time || 0, upd:+o.updateTime || +o.time || 0, symbol:str(o.symbol), side:str(o.side), type:str(o.type), price:num(o.price), qty:num(o.origQty), filled:num(o.executedQty), avg:num(o.avgPrice), status:str(o.status), reduce:!!o.reduceOnly, tif:str(o.timeInForce)});
   const fill = f => ({id:f.id, orderId:f.orderId, t:+f.time || 0, symbol:str(f.symbol), side:str(f.side), price:num(f.price), qty:num(f.qty), fee:num(f.commission), feeAsset:str(f.commissionAsset), pnl:num(f.realizedPnl), maker:!!f.maker});
-  const income = i => ({id:i.tranId, t:+i.time || 0, symbol:str(i.symbol), type:str(i.incomeType), amount:num(i.income), asset:str(i.asset), info:str(i.info)});
+  const income = i => ({id:str(i.incomeType) + ":" + str(i.tranId), t:+i.time || 0, symbol:str(i.symbol), type:str(i.incomeType), amount:num(i.income), asset:str(i.asset), info:str(i.info)});
 
   // raw: {account:/fapi/v2/account, positions:/fapi/v2/positionRisk, dual:/fapi/v1/positionSide/dual, rate:/fapi/v1/commissionRate} (each may be missing: a failed call must not hide the rest)
   function account(raw) {
@@ -48,6 +48,16 @@ const HIST = (() => {
   const fillTotals = rows => { let fee = 0, pnl = 0, volume = 0, n = 0; for (const f of rows || []) { fee += f.fee; pnl += f.pnl; volume += f.qty * f.price; n++; } return {n, fee, pnl, volume}; };
   const statusCounts = rows => { const o = {}; for (const r of rows || []) o[r.status] = (o[r.status] || 0) + 1; return o; };
 
+  // ---- columns shared by the History table and its CSV ("iso" is added by csvRows)
+  const COLUMNS = {
+    orders:[["iso", "time (UTC)"], ["symbol", "symbol"], ["side", "side"], ["type", "type"], ["price", "price"], ["qty", "qty"], ["filled", "filled"], ["avg", "avg price"], ["status", "status"], ["reduce", "reduce only"], ["id", "order id"]],
+    fills:[["iso", "time (UTC)"], ["symbol", "symbol"], ["side", "side"], ["price", "price"], ["qty", "qty"], ["fee", "fee"], ["feeAsset", "fee asset"], ["pnl", "realised PnL"], ["maker", "maker"], ["orderId", "order id"], ["id", "trade id"]],
+    income:[["iso", "time (UTC)"], ["symbol", "symbol"], ["type", "type"], ["amount", "amount"], ["asset", "asset"], ["info", "info"]],
+  };
+  const csvRows = rows => (rows || []).map(r => Object.assign({iso:new Date(r.t).toISOString()}, r));
+  const symbols = rows => [...new Set((rows || []).map(r => r.symbol).filter(Boolean))].sort();
+  const period = (days, now) => ({from:now - Math.min(days * DAY, days <= 7 ? WINDOW : Infinity), to:now});   // "7 days" is cut to the 6 days 23 h 59 min 59 s the API accepts, so it is one request, not two
+
   // ---- paging: [start, end] pieces no longer than the API accepts, newest first
   function pieces(from, to) {
     const out = []; let end = to;
@@ -75,5 +85,5 @@ const HIST = (() => {
   const LOG_CAP = 5000;
   const push = (arr, row) => { arr.push(row); if (arr.length > LOG_CAP) arr.shift(); return row; };
 
-  return {DAY, WINDOW, LOG_CAP, order, fill, income, account, simAccount, totals, fillTotals, statusCounts, pieces, merge, toCsv, push};
+  return {DAY, WINDOW, LOG_CAP, COLUMNS, csvRows, symbols, period, order, fill, income, account, simAccount, totals, fillTotals, statusCounts, pieces, merge, toCsv, push};
 })();

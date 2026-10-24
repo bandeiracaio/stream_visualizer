@@ -809,6 +809,16 @@ const READER_SELFTEST=(()=>{
       &&e.assets[0].wallet===0&&e.positions.length===0&&e.fees===null;
     return{ok,detail:JSON.stringify(a)};
   });
+  add("history: the table and CSV columns exist on the rows, the CSV gets a UTC time, symbols and periods are worked out",E=>{
+    const o=HIST.order({orderId:1,time:1700000000000,symbol:"BTCUSDT"}),f=HIST.fill({id:2,time:1700000001000,symbol:"ETHUSDT"}),i=HIST.income({tranId:3,time:1700000002000,symbol:"",incomeType:"FUNDING_FEE",income:"1"}),i2=HIST.income({tranId:3,time:1700000002000,symbol:"BTCUSDT",incomeType:"COMMISSION",income:"-1"});
+    const has=(k,row)=>HIST.COLUMNS[k].every(c=>c[0]==="iso"||c[0] in row);
+    const co=HIST.csvRows([o])[0],csv=HIST.toCsv(HIST.csvRows([o]),HIST.COLUMNS.orders).split(String.fromCharCode(13,10));
+    const p=HIST.period(7,1700000000000);
+    const ok=has("orders",o)&&has("fills",f)&&has("income",i)&&co.iso==="2023-11-14T22:13:20.000Z"&&csv[0].startsWith("time (UTC),symbol,side")&&csv[1].startsWith("2023-11-14T22:13:20.000Z,BTCUSDT")
+      &&HIST.symbols([{symbol:"ETHUSDT"},{symbol:""},{symbol:"BTCUSDT"},{symbol:"ETHUSDT"},{}]).join()==="BTCUSDT,ETHUSDT"&&HIST.symbols(null).length===0&&p.to-p.from===HIST.WINDOW&&HIST.period(30,1700000000000).to-HIST.period(30,1700000000000).from===30*HIST.DAY&&HIST.period(1,1700000000000).to-HIST.period(1,1700000000000).from===HIST.DAY&&HIST.pieces(p.from,p.to).length===1
+      &&i.id!==i2.id&&HIST.merge([i,i2]).length===2;
+    return{ok,detail:JSON.stringify({co,csv})};
+  });
   add("history: income totals by type inside a period, fill totals and order status counts",E=>{
     const rows=[{t:100,type:"REALIZED_PNL",amount:5,asset:"USDT"},{t:200,type:"COMMISSION",amount:-.5,asset:"USDT"},{t:300,type:"REALIZED_PNL",amount:-2,asset:"USDT"},{t:400,type:"FUNDING_FEE",amount:-.1,asset:"BNB"},{t:500,type:"COMMISSION",amount:-.2,asset:"USDT"}];
     const all=HIST.totals(rows),part=HIST.totals(rows,200,500),empty=HIST.totals([]),none=HIST.totals(null);

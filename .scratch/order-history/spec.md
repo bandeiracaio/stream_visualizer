@@ -1,6 +1,6 @@
 # Order history and account info
 
-Status: in progress. Steps 1 (core and simulated history, v071) and 2 (Account info view, v072) built; step 3 open. Agreed in a grilling session, 2026-10-24.
+Status: in progress. Built: step 1 (core and simulated history, v071), step 2 (Account info view, v072), step 3 (History view, v073). Not yet tried with a real demo or live key. Agreed in a grilling session, 2026-10-24.
 
 ## Goal
 The Trade area shows only what is open right now: the USDT wallet, positions of the selected asset, open orders and the last 30 fills of that asset.
@@ -55,6 +55,9 @@ Today `SIM.fills` keeps the last 50 and orders vanish when filled or cancelled. 
 
 ## Built in step 2 (v072)
 `src/js/account-info.js` and a section in Trade (view id `accinfo`, not offered as a movable Trading panel). Four independent GETs per refresh (about 60 request weight): account, positionRisk, positionSide/dual, commissionRate for the header asset. Tested with a stubbed network (only GET issued, one failing call isolated, hostile asset name shown as text); not yet with a real demo or live key.
+
+## Built in step 3 (v073)
+`src/js/order-history.js`, section `history` in Trade. Pieces of under 7 days, newest first, 150 ms apart, a Stop button, the first refusal stops the load and keeps the rows already read. Fills carry on from the last trade id when a piece is full (documented `fromId`); orders and income cannot be paged that way, so a full page of 1000 shows a warning to shorten the period. "7 days" is cut to 6 d 23 h 59 min 59 s so it is one request. Income row ids are `type:tranId` because Binance's `tranId` is only unique per type. Tested with a stubbed network (paging, merge, full-page warning, a refusal mid-load, Stop) and the simulated account (tabs, totals, CSV, logout clears). The one-request-per-piece weights: allOrders 5, userTrades 5, income 30.
 
 ## Out of scope
 - Spot, margin, transfers, coin-margined futures; placing or cancelling from these views; automatic background syncing; saving history to disk or IndexedDB (a later step if wanted).
