@@ -76,6 +76,10 @@ function renderOverview(){
   ov$("ovReader").innerHTML = act.length ? act.map(e=>`<div class="ovev ${e.stage}"><span class="stat">${ovSpan(Math.max(0,rs.now-e.tStart))}</span> <b>${READER_EPISODES.FAMILY_LABEL[e.family]}</b> <span class="venue v-${e.venue}">${e.venue.toUpperCase()}</span> <span class="chip">${e.horizon}</span> <span class="stg">${e.stage}</span><div class="ovevd">${e.reading}</div></div>`).join("")
     : `<div class="note" style="margin:0">${!connected ? "Not connected." : !rs.calibrated ? "Calibrating: detectors arm after about two minutes of data." : "Quiet: no active episodes."}${lastEnded ? ` Last: ${READER_EPISODES.FAMILY_LABEL[lastEnded.family].toLowerCase()} (${lastEnded.venue.toUpperCase()}) ended ${ovSpan(Math.max(0,rs.now-lastEnded.tEnd))} ago.` : ""}</div>`;
 
+  // Recording: what auto-record and a manual recording are doing, and how many are kept (read from the Recordings views' own text)
+  const rcN = typeof RC !== "undefined" ? RC.rows.length : 0, mtile = (k, v) => `<div class="metric"><span>${k}</span><b>${v}</b></div>`;
+  ov$("ovRec").innerHTML = `<div class="metrics">${mtile("auto-record", ov$("arStat").textContent || "off")}${mtile("recording", ov$("rtStat").textContent || "not recording")}${mtile("saved on this device", rcN)}</div>`;
+
   // Account
   if (ACC.mode==="sim") ACC.data = simSnapshot();
   const d = ACC.data;
@@ -90,3 +94,5 @@ function renderOverview(){
 ov$("ovWin").onchange = () => { if (typeof visible==="function" && visible("overview")) renderOverview(); };
 ov$("ovOpenReader").onclick = () => setTab("reader");
 ov$("ovOpenAcc").onclick = () => setTab("accounts");
+ov$("ovOpenRec").onclick = () => setTab("record");
+ov$("ovOpenCharts").onclick = () => setTab("charts");

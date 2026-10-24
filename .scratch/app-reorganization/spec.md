@@ -1,6 +1,6 @@
 # App reorganization: six areas by what you are doing
 
-Status: in progress. Steps 1 (navigation shell, v068) and 2 (Record panel split, v069) built; step 3 (Overview dashboard and polish) open. Agreed in a grilling session, 2026-10-24.
+Status: built (v068 navigation shell, v069 Record panel split, v070 Overview dashboard). Agreed in a grilling session, 2026-10-24.
 
 ## Goal
 The app is hard to find things in: 12 views in 5 groups organised by data type, overlapping names (Reader, Raw, Streams, Health, Collectors, Saved
