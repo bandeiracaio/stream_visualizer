@@ -796,7 +796,8 @@ function smoothPath(ctx, xs, ys, move){
 }
 function label(ctx, txt, x, y, color, align="left", bold=false){
   ctx.font = (bold?"600 ":"")+"11px ui-monospace,Menlo,Consolas,monospace"; ctx.textAlign = align;
-  ctx.lineWidth = 3; ctx.strokeStyle = TH.canvas; ctx.strokeText(txt, x, y); ctx.fillStyle = color; ctx.fillText(txt, x, y);
+  if (color !== TH.ink){ ctx.lineWidth = 3; ctx.strokeStyle = TH.canvas; ctx.strokeText(txt, x, y); }      // light text gets a dark outline; dark text sits on a coloured fill, where a dark outline would swallow it
+  ctx.fillStyle = color; ctx.fillText(txt, x, y);
   ctx.font = "10.5px ui-monospace,Menlo,Consolas,monospace";
 }
 
@@ -825,7 +826,10 @@ function drawStream(){
     ctx.closePath(); ctx.fillStyle = VC[k]; ctx.globalAlpha = .88; ctx.fill(); ctx.globalAlpha = 1;
     ctx.strokeStyle = TH.canvas; ctx.lineWidth = 1; ctx.stroke();
     let bi = 0; for (let i=1;i<n;i++) if (b[k][i] > b[k][bi]) bi = i;
-    if (b[k][bi]*sc > 16){ const y = cy + dir*(lo[bi] + b[k][bi]/2)*sc; label(ctx, `${k.slice(0,2).toUpperCase()} ${k.slice(2)} $${fmtK(b[k][bi])}`, xs[bi], y+4, TH.ink, "center", true); }
+    if (b[k][bi]*sc > 16){ const y = cy + dir*(lo[bi] + b[k][bi]/2)*sc; const txt = `${k.slice(0,2).toUpperCase()} ${k.slice(2)} $${fmtK(b[k][bi])}`; ctx.font = "600 11px ui-monospace,Menlo,Consolas,monospace"; const tw = ctx.measureText(txt).width;
+      const lx = Math.min(w-R-tw/2-4, Math.max(L+tw/2+4, xs[bi]));      // keep the whole label inside the plot when the peak is at an edge
+      ctx.fillStyle = VC[k]; ctx.fillRect(lx-tw/2-4, y-8, tw+8, 15);      // a chip in the layer's own colour: invisible inside the area, still readable where the text is wider than the area under it
+      label(ctx, txt, lx, y+4, TH.ink, "center", true); }
   }
   ctx.strokeStyle = TH.text; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(L,cy); ctx.lineTo(w-R,cy); ctx.stroke();
   label(ctx, `buy $${fmtK(max)}/${BIN/1000}s`, L+2, T+10, TH.dim); label(ctx, "sell", L+2, h-B-4, TH.dim);
