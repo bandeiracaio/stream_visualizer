@@ -26,7 +26,7 @@ export function readInput(file) {
   if (j.kind === "sv-session") {
     const recs = (j.ext || []).filter(COLLECT.isRec), times = (j.inputs || []).map(r => r[0] === "t" ? r[1] && r[1].t : r[2]).filter(Number.isFinite);
     const end = times.length ? Math.max(...times) : (recs.length ? recs[recs.length - 1][2] : j.startedAt);
-    return { file, kind:"session", sym:j.sym, auto:!!j.pre, records:recs, t0:j.startedAt, t1:end, quality:j.quality || null };
+    return { file, kind:"session", sym:j.sym, auto:!!j.pre, records:recs, t0:j.startedAt, t1:end, quality:j.quality || null, inputs:j.inputs || [] };
   }
   throw new Error(file + ": not a tape or a session (kind " + j.kind + ")");
 }
@@ -120,7 +120,7 @@ export function spearman(x, y) {
   for (let i = 0; i < n; i++) { sxy += (rx[i] - mx)*(ry[i] - mx); sxx += (rx[i] - mx)**2; syy += (ry[i] - mx)**2; }
   return sxx && syy ? +(sxy/Math.sqrt(sxx*syy)).toFixed(3) : null;
 }
-function rng(seed) { let s = seed >>> 0; return () => ((s = (Math.imul(s, 1664525) + 1013904223) >>> 0)/4294967296); }
+export function rng(seed) { let s = seed >>> 0; return () => ((s = (Math.imul(s, 1664525) + 1013904223) >>> 0)/4294967296); }
 function residual(a, z) {      // a with the part explained by z (least squares) removed, then centred
   const n = a.length, ma = a.reduce((p, q) => p + q, 0)/n, mz = z.reduce((p, q) => p + q, 0)/n; let cov = 0, vz = 0;
   for (let i = 0; i < n; i++) { cov += (a[i] - ma)*(z[i] - mz); vz += (z[i] - mz)**2; }
