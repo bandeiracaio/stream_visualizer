@@ -154,6 +154,22 @@ const READER_SELFTEST=(()=>{
       &&bn.src==="bnS"&&bn.set.b===81105.85&&bn.e===null&&mj.src==="maj"&&mj.set.eth===3100.5&&junk.every(x=>x===null)
       &&r.byL.b===81054.7&&r.byL.m===81059.93&&r.byL.age===800&&r.byL.lag===9100&&r.maj.eth===3100.5&&r.maj.sol===150.5&&r.maj.age===600&&r.maj.lag===undefined&&none===null&&COLLECT.REGISTRY.some(c=>c.id==="venues"&&c.speed==="fast"),detail:J({cb,by1,by2,okT,bn,mj,r,eth5:eth[5].url})};
   });
+  add("collectors: wallets: ranking over a window, position read from clearinghouseState, change rule, liquidation fills, predicted funding",E=>{
+    const J=JSON.stringify,tr=COLLECT.walletTracker(1000);
+    tr.note(100,["A","B"],500,100);tr.note(200,["A","C"],300,200);tr.note(300,["D","B"],100,300);tr.note(0,["Z"],-5,300);tr.note(0,"x",5,300);tr.note(NaN,["Q"],5,300);
+    const top=tr.top(2,300),all=tr.top(10,300),later=tr.top(10,1250),empty=tr.top(10,5000);
+    const pos=COLLECT.walletPosition({marginSummary:{accountValue:"22336.099666",totalMarginUsed:"16120.992149"},assetPositions:[{type:"oneWay",position:{coin:"ETH",szi:"2"}},{type:"oneWay",position:{coin:"BTC",szi:"1.53554",leverage:{type:"cross",value:20},entryPx:"81417.1",unrealizedPnl:"-370.23201",liquidationPx:"22313.3773732013"}}]},"BTC");
+    const flat=COLLECT.walletPosition({marginSummary:{accountValue:"10",totalMarginUsed:"0"},assetPositions:[]},"BTC"),badPos=[COLLECT.walletPosition({},"BTC"),COLLECT.walletPosition(null,"BTC")];
+    const ch=(a,b,age)=>COLLECT.walletChanged(a,b,age),p2=Object.assign({},pos,{av:99});
+    const msg=live=>({channel:"userFills",data:Object.assign(live,{user:"0xabc",fills:[{coin:"BTC",px:"81000",sz:"0.5",side:"A",time:5,dir:"Close Long",closedPnl:"-3",startPosition:"0.5"},{coin:"ETH",px:"3000.5",sz:"2",side:"A",time:6,dir:"Close Long",closedPnl:"-9",startPosition:"2",liquidation:{liquidatedUser:"0xabc",markPx:"3001",method:"market"}}]})});
+    const lf=COLLECT.liqFills(msg({isSnapshot:false})),snap=COLLECT.liqFills(msg({isSnapshot:true})),other=[COLLECT.liqFills({channel:"trades",data:[]}),COLLECT.liqFills(null),COLLECT.liqFills({channel:"userFills",data:{}})];
+    const pf=COLLECT.predictedFunding([["ETH",[["HlPerp",{fundingRate:"0.1",nextFundingTime:1,fundingIntervalHours:1}]]],["BTC",[["BinPerp",{fundingRate:"0.00005",nextFundingTime:1792800000000,fundingIntervalHours:4}],["HlPerp",{fundingRate:"0.0000125",nextFundingTime:1792796400000,fundingIntervalHours:1}],["Odd",{}]]]],"BTC");
+    return{ok:J(top)==='[{"w":"A","n":800},{"w":"B","n":600}]'&&all.length===4&&J(later.map(x=>x.w))==='["B","D"]'&&later[1].n===100&&empty.length===0&&tr.size()===0
+      &&pos.sz===1.53554&&pos.e===81417.1&&pos.lq===22313.3773732013&&pos.lev===20&&pos.up===-370.23201&&pos.av===22336&&pos.mg===16121&&flat.sz===0&&flat.e===null&&flat.lq===null&&badPos.every(x=>x===null)
+      &&ch(null,pos,0)&&!ch(pos,p2,1000)&&ch(pos,Object.assign({},pos,{sz:2}),1000)&&ch(pos,Object.assign({},pos,{lq:1}),1000)&&ch(pos,p2,COLLECT.WALLET_REFRESH_MS)
+      &&lf.length===1&&lf[0].coin==="ETH"&&lf[0].w==="0xabc"&&lf[0].liquidated==="0xabc"&&lf[0].mark===3001&&lf[0].px===3000.5&&snap.length===0&&other.every(x=>x.length===0)
+      &&J(pf)==='{"Bin":[0.00005,1792800000000,4],"Hl":[0.0000125,1792796400000,1]}'&&COLLECT.predictedFunding([],"BTC")===null&&COLLECT.predictedFunding([["ETH",[]]],"BTC")===null&&COLLECT.REGISTRY.some(c=>c.id==="wallets"&&c.speed==="slow"),detail:J({top,all,later,pos,flat,lf,pf})};
+  });
   add("collectors: records among the inputs change no detection and no session quality",E=>{
     const e=E.create();e.startRecording();const a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:21,params:()=>burstSell});sim(e,{t0:b.t,mid0:b.mid,seconds:40,seed:22});
     const inputs=e.stopRecording(),mixed=[];inputs.forEach((r,i)=>{mixed.push(r);if(i%40===0)mixed.push(COLLECT.rec("feeds",T0+i,{src:"page",feeds:{bn:{n:1}}}));});

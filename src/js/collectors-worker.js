@@ -4,8 +4,10 @@
 // stops only the source concerned. Collector "derivs": Binance premium index + open interest (15 s), Hyperliquid funding / open interest
 // (15 s), long-short and taker ratios (60 s), and from one stream the basis (10 s) and every liquidation. Collector "calendar": a record at every
 // scheduled instant (COLLECT.calendar, by rule, no network). Collector "venues" (fast, only while a recording is on): sockets to Coinbase, Bybit, OKX, Binance spot and the majors' marks, one record a second.
-// The page says which collectors are on in the start message: {t:"start", sym, want:{derivs, calendar, venues}, rec}, and tells when a recording starts or stops: {t:"rec", on}.
-let on = false, gen = 0, sym = "btc", want = {}, ws = null, lastMsg = 0, timer = null, mk = null, prevRatios = null, lastCal = 0, recOn = false, vOn = false, vGen = 0, vSock = {}, vState = {}, lastVen = 0, lastPing = 0;
+// Collector "wallets": the 10 Hyperliquid wallets that traded the most in this coin over 15 minutes, their positions (30 s), their liquidation fills,
+// and the predicted funding across venues (60 s).
+// The page says which collectors are on in the start message: {t:"start", sym, want:{derivs, calendar, venues, wallets}, rec}, and tells when a recording starts or stops: {t:"rec", on}.
+let on = false, gen = 0, sym = "btc", want = {}, ws = null, lastMsg = 0, timer = null, mk = null, prevRatios = null, lastCal = 0, recOn = false, vOn = false, vGen = 0, vSock = {}, vState = {}, lastVen = 0, lastPing = 0, wtr = null, wsk = null, wTracked = new Map(), wGen = 0, startAt = 0;
 const last = {}, busy = {}, hold = {}, said = {};
 const BN = "https://fapi.binance.com", HLI = "https://api.hyperliquid.xyz/info";
 const post = m => self.postMessage(m);
@@ -65,6 +67,51 @@ function open() {
   };
   w.onclose = () => { if (!on || g !== gen) return; say("stream", "closed, reopening"); setTimeout(() => { if (on && g === gen) open(); }, 5000); };
 }
+// ---- Hyperliquid wallets: one socket (the coin's trades, to rank wallets, and userFills for the ones followed) and a request every 30 s for their positions
+function wOpen() {
+  const g = wGen; let w;
+  try { w = new WebSocket("wss://api.hyperliquid.xyz/ws"); } catch (e) { say("wallets", e); return; }
+  wsk = {w, last:Date.now()};
+  w.onopen = () => {
+    try { w.send(JSON.stringify({method:"subscribe", subscription:{type:"trades", coin:sym.toUpperCase()}})); for (const a of wTracked.keys()) w.send(JSON.stringify({method:"subscribe", subscription:{type:"userFills", user:a}})); } catch {}
+  };
+  w.onmessage = ev => {
+    if (!wsk || wsk.w !== w) return;
+    const now = wsk.last = Date.now(); let j; try { j = JSON.parse(ev.data); } catch { return; }
+    if (j.channel === "trades" && Array.isArray(j.data)) { for (const t of j.data) wtr.note(t.time, t.users, +t.px * +t.sz, now); }
+    else if (j.channel === "userFills") { for (const f of COLLECT.liqFills(j)) col("hlLiq", f.t || now, f); }
+    else if (j.channel === "error") say("wallets", String(j.data).slice(0, 120));
+  };
+  w.onclose = () => { if (!on || g !== wGen) return; say("wallets socket", "closed, reopening"); setTimeout(() => { if (on && g === wGen) wOpen(); }, 5000); };
+}
+async function pollWallets() {
+  if (!wtr) return;
+  const g = wGen, now = Date.now(), coin = sym.toUpperCase(), top = wtr.top(COLLECT.WALLET_TOP, now);
+  if (!top.length) return;
+  const want_ = new Set(top.map(x => x.w));
+  for (const a of [...wTracked.keys()]) if (!want_.has(a)) { wTracked.delete(a); if (wsk && wsk.w.readyState === 1) try { wsk.w.send(JSON.stringify({method:"unsubscribe", subscription:{type:"userFills", user:a}})); } catch {} }
+  for (const x of top) if (!wTracked.has(x.w)) { wTracked.set(x.w, {prev:null, at:0}); if (wsk && wsk.w.readyState === 1) try { wsk.w.send(JSON.stringify({method:"subscribe", subscription:{type:"userFills", user:x.w}})); } catch {} }
+  const rs = await Promise.allSettled(top.map(x => getJson("wallets", HLI, {method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({type:"clearinghouseState", user:x.w})})));
+  if (!on || g !== wGen) return;
+  const rows = []; let bad = null;
+  rs.forEach((r, i) => {
+    const x = top[i], st = wTracked.get(x.w); if (!st) return;
+    if (r.status !== "fulfilled") { bad = bad || r.reason; return; }
+    const cur = COLLECT.walletPosition(r.value, coin); if (!cur) { bad = bad || new Error("no usable answer"); return; }
+    if (COLLECT.walletChanged(st.prev, cur, now - st.at)) { st.prev = cur; st.at = now; rows.push(Object.assign({w:x.w, n:x.n}, cur)); }
+  });
+  if (rows.length) col("walletsTop", now, {rows});
+  if (bad && rows.length === 0 && rs.every(r => r.status !== "fulfilled")) throw bad;
+}
+async function pollFunding() {
+  const g = gen, t = Date.now(), j = await getJson("fundPred", HLI, {method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({type:"predictedFundings"})});
+  if (!on || g !== gen) return;
+  const f = COLLECT.predictedFunding(j, sym.toUpperCase()); if (!f) throw new Error("no usable answer for " + sym.toUpperCase());
+  col("fundPred", t, f);
+}
+function walletsStart() { wGen++; wtr = COLLECT.walletTracker(); wTracked = new Map(); wOpen(); }
+function walletsStop() { wGen++; wtr = null; wTracked = new Map(); if (wsk) try { wsk.w.close(); } catch {} wsk = null; }
+
 // ---- extra venues: open only while a recording is on (and the collector is), close when it stops
 function vOpen(v) {
   const g = vGen; let w;
@@ -99,6 +146,12 @@ function tick() {
     lastCal = now;
   }
   venuesTick(now);
+  if (want.wallets) {
+    if (wsk && now - wsk.last > 30000) try { wsk.w.close(); } catch {}      // silent without closing (the coin's trades keep it busy): close it so onclose reopens it
+    if (now - (last.wping || 0) >= 30000) { last.wping = now; if (wsk && wsk.w.readyState === 1) try { wsk.w.send(JSON.stringify({method:"ping"})); } catch {} }
+    if (now - startAt >= 60000 && COLLECT.due(last.wallets, now, COLLECT.EVERY.wallets)) { last.wallets = now; run("wallets", pollWallets); }
+    if (COLLECT.due(last.fundPred, now, COLLECT.EVERY.funding)) { last.fundPred = now; run("fundPred", pollFunding); }
+  }
   if (!want.derivs) return;
   const E = COLLECT.EVERY;
   if (COLLECT.due(last.prem, now, E.prem)) { last.prem = now; run("bnDerivs", pollPremium); }
@@ -108,7 +161,7 @@ function tick() {
 }
 self.onmessage = ev => {
   const m = ev.data;
-  if (m.t === "start") { on = true; gen++; venuesClose(); sym = String(m.sym || "btc"); want = m.want || {derivs:true}; recOn = !!m.rec; mk = null; prevRatios = null; lastCal = Date.now(); for (const k of [last, busy, hold, said]) for (const i in k) delete k[i]; if (want.derivs) open(); venuesSync(); clearInterval(timer); timer = setInterval(tick, 1000); tick(); }
+  if (m.t === "start") { on = true; gen++; venuesClose(); walletsStop(); sym = String(m.sym || "btc"); want = m.want || {derivs:true}; recOn = !!m.rec; mk = null; prevRatios = null; lastCal = Date.now(); for (const k of [last, busy, hold, said]) for (const i in k) delete k[i]; startAt = Date.now(); if (want.derivs) open(); if (want.wallets) walletsStart(); venuesSync(); clearInterval(timer); timer = setInterval(tick, 1000); tick(); }
   else if (m.t === "rec") { recOn = !!m.on; venuesSync(); }
-  else if (m.t === "stop") { venuesClose(); on = false; gen++; clearInterval(timer); try { if (ws) ws.close(); } catch {} ws = null; }
+  else if (m.t === "stop") { venuesClose(); walletsStop(); on = false; gen++; clearInterval(timer); try { if (ws) ws.close(); } catch {} ws = null; }
 };

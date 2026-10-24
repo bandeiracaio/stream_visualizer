@@ -1,6 +1,6 @@
 # Collectors: data we do not collect yet
 
-Status: agreed (2026-10-23). Framework and F self-telemetry built in v053; A derivatives context and the always-on worker built in v055; G calendar tags (rules only) in v056; B book depth summaries in v057; C extra venues in v058.
+Status: agreed (2026-10-23). Framework and F self-telemetry built in v053; A derivatives context and the always-on worker built in v055; G calendar tags (rules only) in v056; B book depth summaries in v057; C extra venues in v058; E Hyperliquid wallet layer in v059.
 
 ## Goal
 Collect possibly useful data the app does not collect today, even where there is no event type or movement to attach it to yet. Log first,
@@ -96,3 +96,20 @@ All public WebSockets, no key. A browser page and a worker connect to every one 
 - A silent socket (30 s) is closed and reopened, a closed one is reopened after 5 s, notes go to the Health log at most once per 5 minutes per socket.
 - Measured live: about 500 bytes a record, so about 1.8 MB an hour. With book depth (about 2 MB an hour) a 60-minute recording is near the old 5 MB file budget, so `FILE_BUDGET` is now 8 MB.
 - **For a coin other than BTC** a venue may not list it (Coinbase has no `-USD` for many); that source simply never appears. Coins whose Binance symbol is not `<COIN>USDT` are not handled.
+
+## Verified endpoints for collector E, Hyperliquid wallets (checked live 2026-10-23, BTC)
+- **Per-wallet flow is already collected:** every `trades` message names both wallets (`users:[buyer, seller]`) and every recording stores them in its `["t", ...]` inputs. Nothing new was needed for that item.
+- `POST /info {type:"clearinghouseState", user}`: about 0.3 s, `access-control-allow-origin: *`. Gives `marginSummary` (accountValue, totalMarginUsed) and `assetPositions[].position` with `coin`, `szi` (signed size), `entryPx`, `liquidationPx`, `leverage`, `unrealizedPnl`.
+- WebSocket `{type:"userFills", user}`: a first message with `isSnapshot:true` (old fills, large) and then live fills of that wallet on any coin, each with `dir`, `closedPnl`, `startPosition` and, for a liquidation, a `liquidation:{liquidatedUser, markPx, method}` object. Twelve users on one socket were accepted without an error (the documented limit is about 10).
+- `POST /info {type:"predictedFundings"}`: 64 KB, rows `[coin, [[venue, {fundingRate, nextFundingTime, fundingIntervalHours}], ...]]` with venues `BinPerp`, `HlPerp`, `BybitPerp`.
+- **Not usable:** `userFills` over REST (644 KB for one wallet, 1.6 s), `liquidatable` (empty), the leaderboard (38 MB, no CORS header), and there is no public global liquidation feed.
+- **Not seen live:** a liquidation fill. The liquidation object's shape is from Hyperliquid's documentation and is covered only by a synthetic self-test; check the first real `hlLiq` record against it.
+
+## Built in v059 (collector E, Hyperliquid wallets; decisions: full addresses, always on)
+- **Always on** in the worker (slow collector), one extra socket `wss://api.hyperliquid.xyz/ws`. Switch: "wallets". With the symbol changed or the switch toggled the worker restarts and the ranking starts over.
+- **Ranking:** every `trades` fill credits both wallets with its notional; the 10 with the most notional in the last 15 minutes are followed. This favours market makers and bots (there is no public ranking by position size). Trade replays on subscribe count (they carry their own times). Polling starts 60 s after the worker starts, so the ranking has data.
+- **`walletsTop`** every 30 s, only for wallets whose position changed (size, entry, leverage or liquidation price), plus a refresh of each wallet every 5 minutes: `{rows:[{w (full address), n (15 min notional, $), sz (signed size in this coin, 0 = none), e (entry), lq (liquidation price), lev, up (unrealised PnL on it), av (account value), mg (margin used)}]}`. Wallets that join the top 10 are subscribed to `userFills` and polled; those that leave are unsubscribed.
+- **`hlLiq`**: one record per live fill that carries a `liquidation` object, for the followed wallets only, on any coin: `{w, coin, side, px, sz, t, dir, pnl, start, liquidated, mark, method}`. Snapshots are ignored.
+- **`fundPred`** every 60 s: `{Bin:[rate, next time, interval h], Hl:[...], Bybit:[...]}` for the coin.
+- Cost: about 60 request weight a minute of the 1200 allowed. Size: measured about 1.5 KB per `walletsTop` record, so 3 to 5 MB a day when the wallets are busy (more than first estimated: the 42-character address is a quarter of each row).
+- **Hygiene:** addresses live only in data files. `.gitignore` now also covers `tape_*.json` and `health_*.json` (recordings and registers were already covered).

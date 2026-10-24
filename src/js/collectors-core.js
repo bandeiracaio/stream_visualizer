@@ -10,6 +10,7 @@ const COLLECT = (() => {
     {id:"calendar", label:"Calendar tags: funding times, 15m / 1h / 4h / daily / weekly / monthly closes, US open and close, options expiry (rules, no network)", speed:"slow", on:true},
     {id:"book", label:"Book depth (while recording): depth within 1 / 5 / 10 / 25 bps, spread, touch size, size added and removed per side (Binance, Hyperliquid)", speed:"fast", on:true},
     {id:"venues", label:"Extra venues (while recording): Coinbase, Bybit and OKX quotes, Binance spot, perp marks and indexes, and the ETH / SOL / BNB / XRP / DOGE marks", speed:"fast", on:true},
+    {id:"wallets", label:"Hyperliquid wallets: position and liquidation price of the 10 biggest traders, their liquidation fills, predicted funding across venues", speed:"slow", on:true},
   ];
   const TAPE_MS = 24*3600*1000, FILE_BUDGET = 8*1024*1024;      // the rolling tape keeps 24 h; one session file takes at most about 8 MB of them (5 MB until v058: book depth and the extra venues fill about 2 MB an hour each while recording)
   const round = (x, d) => Math.round(x*Math.pow(10, d))/Math.pow(10, d);
@@ -41,7 +42,7 @@ const COLLECT = (() => {
 
   // ---- derivatives context (collector "derivs", run by collectors-worker.js). Readers of the public endpoints; each returns null for an answer that is not usable.
   // Verified live 2026-10-23, see .scratch/collectors/01-collectors.md.
-  const EVERY = {prem:15000, hl:15000, ratios:60000, basis:10000}, BACKOFF_MS = 300000;      // polling spacing per source; a rate-limited source rests this long
+  const EVERY = {prem:15000, hl:15000, ratios:60000, basis:10000, wallets:30000, funding:60000}, BACKOFF_MS = 300000;      // polling spacing per source; a rate-limited source rests this long
   const num = x => { const n = +x; return x != null && x !== "" && Number.isFinite(n) ? n : null; };
   const due = (last, now, every) => !last || now - last >= every;
   function premium(j) {
@@ -209,6 +210,44 @@ const COLLECT = (() => {
     return n ? out : null;
   }
 
+  // ---- Hyperliquid wallets (collector "wallets", run by collectors-worker.js). The trade stream names both wallets of every fill, so the 10 that traded the most in the
+  // last 15 minutes are followed: their position and liquidation price are read every 30 s, and their fills on any coin are watched for liquidations. The ranking is by
+  // traded notional in this coin (that favours market makers and bots; there is no public ranking by position size). Addresses are kept in full, in data files only.
+  const WALLET_TOP = 10, WALLET_WIN_MS = 900000, WALLET_REFRESH_MS = 300000;
+  function walletTracker(winMs) {
+    const win = winMs || WALLET_WIN_MS, q = [], sums = new Map(); let head = 0;
+    const drop = nowMs => { while (head < q.length && q[head][0] < nowMs - win) { const [, w, v] = q[head++]; const s = sums.get(w) - v; if (s > 1e-6) sums.set(w, s); else sums.delete(w); } if (head > 4096) { q.splice(0, head); head = 0; } };
+    return {
+      // one fill: t its time, users [buyer, seller], ntl its notional in dollars; both wallets are credited with it
+      note(t, users, ntl, nowMs) { if (!Array.isArray(users) || !(ntl > 0) || !Number.isFinite(t)) return; for (const w of users) if (typeof w === "string" && w) { q.push([t, w, ntl]); sums.set(w, (sums.get(w) || 0) + ntl); } drop(nowMs == null ? t : nowMs); },
+      top(n, nowMs) { drop(nowMs); return [...sums].sort((a, b) => b[1] - a[1]).slice(0, n == null ? WALLET_TOP : n).map(([w, v]) => ({w, n:Math.round(v)})); },
+      size() { return sums.size; },
+    };
+  }
+  // clearinghouseState -> the wallet's position in one coin (sz 0 when it has none) and its account
+  function walletPosition(j, coin) {
+    const m = j && j.marginSummary; if (!m || num(m.accountValue) == null) return null;
+    const ap = Array.isArray(j.assetPositions) ? j.assetPositions.map(x => x && x.position).find(p => p && p.coin === coin) : null;
+    return {sz:ap ? num(ap.szi) || 0 : 0, e:ap ? num(ap.entryPx) : null, lq:ap ? num(ap.liquidationPx) : null, lev:ap && ap.leverage ? num(ap.leverage.value) : null, up:ap ? num(ap.unrealizedPnl) : null,
+      av:round(num(m.accountValue), 0), mg:round(num(m.totalMarginUsed) || 0, 0)};
+  }
+  // does this reading need a record: first reading, a different position (size, entry, leverage, liquidation price), or the refresh time has passed
+  function walletChanged(prev, cur, ageMs) {
+    return !prev || prev.sz !== cur.sz || prev.e !== cur.e || prev.lev !== cur.lev || prev.lq !== cur.lq || ageMs >= WALLET_REFRESH_MS;
+  }
+  // a live userFills message -> the fills that carry a liquidation. The first message of a subscription is a snapshot of old fills: ignored.
+  function liqFills(j) {
+    const d = j && j.channel === "userFills" && j.data; if (!d || d.isSnapshot || !Array.isArray(d.fills)) return [];
+    return d.fills.filter(f => f && f.liquidation).map(f => ({w:d.user, coin:f.coin, side:f.side, px:num(f.px), sz:num(f.sz), t:num(f.time), dir:f.dir, pnl:num(f.closedPnl), start:num(f.startPosition),
+      liquidated:f.liquidation.liquidatedUser, mark:num(f.liquidation.markPx), method:f.liquidation.method}));
+  }
+  // predictedFundings -> {venue: [rate, next funding time, interval hours]} for one coin, venue names without "Perp" ("Bin", "Hl", "Bybit")
+  function predictedFunding(j, coin) {
+    const row = Array.isArray(j) && j.find(r => Array.isArray(r) && r[0] === coin); if (!row || !Array.isArray(row[1])) return null;
+    const out = {}; for (const v of row[1]) if (Array.isArray(v) && v[1] && num(v[1].fundingRate) != null) out[String(v[0]).replace(/Perp$/, "")] = [num(v[1].fundingRate), num(v[1].nextFundingTime), num(v[1].fundingIntervalHours)];
+    return Object.keys(out).length ? out : null;
+  }
+
   // tape helpers on arrays of records
   const prune = (recs, nowMs, keepMs) => recs.filter(r => r[2] >= nowMs - (keepMs == null ? TAPE_MS : keepMs));
   const slice = (recs, t0, t1) => recs.filter(r => r[2] >= t0 && r[2] <= t1);
@@ -218,5 +257,5 @@ const COLLECT = (() => {
     for (let i = recs.length - 1; i >= 0; i--) { const b = JSON.stringify(recs[i]).length + 1; if (size + b > lim) break; size += b; out.push(recs[i]); }
     return out.reverse();
   }
-  return {REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, due, calendar, MAJORS, venueSubs, venueParse, venueApply, venueRecord, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
+  return {REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, due, calendar, walletTracker, walletPosition, walletChanged, liqFills, predictedFunding, WALLET_TOP, WALLET_REFRESH_MS, MAJORS, venueSubs, venueParse, venueApply, venueRecord, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
 })();
