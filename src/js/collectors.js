@@ -2,7 +2,7 @@
 // Collectors (view): samples that no detector uses yet, kept on a rolling 24 h tape (IndexedDB "sv-tape") and attached to every saved session
 // as `ext`. This file runs the page-side collector (self-telemetry of the page's own feeds), receives the worker's records, owns the tape and the
 // switches. Read-only: it only looks at the app's state and never touches a feed, a recording or a detection. Loaded after health-log.js.
-const CL = {cfg:store.get("col.cfg", {}) || {}, db:null, prev:null, prevAt:0, adds:0, count:0, stat:{}, t0:Date.now()};
+const CL = {cfg:store.get("col.cfg", {}) || {}, db:null, prev:null, prevAt:0, adds:0, count:0, stat:{}, t0:Date.now(), recent:{}, ctx:new Map()};      // recent: the last 75 minutes of records by name, for the episode cards
 const cl$ = id => document.getElementById(id);
 const colOn = id => CL.cfg[id] != null ? !!CL.cfg[id] : (COLLECT.REGISTRY.find(x => x.id === id) || {on:false}).on;
 const colWorkerCfg = () => ({telemetry:colOn("telemetry")});
@@ -20,7 +20,7 @@ const colReq = (mode, fn) => colOpen().then(db => new Promise((ok, no) => {
 }));
 async function colAdd(r) {
   if (!COLLECT.isRec(r)) return;
-  try { await colReq("readwrite", st => st.add(r)); CL.count++; if (++CL.adds % 360 === 0) colPrune(); const o = COLLECT.ownerOf(r[1]); if (o) { const s = CL.stat[o] || (CL.stat[o] = {n:0, last:0}); s.n++; s.last = Date.now(); } } catch {}      // a full or blocked store only costs the tape, never the app
+  try { await colReq("readwrite", st => st.add(r)); CL.count++; if (++CL.adds % 360 === 0) colPrune(); const o = COLLECT.ownerOf(r[1]); if (o) { const s = CL.stat[o] || (CL.stat[o] = {n:0, last:0}); s.n++; s.last = Date.now(); } colRemember(r); } catch {}      // a full or blocked store only costs the tape, never the app
 }
 const colAll = () => colReq("readonly", st => st.getAll()).then(a => a || []);
 async function colPrune() {
@@ -35,6 +35,12 @@ async function colSlice(t0, leadMs) {
   try { return COLLECT.fit(COLLECT.slice(await colAll(), (t0 || 0) - (leadMs == null ? 60000 : leadMs), Date.now())); } catch { return []; }
 }
 
+// ---- the last 75 minutes in memory (episode cards read their context from here while live), seeded from the tape
+const COL_RECENT_MS = 75*60000;
+function colRemember(r) {
+  const a = CL.recent[r[1]] || (CL.recent[r[1]] = []); a.push(r);
+  if (a.length > 4000 || (a.length > 64 && a[0][2] < r[2] - COL_RECENT_MS)) { const cut = r[2] - COL_RECENT_MS; let i = 0; while (i < a.length && a[i][2] < cut) i++; if (i) a.splice(0, i); }
+}
 // ---- the page's own feeds, every 10 s while connected
 function colSample() {
   if (!colOn("telemetry") || !connected) { CL.prev = null; return; }
@@ -149,6 +155,33 @@ cl$("colSave").onclick = async () => {
   rtDownload(new Blob([text], {type:"application/json"}), "tape_" + new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "") + ".json");
 };
 cl$("colClear").onclick = async () => { try { await colReq("readwrite", st => st.clear()); CL.count = 0; CL.stat = {}; } catch {} colStatus(); };
-colAll().then(a => { CL.count = a.length; colTally(a); colStatus(); colPrune(); }, () => colStatus());
+colAll().then(a => { CL.count = a.length; colTally(a); colStatus(); colPrune(); const cut = Date.now() - COL_RECENT_MS; for (const r of a) if (r[2] >= cut) colRemember(r); }, () => colStatus());
 colRender();
 colWorkerSync();
+
+// ---- collector context on an episode card (v067): what the collectors read when the episode was detected, as the feature's deviation from its own recent mean
+// While live the records come from the last 75 minutes in memory; in a replay from the session's own collector records (`ext`). Shown in the opened card, above "your call", and
+// copied into the label when you press agree or disagree (the tape is pruned after 24 hours, the label is not).
+function colContextFor(ep) {
+  const t = ep.tDetected; if (!t) return null;
+  const replay = !!rdView.engine, ext = replay ? RT.session && RT.session.ext : null, key = (replay ? "r" + (RT.session ? RT.session.startedAt : 0) + ":" + (ext ? ext.length : -1) : "l") + "|" + ep.id + "|" + t;
+  if (CL.ctx.has(key)) return CL.ctx.get(key);
+  const recs = replay ? (ext || []) : [].concat(...Object.values(CL.recent)), c = COLLECT.context(recs, t);
+  if (CL.ctx.size > 400) CL.ctx.clear(); CL.ctx.set(key, c); return c;
+}
+function epCtxBar(ep) {
+  const c = colContextFor(ep); if (!c) return "";
+  const head = `<span class="stat" title="Each reading against its own mean of the previous 30 minutes, in standard deviations; only the unusual ones (1.5 or more) are shown">collector context at detection</span>`;
+  if (!c.items.length) return `<div class="epctx">${head}<span class="stat">none at that time (the collectors were off, or the data does not reach back that far)</span></div>`;
+  const chips = c.items.filter(x => x.unusual).slice(0, 6).map(x => `<span class="chip ${x.z > 0 ? "hi" : "lo"}" title="${x.label}: ${+x.x.toPrecision(6)} now, ${x.text} from its 30-minute mean (${x.z >= 99 ? "it had been constant" : x.z + " sd"})">${x.label} ${x.z > 0 ? "▲" : "▼"} ${x.text}</span>`).join("");
+  const liq = c.liq.bn || c.liq.hl ? `<span class="chip" title="Binance liquidations and Hyperliquid liquidation fills (followed wallets) in the minute before detection">liquidations ${c.liq.bn} BN · ${c.liq.hl} HL</span>` : "";
+  return `<div class="epctx">${head}${chips || `<span class="stat">nothing unusual (${c.items.length} readings within 1.5 sd)</span>`}${liq}</div>`;
+}
+// the compact snapshot stored with a label: {t, v:{feature:[value, deviation]}, liq:[binance, hyperliquid]}
+function colLabelCtx(ep) {
+  try {
+    const c = colContextFor(ep); if (!c || !c.items.length) return undefined;
+    const v = {}; for (const x of c.items) v[x.f] = [+x.x.toPrecision(7), +x.dev.toPrecision(5)];
+    return {t:c.t, v, liq:[c.liq.bn, c.liq.hl]};
+  } catch { return undefined; }
+}

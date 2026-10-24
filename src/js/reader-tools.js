@@ -36,6 +36,7 @@ function rtSpan(inputs){
 }
 function rtSetSession(s){
   const span = rtSpan(s.inputs); RT.session = {...s, span};
+  if (!s.ext && typeof colSlice === "function") colSlice(s.startedAt, 1800000).then(x => { if (RT.session && RT.session.startedAt === s.startedAt && !RT.session.ext) { RT.session.ext = x; if (typeof renderReader === "function") renderReader(); } });      // a recording made on this page: its collector records come from the tape
   rtMsg(span ? `Session ready: ${s.sym || "?"}, ${rtDur(span.t1-span.t0)}, ${s.inputs.length.toLocaleString()} inputs.${span.t1-span.t0 < 150000 ? " It is shorter than the 2-minute warm-up, so a replay will find nothing." : ""}` : "That session has no usable data.");
   rtButtons();
 }
@@ -82,7 +83,7 @@ async function rtReadSessionFile(f){
     : new TextDecoder().decode(buf);
   const o = JSON.parse(text);
   if (!o || o.kind !== "sv-session" || !Array.isArray(o.inputs)) throw new Error("not a session file from this app");
-  return {inputs:o.inputs, sym:String(o.sym || ""), startedAt:+o.startedAt || 0, baseline:o.baseline && o.baseline.v === 1 ? o.baseline : null};
+  return {inputs:o.inputs, sym:String(o.sym || ""), startedAt:+o.startedAt || 0, baseline:o.baseline && o.baseline.v === 1 ? o.baseline : null, ext:Array.isArray(o.ext) && typeof COLLECT !== "undefined" ? o.ext.filter(COLLECT.isRec) : null};      // ext: the collector records saved with the session (the cards show their context)
 }
 rt$("rtLoad").onchange = async e => {
   const f = e.target.files[0]; e.target.value = ""; if (!f) return;
@@ -120,7 +121,7 @@ function epLabelBar(ep){
 }
 function rtToggleLabel(ep, verdict){
   const cur = rdLabelFor(ep); if (cur) RT.labels = RT.labels.filter(l => l !== cur);
-  if (!cur || cur.verdict !== verdict) RT.labels.push({id:Date.now()+"."+Math.floor(Math.random()*1e6), verdict, family:ep.family, venue:ep.venues && ep.venues.length>1 ? "any" : ep.venue, side:rtSide(ep), horizon:ep.horizons && ep.horizons.length>1 ? undefined : ep.horizon, group:ep.primary, t0:ep.tStart, t1:ep.tEnd || ep.tUpdate, at:Date.now(), src:rdView.engine ? "replay" : "live"});
+  if (!cur || cur.verdict !== verdict) RT.labels.push({id:Date.now()+"."+Math.floor(Math.random()*1e6), verdict, family:ep.family, venue:ep.venues && ep.venues.length>1 ? "any" : ep.venue, side:rtSide(ep), horizon:ep.horizons && ep.horizons.length>1 ? undefined : ep.horizon, group:ep.primary, t0:ep.tStart, t1:ep.tEnd || ep.tUpdate, at:Date.now(), src:rdView.engine ? "replay" : "live", ctx:typeof colLabelCtx === "function" ? colLabelCtx(ep) : undefined});      // ctx: what the collectors read at detection, kept with the label because the tape is pruned after 24 hours
   rtSave();
 }
 document.addEventListener("click", e => {                        // capture phase: a label tap must not also fold/unfold the card

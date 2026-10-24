@@ -90,32 +90,8 @@ export const constantFields = (stats, minN = 20) => { const out = []; for (const
 //   rehearsal  under minHours of marks, or on fewer than minDays calendar days, every verdict is labelled "rehearsal only": one evening is one regime, and drifting series can pass by chance
 export const PLAN = { horizonSec:300, stepSec:10, detrendSec:1800, minSamples:300, alpha:0.05, confirmAlpha:0.05, minAbsRho:0.08, permutations:999, seed:12345, minHours:24, minDays:2 };
 const num = x => (typeof x === "number" && Number.isFinite(x) ? x : null);
-const mid = q => (q && num(q.b) != null && num(q.a) != null ? (q.b + q.a)/2 : null);
-const imb = (p, e) => { const d = p && p.d && p.d[e]; return d && num(d[0]) != null && num(d[1]) != null && d[0] + d[1] > 0 ? (d[0] - d[1])/(d[0] + d[1]) : null; };
-const dep = (p, e) => { const d = p && p.d && p.d[e]; return d && num(d[0]) != null && num(d[1]) != null ? d[0] + d[1] : null; };
-export const FEATURES = {
-  "dvol.vol":           ["dvol", p => num(p.vol)],
-  "bnDerivs.fund":      ["bnDerivs", p => p.prem && num(p.prem.fund)],
-  "bnDerivs.basisBps":  ["bnDerivs", p => p.prem && num(p.prem.mark) != null && p.prem.index ? (p.prem.mark - p.prem.index)/p.prem.index*1e4 : null],
-  "bnDerivs.oi":        ["bnDerivs", p => p.oi && num(p.oi.oi)],
-  "hlCtx.fund":         ["hlCtx", p => num(p.fund)],
-  "hlCtx.prem":         ["hlCtx", p => num(p.prem)],
-  "hlCtx.oi":           ["hlCtx", p => num(p.oi)],
-  "ratios.accountLS":   ["ratios", p => p.acct && num(p.acct.ratio)],
-  "ratios.topLS":       ["ratios", p => p.top && num(p.top.ratio)],
-  "ratios.taker":       ["ratios", p => p.taker && num(p.taker.ratio)],
-  "basis.bps":          ["basis", p => num(p.bps)],
-  "bookBn.spread":      ["bookBn", p => num(p.spr)],
-  "bookBn.imbalance5":  ["bookBn", p => imb(p, 5)],
-  "bookBn.depth5":      ["bookBn", p => dep(p, 5)],
-  "bookHl.spread":      ["bookHl", p => num(p.spr)],
-  "bookHl.imbalance5":  ["bookHl", p => imb(p, 5)],
-  "bookHl.depth5":      ["bookHl", p => dep(p, 5)],
-  "venues.coinbaseVsBinanceBps": ["venues", p => { const m = mid(p.bnS), c = p.cb && num(p.cb.l); return m && c != null ? (c - m)/m*1e4 : null; }],
-  "venues.bybitVsBinanceBps":    ["venues", p => { const m = mid(p.bnS), c = p.byL && num(p.byL.l); return m && c != null ? (c - m)/m*1e4 : null; }],
-  "optChain.atmVol":    ["optChain", p => p.exps && p.exps[0] && num(p.exps[0].atm)],
-  "optChain.skew5":     ["optChain", p => p.exps && p.exps[0] && p.exps[0].s && num(p.exps[0].s["-5"]) != null && num(p.exps[0].s["5"]) != null ? p.exps[0].s["-5"] - p.exps[0].s["5"] : null],
-};
+export const FEATURES = COLLECT.FEATURES;      // defined in collectors-core.js, shared with the episode cards in the app
+export const featureSeries = COLLECT.featureSeries;
 function ranks(a) { const idx = a.map((v, i) => [v, i]).sort((x, y) => x[0] - y[0]), r = new Array(a.length); for (let i = 0; i < idx.length;) { let j = i; while (j + 1 < idx.length && idx[j + 1][0] === idx[i][0]) j++; const avg = (i + j)/2 + 1; for (let k = i; k <= j; k++) r[idx[k][1]] = avg; i = j + 1; } return r; }
 export function spearman(x, y) {
   const n = x.length; if (n < 30) return null;
@@ -164,19 +140,6 @@ function makeMarks(records) {
   return { marks, stat };
 }
 // per feature: samples (at most one per step) with the feature value, the next-horizon volatility and move, and the previous-horizon volatility
-// a feature over time: one value per step at most, with `dev` = the value minus the mean of the previous winMs (null until 5 earlier values exist)
-export function featureSeries(rows, fn, stepMs, winMs) {
-  const out = [], win = []; let sum = 0, lastT = -Infinity;
-  for (const r of rows) {
-    if (r[2] - lastT < stepMs) continue;
-    let x = null; try { x = fn(r[3] || {}); } catch {}
-    if (num(x) == null) continue;
-    while (win.length && win[0][0] < r[2] - winMs) sum -= win.shift()[1];
-    out.push({ t:r[2], x, dev:win.length >= 5 ? x - sum/win.length : null });
-    win.push([r[2], x]); sum += x; lastT = r[2];
-  }
-  return out;
-}
 export function buildSamples(records, plan = PLAN) {
   const H = plan.horizonSec*1000, step = plan.stepSec*1000, mk = makeMarks(records), byName = {};
   for (const r of records) (byName[r[1]] ||= []).push(r);

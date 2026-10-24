@@ -324,6 +324,87 @@ const COLLECT = (() => {
     return o.ageMs <= o.expectMs*3 ? {text:n + " · last " + ageText(o.ageMs) + " ago", tone:"ok"} : {text:n + " · last " + ageText(o.ageMs) + " ago, slower than expected", tone:"warn"};
   }
 
+  // ---- features and context: what the collectors read, as numbers a person can read (shared by the offline analysis scripts and the episode cards)
+  // FEATURES: name -> [record name, function(payload) -> number | null]
+  const fmid = q => (q && num(q.b) != null && num(q.a) != null ? (q.b + q.a)/2 : null);
+  const fimb = (p, e) => { const d = p && p.d && p.d[e]; return d && num(d[0]) != null && num(d[1]) != null && d[0] + d[1] > 0 ? (d[0] - d[1])/(d[0] + d[1]) : null; };
+  const fdep = (p, e) => { const d = p && p.d && p.d[e]; return d && num(d[0]) != null && num(d[1]) != null ? d[0] + d[1] : null; };
+  const FEATURES = {
+    "dvol.vol":           ["dvol", p => num(p.vol)],
+    "bnDerivs.fund":      ["bnDerivs", p => p.prem && num(p.prem.fund)],
+    "bnDerivs.basisBps":  ["bnDerivs", p => p.prem && num(p.prem.mark) != null && p.prem.index ? (p.prem.mark - p.prem.index)/p.prem.index*1e4 : null],
+    "bnDerivs.oi":        ["bnDerivs", p => p.oi && num(p.oi.oi)],
+    "hlCtx.fund":         ["hlCtx", p => num(p.fund)],
+    "hlCtx.prem":         ["hlCtx", p => num(p.prem)],
+    "hlCtx.oi":           ["hlCtx", p => num(p.oi)],
+    "ratios.accountLS":   ["ratios", p => p.acct && num(p.acct.ratio)],
+    "ratios.topLS":       ["ratios", p => p.top && num(p.top.ratio)],
+    "ratios.taker":       ["ratios", p => p.taker && num(p.taker.ratio)],
+    "basis.bps":          ["basis", p => num(p.bps)],
+    "bookBn.spread":      ["bookBn", p => num(p.spr)],
+    "bookBn.imbalance5":  ["bookBn", p => fimb(p, 5)],
+    "bookBn.depth5":      ["bookBn", p => fdep(p, 5)],
+    "bookHl.spread":      ["bookHl", p => num(p.spr)],
+    "bookHl.imbalance5":  ["bookHl", p => fimb(p, 5)],
+    "bookHl.depth5":      ["bookHl", p => fdep(p, 5)],
+    "venues.coinbaseVsBinanceBps": ["venues", p => { const m = fmid(p.bnS), c = p.cb && num(p.cb.l); return m && c != null ? (c - m)/m*1e4 : null; }],
+    "venues.bybitVsBinanceBps":    ["venues", p => { const m = fmid(p.bnS), c = p.byL && num(p.byL.l); return m && c != null ? (c - m)/m*1e4 : null; }],
+    "optChain.atmVol":    ["optChain", p => p.exps && p.exps[0] && num(p.exps[0].atm)],
+    "optChain.skew5":     ["optChain", p => p.exps && p.exps[0] && p.exps[0].s && num(p.exps[0].s["-5"]) != null && num(p.exps[0].s["5"]) != null ? p.exps[0].s["-5"] - p.exps[0].s["5"] : null],
+  };
+  // how a feature is shown on a card: a short name, and whether its change reads as a percentage of its recent level (`rel`) or in its own unit (`unit`)
+  const FEATURE_INFO = {
+    "dvol.vol":{label:"volatility index", rel:true, min:0.3}, "bnDerivs.fund":{label:"Binance funding", unit:"bps", scale:1e4, min:0.2}, "bnDerivs.basisBps":{label:"Binance basis", unit:"bps", min:0.3}, "bnDerivs.oi":{label:"Binance open interest", rel:true, min:0.1},
+    "hlCtx.fund":{label:"Hyperliquid funding", unit:"bps", scale:1e4, min:0.2}, "hlCtx.prem":{label:"Hyperliquid premium", unit:"bps", scale:1e4, min:0.3}, "hlCtx.oi":{label:"Hyperliquid open interest", rel:true, min:0.1},
+    "ratios.taker":{label:"taker buy/sell", unit:"", min:0.1}, "basis.bps":{label:"mark vs index", unit:"bps", min:0.3},
+    "bookBn.imbalance5":{label:"Binance book imbalance (5 bps)", unit:"", min:0.1}, "bookBn.depth5":{label:"Binance depth (5 bps)", rel:true, min:10}, "bookHl.depth5":{label:"Hyperliquid depth (5 bps)", rel:true, min:10}, "bookHl.imbalance5":{label:"Hyperliquid book imbalance (5 bps)", unit:"", min:0.1},
+    "venues.coinbaseVsBinanceBps":{label:"Coinbase vs Binance", unit:"bps", min:0.5}, "venues.bybitVsBinanceBps":{label:"Bybit vs Binance", unit:"bps", min:0.5},
+    "optChain.atmVol":{label:"option ATM vol", rel:true, min:1}, "optChain.skew5":{label:"option skew (-5/+5%)", unit:"pts", min:1},
+  };
+  // the feature over time: at most one value per step, with `dev` = value minus the mean of the previous winMs (null until 5 earlier values exist)
+  function featureSeries(rows, fn, stepMs, winMs) {
+    const out = [], win = []; let sum = 0, lastT = -Infinity;
+    for (const r of rows) {
+      if (r[2] - lastT < stepMs) continue;
+      let x = null; try { x = fn(r[3] || {}); } catch {}
+      if (num(x) == null) continue;
+      while (win.length && win[0][0] < r[2] - winMs) sum -= win.shift()[1];
+      out.push({t:r[2], x, dev:win.length >= 5 ? x - sum/win.length : null});
+      win.push([r[2], x]); sum += x; lastT = r[2];
+    }
+    return out;
+  }
+  const featureMaxAge = f => f.indexOf("ratios.") === 0 ? 900000 : Math.max(3*(EXPECT_MS[OWNER[FEATURES[f][0]]] || 60000), 120000);      // how old a reading may be and still count
+  // context(recs, tMs): what the collector records (any order, any times) said at time tMs, as the deviation of each shown feature from its own mean of the previous 30 minutes.
+  // `z` is that deviation in standard deviations of the same window; `unusual` is |z| >= zMin AND a move worth seeing (FEATURE_INFO.min, in the shown unit: a funding rate that moved 0.03 bps can be many standard deviations of its own jitter and still mean nothing). `liq` counts the Binance liquidations and the Hyperliquid liquidation fills in the minute before.
+  function context(recs, tMs, opt) {
+    opt = opt || {}; const winMs = (opt.winSec || 1800)*1000, zMin = opt.zMin || 1.5, by = {}; let lb = 0, lh = 0;
+    for (const r of recs) {
+      if (!isRec(r) || r[2] > tMs || r[2] < tMs - winMs - 120000) continue;
+      (by[r[1]] || (by[r[1]] = [])).push(r);
+      if (r[2] > tMs - 60000) { if (r[1] === "liq") lb++; else if (r[1] === "hlLiq") lh++; }
+    }
+    const items = [];
+    for (const f in FEATURE_INFO) {
+      const rows = by[FEATURES[f][0]]; if (!rows || rows.length < 6) continue;
+      rows.sort((a, b) => a[2] - b[2]);
+      const ser = featureSeries(rows, FEATURES[f][1], 10000, winMs), q = ser[ser.length - 1];
+      if (!q || q.dev == null || tMs - q.t > featureMaxAge(f)) continue;
+      const prev = ser.slice(0, -1).filter(s => s.t >= q.t - winMs).map(s => s.x); if (prev.length < 5) continue;
+      const mean = prev.reduce((a, b) => a + b, 0)/prev.length, sd = Math.sqrt(prev.reduce((a, b) => a + (b - mean)*(b - mean), 0)/prev.length), info = FEATURE_INFO[f];
+      const z = sd > 1e-12*Math.max(1, Math.abs(mean)) ? q.dev/sd : (Math.abs(q.dev) > 1e-9*Math.max(1, Math.abs(mean)) ? (q.dev > 0 ? 99 : -99) : 0);
+      const mag = info.rel ? (mean ? Math.abs(q.dev/mean)*100 : 0) : Math.abs(q.dev)*(info.scale || 1);
+      items.push({f, label:info.label, x:q.x, dev:q.dev, mean, z:round(z, 2), unusual:Math.abs(z) >= zMin && mag >= (info.min || 0), text:cardText(info, q.dev, mean)});
+    }
+    items.sort((a, b) => Math.abs(b.z) - Math.abs(a.z));
+    return {t:tMs, items, liq:{bn:lb, hl:lh}};
+  }
+  function cardText(info, dev, mean) {
+    const sign = dev >= 0 ? "+" : "-", a = Math.abs(dev);
+    if (info.rel) return mean ? sign + round(a/Math.abs(mean)*100, a/Math.abs(mean) < 0.1 ? 2 : 1) + "%" : sign + round(a, 2);
+    const v = a*(info.scale || 1); return sign + round(v, v < 10 ? 2 : 1) + (info.unit ? " " + info.unit : "");
+  }
+
   // tape helpers on arrays of records
   const prune = (recs, nowMs, keepMs) => recs.filter(r => r[2] >= nowMs - (keepMs == null ? TAPE_MS : keepMs));
   const slice = (recs, t0, t1) => recs.filter(r => r[2] >= t0 && r[2] <= t1);
@@ -333,5 +414,5 @@ const COLLECT = (() => {
     for (let i = recs.length - 1; i >= 0; i--) { const b = JSON.stringify(recs[i]).length + 1; if (size + b > lim) break; size += b; out.push(recs[i]); }
     return out.reverse();
   }
-  return {REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, due, calendar, OWNER, EXPECT_MS, ownerOf, tally, ageText, health, deribitCoin, optName, optionsChain, walletTracker, walletPosition, walletChanged, liqFills, predictedFunding, WALLET_TOP, WALLET_REFRESH_MS, MAJORS, venueSubs, venueParse, venueApply, venueRecord, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
+  return {REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, due, calendar, OWNER, EXPECT_MS, ownerOf, tally, ageText, health, FEATURES, FEATURE_INFO, featureSeries, featureMaxAge, context, deribitCoin, optName, optionsChain, walletTracker, walletPosition, walletChanged, liqFills, predictedFunding, WALLET_TOP, WALLET_REFRESH_MS, MAJORS, venueSubs, venueParse, venueApply, venueRecord, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
 })();

@@ -171,6 +171,7 @@ td.up{color:var(--buy)}td.dn{color:var(--sell)}
 .rt-h{font-size:12px;font-weight:600;color:var(--dim);margin:14px 0 6px}
 .rd-det input[type=number]{width:84px;margin-left:auto}
 .rd-det label{justify-content:space-between}
+.epctx{margin-top:8px;font-size:11.5px;display:flex;flex-wrap:wrap;gap:5px;align-items:center}.epctx .chip{font-size:11px}.chip.hi{border-color:var(--warn);color:var(--warn)}.chip.lo{border-color:var(--accent);color:var(--accent)}
 .eplab{display:flex;gap:6px;align-items:center;margin-top:8px}.eplab button{padding:3px 12px;font-size:12px}
 .eplab button.on{border-color:var(--accent);color:var(--accent);font-weight:600}
 .chip.lab-agree{border-color:var(--buy);color:var(--buy)}.chip.lab-disagree{border-color:var(--sell);color:var(--sell)}

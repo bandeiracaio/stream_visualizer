@@ -198,6 +198,24 @@ const READER_SELFTEST=(()=>{
       &&COLLECT.ageText(4000)==="4 s"&&COLLECT.ageText(120000)==="2 min"&&COLLECT.ageText(7200000)==="2 h"
       &&COLLECT.REGISTRY.every(c=>owners.includes(c.id)&&COLLECT.EXPECT_MS[c.id]>0),detail:J({t,ok,slow,idle,idleN,start,silent,off})};
   });
+  add("collectors: context at a moment: a feature far from its own recent mean is unusual, a constant one that moves is too, stale or future readings are ignored, liquidations are counted",E=>{
+    const R=COLLECT.rec,recs=[],T=T0,J=JSON.stringify;
+    for(let i=0;i<=240;i++){const t=T+i*10000;      // 40 minutes
+      recs.push(R("dvol",t,{vol:(i<234?50+Math.sin(i)*.3:60),idx:1}));
+      recs.push(R("hlCtx",t,{fund:i<239?0.0000125:0.0001125,oi:1000+Math.cos(i)*2,prem:Math.sin(i*2)*1e-5}));
+      recs.push(R("bookBn",t,{spr:0.01,d:{"5":[10,10]}}));}
+    recs.push(R("optChain",T+10000,{exps:[{atm:30,s:{"-5":40,"5":35}}]}));      // one old reading only
+    const now=T+40*60000-5000;
+    recs.push(R("dvol",now+10000,{vol:999,idx:1}));      // in the future of `now`
+    recs.push(R("liq",now-30000,{}),R("liq",now-31000,{}),R("liq",now-90000,{}),R("hlLiq",now-10000,{}));
+    const c=COLLECT.context(recs,now),by=f=>c.items.find(x=>x.f===f),early=COLLECT.context(recs,T+20*60000),none=COLLECT.context([],now);
+    return{ok:c.items.length>=3&&c.items[0].f==="hlCtx.fund"&&c.items[1].f==="dvol.vol"&&by("dvol.vol").unusual&&by("dvol.vol").z>5&&/^\+(19|20|21|22)(\.\d)?%$/.test(by("dvol.vol").text)
+      &&by("hlCtx.fund")&&by("hlCtx.fund").unusual&&by("hlCtx.fund").z===99&&by("hlCtx.fund").text==="+1 bps"
+      &&by("bookBn.depth5")&&!by("bookBn.depth5").unusual&&by("bookBn.depth5").z===0&&!by("optChain.atmVol")&&by("dvol.vol").x===60
+      &&c.liq.bn===2&&c.liq.hl===1&&early.items.length>=2&&!early.items.find(x=>x.f==="dvol.vol").unusual&&none.items.length===0&&none.liq.bn===0
+      &&c.items.every((x,i,a)=>!i||Math.abs(a[i-1].z)>=Math.abs(x.z))&&COLLECT.REGISTRY.length===7&&Object.keys(COLLECT.FEATURES).length===21,
+      detail:J({n:c.items.length,top:c.items.slice(0,4).map(x=>[x.f,x.z,x.text,x.unusual]),liq:c.liq,early:early.items.length})};
+  });
   add("collectors: records among the inputs change no detection and no session quality",E=>{
     const e=E.create();e.startRecording();const a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:21,params:()=>burstSell});sim(e,{t0:b.t,mid0:b.mid,seconds:40,seed:22});
     const inputs=e.stopRecording(),mixed=[];inputs.forEach((r,i)=>{mixed.push(r);if(i%40===0)mixed.push(COLLECT.rec("feeds",T0+i,{src:"page",feeds:{bn:{n:1}}}));});

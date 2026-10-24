@@ -1479,7 +1479,7 @@ function epCard(ep, now, compact){
     : `began ${rdMs(now-ep.tStart)} ago${ep.tDetected ? ` · detected ${rdMs(now-ep.tDetected)} ago` : " · not yet confirmed"}`;
   return `<div class="ep ${ep.stage}" data-id="${ep.id}"><div class="eph"><b>${READER_EPISODES.FAMILY_LABEL[ep.family]}</b> ${(ep.venues||[ep.venue]).map(v=>`<span class="venue v-${v}">${v.toUpperCase()}</span>`).join("")}${(ep.horizons||[ep.horizon]).map(h=>`<span class="chip">${h}</span>`).join("")} <span class="stg">${ep.stage}</span>${typeof epLabelChip==="function" ? epLabelChip(ep) : ""}${ep.pulses>1 ? ` <span class="chip">${ep.pulses} pulses</span>` : ""} ${epWho(ep)}</div>`
     + (compact ? "" : `<div class="epbar"><i style="width:${Math.round(ep.intensity*100)}%"></i></div>`)
-    + `<div class="epread">${ep.stage==="ended" && ep.peakReading ? "At its peak: " + ep.peakReading : ep.reading}</div><div class="epmeta stat">${timing} · peak ${Math.round(ep.peak*100)}%</div>${epOpen.has(String(ep.id)) ? epEvidence(ep) + epMembers(ep) + (typeof epLabelBar==="function" ? epLabelBar(ep) : "") : ""}</div>`;
+    + `<div class="epread">${ep.stage==="ended" && ep.peakReading ? "At its peak: " + ep.peakReading : ep.reading}</div><div class="epmeta stat">${timing} · peak ${Math.round(ep.peak*100)}%</div>${epOpen.has(String(ep.id)) ? epEvidence(ep) + epMembers(ep) + (typeof epCtxBar==="function" ? epCtxBar(ep) : "") + (typeof epLabelBar==="function" ? epLabelBar(ep) : "") : ""}</div>`;
 }
 function renderEpisodes(s){
   const keep = e => (!epFilter.family.size || epFilter.family.has(e.family)) && (!epFilter.horizon.size || (e.horizons||[e.horizon]).some(h=>epFilter.horizon.has(h)) || e.horizon==="book");
