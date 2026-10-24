@@ -2,9 +2,10 @@
 //   1. coverage: per collector and per record name, how many records, the longest gap, and the share of minutes with data;
 //   2. lead-in: for a session, how far before the start each collector's data reaches (an auto-recording should reach 30 minutes back);
 //   3. field check: numeric fields that never change (a collector that reads a constant is not telling anything);
-//   4. lead test: does a feature taken now go with the NEXT 5 minutes of volatility or movement of the Binance mark price? (Spearman rank correlation, descriptive only:
-//      windows overlap, so there is no significance here, and a few hours of data prove nothing; it is the monthly judgement's first look.)
-// Usage:  node analyze-collectors.mjs FILE... [--horizon 300] [--fields] [--json]      |      node analyze-collectors.mjs --selftest
+//   4. evaluation: does a feature taken now say something about the NEXT 5 minutes of volatility of the Binance mark that the PREVIOUS 5 minutes of volatility do not?
+//      A plan fixed in advance (see PLAN below, printed with every result): partial rank correlation, permutation p-values that respect the autocorrelation,
+//      a correction for the number of features, and a time split into a deciding and a confirming half. Meant for weeks of tapes joined with --merge.
+// Usage:  node analyze-collectors.mjs FILE... [--merge] [--horizon 300] [--fields] [--json]      |      --plan      |      --selftest
 // The record names and expected intervals come from src/js/collectors-core.js (COLLECT.OWNER / EXPECT_MS), so a new collector is picked up when it is added there.
 import fs from "node:fs";
 import path from "node:path";
@@ -76,7 +77,15 @@ export function fieldStats(records) {
 }
 export const constantFields = (stats, minN = 20) => { const out = []; for (const name in stats) for (const k in stats[name]) { const s = stats[name][k]; if (s.n >= minN && s.distinct === 1) out.push(name + "." + k + " = " + s.min + " (" + s.n + " records)"); } return out; };
 
-// ---------- 4. lead test
+// ---------- 4. evaluation: does a feature say something about the NEXT horizon of the Binance mark that the CURRENT volatility does not?
+// The plan is fixed here, in advance, and printed with every result. The questions it answers badly are listed in .scratch/collectors/01-collectors.md.
+//   target     realised volatility of the mark over the next horizon (standard deviation of its 10-second log returns, in bps); the absolute move is reported, not judged
+//   control    realised volatility over the PREVIOUS horizon: volatility clusters, so a feature that only mirrors the current volatility would look predictive without being so
+//   statistic  partial rank correlation of feature and target given the control (ranks, both residualised on the control ranks)
+//   inference  circular-shift permutation (keeps the autocorrelation of both series; a plain p-value would be meaningless because the windows overlap)
+//   verdict    the data is split in time in two halves. A feature is "confirmed" only if the first half passes (p <= alpha / number of features, |rho| >= minAbsRho)
+//              and the second half agrees (same sign, p <= confirmAlpha, |rho| >= minAbsRho / 2). Passing in the first half only is "promising", never "keep".
+export const PLAN = { horizonSec:300, stepSec:10, minSamples:300, alpha:0.05, confirmAlpha:0.05, minAbsRho:0.08, permutations:999, seed:12345 };
 const num = x => (typeof x === "number" && Number.isFinite(x) ? x : null);
 const mid = q => (q && num(q.b) != null && num(q.a) != null ? (q.b + q.a)/2 : null);
 const imb = (p, e) => { const d = p && p.d && p.d[e]; return d && num(d[0]) != null && num(d[1]) != null && d[0] + d[1] > 0 ? (d[0] - d[1])/(d[0] + d[1]) : null; };
@@ -111,44 +120,99 @@ export function spearman(x, y) {
   for (let i = 0; i < n; i++) { sxy += (rx[i] - mx)*(ry[i] - mx); sxx += (rx[i] - mx)**2; syy += (ry[i] - mx)**2; }
   return sxx && syy ? +(sxy/Math.sqrt(sxx*syy)).toFixed(3) : null;
 }
-// the Binance mark price (the `basis` records) -> for each time t, the volatility (standard deviation of the log returns between marks) and the absolute move over the next horizon
-export function futureMoves(records, horizonMs) {
-  const marks = records.filter(r => r[1] === "basis" && r[3] && num(r[3].mark) > 0).map(r => [r[2], r[3].mark]).sort((a, b) => a[0] - b[0]);
-  const after = t => { let lo = 0, hi = marks.length; while (lo < hi) { const m = (lo + hi) >> 1; if (marks[m][0] <= t) lo = m + 1; else hi = m; } return lo; };      // first mark later than t
-  const at = new Map();
-  const out = t => {
-    if (at.has(t)) return at.get(t);
-    const lo = after(t), hi = after(t + horizonMs), w = marks.slice(lo, hi); let res = null;
-    if (w.length >= 10 && w[w.length - 1][0] - t >= horizonMs*0.8) {
-      const r = []; for (let i = 1; i < w.length; i++) r.push(Math.log(w[i][1]/w[i - 1][1]));
-      const m = r.reduce((a, b) => a + b, 0)/r.length, sd = Math.sqrt(r.reduce((a, b) => a + (b - m)**2, 0)/r.length);
-      res = { vol:sd*1e4, move:Math.abs(Math.log(w[w.length - 1][1]/w[0][1]))*1e4 };      // in bps
-    }
-    at.set(t, res); return res;
-  };
-  return { out, n:marks.length };
+function rng(seed) { let s = seed >>> 0; return () => ((s = (Math.imul(s, 1664525) + 1013904223) >>> 0)/4294967296); }
+function residual(a, z) {      // a with the part explained by z (least squares) removed, then centred
+  const n = a.length, ma = a.reduce((p, q) => p + q, 0)/n, mz = z.reduce((p, q) => p + q, 0)/n; let cov = 0, vz = 0;
+  for (let i = 0; i < n; i++) { cov += (a[i] - ma)*(z[i] - mz); vz += (z[i] - mz)**2; }
+  const b = vz ? cov/vz : 0; return a.map((v, i) => v - ma - b*(z[i] - mz));
 }
-export function leadTest(records, horizonMs) {
-  const fm = futureMoves(records, horizonMs), byName = {};
-  for (const r of records) (byName[r[1]] ||= []).push(r);
-  for (const k in byName) byName[k].sort((a, b) => a[2] - b[2]);
-  const rows = [];
-  for (const f in FEATURES) {
-    const [name, fn] = FEATURES[f], xs = [], v = [], m = [];
-    for (const r of byName[name] || []) { let x = null; try { x = fn(r[3] || {}); } catch {} if (num(x) == null) continue; const fut = fm.out(r[2]); if (!fut) continue; xs.push(x); v.push(fut.vol); m.push(fut.move); }
-    rows.push({ feature:f, n:xs.length, rhoVol:spearman(xs, v), rhoMove:spearman(xs, m) });
+// partial rank correlation of x and y given z, with a circular-shift permutation p-value; null when there are too few samples or no variation
+export function partialTest(x, y, z, K, seed) {
+  const n = x.length; if (n < 30 || y.length !== n || z.length !== n) return null;
+  const rz = ranks(z), ex = residual(ranks(x), rz), ey = residual(ranks(y), rz);
+  let sxx = 0, syy = 0, sxy = 0; for (let i = 0; i < n; i++) { sxx += ex[i]**2; syy += ey[i]**2; sxy += ex[i]*ey[i]; }
+  if (!(sxx > 1e-9) || !(syy > 1e-9)) return null;
+  const den = Math.sqrt(sxx*syy), rho = sxy/den, rand = rng(seed), lo = Math.ceil(n*0.05), hi = Math.floor(n*0.95); let ge = 0;
+  for (let k = 0; k < K; k++) {
+    const s = lo + Math.floor(rand()*(hi - lo + 1)); let acc = 0;
+    for (let i = 0; i < n; i++) acc += ex[i]*ey[(i + s) % n];
+    if (Math.abs(acc/den) >= Math.abs(rho) - 1e-12) ge++;
   }
-  rows.sort((a, b) => Math.abs(b.rhoVol ?? 0) - Math.abs(a.rhoVol ?? 0));
-  return { rows, marks:fm.n };
+  return { rho:+rho.toFixed(3), p:+((1 + ge)/(K + 1)).toFixed(4), n };
+}
+export function verdict(disc, conf, plan = PLAN, nFeatures = 1) {
+  if (!disc || !conf) return "no variation, or too few samples";
+  if (disc.n < plan.minSamples || conf.n < plan.minSamples) return "not enough data";
+  const alpha = plan.alpha/Math.max(1, nFeatures);
+  if (!(disc.p <= alpha && Math.abs(disc.rho) >= plan.minAbsRho)) return "nothing";
+  return Math.sign(conf.rho) === Math.sign(disc.rho) && conf.p <= plan.confirmAlpha && Math.abs(conf.rho) >= plan.minAbsRho/2 ? "CONFIRMED" : "promising, not confirmed in the second half";
+}
+// the Binance mark (the `basis` records): realised volatility (bps) and absolute move over any window (a, b]
+function makeMarks(records) {
+  const marks = records.filter(r => r[1] === "basis" && r[3] && num(r[3].mark) > 0).map(r => [r[2], r[3].mark]).sort((a, b) => a[0] - b[0]);
+  const after = t => { let lo = 0, hi = marks.length; while (lo < hi) { const m = (lo + hi) >> 1; if (marks[m][0] <= t) lo = m + 1; else hi = m; } return lo; };
+  const stat = (a, b) => {
+    const w = marks.slice(after(a), after(b));
+    if (w.length < 10 || w[w.length - 1][0] - w[0][0] < (b - a)*0.7) return null;
+    const r = []; for (let i = 1; i < w.length; i++) r.push(Math.log(w[i][1]/w[i - 1][1]));
+    const m = r.reduce((p, q) => p + q, 0)/r.length, sd = Math.sqrt(r.reduce((p, q) => p + (q - m)**2, 0)/r.length);
+    return { vol:sd*1e4, move:Math.abs(Math.log(w[w.length - 1][1]/w[0][1]))*1e4 };
+  };
+  return { marks, stat };
+}
+// per feature: samples (at most one per step) with the feature value, the next-horizon volatility and move, and the previous-horizon volatility
+export function buildSamples(records, plan = PLAN) {
+  const H = plan.horizonSec*1000, step = plan.stepSec*1000, mk = makeMarks(records), byName = {};
+  for (const r of records) (byName[r[1]] ||= []).push(r);
+  const out = {};
+  for (const f in FEATURES) {
+    const [name, fn] = FEATURES[f], rows = (byName[name] || []).sort((a, b) => a[2] - b[2]), s = []; let lastT = -Infinity;
+    for (const r of rows) {
+      if (r[2] - lastT < step) continue;
+      let x = null; try { x = fn(r[3] || {}); } catch {}
+      if (num(x) == null) continue;
+      const fut = mk.stat(r[2], r[2] + H), past = mk.stat(r[2] - H, r[2]); if (!fut || !past) continue;
+      s.push({ t:r[2], x, vol:fut.vol, move:fut.move, pvol:past.vol }); lastT = r[2];
+    }
+    out[f] = s;
+  }
+  return { samples:out, marks:mk.marks, stat:mk.stat };
+}
+export function evaluate(records, plan = PLAN) {
+  const { samples, marks, stat } = buildSamples(records, plan), nF = Object.keys(FEATURES).length, H = plan.horizonSec*1000;
+  const t0 = marks.length ? marks[0][0] : 0, t1 = marks.length ? marks[marks.length - 1][0] : 0, tMid = (t0 + t1)/2, rows = [];
+  for (const f in samples) {
+    const s = samples[f], a = s.filter(q => q.t < tMid), b = s.filter(q => q.t >= tMid), col = (arr, k) => arr.map(q => q[k]);
+    const disc = partialTest(col(a, "x"), col(a, "vol"), col(a, "pvol"), plan.permutations, plan.seed), conf = partialTest(col(b, "x"), col(b, "vol"), col(b, "pvol"), plan.permutations, plan.seed + 1);
+    rows.push({ feature:f, n:s.length, raw:spearman(col(s, "x"), col(s, "vol")), disc, conf, verdict:s.length < 2*plan.minSamples ? "not enough data" : verdict(disc, conf, plan, nF) });
+  }
+  const order = { "CONFIRMED":0, "promising, not confirmed in the second half":1, "nothing":2 };
+  rows.sort((p, q) => (order[p.verdict] ?? 3) - (order[q.verdict] ?? 3) || Math.abs(q.disc ? q.disc.rho : 0) - Math.abs(p.disc ? p.disc.rho : 0));
+  const vols = []; for (let t = t0 + H; t <= t1; t += 60000) { const v = stat(t - H, t); if (v) vols.push(v.vol); } vols.sort((p, q) => p - q);
+  const q = p => vols.length ? vols[Math.min(vols.length - 1, Math.floor(vols.length*p))] : null;
+  const days = new Set(marks.map(m => new Date(m[0]).toISOString().slice(0, 10)));
+  return { plan, rows, marks:marks.length, span:{ from:t0, to:t1, hours:+((t1 - t0)/3600000).toFixed(1), days:days.size }, volRange:{ p10:q(.1) == null ? null : +q(.1).toFixed(2), p90:q(.9) == null ? null : +q(.9).toFixed(2) } };
 }
 
 // ---------- report
 const dur = ms => ms == null ? "-" : ms < 90000 ? Math.round(ms/1000) + "s" : ms < 5400000 ? Math.round(ms/MIN) + "m" : (ms/3600000).toFixed(1) + "h";
-export function analyze(input, horizonMs) {
+export function analyze(input, plan = PLAN) {
   const recs = input.records, times = recs.map(r => r[2]);
   const a = input.t0 != null ? input.t0 - 30*MIN : Math.min(...times), b = input.t1 != null ? input.t1 : Math.max(...times);
   const cov = recs.length ? coverage(recs, a, b) : null, st = recs.length ? fieldStats(recs) : {};
-  return { file:input.file, kind:input.kind, window:{ from:a, to:b, minutes:cov ? cov.totalMinutes : 0 }, records:recs.length, coverage:cov, leadIn:input.t0 != null ? leadIn(recs, input.t0) : null, auto:!!input.auto, constants:constantFields(st), fields:st, lead:leadTest(recs, horizonMs) };
+  return { file:input.file, kind:input.kind, window:{ from:a, to:b, minutes:cov ? cov.totalMinutes : 0 }, records:recs.length, coverage:cov, leadIn:input.t0 != null ? leadIn(recs, input.t0) : null, auto:!!input.auto, constants:constantFields(st), fields:st, evaluation:evaluate(recs, plan) };
+}
+const fmt = x => x == null ? "-" : (x.rho >= 0 ? "+" : "") + x.rho.toFixed(2) + " (p " + (x.p < 0.001 ? "<.001" : x.p.toFixed(3)) + ")";
+function printEvaluation(ev) {
+  const L = s => console.log(s), p = ev.plan;
+  L("\n   EVALUATION  (plan fixed in advance: " + p.horizonSec/60 + " min horizon; target = next-horizon volatility; control = previous-horizon volatility; partial rank correlation;");
+  L("   circular-shift permutation, " + p.permutations + " shifts; first half decides at p <= " + p.alpha + "/" + Object.keys(FEATURES).length + " and |rho| >= " + p.minAbsRho + ", second half must agree; at least " + p.minSamples + " samples a half)");
+  L("   data: " + ev.marks + " mark prices over " + ev.span.hours + " h on " + ev.span.days + " day(s); volatility seen: " + (ev.volRange.p10 == null ? "-" : ev.volRange.p10 + " to " + ev.volRange.p90 + " bps per 10 s step (10th to 90th percentile)"));
+  if (ev.marks < 120) return L("   not enough mark prices (the `basis` collector needs to have run for hours; use --merge to join several tapes)");
+  if (ev.span.hours < 24 || ev.span.days < 2) L("   WARNING: under a day, or one calendar day, of data: one regime only. Treat everything below as a rehearsal, not a result.");
+  if (ev.volRange.p10 && ev.volRange.p90 / ev.volRange.p10 < 1.5) L("   WARNING: the volatility barely changed (90th/10th percentile under 1.5): there is nothing for a feature to lead.");
+  L("   " + "feature".padEnd(30) + "n".padEnd(7) + "raw rho".padEnd(9) + "1st half (decides)".padEnd(22) + "2nd half (confirms)".padEnd(22) + "verdict");
+  for (const x of ev.rows) L("   " + x.feature.padEnd(30) + String(x.n).padEnd(7) + String(x.raw ?? "-").padEnd(9) + fmt(x.disc).padEnd(22) + fmt(x.conf).padEnd(22) + x.verdict);
 }
 function print(r, showFields) {
   const L = s => console.log(s);
@@ -164,43 +228,53 @@ function print(r, showFields) {
   L("\n   FIELDS that never change: " + (r.constants.length ? "" : "none"));
   for (const c of r.constants) L("   " + c);
   if (showFields) { L("\n   ALL FIELDS (n, distinct, min, max, sd)"); for (const n in r.fields) for (const k in r.fields[n]) { const s = r.fields[n][k]; L("   " + (n + "." + k).padEnd(40) + [s.n, s.distinct, s.min, s.max, s.sd].join("  ")); } }
-  L("\n   LEAD TEST: feature now vs the next " + (r.horizonMin) + " minutes of the Binance mark (Spearman rank correlation; descriptive only; " + r.lead.marks + " mark prices)");
-  if (r.lead.marks < 120) L("   not enough mark prices (need the `basis` collector for 20+ minutes)");
-  else { L("   " + "feature".padEnd(32) + "n".padEnd(8) + "vs volatility".padEnd(16) + "vs abs move"); for (const x of r.lead.rows) L("   " + x.feature.padEnd(32) + String(x.n).padEnd(8) + String(x.rhoVol ?? "-").padEnd(16) + String(x.rhoMove ?? "-") + (x.n < 200 ? "   few samples" : "")); }
+  printEvaluation(r.evaluation);
 }
 
 // ---------- self-test on a synthetic tape with known structure
 function selfTest() {
-  let seed = 7; const rnd = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
-  const T0 = Date.UTC(2026, 9, 24, 0, 0, 0), recs = [], R = COLLECT.rec;
-  let price = 80000; const volAt = i => (Math.floor(i/60) % 2 ? 6 : 1);      // 10 minutes calm, 10 minutes wild, in 10 s steps
-  for (let i = 0; i < 360*3; i++) {      // 3 hours of 10 s steps
-    const t = T0 + i*10000, v = volAt(i + 30);      // `v` is what the market will be doing 5 minutes (30 steps) from now
-    price *= Math.exp((rnd() - .5)*2e-5*volAt(i));
-    recs.push(R("basis", t, { mark:price, index:price, bps:0 }));
-    recs.push(R("dvol", t, { vol:30 + 10*v + rnd()*2, idx:price }));      // leads volatility by construction
-    recs.push(R("hlCtx", t, { fund:0.0000125, oi:1000 + rnd(), prem:rnd()*1e-4 }));      // fund is constant, prem is noise
+  const R = COLLECT.rec, T0 = Date.UTC(2026, 9, 24, 0, 0, 0), N = 1500, rnd = rng(7);
+  // volatility regimes of random length (6 to 18 minutes), calm = 1, wild = 6
+  const regime = []; for (let c = 0, w = false; regime.length < N + 60; w = !w, c++) { const len = 36 + Math.floor(rnd()*72); for (let k = 0; k < len; k++) regime.push(w ? 6 : 1); }
+  const recs = [], basisRecs = []; let price = 80000;
+  for (let i = 0; i < N; i++) { price *= Math.exp((rnd() - .5)*2e-5*regime[i]); basisRecs.push(R("basis", T0 + i*10000, { mark:price, index:price, bps:0 })); }
+  const pastVol = makeMarks(basisRecs).stat;      // what the plan uses as its control: the volatility of the previous 5 minutes
+  for (let i = 0; i < N; i++) {
+    const t = T0 + i*10000, fut = regime[i + 30], pv = pastVol(t - 300000, t);
+    recs.push(basisRecs[i]);
+    recs.push(R("dvol", t, { vol:30 + 10*fut + rnd()*2, idx:basisRecs[i][3].mark }));      // knows the regime 5 minutes ahead: says something the previous volatility does not
+    recs.push(R("hlCtx", t, { fund:0.0000125, oi:1000 + (pv ? 20*pv.vol : 0) + rnd()*2, prem:rnd()*1e-4 }));      // oi only mirrors the previous volatility; prem is noise; fund is constant
   }
-  for (let i = 0; i < 120; i++) recs.push(R("venues", T0 + 3600000 + i*1000, { cb:{ l:80000 }, bnS:{ b:79999, a:80001 } }));      // a recording hour with a 2-minute gap
+  for (let i = 0; i < 120; i++) recs.push(R("venues", T0 + 3600000 + i*1000, { cb:{ l:80000 }, bnS:{ b:79999, a:80001 } }));
   const gone = recs.filter(r => r[1] !== "venues" || r[2] < T0 + 3600000 + 50000 || r[2] > T0 + 3600000 + 70000);
-  const cov = coverage(gone, T0, T0 + 3*3600000), v = cov.owners.venues, d = cov.owners.derivs, w = cov.owners.wallets, o = cov.owners.options;
-  const lead = leadIn(gone, T0 + 3600000), st = fieldStats(gone), consts = constantFields(st), lt = leadTest(gone, 300000);
-  const row = f => lt.rows.find(x => x.feature === f);
-  const sp1 = spearman([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30], [30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1]);
+  const cov = coverage(gone, T0, T0 + N*10000), v = cov.owners.venues, d = cov.owners.derivs, w = cov.owners.wallets, o = cov.owners.options;
+  const lead = leadIn(gone, T0 + 3600000), st = fieldStats(gone), consts = constantFields(st);
+  const ev = evaluate(gone, Object.assign({}, PLAN, { permutations:499 })), row = f => ev.rows.find(x => x.feature === f);
+  const sp1 = spearman(Array.from({ length:30 }, (_, i) => i), Array.from({ length:30 }, (_, i) => 30 - i));
+  // partialTest on its own: y and x both just follow z -> raw correlation high, partial near zero; a real extra link survives
+  const rz = rng(3), z = Array.from({ length:400 }, () => rz()), echo = z.map(q => q + rz()*0.3), y = z.map(q => q + rz()*0.3), extra = Array.from({ length:400 }, () => rz()), y2 = y.map((q, i) => q + 1.5*extra[i]);
+  const pe = partialTest(echo, y, z, 299, 1), pl = partialTest(extra, y2, z, 299, 1), ps = partialTest(echo, y, z, 299, 1);
+  const V = verdict, P = PLAN;
   const checks = [
     ["venues: 99 records, one 22 s gap", v && v.n === 99 && v.maxGapMs === 22000],
     ["venues: minutes with data counts only the minute that has some", v && v.minutes === 2],
     ["derivs: every 10 s step counted, no gap above 10 s", d && d.maxGapMs === 10000 && d.onTimePct === 100],
-    ["dvol counts as options; no wallets records means no wallets coverage", o && o.n === 1080 && w === undefined],
+    ["dvol counts as options; no wallets records means no wallets coverage", o && o.n === N && w === undefined],
     ["lead-in: derivs start 60 minutes before the recording, venues at its start", lead.derivs === 60 && lead.venues === 0],
     ["constant field found (hlCtx.fund), noisy ones not", consts.some(c => c.startsWith("hlCtx.fund ")) && !consts.some(c => c.startsWith("hlCtx.prem"))],
-    ["lead test: dvol leads volatility by construction, rank correlation high", row("dvol.vol") && row("dvol.vol").rhoVol > 0.5],
-    ["lead test: noise has no such relation", row("hlCtx.prem") && Math.abs(row("hlCtx.prem").rhoVol) < 0.25],
-    ["lead test: the ranking puts dvol first", lt.rows[0].feature === "dvol.vol"],
     ["spearman: perfectly reversed is -1, fewer than 30 points is null", sp1 === -1 && spearman([1, 2], [2, 1]) === null],
+    ["partialTest: a feature that only mirrors the control has a high raw but a small partial correlation", spearman(echo, y) > 0.6 && Math.abs(pe.rho) < 0.2],
+    ["partialTest: a real extra link survives the control and is significant", pl.rho > 0.5 && pl.p <= 0.01],
+    ["partialTest: same data and seed give the same answer", pe.rho === ps.rho && pe.p === ps.p],
+    ["evaluation: the feature that knows the next regime is CONFIRMED", row("dvol.vol") && row("dvol.vol").verdict === "CONFIRMED" && row("dvol.vol").disc.rho > 0.3],
+    ["evaluation: a copy of the previous volatility looks predictive raw but is NOT confirmed", row("hlCtx.oi") && row("hlCtx.oi").raw > 0.2 && row("hlCtx.oi").verdict !== "CONFIRMED"],
+    ["evaluation: noise is not confirmed, a constant has no verdict of value", row("hlCtx.prem").verdict !== "CONFIRMED" && /no variation|nothing/.test(row("hlCtx.fund").verdict)],
+    ["evaluation: features with no records say not enough data, and CONFIRMED comes first in the order", row("bookBn.spread").verdict === "not enough data" && ev.rows[0].feature === "dvol.vol"],
+    ["verdict rules: both halves needed, same sign, enough samples, corrected alpha", V({ rho:.2, p:.0001, n:400 }, { rho:.12, p:.01, n:400 }, P, 21) === "CONFIRMED" && V({ rho:.2, p:.0001, n:400 }, { rho:-.12, p:.01, n:400 }, P, 21).startsWith("promising") && V({ rho:.2, p:.01, n:400 }, { rho:.2, p:.0001, n:400 }, P, 21) === "nothing" && V({ rho:.05, p:.0001, n:400 }, { rho:.2, p:.0001, n:400 }, P, 21) === "nothing" && V({ rho:.2, p:.0001, n:100 }, { rho:.2, p:.0001, n:400 }, P, 21) === "not enough data" && V(null, null) !== "CONFIRMED"],
+    ["data summary: marks, hours and the volatility range are reported", ev.marks === N && ev.span.hours > 4 && ev.volRange.p90 > ev.volRange.p10 * 1.5],
   ];
   let bad = 0; for (const [name, ok] of checks) { console.log((ok ? "  pass  " : "  FAIL  ") + name); if (!ok) bad++; }
-  if (bad) { console.log(JSON.stringify({ v, d, lead, consts, rows:lt.rows.slice(0, 4) })); process.exit(1); }
+  if (bad) { console.log(JSON.stringify({ v, d, lead, consts, pe, pl, rows:ev.rows.slice(0, 5), span:ev.span, volRange:ev.volRange })); process.exit(1); }
   console.log("\nall " + checks.length + " checks passed");
 }
 
@@ -208,10 +282,18 @@ function selfTest() {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
   if (args.includes("--selftest")) selfTest();
+  else if (args.includes("--plan")) console.log(JSON.stringify(PLAN, null, 1));
   else {
-    const hi = args.indexOf("--horizon"), horizon = hi >= 0 ? +args[hi + 1] : 300, files = args.filter((x, i) => !x.startsWith("--") && !(hi >= 0 && i === hi + 1));
-    if (!files.length) { console.error("usage: node analyze-collectors.mjs FILE... [--horizon 300] [--fields] [--json]   |   node analyze-collectors.mjs --selftest"); process.exit(1); }
-    const results = files.map(f => Object.assign(analyze(readInput(f), horizon*1000), { horizonMin:+(horizon/60).toFixed(1) }));
+    const hi = args.indexOf("--horizon"), horizon = hi >= 0 ? +args[hi + 1] : PLAN.horizonSec, files = args.filter((x, i) => !x.startsWith("--") && !(hi >= 0 && i === hi + 1));
+    if (!files.length) { console.error("usage: node analyze-collectors.mjs FILE... [--merge] [--horizon 300] [--fields] [--json]   |   --plan   |   --selftest"); process.exit(1); }
+    const plan = Object.assign({}, PLAN, { horizonSec:horizon });
+    let inputs = files.map(readInput);
+    if (args.includes("--merge")) {      // one analysis over all files: tapes of consecutive days overlap, and a session's slice overlaps the tape, so identical records are counted once
+      const seen = new Set(), records = [];
+      for (const i of inputs) for (const r of i.records) { const k = JSON.stringify(r); if (!seen.has(k)) { seen.add(k); records.push(r); } }
+      inputs = [{ file:"(" + files.length + " files merged)", kind:"merged", records, t0:null, t1:null }];
+    }
+    const results = inputs.map(i => analyze(i, plan));
     if (args.includes("--json")) console.log(JSON.stringify(results, null, 1));
     else for (const r of results) print(r, args.includes("--fields"));
   }
