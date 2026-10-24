@@ -174,25 +174,25 @@ function rtTimeline(s){
   if (!(hi > lo)){ lo = (pts.length ? pts[0][1] : 1)-1; hi = lo+2; }
   const pad = (hi-lo)*.08; lo -= pad; hi += pad; const Y = p => T+PH-(p-lo)/(hi-lo)*PH;
   const sel = vis.find(e => e.id===RT.sel);
-  if (sel){ ctx.fillStyle = "rgba(122,162,247,.10)"; ctx.fillRect(X(Math.max(sel.tStart,t0)), T, Math.max(2, X(Math.min(sel.tEnd || now, now))-X(Math.max(sel.tStart,t0))), PH); }
-  ctx.strokeStyle = "#1e252e"; ctx.fillStyle = "#7d8a99"; ctx.lineWidth = 1; ctx.textAlign = "right";
+  if (sel){ ctx.fillStyle = TH.a("accent",.10); ctx.fillRect(X(Math.max(sel.tStart,t0)), T, Math.max(2, X(Math.min(sel.tEnd || now, now))-X(Math.max(sel.tStart,t0))), PH); }
+  ctx.strokeStyle = TH.line; ctx.fillStyle = TH.dim; ctx.lineWidth = 1; ctx.textAlign = "right";
   for (let i = 0; i <= 3; i++){ const p = lo+(hi-lo)*i/3, y = Y(p); ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(w-R, y); ctx.stroke(); ctx.fillText(fmt(p, p >= 1000 ? 1 : 3), L-4, y+3); }
   const steps = [10e3,30e3,60e3,120e3,300e3,600e3,1800e3], span = now-t0, step = steps.find(x => span/x <= 7) || 3600e3; ctx.textAlign = "center";
-  for (let t = Math.ceil(t0/step)*step; t <= now; t += step){ const x = X(t); ctx.strokeStyle = "#1e252e"; ctx.beginPath(); ctx.moveTo(x, T); ctx.lineTo(x, T+PH); ctx.stroke(); ctx.fillStyle = "#7d8a99"; ctx.fillText(new Date(t).toTimeString().slice(0, span >= 600e3 ? 5 : 8), x, T+PH+13); }
-  ctx.beginPath(); pts.forEach((p,i) => { if (i % stride) return; i ? ctx.lineTo(X(p[0]), Y(p[1])) : ctx.moveTo(X(p[0]), Y(p[1])); }); ctx.strokeStyle = "#aab6c3"; ctx.lineWidth = 1.3; ctx.stroke();
-  if (!pts.length){ ctx.fillStyle = "#7d8a99"; ctx.textAlign = "center"; ctx.fillText("waiting for price data", w/2, T+PH/2); }
+  for (let t = Math.ceil(t0/step)*step; t <= now; t += step){ const x = X(t); ctx.strokeStyle = TH.line; ctx.beginPath(); ctx.moveTo(x, T); ctx.lineTo(x, T+PH); ctx.stroke(); ctx.fillStyle = TH.dim; ctx.fillText(new Date(t).toTimeString().slice(0, span >= 600e3 ? 5 : 8), x, T+PH+13); }
+  ctx.beginPath(); pts.forEach((p,i) => { if (i % stride) return; i ? ctx.lineTo(X(p[0]), Y(p[1])) : ctx.moveTo(X(p[0]), Y(p[1])); }); ctx.strokeStyle = TH.text; ctx.lineWidth = 1.3; ctx.stroke();
+  if (!pts.length){ ctx.fillStyle = TH.dim; ctx.textAlign = "center"; ctx.fillText("waiting for price data", w/2, T+PH/2); }
   // lanes
   RT.hits = []; let y = T+PH+B;
   for (const lane of lanes){
     ctx.fillStyle = RT_COLORS[lane.f]; ctx.textAlign = "right"; ctx.fillText(RT_SHORT[lane.f], L-4, y+rowH);
-    ctx.strokeStyle = "#1e252e"; ctx.beginPath(); ctx.moveTo(L, y+lane.rows*(rowH+gap)+laneGap/2-1); ctx.lineTo(w-R, y+lane.rows*(rowH+gap)+laneGap/2-1); ctx.stroke();
+    ctx.strokeStyle = TH.line; ctx.beginPath(); ctx.moveTo(L, y+lane.rows*(rowH+gap)+laneGap/2-1); ctx.lineTo(w-R, y+lane.rows*(rowH+gap)+laneGap/2-1); ctx.stroke();
     for (const e of lane.list){
       const x0 = X(Math.max(e.tStart, t0)), x1 = Math.max(x0+3, X(Math.min(e.tEnd || now, now))), yy = y+rowOf.get(e)*(rowH+gap);
       ctx.globalAlpha = e.stage==="ended" ? .55 : .95; ctx.fillStyle = RT_COLORS[lane.f]; ctx.fillRect(x0, yy, x1-x0, rowH); ctx.globalAlpha = 1;
-      if (e.stage==="fading"){ ctx.strokeStyle = "#d9a43b"; ctx.lineWidth = 1.5; ctx.strokeRect(x0, yy, x1-x0, rowH); }
-      if (e.id===RT.sel){ ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5; ctx.strokeRect(x0-1, yy-1, x1-x0+2, rowH+2); }
-      ctx.fillStyle = "#0d1014"; for (const r of e.resumedAt || []){ const rx = X(r); if (rx > x0 && rx < x1) ctx.fillRect(rx-.5, yy, 1.5, rowH); }
-      const lb = rdLabelFor(e); if (lb){ ctx.fillStyle = lb.verdict==="agree" ? "#2fbf71" : "#e5534b"; ctx.beginPath(); ctx.arc(x1, yy, 3, 0, 7); ctx.fill(); }
+      if (e.stage==="fading"){ ctx.strokeStyle = TH.warn; ctx.lineWidth = 1.5; ctx.strokeRect(x0, yy, x1-x0, rowH); }
+      if (e.id===RT.sel){ ctx.strokeStyle = TH.hi; ctx.lineWidth = 1.5; ctx.strokeRect(x0-1, yy-1, x1-x0+2, rowH+2); }
+      ctx.fillStyle = TH.ink; for (const r of e.resumedAt || []){ const rx = X(r); if (rx > x0 && rx < x1) ctx.fillRect(rx-.5, yy, 1.5, rowH); }
+      const lb = rdLabelFor(e); if (lb){ ctx.fillStyle = lb.verdict==="agree" ? TH.buy : TH.sell; ctx.beginPath(); ctx.arc(x1, yy, 3, 0, 7); ctx.fill(); }
       RT.hits.push({x0, x1, y0:yy, y1:yy+rowH, ep:e});
     }
     y += lane.rows*(rowH+gap)+laneGap;
@@ -209,7 +209,7 @@ rt$("tlCv").onclick = e => {
   RT.sel = hit ? hit.ep.id : null; if (hit) epOpen.add(String(hit.ep.id)); RT.last.detail = null; renderReader();
 };
 rt$("tlLegend").innerHTML = Object.keys(RT_COLORS).map(f => `<span><i style="background:${RT_COLORS[f]}"></i>${READER_EPISODES.FAMILY_LABEL[f]}</span>`).join("")
-  + `<span><i style="background:#2fbf71;border-radius:50%"></i>you agreed</span><span><i style="background:#e5534b;border-radius:50%"></i>you disagreed</span><span><i style="background:#c792ea"></i>you marked missed</span><span>dark tick = resumed</span>`;
+  + `<span><i style="background:${TH.buy};border-radius:50%"></i>you agreed</span><span><i style="background:${TH.sell};border-radius:50%"></i>you disagreed</span><span><i style="background:#c792ea"></i>you marked missed</span><span>dark tick = resumed</span>`;
 
 // ---------- assumption register (measures only; see reader-register.js) ----------
 const rgMsg = t => { rt$("rgMsg").textContent = t; };
@@ -230,8 +230,8 @@ function rvSpark(j){
     const vs = j.points.map(p => p.v); if (j.refV) vs.push(j.refV.m - j.refV.unit, j.refV.m + j.refV.unit);
     let lo = Math.min(...vs), hi = Math.max(...vs); if (!(hi > lo)){ lo -= 1; hi += 1; }
     const W = 170, H = 30, n = j.points.length, X = i => 6 + i * (W - 12) / Math.max(1, n - 1), Y = v => H - 3 - (v - lo) / (hi - lo) * (H - 6);
-    let g = j.refV ? `<rect x="0" y="${Y(j.refV.m + j.refV.unit).toFixed(1)}" width="${W}" height="${Math.max(1, Y(j.refV.m - j.refV.unit) - Y(j.refV.m + j.refV.unit)).toFixed(1)}" fill="rgba(122,162,247,.22)"/>` : "";
-    j.points.forEach((p, i) => { g += `<circle cx="${X(i).toFixed(1)}" cy="${Y(p.v).toFixed(1)}" r="2.6" fill="${p.eff && p.eff.drifted ? "#e5534b" : "#7d8a99"}"/>`; });
+    let g = j.refV ? `<rect x="0" y="${Y(j.refV.m + j.refV.unit).toFixed(1)}" width="${W}" height="${Math.max(1, Y(j.refV.m - j.refV.unit) - Y(j.refV.m + j.refV.unit)).toFixed(1)}" fill="${TH.a("accent",.22)}"/>` : "";
+    j.points.forEach((p, i) => { g += `<circle cx="${X(i).toFixed(1)}" cy="${Y(p.v).toFixed(1)}" r="2.6" fill="${p.eff && p.eff.drifted ? TH.sell : TH.dim}"/>`; });
     return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="recent sessions against the reference band">${g}</svg>`;
   }
   const n = j.points.length + (j.preview ? 1 : 0), vals = [];
@@ -240,9 +240,9 @@ function rvSpark(j){
   let lo = Math.min(...vals), hi = Math.max(...vals); if (!(hi > lo)){ lo -= 1; hi += 1; }
   const W = 170, H = 30, X = i => 6 + i * (W - 12) / Math.max(1, n - 1), Y = v => H - 3 - (v - lo) / (hi - lo) * (H - 6);
   let g = "";
-  if (j.refQ) g += `<rect x="0" y="${Y(j.refQ[4]).toFixed(1)}" width="${W}" height="${Math.max(1, Y(j.refQ[0]) - Y(j.refQ[4])).toFixed(1)}" fill="rgba(122,162,247,.10)"/><rect x="0" y="${Y(j.refQ[3]).toFixed(1)}" width="${W}" height="${Math.max(1, Y(j.refQ[1]) - Y(j.refQ[3])).toFixed(1)}" fill="rgba(122,162,247,.22)"/>`;
-  j.points.forEach((p, i) => { const c = p.eff && p.eff.drifted ? "#e5534b" : "#7d8a99"; g += `<line x1="${X(i).toFixed(1)}" x2="${X(i).toFixed(1)}" y1="${Y(p.q[4]).toFixed(1)}" y2="${Y(p.q[0]).toFixed(1)}" stroke="${c}" stroke-width="1"/><circle cx="${X(i).toFixed(1)}" cy="${Y(p.q[2]).toFixed(1)}" r="2.4" fill="${c}"/>`; });
-  if (j.preview){ const i = n - 1; g += `<line x1="${X(i).toFixed(1)}" x2="${X(i).toFixed(1)}" y1="${Y(j.preview.q[4]).toFixed(1)}" y2="${Y(j.preview.q[0]).toFixed(1)}" stroke="#d9a43b" stroke-width="1"/><circle cx="${X(i).toFixed(1)}" cy="${Y(j.preview.q[2]).toFixed(1)}" r="2.6" fill="none" stroke="#d9a43b"/>`; }
+  if (j.refQ) g += `<rect x="0" y="${Y(j.refQ[4]).toFixed(1)}" width="${W}" height="${Math.max(1, Y(j.refQ[0]) - Y(j.refQ[4])).toFixed(1)}" fill="${TH.a("accent",.10)}"/><rect x="0" y="${Y(j.refQ[3]).toFixed(1)}" width="${W}" height="${Math.max(1, Y(j.refQ[1]) - Y(j.refQ[3])).toFixed(1)}" fill="${TH.a("accent",.22)}"/>`;
+  j.points.forEach((p, i) => { const c = p.eff && p.eff.drifted ? TH.sell : TH.dim; g += `<line x1="${X(i).toFixed(1)}" x2="${X(i).toFixed(1)}" y1="${Y(p.q[4]).toFixed(1)}" y2="${Y(p.q[0]).toFixed(1)}" stroke="${c}" stroke-width="1"/><circle cx="${X(i).toFixed(1)}" cy="${Y(p.q[2]).toFixed(1)}" r="2.4" fill="${c}"/>`; });
+  if (j.preview){ const i = n - 1; g += `<line x1="${X(i).toFixed(1)}" x2="${X(i).toFixed(1)}" y1="${Y(j.preview.q[4]).toFixed(1)}" y2="${Y(j.preview.q[0]).toFixed(1)}" stroke="${TH.warn}" stroke-width="1"/><circle cx="${X(i).toFixed(1)}" cy="${Y(j.preview.q[2]).toFixed(1)}" r="2.6" fill="none" stroke="${TH.warn}"/>`; }
   return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="recent sessions against the reference band">${g}</svg>`;
 }
 const rvState = j => j.state === "building" ? `building ${j.refN}/${j.need}` : j.state === "watching" ? `watching ${j.streak}/${j.m}` : "ok";

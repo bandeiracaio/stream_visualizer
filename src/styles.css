@@ -2,7 +2,8 @@
   --bg:#07090b;--panel:#0c1014;--panel2:#11161b;--canvas:#06080a;
   --line:#26303a;                 /* hairlines between things */
   --edge:#5f6e7d;                 /* the border of a control: at least 3:1 against every surface */
-  --text:#dbe3ea;--dim:#93a3af;
+  --text:#dbe3ea;--dim:#93a3af;--hi:#f4f7fa;   /* the brightest: highlights and strokes that must stand out on a chart */
+  
   --buy:#3ddc84;--sell:#ff6b66;--warn:#ff8a4c;--bn:#f0b90b;--hl:#5fd4c4;--accent:#ffb454;
   --ink:#07090b;                  /* text on an accent, buy, sell or warning fill */
   --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;

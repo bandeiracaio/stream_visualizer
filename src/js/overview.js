@@ -53,7 +53,7 @@ function renderOverview(){
     return `<span class="chg ${ovCls(pct)}${part?" part":""}" title="${part?"only "+ovSpan(span)+" of history so far":""}">${k} ${ovSigned(pct, a=>a.toFixed(2))}%${part?" ("+ovSpan(span)+")":""}</span>`;
   }).join("");
   const line = OV.hist.filter(x=>x.t >= nowEx()-900000).map(x=>x.px); if (px) line.push(px);
-  ovLine(ov$("ovSpark"), line, line.length>1 && line[line.length-1]<line[0] ? "#e5534b" : "#2fbf71");
+  ovLine(ov$("ovSpark"), line, line.length>1 && line[line.length-1]<line[0] ? TH.sell : TH.buy);
 
   // market numbers
   const b = ovBase(win), age = b ? nowEx()-b.t : 0, part = b && age < win*.8, tag = part ? ovSpan(age) : wl;

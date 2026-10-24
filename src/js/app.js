@@ -1,4 +1,13 @@
 "use strict";
+// ---------- chart colours: read from the CSS tokens (styles.css :root) so the charts always match the rest of the look ----------
+// TH.dim = axis text, TH.text / TH.hi = lines and labels, TH.line = grid, TH.edge = axes and zero lines, TH.ink = text on a coloured fill, TH.canvas = chart background;
+// TH.a(name, alpha) = the token as an rgba() string. A token that is missing shows up as magenta, never as a silent default.
+const TH = (() => {
+  const cs = getComputedStyle(document.documentElement), t = {};
+  for (const n of ["bg", "panel", "panel2", "canvas", "line", "edge", "text", "dim", "hi", "buy", "sell", "warn", "bn", "hl", "accent", "ink"]) t[n] = cs.getPropertyValue("--" + n).trim() || "#ff00ff";
+  t.a = (n, al) => { const h = t[n].replace("#", ""); return `rgba(${parseInt(h.slice(0, 2), 16)},${parseInt(h.slice(2, 4), 16)},${parseInt(h.slice(4, 6), 16)},${al})`; };
+  return t;
+})();
 // ---------- stream catalogue ----------
 // gap: longest normal silence (ms) before the stream is flagged.
 const STREAMS = [
@@ -22,8 +31,8 @@ function freshStats(){ return {total:0,cur:0,bytes:0,rates:new Array(60).fill(0)
 for (const d of STREAMS) S[d.id] = Object.assign({def:d, on:!d.off}, freshStats());
 const HL_CHANNEL = {trades:"hl.trades", l2Book:"hl.l2Book", bbo:"hl.bbo", activeAssetCtx:"hl.ctx", candle:"hl.candle"};
 // Text colour of each stream in the Raw messages log (and in its filter list): warm colours are Binance, cool colours are Hyperliquid.
-const LOG_COLOR = {"bn.trade":"#f0b90b", "bn.aggTrade":"#c9a227", "bn.depth":"#ff8a3d", "bn.bookTicker":"#ffb4a2", "bn.markPrice":"#e07be0", "bn.forceOrder":"#ff5c5c", "bn.ticker":"#a89984", "bn.kline":"#8a7f60", "bn.oi":"#ffd9a0",
-                   "hl.trades":"#5fd4c4", "hl.l2Book":"#4da6ff", "hl.bbo":"#9ad1ff", "hl.ctx":"#7be08f", "hl.candle":"#b19cff"};
+const LOG_COLOR = {"bn.trade":TH.bn, "bn.aggTrade":"#c9a227", "bn.depth":"#ff8a3d", "bn.bookTicker":"#ffb4a2", "bn.markPrice":"#e07be0", "bn.forceOrder":"#ff5c5c", "bn.ticker":"#a89984", "bn.kline":"#8a7f60", "bn.oi":"#ffd9a0",
+                   "hl.trades":TH.hl, "hl.l2Book":"#4da6ff", "hl.bbo":"#9ad1ff", "hl.ctx":"#7be08f", "hl.candle":"#b19cff"};
 
 // ---------- helpers ----------
 const $ = id => document.getElementById(id);
@@ -289,17 +298,17 @@ function prep(cv){
   return {ctx,w,h};
 }
 function niceStep(x){ const p = 10**Math.floor(Math.log10(x)); for (const m of [1,2,2.5,5,10]) if (m*p >= x) return m*p; return 10*p; }
-function emptyMsg(ctx,w,h,txt){ ctx.fillStyle="#7d8a99"; ctx.textAlign="center"; ctx.fillText(txt, w/2, h/2); }
+function emptyMsg(ctx,w,h,txt){ ctx.fillStyle=TH.dim; ctx.textAlign="center"; ctx.fillText(txt, w/2, h/2); }
 function timeAxis(ctx, X, t0, t1, h, B, L, R, w){
   const win = t1-t0, step = win<=60000?10000:win<=180000?30000:60000;
-  ctx.strokeStyle="#1e252e"; ctx.fillStyle="#7d8a99"; ctx.textAlign="center"; ctx.lineWidth=1;
+  ctx.strokeStyle=TH.line; ctx.fillStyle=TH.dim; ctx.textAlign="center"; ctx.lineWidth=1;
   for (let k=step; k<=win; k+=step){
     const x = X(t1-k); if (x < L) break;
     ctx.beginPath(); ctx.moveTo(x,6); ctx.lineTo(x,h-B); ctx.stroke();
     ctx.fillText(`-${k/1000}s`, x, h-5);
   }
 }
-const COL = {buy:"#2fbf71", sell:"#e5534b", bn:"#f0b90b", hl:"#5fd4c4"};
+const COL = {buy:TH.buy, sell:TH.sell, bn:TH.bn, hl:TH.hl};
 
 // ---------- trade bubble chart ----------
 function drawBubbles(){
@@ -316,7 +325,7 @@ function drawBubbles(){
   const X = t => L + (t-t0)/win*(w-L-R), Y = p => T + (hi-p)/(hi-lo)*(h-T-B);
   // price grid
   const st = niceStep((hi-lo)/6);
-  ctx.strokeStyle="#1e252e"; ctx.fillStyle="#7d8a99"; ctx.textAlign="left"; ctx.lineWidth=1;
+  ctx.strokeStyle=TH.line; ctx.fillStyle=TH.dim; ctx.textAlign="left"; ctx.lineWidth=1;
   for (let p=Math.ceil(lo/st)*st; p<=hi; p+=st){ const y=Y(p); ctx.beginPath(); ctx.moveTo(L,y); ctx.lineTo(w-R,y); ctx.stroke(); ctx.fillText(fmt(p, st<1?1:0), w-R+4, y+3.5); }
   timeAxis(ctx, X, t0, t1, h, B, L, R, w);
   // mid lines
@@ -342,14 +351,14 @@ function drawBubbles(){
   for (const e of READER.events){
     if (e.t<t0 || e.t>t1 || !(e.px>=lo && e.px<=hi)) continue;
     const x=X(e.t),y=Y(e.px),up=e.dir==="bull",neutral=e.dir==="neutral";
-    ctx.fillStyle=neutral?"#e0af68":up?COL.buy:COL.sell;ctx.strokeStyle="#0d1014";ctx.lineWidth=1;
+    ctx.fillStyle=neutral?TH.accent:up?COL.buy:COL.sell;ctx.strokeStyle=TH.ink;ctx.lineWidth=1;
     ctx.beginPath();
     if(neutral){ctx.arc(x,y,4,0,Math.PI*2);}else{ctx.moveTo(x,y+(up?6:-6));ctx.lineTo(x-5,y+(up?-3:3));ctx.lineTo(x+5,y+(up?-3:3));ctx.closePath();}
     ctx.fill();ctx.stroke();
   }
   // current mids on the axis
   const last = mids[mids.length-1];
-  if (last) for (const v of ["bn","hl"]) if (last[v]){ const y=Y(last[v]); ctx.fillStyle=COL[v]; ctx.fillRect(w-R+1,y-7,R-2,14); ctx.fillStyle="#0d1014"; ctx.fillText(fmt(last[v],1), w-R+4, y+3.5); }
+  if (last) for (const v of ["bn","hl"]) if (last[v]){ const y=Y(last[v]); ctx.fillStyle=COL[v]; ctx.fillRect(w-R+1,y-7,R-2,14); ctx.fillStyle=TH.ink; ctx.fillText(fmt(last[v],1), w-R+4, y+3.5); }
 }
 
 // ---------- CVD chart (dual axis, rebased at window start) ----------
@@ -367,7 +376,7 @@ function drawCvd(){
     let lo = Math.min(0,...vals), hi = Math.max(0,...vals); if (hi-lo < 1){ hi+=1; lo-=1; }
     const pad=(hi-lo)*.1; lo-=pad; hi+=pad;
     const Y = x => T + (hi-x)/(hi-lo)*(h-T-B);
-    if (v==="bn"){ ctx.strokeStyle="#39424e"; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(L,Y(0)); ctx.lineTo(w-R,Y(0)); ctx.stroke(); ctx.setLineDash([]); }
+    if (v==="bn"){ ctx.strokeStyle=TH.edge; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(L,Y(0)); ctx.lineTo(w-R,Y(0)); ctx.stroke(); ctx.setLineDash([]); }
     ctx.fillStyle = COL[v]; ctx.textAlign = side==="left" ? "right" : "left";
     for (const val of [hi-pad, 0, lo+pad]) ctx.fillText(fmtK(val), side==="left" ? L-4 : w-R+4, Y(val)+3.5);
     ctx.strokeStyle = COL[v]; ctx.lineWidth=1.6; ctx.beginPath();
@@ -616,9 +625,9 @@ function drawLines(cv, rows, series, opt={}){
   const L=6, R=58, T=8, B=18;
   const X = t => L+(t-t0)/win*(w-L-R), Y = v => T+(hi-v)/(hi-lo)*(h-T-B);
   const st = niceStep((hi-lo)/4), dec = st>=1?0:st>=0.1?1:st>=0.01?2:4, f = opt.fmt || (v=>fmt(v,dec));
-  ctx.strokeStyle="#1e252e"; ctx.fillStyle="#7d8a99"; ctx.textAlign="left"; ctx.lineWidth=1;
+  ctx.strokeStyle=TH.line; ctx.fillStyle=TH.dim; ctx.textAlign="left"; ctx.lineWidth=1;
   for (let v=Math.ceil(lo/st)*st; v<=hi; v+=st){ const y=Y(v); ctx.beginPath(); ctx.moveTo(L,y); ctx.lineTo(w-R,y); ctx.stroke(); ctx.fillText(f(v), w-R+4, y+3.5); }
-  if (lo<0 && hi>0){ ctx.strokeStyle="#4a5462"; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(L,Y(0)); ctx.lineTo(w-R,Y(0)); ctx.stroke(); ctx.setLineDash([]); }
+  if (lo<0 && hi>0){ ctx.strokeStyle=TH.edge; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(L,Y(0)); ctx.lineTo(w-R,Y(0)); ctx.stroke(); ctx.setLineDash([]); }
   timeAxis(ctx, X, t0, t1, h, B, L, R, w);
   for (const sr of series){
     ctx.strokeStyle=sr.color; ctx.lineWidth=1.5; ctx.beginPath(); let on=false;
@@ -664,26 +673,26 @@ function drawHeat(){
   ctx.imageSmoothingEnabled = false; ctx.drawImage(hmOff, L, T, pw, ph);
   const X = t => L+(t-t0)/win*pw, Y = p => T+(hi-p)/(hi-lo)*ph;
   const st = niceStep((hi-lo)/6);
-  ctx.fillStyle="#7d8a99"; ctx.textAlign="left";
+  ctx.fillStyle=TH.dim; ctx.textAlign="left";
   for (let p=Math.ceil(lo/st)*st; p<=hi; p+=st) ctx.fillText(fmt(p, st<1?1:0), w-R+4, Y(p)+3.5);
   timeAxis(ctx, X, t0, t1, h, B, L, R, w);
   ctx.save(); ctx.beginPath(); ctx.rect(L,T,pw,ph); ctx.clip();
-  ctx.strokeStyle="rgba(255,255,255,.85)"; ctx.lineWidth=1.2; ctx.beginPath();
+  ctx.strokeStyle=TH.a("hi",.85); ctx.lineWidth=1.2; ctx.beginPath();
   ss.forEach((s,i)=>{ const x=X(s.t), y=Y(s.mid); i ? ctx.lineTo(x,y) : ctx.moveTo(x,y); }); ctx.stroke();
   for (const t of trades){
     if (t.v!==v || t.t<t0 || t.bf || t.liq) continue;
     const r = Math.min(14, Math.max(1.4, Math.sqrt(t.ntl)/22));
-    ctx.fillStyle = t.side==="buy" ? "rgba(47,191,113,.8)" : "rgba(229,83,75,.8)";
+    ctx.fillStyle = t.side==="buy" ? TH.a("buy",.8) : TH.a("sell",.8);
     ctx.beginPath(); ctx.arc(X(t.t), Y(t.px), r, 0, Math.PI*2); ctx.fill();
   }
   for (const s of sweeps){
     if (s.v!==v || s.t<t0) continue;
     const x=X(s.t), y=Y(s.to), d = s.side==="buy" ? -1 : 1;
-    ctx.fillStyle = s.side==="buy" ? COL.buy : COL.sell; ctx.strokeStyle="#fff"; ctx.lineWidth=1;
+    ctx.fillStyle = s.side==="buy" ? COL.buy : COL.sell; ctx.strokeStyle=TH.hi; ctx.lineWidth=1;
     ctx.beginPath(); ctx.moveTo(x, y+d*9); ctx.lineTo(x-5, y+d*1); ctx.lineTo(x+5, y+d*1); ctx.closePath(); ctx.fill(); ctx.stroke();
   }
   ctx.restore();
-  ctx.fillStyle="#fff"; ctx.fillRect(w-R+1, Y(mid)-7, R-2, 14); ctx.fillStyle="#0d1014"; ctx.fillText(fmt(mid,1), w-R+4, Y(mid)+3.5);
+  ctx.fillStyle=TH.hi; ctx.fillRect(w-R+1, Y(mid)-7, R-2, 14); ctx.fillStyle=TH.ink; ctx.fillText(fmt(mid,1), w-R+4, Y(mid)+3.5);
 }
 
 function drawHist(){
@@ -705,7 +714,7 @@ function drawHist(){
       ctx.fillStyle=c; ctx.globalAlpha=.85; ctx.fillRect(x, h-B-bh, bw, bh); ctx.globalAlpha=1;
       if (vs>0.005){ ctx.fillStyle=c; ctx.font="9.5px ui-monospace,Menlo,monospace"; ctx.fillText((vs*100).toFixed(0)+"%", x+bw/2, h-B-bh-3); }
     });
-    ctx.fillStyle="#7d8a99"; ctx.font="10px ui-monospace,Menlo,monospace"; ctx.fillText(labels[i], cx, h-6);
+    ctx.fillStyle=TH.dim; ctx.font="10px ui-monospace,Menlo,monospace"; ctx.fillText(labels[i], cx, h-6);
   }
 }
 
@@ -748,7 +757,7 @@ function renderMicro(){
   drawLines($("cvImb"), microHist, [{key:"bnImb"+N, color:COL.bn},{key:"hlImb"+N, color:COL.hl}], {lo:-1.05, hi:1.05, fmt:v=>(v*100).toFixed(0)+"%"});
   drawLines($("cvMicro"), microHist, [{key:"bnMicro", color:COL.bn},{key:"hlMicro", color:COL.hl}], {zero:true});
   drawLines($("cvSpread"), microHist, [{key:"bnSpread", color:COL.bn},{key:"hlSpread", color:COL.hl}], {zero:true});
-  drawLines($("cvBasis"), microHist, [{key:"basis", color:"#7aa2f7"}], {zero:true});
+  drawLines($("cvBasis"), microHist, [{key:"basis", color:TH.accent}], {zero:true});
   const t0 = nowEx() - +$("mwin").value, b = microHist.filter(r=>r.t>=t0 && r.basis!=null).map(r=>r.basis);
   const mean = b.length ? b.reduce((a,x)=>a+x,0)/b.length : null, sd = b.length>1 ? Math.sqrt(b.reduce((a,x)=>a+(x-mean)**2,0)/(b.length-1)) : null;
   $("basisStats").innerHTML = [["now", b.length?fmt(b[b.length-1],2):"–"], ["mean", fmt(mean,2)], ["std", fmt(sd,2)],
@@ -767,7 +776,7 @@ $("swMin").oninput = renderSweeps;
 
 
 // ---------- visualizations (editorial views; read-only over existing state) ----------
-const VC = {bnbuy:"#2fbf71", bnsell:"#e5534b", hlbuy:"#8fe3b4", hlsell:"#f4a39d"};
+const VC = {bnbuy:TH.buy, bnsell:TH.sell, hlbuy:"#8fe3b4", hlsell:"#f4a39d"};
 const vwin = () => +$("vwin").value;
 const vTrades = t0 => trades.filter(t => t.t>=t0 && !t.liq && !t.bf);
 const SIZE_EDGES = [1e3, 1e4, 1e5], SIZE_LABELS = ["<1k","1k–10k","10k–100k","≥100k"];
@@ -787,7 +796,7 @@ function smoothPath(ctx, xs, ys, move){
 }
 function label(ctx, txt, x, y, color, align="left", bold=false){
   ctx.font = (bold?"600 ":"")+"11px ui-monospace,Menlo,Consolas,monospace"; ctx.textAlign = align;
-  ctx.lineWidth = 3; ctx.strokeStyle = "#0a0d10"; ctx.strokeText(txt, x, y); ctx.fillStyle = color; ctx.fillText(txt, x, y);
+  ctx.lineWidth = 3; ctx.strokeStyle = TH.canvas; ctx.strokeText(txt, x, y); ctx.fillStyle = color; ctx.fillText(txt, x, y);
   ctx.font = "10.5px ui-monospace,Menlo,Consolas,monospace";
 }
 
@@ -814,12 +823,12 @@ function drawStream(){
     ctx.beginPath(); smoothPath(ctx, xs, hi.map(v=>cy+dir*v*sc), true);
     smoothPath(ctx, [...xs].reverse(), [...lo].reverse().map(v=>cy+dir*v*sc), false);
     ctx.closePath(); ctx.fillStyle = VC[k]; ctx.globalAlpha = .88; ctx.fill(); ctx.globalAlpha = 1;
-    ctx.strokeStyle = "#0a0d10"; ctx.lineWidth = 1; ctx.stroke();
+    ctx.strokeStyle = TH.canvas; ctx.lineWidth = 1; ctx.stroke();
     let bi = 0; for (let i=1;i<n;i++) if (b[k][i] > b[k][bi]) bi = i;
-    if (b[k][bi]*sc > 16){ const y = cy + dir*(lo[bi] + b[k][bi]/2)*sc; label(ctx, `${k.slice(0,2).toUpperCase()} ${k.slice(2)} $${fmtK(b[k][bi])}`, xs[bi], y+4, "#0d1014", "center", true); }
+    if (b[k][bi]*sc > 16){ const y = cy + dir*(lo[bi] + b[k][bi]/2)*sc; label(ctx, `${k.slice(0,2).toUpperCase()} ${k.slice(2)} $${fmtK(b[k][bi])}`, xs[bi], y+4, TH.ink, "center", true); }
   }
-  ctx.strokeStyle = "#cfd6de"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(L,cy); ctx.lineTo(w-R,cy); ctx.stroke();
-  label(ctx, `buy $${fmtK(max)}/${BIN/1000}s`, L+2, T+10, "#7d8a99"); label(ctx, "sell", L+2, h-B-4, "#7d8a99");
+  ctx.strokeStyle = TH.text; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(L,cy); ctx.lineTo(w-R,cy); ctx.stroke();
+  label(ctx, `buy $${fmtK(max)}/${BIN/1000}s`, L+2, T+10, TH.dim); label(ctx, "sell", L+2, h-B-4, TH.dim);
   timeAxis(ctx, t => L+(t-t0)/win*(w-L-R), t0, t1, h, B, L, R, w);
 }
 
@@ -832,7 +841,7 @@ function drawSwarm(){
   const X = v => L + (Math.log10(Math.max(3,v))-x0)/(x1-x0)*(w-L-R);
   ctx.textAlign="center";
   for (const [v,lab] of [[10,"$10"],[100,"$100"],[1e3,"$1k"],[1e4,"$10k"],[1e5,"$100k"],[1e6,"$1M"]]){
-    const x = X(v); ctx.strokeStyle="#1e252e"; ctx.beginPath(); ctx.moveTo(x,T-4); ctx.lineTo(x,h-B); ctx.stroke(); ctx.fillStyle="#7d8a99"; ctx.fillText(lab, x, 11);
+    const x = X(v); ctx.strokeStyle=TH.line; ctx.beginPath(); ctx.moveTo(x,T-4); ctx.lineTo(x,h-B); ctx.stroke(); ctx.fillStyle=TH.dim; ctx.fillText(lab, x, 11);
   }
   const rr = 2.7, gap = rr*2+0.4;
   rows.forEach(([v,side], r)=>{
@@ -854,8 +863,8 @@ function drawSwarm(){
       ctx.fillStyle = VC[v+side]; ctx.globalAlpha=.8; ctx.beginPath(); ctx.arc(p.x, y, rr, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha=1;
     }
     const big = pts[pts.length-1];
-    ctx.strokeStyle="#fff"; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(big.x, cy, rr+2, 0, Math.PI*2); ctx.stroke();
-    label(ctx, "$"+fmtK(big.t.ntl), Math.min(big.x+8, w-40), cy-6, "#e6edf3");
+    ctx.strokeStyle=TH.hi; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(big.x, cy, rr+2, 0, Math.PI*2); ctx.stroke();
+    label(ctx, "$"+fmtK(big.t.ntl), Math.min(big.x+8, w-40), cy-6, TH.text);
   });
 }
 
@@ -870,20 +879,20 @@ function drawProfile(){
   for (const t of tr){ const i = Math.min(nb-1, Math.floor((t.px-base)/st)); t.side==="buy" ? buy[i]+=t.ntl : sell[i]+=t.ntl; }
   const net = Array.from(buy, (b,i)=> b-sell[i]), mx = Math.max(1, ...net.map(Math.abs));
   const L=70, R=50, T=8, B=8, rh = (h-T-B)/nb, cx = L + (w-L-R)/2, half = (w-L-R)/2 - 44;
-  ctx.strokeStyle="#4a5462"; ctx.beginPath(); ctx.moveTo(cx,T); ctx.lineTo(cx,h-B); ctx.stroke();
+  ctx.strokeStyle=TH.edge; ctx.beginPath(); ctx.moveTo(cx,T); ctx.lineTo(cx,h-B); ctx.stroke();
   for (let i=0;i<nb;i++){
     const y = T + (nb-1-i)*rh, bh = Math.max(2, rh*0.64), yy = y + (rh-bh)/2, len = Math.abs(net[i])/mx*half, pos = net[i]>=0;
-    ctx.fillStyle="#7d8a99"; ctx.textAlign="right"; ctx.fillText(fmt(base+i*st, st<1?1:0), L-6, y+rh/2+3.5);
+    ctx.fillStyle=TH.dim; ctx.textAlign="right"; ctx.fillText(fmt(base+i*st, st<1?1:0), L-6, y+rh/2+3.5);
     if (buy[i]+sell[i] === 0) continue;
     ctx.fillStyle = pos ? COL.buy : COL.sell; ctx.fillRect(pos ? cx : cx-len, yy, Math.max(1,len), bh);
     label(ctx, (pos?"+":"−")+"$"+fmtK(Math.abs(net[i])), pos ? cx+len+4 : cx-len-4, y+rh/2+4, pos?COL.buy:COL.sell, pos?"left":"right", true);
     const share = buy[i]/(buy[i]+sell[i]);
-    ctx.fillStyle = "#c3cfdb"; ctx.textAlign="right"; ctx.fillText((share*100).toFixed(0)+"%", w-6, y+rh/2+3.5);
+    ctx.fillStyle = TH.text; ctx.textAlign="right"; ctx.fillText((share*100).toFixed(0)+"%", w-6, y+rh/2+3.5);
   }
-  ctx.fillStyle="#7d8a99"; ctx.textAlign="right"; ctx.fillText("buy %", w-6, T+2);
+  ctx.fillStyle=TH.dim; ctx.textAlign="right"; ctx.fillText("buy %", w-6, T+2);
   const b = v==="bn" ? M.bnBid : M.hlBid, a = v==="bn" ? M.bnAsk : M.hlAsk;
   if (b && a){ const mid=(a+b)/2, y = T + (nb-1-(mid-base)/st + 0.5)*rh;
-    if (y>T && y<h-B){ ctx.setLineDash([4,3]); ctx.strokeStyle="#fff"; ctx.beginPath(); ctx.moveTo(L,y); ctx.lineTo(w-R,y); ctx.stroke(); ctx.setLineDash([]); label(ctx, "mid", L+2, y-3, "#fff"); } }
+    if (y>T && y<h-B){ ctx.setLineDash([4,3]); ctx.strokeStyle=TH.hi; ctx.beginPath(); ctx.moveTo(L,y); ctx.lineTo(w-R,y); ctx.stroke(); ctx.setLineDash([]); label(ctx, "mid", L+2, y-3, TH.hi); } }
 }
 
 // 4. basis anomaly vs trailing normal
@@ -903,7 +912,7 @@ function drawAnomaly(){
   const pad = (hi-lo)*.12 || 1; lo -= pad; hi += pad;
   const L=6, R=54, T=14, B=18, X = t => L+(t-t0)/win*(w-L-R), Y = v => T+(hi-v)/(hi-lo)*(h-T-B);
   const st = niceStep((hi-lo)/4); ctx.textAlign="left";
-  for (let v=Math.ceil(lo/st)*st; v<=hi; v+=st){ ctx.strokeStyle="#1e252e"; ctx.beginPath(); ctx.moveTo(L,Y(v)); ctx.lineTo(w-R,Y(v)); ctx.stroke(); ctx.fillStyle="#7d8a99"; ctx.fillText(fmt(v, st<1?1:0), w-R+4, Y(v)+3.5); }
+  for (let v=Math.ceil(lo/st)*st; v<=hi; v+=st){ ctx.strokeStyle=TH.line; ctx.beginPath(); ctx.moveTo(L,Y(v)); ctx.lineTo(w-R,Y(v)); ctx.stroke(); ctx.fillStyle=TH.dim; ctx.fillText(fmt(v, st<1?1:0), w-R+4, Y(v)+3.5); }
   timeAxis(ctx, X, t0, t1, h, B, L, R, w);
   for (let i=1;i<pts.length;i++){
     const a = pts[i-1], b = pts[i], z = b.sd ? (b.v-b.m)/b.sd : 0;
@@ -911,13 +920,13 @@ function drawAnomaly(){
     ctx.beginPath(); ctx.moveTo(X(a.t),Y(a.m)); ctx.lineTo(X(a.t),Y(a.v)); ctx.lineTo(X(b.t),Y(b.v)); ctx.lineTo(X(b.t),Y(b.m)); ctx.closePath(); ctx.fill();
   }
   const line = (f, color, dash, wd) => { ctx.setLineDash(dash); ctx.strokeStyle=color; ctx.lineWidth=wd; ctx.beginPath(); pts.forEach((p,i)=> i ? ctx.lineTo(X(p.t),Y(f(p))) : ctx.moveTo(X(p.t),Y(f(p)))); ctx.stroke(); ctx.setLineDash([]); };
-  line(p=>p.m+2*p.sd, "#7d8a99", [3,3], 1); line(p=>p.m-2*p.sd, "#7d8a99", [3,3], 1); line(p=>p.m, "#f2f4f7", [], 2);
+  line(p=>p.m+2*p.sd, TH.dim, [3,3], 1); line(p=>p.m-2*p.sd, TH.dim, [3,3], 1); line(p=>p.m, TH.hi, [], 2);
   const zOf = p => p.sd ? (p.v-p.m)/p.sd : 0;
   const top = pts.reduce((a,p)=> zOf(p)>zOf(a) ? p : a), bot = pts.reduce((a,p)=> zOf(p)<zOf(a) ? p : a);
   for (const p of [top, bot]){ const z = zOf(p); if (Math.abs(z) < 1) continue;
-    ctx.fillStyle="#fff"; ctx.strokeStyle="#0a0d10"; ctx.beginPath(); ctx.arc(X(p.t),Y(p.v),3.5,0,Math.PI*2); ctx.fill(); ctx.stroke();
-    label(ctx, (z>0?"+":"")+z.toFixed(1)+"σ", X(p.t), Y(p.v)+(z>0?-8:15), "#fff", "center", true); }
-  const last = pts[pts.length-1]; label(ctx, "normal", X(last.t)-4, Y(last.m)-5, "#f2f4f7", "right");
+    ctx.fillStyle=TH.hi; ctx.strokeStyle=TH.canvas; ctx.beginPath(); ctx.arc(X(p.t),Y(p.v),3.5,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    label(ctx, (z>0?"+":"")+z.toFixed(1)+"σ", X(p.t), Y(p.v)+(z>0?-8:15), TH.hi, "center", true); }
+  const last = pts[pts.length-1]; label(ctx, "normal", X(last.t)-4, Y(last.m)-5, TH.hi, "right");
 }
 
 // 5. shifting bell curve of 1s returns
@@ -933,7 +942,7 @@ function drawBell(){
   const max = Math.max(...dBase, ...dCur), L=10, R=10, T=8, B=22;
   const X = z => L+(z+5)/10*(w-L-R), Y = d => h-B-(d/max)*(h-T-B)*0.95;
   const edges = [-Infinity,-3,-2,-0.43,0.43,2,3,Infinity];
-  const cols = ["#1f4e9c","#4a86d6","#a9c8ee","#e9e9e4","#f2c39b","#e07a45","#9b2a1c"];
+  const cols = ["#2a63bd","#4a86d6","#a9c8ee","#e9e9e4","#f2c39b","#e07a45","#b03626"];   // both ends lightened to at least 3:1 against the chart background
   const names = ["−3σ or worse","−3σ to −2σ","−2σ to −0.43σ","normal ±0.43σ","+0.43σ to +2σ","+2σ to +3σ","+3σ or more"];
   for (let k=0;k<7;k++){
     ctx.beginPath(); let started = false;
@@ -941,9 +950,9 @@ function drawBell(){
     if (!started) continue;
     const lastX = X(Math.min(5, edges[k+1])); ctx.lineTo(lastX, h-B); ctx.closePath(); ctx.fillStyle = cols[k]; ctx.fill();
   }
-  ctx.strokeStyle="#f2f4f7"; ctx.lineWidth=1.6; ctx.beginPath(); xs.forEach((x,i)=> i ? ctx.lineTo(X(x),Y(dCur[i])) : ctx.moveTo(X(x),Y(dCur[i]))); ctx.stroke();
-  ctx.setLineDash([3,3]); ctx.strokeStyle="#9aa6b2"; ctx.lineWidth=1.2; ctx.beginPath(); xs.forEach((x,i)=> i ? ctx.lineTo(X(x),Y(dBase[i])) : ctx.moveTo(X(x),Y(dBase[i]))); ctx.stroke(); ctx.setLineDash([]);
-  ctx.fillStyle="#7d8a99"; ctx.textAlign="center";
+  ctx.strokeStyle=TH.hi; ctx.lineWidth=1.6; ctx.beginPath(); xs.forEach((x,i)=> i ? ctx.lineTo(X(x),Y(dCur[i])) : ctx.moveTo(X(x),Y(dCur[i]))); ctx.stroke();
+  ctx.setLineDash([3,3]); ctx.strokeStyle=TH.dim; ctx.lineWidth=1.2; ctx.beginPath(); xs.forEach((x,i)=> i ? ctx.lineTo(X(x),Y(dBase[i])) : ctx.moveTo(X(x),Y(dBase[i]))); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle=TH.dim; ctx.textAlign="center";
   for (let z=-4; z<=4; z++) ctx.fillText((z>0?"+":"")+z+"σ", X(z), h-8);
   const pct = k => cur.length ? cur.filter(z=>z>=edges[k] && z<edges[k+1]).length/cur.length*100 : 0;
   const tails = pct(0)+pct(1)+pct(5)+pct(6);
@@ -957,9 +966,9 @@ function drawRadial(){
   const bins = {}; for (const v of ["bn","hl"]) bins[v] = Array.from({length:60}, ()=>({buy:0,sell:0,age:60}));
   for (const t of vTrades(t1-60000)){ const sec = Math.floor(t.t/1000)%60, b = bins[t.v][sec]; b[t.side] += t.ntl; b.age = Math.min(b.age, (t1-t.t)/1000); }
   const ring = {hl:[r0, r0+(R-r0)*0.38], bn:[r0+(R-r0)*0.44, R]}, ang = s => -Math.PI/2 + (s/60)*Math.PI*2;
-  ctx.strokeStyle="#1e252e"; ctx.lineWidth=1;
+  ctx.strokeStyle=TH.line; ctx.lineWidth=1;
   for (const v of ["bn","hl"]) for (const r of ring[v]){ ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke(); }
-  ctx.fillStyle="#7d8a99"; ctx.textAlign="center";
+  ctx.fillStyle=TH.dim; ctx.textAlign="center";
   for (let s=0;s<60;s+=5){ const a=ang(s); ctx.fillText(String(s), cx+Math.cos(a)*(R+12), cy+Math.sin(a)*(R+12)+3.5); }
   let tot = 0, buyTot = 0;
   for (const v of ["bn","hl"]){
@@ -974,11 +983,11 @@ function drawRadial(){
       }
       ctx.globalAlpha = 1;
     });
-    label(ctx, v.toUpperCase(), cx, cy - (ri+ro)/2 - 0, "#7d8a99", "center");
+    label(ctx, v.toUpperCase(), cx, cy - (ri+ro)/2 - 0, TH.dim, "center");
   }
   const now = (t1/1000)%60, a = ang(now);
-  ctx.strokeStyle="#fff"; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(cx+Math.cos(a)*r0*0.9, cy+Math.sin(a)*r0*0.9); ctx.lineTo(cx+Math.cos(a)*(R+4), cy+Math.sin(a)*(R+4)); ctx.stroke();
-  ctx.fillStyle="#e6edf3"; ctx.textAlign="center"; ctx.font="600 15px ui-monospace,Menlo,monospace"; ctx.fillText("$"+fmtK(tot), cx, cy+2);
+  ctx.strokeStyle=TH.hi; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(cx+Math.cos(a)*r0*0.9, cy+Math.sin(a)*r0*0.9); ctx.lineTo(cx+Math.cos(a)*(R+4), cy+Math.sin(a)*(R+4)); ctx.stroke();
+  ctx.fillStyle=TH.text; ctx.textAlign="center"; ctx.font="600 15px ui-monospace,Menlo,monospace"; ctx.fillText("$"+fmtK(tot), cx, cy+2);
   ctx.font="10.5px ui-monospace,Menlo,monospace"; ctx.fillStyle = buyTot/tot>=.5 ? COL.buy : COL.sell;
   ctx.fillText(tot ? `${(buyTot/tot*100).toFixed(0)}% buy` : "", cx, cy+16);
 }
@@ -1006,7 +1015,7 @@ function drawTree(){
     .map(q=>({...q, a:q.val/total*area})).sort((a,b)=>b.a-a.a);
   for (const g of squarify(venues, 0, 0, w, h)){
     const P = 3, gx = g.x+P, gy = g.y+16, gw = g.w-2*P, gh = g.h-16-P;
-    ctx.fillStyle = "#11161c"; ctx.fillRect(g.x+1, g.y+1, g.w-2, g.h-2);
+    ctx.fillStyle = TH.panel2; ctx.fillRect(g.x+1, g.y+1, g.w-2, g.h-2);
     const pc = (g.val/total*100).toFixed(0)+"%", nm = g.v==="bn" ? "Binance" : "Hyperliquid";
     fitLabel(ctx, [`${nm} · $${fmtK(g.val)} · ${pc}`, `${nm} · ${pc}`, `${g.v.toUpperCase()} ${pc}`, g.v.toUpperCase()], g.x+5, g.y+12, g.w-8, COL[g.v], true);
     if (gw<4 || gh<4) continue;
@@ -1018,8 +1027,8 @@ function drawTree(){
       ctx.fillStyle = `rgb(${base.map(v=>Math.round(14+(v-14)*shade)).join(",")})`;
       ctx.fillRect(c.x+1, c.y+1, Math.max(0,c.w-2), Math.max(0,c.h-2));
       const mw = c.w-8;
-      if (c.h > 30 && fitLabel(ctx, [`${c.side} ${SIZE_LABELS[c.s]}`, SIZE_LABELS[c.s]], c.x+4, c.y+14, mw, "#f5f7fa")) fitLabel(ctx, [`$${fmtK(c.val)}`], c.x+4, c.y+27, mw, "#f5f7fa", true);
-      else if (c.h > 15) fitLabel(ctx, [`$${fmtK(c.val)}`], c.x+4, c.y+12, mw, "#f5f7fa");
+      if (c.h > 30 && fitLabel(ctx, [`${c.side} ${SIZE_LABELS[c.s]}`, SIZE_LABELS[c.s]], c.x+4, c.y+14, mw, TH.hi)) fitLabel(ctx, [`$${fmtK(c.val)}`], c.x+4, c.y+27, mw, TH.hi, true);
+      else if (c.h > 15) fitLabel(ctx, [`$${fmtK(c.val)}`], c.x+4, c.y+12, mw, TH.hi);
     }
   }
 }
@@ -1034,27 +1043,27 @@ function drawWater(){
   const lo = Math.min(0, ...bars.map(b=>Math.min(b.a,b.b))), hi = Math.max(0, ...bars.map(b=>Math.max(b.a,b.b)));
   const pad = (hi-lo)*.12 || 1, ylo = lo-pad, yhi = hi+pad, L=8, R=54, T=10, B=34, n = bars.length+1, cw = (w-L-R)/n;
   const Y = v => T+(yhi-v)/(yhi-ylo)*(h-T-B);
-  ctx.fillStyle = "rgba(240,185,11,.06)"; ctx.fillRect(L, T, cw*4, h-T-B+16);
-  ctx.fillStyle = "rgba(95,212,196,.06)"; ctx.fillRect(L+cw*4, T, cw*4, h-T-B+16);
+  ctx.fillStyle = TH.a("bn",.06); ctx.fillRect(L, T, cw*4, h-T-B+16);
+  ctx.fillStyle = TH.a("hl",.06); ctx.fillRect(L+cw*4, T, cw*4, h-T-B+16);
   label(ctx, "Binance", L+cw*2, h-4, COL.bn, "center", true); label(ctx, "Hyperliquid", L+cw*6, h-4, COL.hl, "center", true);
   const st = niceStep((yhi-ylo)/4); ctx.textAlign="left";
-  for (let v=Math.ceil(ylo/st)*st; v<=yhi; v+=st){ ctx.strokeStyle = v===0 ? "#4a5462" : "#1e252e"; ctx.beginPath(); ctx.moveTo(L,Y(v)); ctx.lineTo(w-R,Y(v)); ctx.stroke(); ctx.fillStyle="#7d8a99"; ctx.fillText("$"+fmtK(v), w-R+4, Y(v)+3.5); }
+  for (let v=Math.ceil(ylo/st)*st; v<=yhi; v+=st){ ctx.strokeStyle = v===0 ? TH.edge : TH.line; ctx.beginPath(); ctx.moveTo(L,Y(v)); ctx.lineTo(w-R,Y(v)); ctx.stroke(); ctx.fillStyle=TH.dim; ctx.fillText("$"+fmtK(v), w-R+4, Y(v)+3.5); }
   bars.forEach((b,i)=>{
     const x = L+cw*i+cw*.18, bw = cw*.64, pos = b.d >= 0;
     ctx.fillStyle = pos ? COL.buy : COL.sell; ctx.fillRect(x, Y(Math.max(b.a,b.b)), bw, Math.max(1, Math.abs(Y(b.a)-Y(b.b))));
-    ctx.setLineDash([2,2]); ctx.strokeStyle="#7d8a99"; ctx.beginPath(); ctx.moveTo(x+bw, Y(b.b)); ctx.lineTo(x+cw, Y(b.b)); ctx.stroke(); ctx.setLineDash([]);   // connector to the next bar (also to "net")
+    ctx.setLineDash([2,2]); ctx.strokeStyle=TH.dim; ctx.beginPath(); ctx.moveTo(x+bw, Y(b.b)); ctx.lineTo(x+cw, Y(b.b)); ctx.stroke(); ctx.setLineDash([]);   // connector to the next bar (also to "net")
     const short = v => { const a=Math.abs(v); return a>=1e6 ? (a/1e6).toFixed(1)+"M" : a>=1e3 ? Math.round(a/1e3)+"k" : a.toFixed(0); };
     let vt = (pos?"+":"−")+fmtK(Math.abs(b.d)); if (ctx.measureText(vt).width > cw+6) vt = (pos?"+":"−")+short(b.d);
     if (Math.abs(b.d) > 0 && ctx.measureText(vt).width <= cw+6) label(ctx, vt, x+bw/2, pos ? Y(b.b)-4 : Y(b.b)+12, pos?COL.buy:COL.sell, "center");
-    ctx.fillStyle="#7d8a99";
+    ctx.fillStyle=TH.dim;
     const sl = ctx.measureText(SIZE_LABELS[b.s]).width <= cw-2 ? SIZE_LABELS[b.s] : ["<1k","<10k","<100k","≥100k"][b.s]; // compact on narrow screens
     ctx.textAlign="center"; ctx.fillText(sl, x+bw/2, h-B+12);
   });
   const x = L+cw*(n-1)+cw*.18, bw = cw*.64, pos = run>=0;
   ctx.fillStyle = pos ? "#1f8a52" : "#a8352e"; ctx.fillRect(x, Y(Math.max(0,run)), bw, Math.max(1, Math.abs(Y(0)-Y(run))));
-  ctx.strokeStyle="#fff"; ctx.strokeRect(x, Y(Math.max(0,run)), bw, Math.max(1, Math.abs(Y(0)-Y(run))));
-  label(ctx, (pos?"+":"−")+fmtK(Math.abs(run)), x+bw/2, pos ? Y(run)-4 : Y(0)-5, "#fff", "center", true); // net value sits beside the zero line, never off-canvas
-  ctx.fillStyle="#e6edf3"; ctx.textAlign="center"; ctx.fillText("net", x+bw/2, h-B+12);
+  ctx.strokeStyle=TH.hi; ctx.strokeRect(x, Y(Math.max(0,run)), bw, Math.max(1, Math.abs(Y(0)-Y(run))));
+  label(ctx, (pos?"+":"−")+fmtK(Math.abs(run)), x+bw/2, pos ? Y(run)-4 : Y(0)-5, TH.hi, "center", true); // net value sits beside the zero line, never off-canvas
+  ctx.fillStyle=TH.text; ctx.textAlign="center"; ctx.fillText("net", x+bw/2, h-B+12);
 }
 
 // 9. fan of trades from mid into a marginal density
@@ -1066,7 +1075,7 @@ function drawFan(){
   const L=60, T=10, B=10, ox = L, oy = T+(h-T-B)/2, xe = w*0.64, dx0 = xe+8, dx1 = w-14;
   const Y = b => oy - Math.max(-lim, Math.min(lim, b))/lim*(h-T-B)/2;
   const maxN = Math.max(...tr.map(t=>t.ntl));
-  ctx.strokeStyle="#1e252e"; ctx.fillStyle="#7d8a99"; ctx.textAlign="right";
+  ctx.strokeStyle=TH.line; ctx.fillStyle=TH.dim; ctx.textAlign="right";
   const st = niceStep(lim/3);
   for (let b=-Math.floor(lim/st)*st; b<=lim; b+=st){ ctx.beginPath(); ctx.moveTo(xe,Y(b)); ctx.lineTo(dx1,Y(b)); ctx.stroke(); ctx.fillText((b>0?"+":"")+fmt(b, st<1?1:0)+" bps", xe-4, Y(b)+3.5); }
   const order = tr.map((t,i)=>i).sort((a,b)=>tr[a].ntl-tr[b].ntl);
@@ -1076,8 +1085,8 @@ function drawFan(){
     ctx.beginPath(); ctx.moveTo(ox, oy); ctx.bezierCurveTo(ox+(xe-ox)*0.45, oy, ox+(xe-ox)*0.55, y, xe, y); ctx.stroke();
   }
   ctx.globalAlpha = 1;
-  ctx.fillStyle="#fff"; ctx.beginPath(); ctx.arc(ox, oy, 4, 0, Math.PI*2); ctx.fill();
-  label(ctx, "mid", ox-8, oy+4, "#e6edf3", "right", true);
+  ctx.fillStyle=TH.hi; ctx.beginPath(); ctx.arc(ox, oy, 4, 0, Math.PI*2); ctx.fill();
+  label(ctx, "mid", ox-8, oy+4, TH.text, "right", true);
   const NB = 48, dens = new Float64Array(NB);
   tr.forEach((t,i)=>{ const k = Math.max(0, Math.min(NB-1, Math.floor((off[i]+lim)/(2*lim)*NB))); dens[k] += t.ntl; });
   const sm = Array.from(dens, (_,k)=> (dens[Math.max(0,k-1)] + 2*dens[k] + dens[Math.min(NB-1,k+1)])/4), dm = Math.max(...sm) || 1;
@@ -1088,7 +1097,7 @@ function drawFan(){
     if (!any) continue;
     ctx.lineTo(dx0, cond(0) ? yk(0) : yk(NB-1)); ctx.closePath(); ctx.fillStyle = c; ctx.globalAlpha=.35; ctx.fill(); ctx.globalAlpha=1; ctx.strokeStyle=c; ctx.stroke();
   }
-  ctx.strokeStyle="#cfd6de"; ctx.beginPath(); ctx.moveTo(dx0, T); ctx.lineTo(dx0, h-B); ctx.stroke();
+  ctx.strokeStyle=TH.text; ctx.beginPath(); ctx.moveTo(dx0, T); ctx.lineTo(dx0, h-B); ctx.stroke();
   const above = tr.reduce((a,t,i)=> a + (off[i]>0 ? t.ntl : 0), 0), totN = tr.reduce((a,t)=>a+t.ntl,0);
   label(ctx, `${(above/totN*100).toFixed(0)}% of $ above mid`, dx1, T+12, COL.buy, "right", true);
   label(ctx, `${(100-above/totN*100).toFixed(0)}% at/below`, dx1, h-B-4, COL.sell, "right", true);

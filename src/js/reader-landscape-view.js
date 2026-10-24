@@ -60,17 +60,17 @@ function lsDraw(cv, g, info, fast, marks) {
   // floor and grid
   const c4 = [P(-1,0,-1), P(1,0,-1), P(1,0,1), P(-1,0,1)];
   ctx.beginPath(); c4.forEach((p, k) => k ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath();
-  ctx.fillStyle = "rgba(122,162,247,.05)"; ctx.fill(); ctx.strokeStyle = "#2c3744"; ctx.stroke();
-  ctx.strokeStyle = "rgba(125,138,153,.16)"; ctx.beginPath();
+  ctx.fillStyle = TH.a("accent",.05); ctx.fill(); ctx.strokeStyle = TH.line; ctx.stroke();
+  ctx.strokeStyle = TH.a("dim",.16); ctx.beginPath();
   for (let k = 1; k < 4; k++){ const u = -1 + k/2, a = P(u,0,-1), b = P(u,0,1), c = P(-1,0,u), d = P(1,0,u); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.moveTo(c[0],c[1]); ctx.lineTo(d[0],d[1]); }
   ctx.stroke();
-  ctx.setLineDash([4,4]); ctx.strokeStyle = "rgba(214,221,230,.4)"; { const a = P(0,0,-1), b = P(0,0,1); ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke(); } ctx.setLineDash([]);
+  ctx.setLineDash([4,4]); ctx.strokeStyle = TH.a("text",.4); { const a = P(0,0,-1), b = P(0,0,1); ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke(); } ctx.setLineDash([]);
   const trace = (style, width) => {                              // where the price actually was
     ctx.strokeStyle = style; ctx.lineWidth = width; ctx.beginPath(); let pen = false;
     g.path.forEach((off, j) => { if (off == null){ pen = false; return; } const p = P(Math.max(-1, Math.min(1, off/g.half)), 0, Zc(j)); pen ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); pen = true; });
     ctx.stroke(); ctx.lineWidth = 1;
   };
-  trace("rgba(240,244,248,.95)", 2);
+  trace(TH.a("hi",.95), 2);
   // vertices, projected once
   const vx = new Float32Array(n), vy = new Float32Array(n);
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++){ const k = j*nx + i, p = P(U(i), sq(g.zs[k]) * LS_HEIGHT, Zc(j)); vx[k] = p[0]; vy[k] = p[1]; }
@@ -91,22 +91,22 @@ function lsDraw(cv, g, info, fast, marks) {
     ctx.fillStyle = LS_FILL[side][lv]; ctx.fill();
     ctx.strokeStyle = fast ? LS_FILL[side][lv] : LS_EDGE[side]; ctx.stroke();      // fast mode: a hairline in the fill colour only hides the seams
   }
-  trace("rgba(240,244,248,.5)", 1);
+  trace(TH.a("hi",.5), 1);
   for (const m of marks || []){                                  // Reader episodes: a stripe along the age axis at the episode's price, a diamond where it was detected
     const col = LS_FAM[m.family] || "214,221,230", a0 = P(m.u, 0, m.z0), a1 = P(m.u, 0, m.z1);
     ctx.strokeStyle = `rgba(${col},${m.stage === "ended" ? .45 : .95})`; ctx.lineWidth = m.wall ? 3 : 2; ctx.setLineDash(m.outside ? [3,3] : []);
     ctx.beginPath(); ctx.moveTo(a0[0], a0[1]); ctx.lineTo(a1[0], a1[1]); ctx.stroke(); ctx.setLineDash([]); ctx.lineWidth = 1;
     if (m.zd != null){ const d = P(m.u, 0, m.zd); ctx.fillStyle = `rgb(${col})`; ctx.beginPath(); ctx.moveTo(d[0], d[1]-5); ctx.lineTo(d[0]+4, d[1]); ctx.lineTo(d[0], d[1]+5); ctx.lineTo(d[0]-4, d[1]); ctx.closePath(); ctx.fill(); }
   }                              // the path again over the surface, so a peak cannot hide it
-  ctx.strokeStyle = "rgba(122,162,247,.9)"; ctx.lineWidth = 1.5; { const a = P(-1,0,-1), b = P(1,0,-1); ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke(); } ctx.lineWidth = 1;
+  ctx.strokeStyle = TH.a("hi",.9); ctx.lineWidth = 1.5; { const a = P(-1,0,-1), b = P(1,0,-1); ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke(); } ctx.lineWidth = 1;
   // axes
-  ctx.fillStyle = "#7d8a99"; ctx.textAlign = "center";
+  ctx.fillStyle = TH.dim; ctx.textAlign = "center";
   for (const u of [-1, 0, 1]){ const p = P(u,0,-1.2); ctx.fillText((u > 0 ? "+" : u < 0 ? "-" : "") + (Math.abs(u)*g.half).toFixed(g.half < 10 ? 1 : 0) + " bps", p[0], p[1]+4); }
   ctx.textAlign = "left";
   for (const z of [-1, 0, 1]){ const p = P(1.08,0,z); ctx.fillText(z === -1 ? "now" : ((z+1)/2*g.spanMs/1000).toFixed(0) + " s ago", p[0], p[1]+3); }
-  { const b = P(-1,LS_HEIGHT,1), c = P(-1,-LS_HEIGHT,1); ctx.strokeStyle = "#2c3744"; ctx.beginPath(); ctx.moveTo(c[0],c[1]); ctx.lineTo(b[0],b[1]); ctx.stroke();
+  { const b = P(-1,LS_HEIGHT,1), c = P(-1,-LS_HEIGHT,1); ctx.strokeStyle = TH.line; ctx.beginPath(); ctx.moveTo(c[0],c[1]); ctx.lineTo(b[0],b[1]); ctx.stroke();
     ctx.fillStyle = lsRgba(LS_BUY, 1); ctx.fillText("buyers", b[0]+4, b[1]+3); ctx.fillStyle = lsRgba(LS_SELL, 1); ctx.fillText("sellers", c[0]+4, c[1]+3); }
-  ctx.fillStyle = "#7d8a99"; ctx.textAlign = "left"; ctx.fillText(info + "   \u00b7   full height = " + fmtK(sc) + " net per spot (square-root scale)", 8, 14);
+  ctx.fillStyle = TH.dim; ctx.textAlign = "left"; ctx.fillText(info + "   \u00b7   full height = " + fmtK(sc) + " net per spot (square-root scale)", 8, 14);
 }
 
 // ---------- readout ----------
