@@ -113,3 +113,15 @@ Each state shows which indicators fired and which had no reading. No colour that
 2. Is 3 bps for funding a fair "crowded" line for how you read BTC perps, or should it use the context rule like the others?
 3. Should "stressed" need 2 of 3, or is any single one enough? (2 of 3 is stricter; one of 3 would label most volatile minutes stressed.)
 4. Do you want the state on the Overview as a card, as a header chip next to the status chips, or both?
+
+### D decisions (2026-10-26, the user said "use your picks")
+Three named states; C (crowded) uses the same 1.5 sd context rule as the others, not a fixed 3 bps; stressed = at least 2 of V, L, F; shown as an Overview card and a track under the Review timeline (no header chip).
+Two changes from the draft, found while writing the logic, both stated in the build note:
+- **A fourth word, "unsettled".** The draft left "exactly one of V, L, F fired, and not crowded" with no name (it fell to "unknown", which would be wrong: the market was read, it just was not stressed). It is now "unsettled". Order, first match wins: stressed (2 or more of V, L, F), crowded (C), unsettled (exactly one of V, L, F), calm (none, and at least 3 of the 4 indicators had a reading), unknown.
+- **C reads both venues.** Binance's funding rate is the LAST SETTLED rate and changes only every 8 hours, so "unusual against the previous 30 minutes" would almost never fire for it. C = funding unusual (either direction) on Binance OR Hyperliquid (whose rate moves continuously), AND open interest on Binance or Hyperliquid not below its 30-minute mean.
+
+## D built (v082, 2026-10-26)
+- `COLLECT.marketState(recs, tMs, {ctx, coin})` and `marketStateSeries` (pure, self-tested), rules version 1 as decided above. Views: Overview card "Market state" (`colStateLive`, recomputed every 10 s; button to the timeline), a "state" strip between the price panel and the lanes of the Reader timeline (`colStateStrip`, step 30 s or finer for long windows, cached; grey ramp calm -> unsettled -> stressed, crowded in the accent colour, blank = unknown), a chip "market: unsettled (V)" first in an episode card's context row, and `ctx.st = {v, s, i}` in every label.
+- Rule version 1 run over the 17 recordings (1,188 moments at 30 s, counts only, no outcomes looked at): calm 775, unsettled 331, stressed 79, unknown 3, **crowded 0**. Indicator fire counts: V 124, L 74, F 305, C 0 (C had a reading in 1,174 of 1,188 moments and never fired). Reading: with the 0.2 bps minimum move and 1.5 sd, funding almost never moves enough in 30 minutes; the "crowded" state is dead weight at version 1. NOT changed (the rules stay fixed after looking); a candidate for version 2 once there are more nights (for example a funding level against its own previous 24 hours, using the tape). F fires most (305): the Coinbase and Bybit gaps are noisy at the 0.5 bps minimum.
+- Cost: about 11 ms per evaluation, so a 60-step strip is under a second; cached.
+- Engine, episode layer and register untouched.

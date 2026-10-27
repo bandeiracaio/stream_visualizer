@@ -260,6 +260,22 @@ const READER_SELFTEST=(()=>{
       &&/no book records/.test(none.none)&&/no book records/.test(other.none)===true&&/no book record within 10 s/.test(late.none)&&hl.verdict&&nowall===null&&weak.weak===true&&weak.verdict===null&&weak.end.ret===.21&&pulled.weak===false,
       detail:J({pulled,atWall:atWall.end,far:far.none,nul:nul.none,brief:[brief.usual,brief.x],late:late.none,other:other.none})};
   });
+  add("collectors: market state (rules v1): two of volatility / forced flow / venue gap is stressed, funding with open interest is crowded, one is unsettled, none is calm, too few readings is unknown",E=>{
+    const R=COLLECT.rec,J=JSON.stringify,T=T0,now=T+40*60000-5000;
+    const mk=o=>{const recs=[];for(let i=0;i<=240;i++){const t=T+i*10000,late=i>=234;
+      recs.push(R("dvol",t,{vol:late&&o.V?60:50+Math.sin(i)*.3,idx:1}));
+      recs.push(R("hlCtx",t,{fund:late&&o.C?0.0001125:0.0000125+Math.sin(i)*1e-7,oi:1000+(late&&o.C?10:0)+Math.cos(i)*2,prem:0}));
+      if(!o.noVen)recs.push(R("venues",t,{bnS:{b:80000,a:80000.02,age:50},cb:{l:80000+(late&&o.F?8:Math.sin(i)*.4),age:50}}));}
+      if(o.L){for(let m=0;m<40;m+=5)recs.push(R("liq",T+m*60000+1000,{side:"SELL",qty:1,px:80000}));recs.push(R("liq",now-90000,{side:"SELL",qty:9,px:80000}));}      // a quiet hour, then 720k forced a minute and a half before
+      return recs;};
+    const st=o=>COLLECT.marketState(mk(o),now,{coin:"BTC"});
+    const all=st({V:1,L:1,F:1,C:1}),two=st({V:1,F:1}),crowd=st({C:1}),one=st({V:1}),calm=st({}),oneL=st({L:1}),few=st({noVen:1}),none=COLLECT.marketState([],now),early=COLLECT.marketState(mk({V:1,F:1,C:1}),T+20*60000);
+    const series=COLLECT.marketStateSeries(mk({V:1,F:1}),T+36*60000,T+39*60000,60000,{coin:"BTC"});
+    return{ok:all.s==="stressed"&&all.i==="VLFC"&&two.s==="stressed"&&two.i==="VF"&&crowd.s==="crowded"&&crowd.i==="C"&&one.s==="unsettled"&&one.i==="V"&&oneL.s==="unsettled"&&oneL.i==="L"
+      &&calm.s==="calm"&&calm.i===""&&calm.n===4&&few.n===3&&few.ind.F===null&&few.s==="calm"&&none.s==="unknown"&&none.n===0&&all.v===1&&COLLECT.STATE_VERSION===1
+      &&early.s!=="stressed"&&series.length===4&&series[0].t===T+36*60000&&series[3].s==="stressed"&&series[0].s==="calm",
+      detail:J({all:[all.s,all.i],two:[two.s,two.i],crowd:[crowd.s,crowd.i],one:[one.s,one.i],oneL:[oneL.s,oneL.i],calm:[calm.s,calm.n],few:[few.s,few.n,few.ind],none:none.s,early:early.s,series:series.map(x=>x.s+x.i)})};
+  });
   add("collectors: records among the inputs change no detection and no session quality",E=>{
     const e=E.create();e.startRecording();const a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:21,params:()=>burstSell});sim(e,{t0:b.t,mid0:b.mid,seconds:40,seed:22});
     const inputs=e.stopRecording(),mixed=[];inputs.forEach((r,i)=>{mixed.push(r);if(i%40===0)mixed.push(COLLECT.rec("feeds",T0+i,{src:"page",feeds:{bn:{n:1}}}));});

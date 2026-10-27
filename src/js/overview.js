@@ -70,6 +70,18 @@ function renderOverview(){
     item("Activity", rs.calibrated ? rs.regime : "calibrating", rs.calibrated ? "x"+rs.ratio.toFixed(2)+" of normal flow" : Math.round(rs.calibratingPct*100)+"% of warm-up", rs.regime==="hot" && rs.calibrated ? "dn" : ""),
   ].join("");
 
+  // Market state (rules version 1, COLLECT.marketState): a label for the kind of market, from the collectors; display only
+  try{
+    const m = typeof colStateLive === "function" ? colStateLive() : null, el = ov$("ovState");
+    if (m){
+      const word = {stressed:"stressed", crowded:"crowded", unsettled:"unsettled", calm:"calm", unknown:"unknown"}[m.s], names = {V:"volatility up", L:"forced flow", F:"venues disagree", C:"crowded"};
+      const sub = m.s === "unknown" ? m.n+" of 4 indicators have a reading: start the collectors (connect, or arm auto-record)" : m.i ? m.i.split("").map(k=>names[k]).join(" · ") : "none of the four indicators fired";
+      const chip = k => `<span class="chip" title="${typeof ST_IND !== "undefined" ? ST_IND[k] : names[k]}">${names[k]}: ${m.ind[k]===true ? "yes" : m.ind[k]===false ? "no" : "no reading"}</span>`;
+      const html = `<div class="metrics"><div class="metric"><span>market now (rules v${m.v})</span><b>${word}</b><small>${sub}</small></div></div><div class="epctx">${["V","L","F","C"].map(chip).join("")}</div><div class="note">Each indicator compares the market with its own previous 30 minutes. A label, not a signal.</div>`;
+      if (el.dataset.h !== html){ el.dataset.h = html; el.innerHTML = html; }
+    }
+  }catch(e){ console.error("overview state", e); }
+
   // Reader: the strongest active episodes, in plain language
   const act = READER.activeEpisodes().sort((x,y)=>y.intensity-x.intensity).slice(0,3);
   const lastEnded = READER.episodes.filter(e=>e.stage==="ended").slice(-1)[0];
@@ -93,6 +105,7 @@ function renderOverview(){
 }
 ov$("ovWin").onchange = () => { if (typeof visible==="function" && visible("overview")) renderOverview(); };
 ov$("ovOpenReader").onclick = () => setTab("reader");
+ov$("ovOpenState").onclick = () => setTab("reader");
 ov$("ovOpenAcc").onclick = () => setTab("accounts");
 ov$("ovOpenRec").onclick = () => setTab("record");
 ov$("ovOpenCharts").onclick = () => setTab("charts");

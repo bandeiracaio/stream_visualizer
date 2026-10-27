@@ -164,7 +164,8 @@ function rtTimeline(s){
     for (const e of list){ let r = ends.findIndex(x => x <= e.tStart); if (r < 0){ r = ends.length; ends.push(0); } ends[r] = e.tEnd || now; rowOf.set(e, r); }
     return {f, list, rows:Math.max(1, ends.length)};
   });
-  const H = T + PH + B + lanes.reduce((a,l) => a + l.rows*(rowH+gap) + laneGap, 0);
+  const SB = 14;      // the market-state strip between the price panel and the lanes
+  const H = T + PH + B + SB + lanes.reduce((a,l) => a + l.rows*(rowH+gap) + laneGap, 0);
   cv.style.height = H + "px";
   const {ctx, w, h} = prep(cv); if (w < 40) return;
   const X = t => L + (t-t0)/(now-t0)*(w-L-R);
@@ -182,7 +183,18 @@ function rtTimeline(s){
   ctx.beginPath(); pts.forEach((p,i) => { if (i % stride) return; i ? ctx.lineTo(X(p[0]), Y(p[1])) : ctx.moveTo(X(p[0]), Y(p[1])); }); ctx.strokeStyle = TH.text; ctx.lineWidth = 1.3; ctx.stroke();
   if (!pts.length){ ctx.fillStyle = TH.dim; ctx.textAlign = "center"; ctx.fillText("waiting for price data", w/2, T+PH/2); }
   // lanes
-  RT.hits = []; let y = T+PH+B;
+  // market-state strip (rules version 1): one band, darker the more of volatility / forced flow / venue gap fired; crowded in the accent colour; blank where unknown
+  try{
+    const st = typeof colStateStrip === "function" ? colStateStrip(t0, now) : null, y0 = T+PH+B, SH = 8;
+    ctx.fillStyle = TH.dim; ctx.textAlign = "right"; ctx.fillText("state", L-4, y0+SH);
+    if (st) st.rows.forEach((r, i) => {
+      if (r.s === "unknown") return;
+      const xa = X(Math.max(r.t, t0)), xb = X(Math.min(i+1 < st.rows.length ? st.rows[i+1].t : now, now)); if (!(xb > xa)) return;
+      ctx.fillStyle = r.s === "stressed" ? TH.a("text",.9) : r.s === "unsettled" ? TH.a("text",.5) : r.s === "crowded" ? TH.accent : TH.a("text",.16);
+      ctx.fillRect(xa, y0, xb-xa+0.5, SH);
+    });
+  }catch(e){ console.error("state strip", e); }
+  RT.hits = []; let y = T+PH+B+SB;
   for (const lane of lanes){
     ctx.fillStyle = RT_COLORS[lane.f]; ctx.textAlign = "right"; ctx.fillText(RT_SHORT[lane.f], L-4, y+rowH);
     ctx.strokeStyle = TH.line; ctx.beginPath(); ctx.moveTo(L, y+lane.rows*(rowH+gap)+laneGap/2-1); ctx.lineTo(w-R, y+lane.rows*(rowH+gap)+laneGap/2-1); ctx.stroke();
@@ -209,7 +221,7 @@ rt$("tlCv").onclick = e => {
   RT.sel = hit ? hit.ep.id : null; if (hit) epOpen.add(String(hit.ep.id)); RT.last.detail = null; renderReader();
 };
 rt$("tlLegend").innerHTML = Object.keys(RT_COLORS).map(f => `<span><i style="background:${RT_COLORS[f]}"></i>${READER_EPISODES.FAMILY_LABEL[f]}</span>`).join("")
-  + `<span><i style="background:${TH.buy};border-radius:50%"></i>you agreed</span><span><i style="background:${TH.sell};border-radius:50%"></i>you disagreed</span><span><i style="background:#c792ea"></i>you marked missed</span><span>dark tick = resumed</span>`;
+  + `<span><i style="background:${TH.a("text",.16)}"></i>state: calm</span><span><i style="background:${TH.a("text",.5)}"></i>unsettled</span><span><i style="background:${TH.accent}"></i>crowded</span><span><i style="background:${TH.a("text",.9)}"></i>stressed</span><span><i style="background:${TH.buy};border-radius:50%"></i>you agreed</span><span><i style="background:${TH.sell};border-radius:50%"></i>you disagreed</span><span><i style="background:#c792ea"></i>you marked missed</span><span>dark tick = resumed</span>`;
 
 // ---------- assumption register (measures only; see reader-register.js) ----------
 const rgMsg = t => { rt$("rgMsg").textContent = t; };

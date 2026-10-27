@@ -204,10 +204,33 @@ function epWallBar(ep) {
   else chips.push("no book record near the end");
   return `<div class="epctx">${head}${chips.map(t => `<span class="chip">${t}</span>`).join("")}</div>`;
 }
+// ---- market state (v082, rules version 1 in COLLECT.marketState): a label for the kind of market, with the indicators behind it. Display only.
+const ST_IND = {V:"volatility up", L:"forced flow", F:"venues disagree", C:"crowded (funding + open interest)"};
+function colStateSource() { const replay = !!rdView.engine; return {replay, recs:replay ? (RT.session && RT.session.ext || []) : [].concat(...Object.values(CL.recent)), coin:replay ? RT.session && RT.session.sym : cl$("sym").value}; }
+function colStateLive() {      // the state now, from the last 75 minutes in memory; recomputed every 10 s
+  const k = Math.floor(Date.now()/10000); if (CL.stNow && CL.stNow.k === k) return CL.stNow.m;
+  const m = COLLECT.marketState([].concat(...Object.values(CL.recent)), Date.now(), {coin:cl$("sym").value}); CL.stNow = {k, m}; return m;
+}
+function colStateFor(ep, c) {
+  const src = colStateSource(), key = (src.replay ? "r" + (RT.session ? RT.session.startedAt : 0) + ":" + src.recs.length : "l") + "|s|" + ep.id + "|" + ep.tDetected;
+  if (CL.ctx.has(key)) return CL.ctx.get(key);
+  const m = COLLECT.marketState(src.recs, ep.tDetected, {ctx:c, coin:src.coin}); if (CL.ctx.size > 400) CL.ctx.clear(); CL.ctx.set(key, m); return m;
+}
+function epStateChip(ep, c) {
+  const m = colStateFor(ep, c), why = m.i ? m.i.split("").map(k => ST_IND[k]).join(", ") : m.s === "unknown" ? m.n + " of 4 indicators had a reading" : "none of the four indicators fired";
+  return `<span class="chip" title="Market state at detection, rules version ${m.v}: ${why}. Stressed = two or more of volatility up / forced flow / venues disagree; crowded = funding and open interest; unsettled = one of the first three; calm = none. Compared with the previous 30 minutes.">market: ${m.s}${m.i ? " (" + m.i + ")" : ""}</span>`;
+}
+// the states over time for the strip under the Review timeline (cached; the work is a few milliseconds per step)
+function colStateStrip(t0, t1) {
+  const src = colStateSource(), step = Math.max(30000, Math.round((t1 - t0)/60/1000)*1000), a = Math.floor(t0/step)*step, b = Math.floor(t1/step)*step;
+  const key = (src.replay ? "r" + (RT.session ? RT.session.startedAt : 0) + ":" + src.recs.length : "l") + "|" + step + "|" + a + "|" + b;
+  if (CL.strip && CL.strip.key === key) return CL.strip;
+  CL.strip = {key, step, rows:src.recs.length ? COLLECT.marketStateSeries(src.recs, a, b, step, {coin:src.coin}) : []}; return CL.strip;
+}
 function epCtxBar(ep) {
   const c = colContextFor(ep); if (!c) return "";
   const lead = epLeadBar(c) + epWallBar(ep);
-  const head = `<span class="stat" title="Each reading against its own mean of the previous 30 minutes, in standard deviations; only the unusual ones (1.5 or more) are shown">collector context at detection</span>`;
+  const head = `<span class="stat" title="Each reading against its own mean of the previous 30 minutes, in standard deviations; only the unusual ones (1.5 or more) are shown">collector context at detection</span>` + epStateChip(ep, c);
   if (!c.items.length) return `<div class="epctx">${head}<span class="stat">none at that time (the collectors were off, or the data does not reach back that far)</span></div>${lead}`;
   const chips = c.items.filter(x => x.unusual).slice(0, 6).map(x => `<span class="chip ${x.z > 0 ? "hi" : "lo"}" title="${x.label}: ${+x.x.toPrecision(6)} now, ${x.text} from its 30-minute mean (${x.z >= 99 ? "it had been constant" : x.z + " sd"})">${x.label} ${x.z > 0 ? "▲" : "▼"} ${x.text}</span>`).join("");
   const liq = epLiqChip(c);
@@ -216,9 +239,9 @@ function epCtxBar(ep) {
 // the compact snapshot stored with a label: {t, v:{feature:[value, deviation]}, liq:[binance, hyperliquid]}
 function colLabelCtx(ep) {
   try {
-    const c = colContextFor(ep), wq = colWallFor(ep); if (!c || !(c.items.length || c.lead && !c.lead.none || c.liqx && (c.liqx.usd || c.liqx.other) || (wq && !wq.none))) return undefined;
+    const c = colContextFor(ep), wq = colWallFor(ep); if (!c) return undefined; const st = colStateFor(ep, c); if (!(st.s !== "unknown" || c.items.length || c.lead && !c.lead.none || c.liqx && (c.liqx.usd || c.liqx.other) || (wq && !wq.none))) return undefined;
     const v = {}; for (const x of c.items) v[x.f] = [+x.x.toPrecision(7), +x.dev.toPrecision(5)];
-    const out = {t:c.t, v, liq:[c.liq.bn, c.liq.hl]};
+    const out = {t:c.t, v, liq:[c.liq.bn, c.liq.hl], st:{v:st.v, s:st.s, i:st.i}};      // st: the market state at detection (rules version, state, letters of the indicators that fired)
     if (c.liqx && (c.liqx.usd || c.liqx.other)) { const q = c.liqx; out.lq = {bn:[q.bn.sell, q.bn.buy], hl:[q.hl.sell, q.hl.buy], x:q.x, other:q.other, tag:q.tag ? 1 : 0}; }      // dollars forced to sell / buy in the 60 s before, by venue
     if (wq && !wq.none) out.wq = {e:wq.edge, sh:wq.share, x:wq.x, ret:wq.end ? wq.end.ret : null, dist:wq.end ? wq.end.dist : null, v:wq.verdict || null};      // the wall's share of the depth within its edge, depth against usual, what the depth did by the end, the mid's distance from the wall
     if (c.lead && !c.lead.none) { const lv = {}; for (const x of c.lead.items) lv[x.src] = x.lead == null ? [null, x.move] : [x.lead, x.move]; out.lead = {ref:c.lead.ref, move:c.lead.move, v:lv}; }      // v: venue -> [seconds it led the reference (negative: lagged; null: no timing), its move in bps]

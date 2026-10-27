@@ -463,7 +463,7 @@ const COLLECT = (() => {
   // hour (when less than 10 minutes of earlier data exist, the floor alone decides). Most minutes hold nothing (76% in the first 17 recordings), the 99th percentile of a minute was about 3.6M.
   function liqDriven(recs, tMs, opt) {
     opt = opt || {}; const winMs = (opt.winSec || 60)*1000, histMs = (opt.histMin || 60)*60000, minUsd = opt.minUsd == null ? 5e5 : opt.minUsd, ratio = opt.ratio || 10, coin = String(opt.coin || "BTC").toUpperCase();
-    const w = {bn:{sell:0, buy:0, n:0}, hl:{sell:0, buy:0, n:0}}; let hist = 0, first = Infinity, other = 0;
+    const w = {bn:{sell:0, buy:0, n:0}, hl:{sell:0, buy:0, n:0}}; let hist = 0, first = opt.since == null ? Infinity : opt.since, other = 0;
     for (const r of recs) {
       if (!isRec(r) || r[2] > tMs) continue;
       if (r[2] < first) first = r[2];      // any record shows how far back the data reaches
@@ -518,6 +518,31 @@ const COLLECT = (() => {
     return out;
   }
 
+  // ---- market state (v082): a plain label for "what kind of market is this moment", from the past only, with its reasons. Rules version 1, written before looking at any episode
+  // (.scratch/collector-features/spec.md, step D); a change is a new version, never an edit. Indicators, each true / false / null (no reading):
+  //   V volatility index above its own previous 30 minutes (1.5 sd and 0.3%, the `context` rule); L "liquidation-driven" (liqDriven) at some moment of the last 5 minutes;
+  //   F Coinbase or Bybit vs Binance gap unusual (context rule); C funding unusual on Binance or Hyperliquid AND open interest on either not below its 30-minute mean.
+  // States, first match wins: stressed (2+ of V, L, F), crowded (C), unsettled (exactly one of V, L, F), calm (none of the four, at least 3 had a reading), unknown.
+  const STATE_VERSION = 1;
+  function marketState(recs, tMs, opt) {
+    opt = opt || {};
+    const c = opt.ctx || context(recs, tMs, {coin:opt.coin}), by = f => c.items.find(x => x.f === f);
+    const anyOf = (fs, test) => { let seen = false; for (const f of fs) { const x = by(f); if (!x) continue; seen = true; if (test(x)) return true; } return seen ? false : null; };
+    const V = anyOf(["dvol.vol"], x => x.unusual && x.z > 0), F = anyOf(["venues.coinbaseVsBinanceBps", "venues.bybitVsBinanceBps"], x => x.unusual);
+    const fund = anyOf(["bnDerivs.fund", "hlCtx.fund"], x => x.unusual), oi = anyOf(["bnDerivs.oi", "hlCtx.oi"], x => x.dev >= 0), C = fund == null || oi == null ? null : fund && oi;
+    let L = c.items.some(x => OWNER[FEATURES[x.f][0]] === "derivs") ? false : null;      // no derivatives reading at all: forced flow cannot be judged
+    if (L === false) {
+      let since = Infinity; const lr = [];
+      for (const r of recs) { if (!isRec(r) || r[2] > tMs) continue; if (r[2] < since) since = r[2]; if (r[1] === "liq" || r[1] === "hlLiq") lr.push(r); }
+      for (let k = 0; k <= 30 && !L; k++) if (liqDriven(lr, tMs - k*10000, {coin:opt.coin, since}).tag) L = true;
+    }
+    const ind = {V, L, F, C}, three = [V, L, F].filter(x => x === true).length, readings = [V, L, F, C].filter(x => x != null).length;
+    const s = three >= 2 ? "stressed" : C === true ? "crowded" : three === 1 ? "unsettled" : readings >= 3 ? "calm" : "unknown";
+    return {t:tMs, v:STATE_VERSION, s, ind, i:Object.keys(ind).filter(k => ind[k] === true).join(""), n:readings};
+  }
+  // the state every stepMs from t0 to t1 (for the strip under the Review timeline)
+  function marketStateSeries(recs, t0, t1, stepMs, opt) { const out = []; for (let t = t0; t <= t1; t += stepMs) { const m = marketState(recs, t, opt); out.push({t, s:m.s, i:m.i}); } return out; }
+
   // tape helpers on arrays of records
   const prune = (recs, nowMs, keepMs) => recs.filter(r => r[2] >= nowMs - (keepMs == null ? TAPE_MS : keepMs));
   const slice = (recs, t0, t1) => recs.filter(r => r[2] >= t0 && r[2] <= t1);
@@ -527,5 +552,5 @@ const COLLECT = (() => {
     for (let i = recs.length - 1; i >= 0; i--) { const b = JSON.stringify(recs[i]).length + 1; if (size + b > lim) break; size += b; out.push(recs[i]); }
     return out.reverse();
   }
-  return {REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, due, calendar, OWNER, EXPECT_MS, ownerOf, tally, ageText, health, FEATURES, FEATURE_INFO, featureSeries, featureMaxAge, context, venueLead, leadText, liqDriven, usdText, wallQuality, deribitCoin, optName, optionsChain, walletTracker, walletPosition, walletChanged, liqFills, predictedFunding, WALLET_TOP, WALLET_REFRESH_MS, MAJORS, venueSubs, venueParse, venueApply, venueRecord, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
+  return {REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, due, calendar, OWNER, EXPECT_MS, ownerOf, tally, ageText, health, FEATURES, FEATURE_INFO, featureSeries, featureMaxAge, context, venueLead, leadText, liqDriven, usdText, wallQuality, marketState, marketStateSeries, STATE_VERSION, deribitCoin, optName, optionsChain, walletTracker, walletPosition, walletChanged, liqFills, predictedFunding, WALLET_TOP, WALLET_REFRESH_MS, MAJORS, venueSubs, venueParse, venueApply, venueRecord, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
 })();
