@@ -166,7 +166,7 @@ function colContextFor(ep) {
   const t = ep.tDetected; if (!t) return null;
   const replay = !!rdView.engine, ext = replay ? RT.session && RT.session.ext : null, key = (replay ? "r" + (RT.session ? RT.session.startedAt : 0) + ":" + (ext ? ext.length : -1) : "l") + "|" + ep.id + "|" + t;
   if (CL.ctx.has(key)) return CL.ctx.get(key);
-  const recs = replay ? (ext || []) : [].concat(...Object.values(CL.recent)), c = COLLECT.context(recs, t);
+  const recs = replay ? (ext || []) : [].concat(...Object.values(CL.recent)), c = COLLECT.context(recs, t, {coin:replay ? RT.session && RT.session.sym : cl$("sym").value});
   if (CL.ctx.size > 400) CL.ctx.clear(); CL.ctx.set(key, c); return c;
 }
 // who moved first (v079): one row under the context chips, venues against Binance spot over the 60 s before detection
@@ -177,21 +177,31 @@ function epLeadBar(c) {
   const chips = l.items.map(x => `<span class="chip" title="${x.label}: ${x.move >= 0 ? "+" : ""}${x.move} bps over the window">${COLLECT.leadText(x)}</span>`).join("");
   return `<div class="epctx">${head}<span class="stat">Binance spot ${l.move >= 0 ? "+" : ""}${l.move} bps</span>${chips}</div>`;
 }
+// forced flow (v080): the liquidations of the 60 s before detection, by side, against the previous hour's pace; "liquidation-driven" only when the written rule in COLLECT.liqDriven holds
+function epLiqChip(c) {
+  const l = c.liqx; if (!l || !l.usd && !l.other) return "";
+  const U = COLLECT.usdText, what = !l.usd ? "no liquidations in this coin" : l.side === "sells" ? "forced sells " + U(l.sell) : l.side === "buys" ? "forced buys " + U(l.buy) : "forced sells " + U(l.sell) + " · buys " + U(l.buy);
+  const pace = !l.usd ? "" : l.x != null ? ` · ${l.x}× the average minute of the previous ${l.histMin >= 60 ? "hour" : l.histMin + " min"}` : l.avg === 0 ? " · none in the hour before" : " · under 10 min of history";
+  const venues = l.usd ? ` (Binance ${U(l.bn.sell + l.bn.buy)} · Hyperliquid ${U(l.hl.sell + l.hl.buy)})` : "", other = l.other ? ` · ${l.other} Hyperliquid fill${l.other > 1 ? "s" : ""} in other coins` : "";
+  const tip = `Forced orders in the 60 s before detection: Binance liquidations of this symbol plus the Hyperliquid liquidation fills of the followed wallets in this coin (the followed wallet is the counterparty: it bought when the liquidated trader was forced to sell). Tagged when at least $500k and at least 10 times the average minute of the previous hour.`;
+  return `<span class="chip" title="${tip}"${l.tag ? ' style="font-weight:700"' : ""}>${l.tag ? "liquidation-driven: " : ""}${what}${venues}${pace}${other}</span>`;
+}
 function epCtxBar(ep) {
   const c = colContextFor(ep); if (!c) return "";
   const lead = epLeadBar(c);
   const head = `<span class="stat" title="Each reading against its own mean of the previous 30 minutes, in standard deviations; only the unusual ones (1.5 or more) are shown">collector context at detection</span>`;
   if (!c.items.length) return `<div class="epctx">${head}<span class="stat">none at that time (the collectors were off, or the data does not reach back that far)</span></div>${lead}`;
   const chips = c.items.filter(x => x.unusual).slice(0, 6).map(x => `<span class="chip ${x.z > 0 ? "hi" : "lo"}" title="${x.label}: ${+x.x.toPrecision(6)} now, ${x.text} from its 30-minute mean (${x.z >= 99 ? "it had been constant" : x.z + " sd"})">${x.label} ${x.z > 0 ? "▲" : "▼"} ${x.text}</span>`).join("");
-  const liq = c.liq.bn || c.liq.hl ? `<span class="chip" title="Binance liquidations and Hyperliquid liquidation fills (followed wallets) in the minute before detection">liquidations ${c.liq.bn} BN · ${c.liq.hl} HL</span>` : "";
+  const liq = epLiqChip(c);
   return `<div class="epctx">${head}${chips || `<span class="stat">nothing unusual (${c.items.length} readings within 1.5 sd)</span>`}${liq}</div>${lead}`;
 }
 // the compact snapshot stored with a label: {t, v:{feature:[value, deviation]}, liq:[binance, hyperliquid]}
 function colLabelCtx(ep) {
   try {
-    const c = colContextFor(ep); if (!c || !(c.items.length || c.lead && !c.lead.none)) return undefined;
+    const c = colContextFor(ep); if (!c || !(c.items.length || c.lead && !c.lead.none || c.liqx && (c.liqx.usd || c.liqx.other))) return undefined;
     const v = {}; for (const x of c.items) v[x.f] = [+x.x.toPrecision(7), +x.dev.toPrecision(5)];
     const out = {t:c.t, v, liq:[c.liq.bn, c.liq.hl]};
+    if (c.liqx && (c.liqx.usd || c.liqx.other)) { const q = c.liqx; out.lq = {bn:[q.bn.sell, q.bn.buy], hl:[q.hl.sell, q.hl.buy], x:q.x, other:q.other, tag:q.tag ? 1 : 0}; }      // dollars forced to sell / buy in the 60 s before, by venue
     if (c.lead && !c.lead.none) { const lv = {}; for (const x of c.lead.items) lv[x.src] = x.lead == null ? [null, x.move] : [x.lead, x.move]; out.lead = {ref:c.lead.ref, move:c.lead.move, v:lv}; }      // v: venue -> [seconds it led the reference (negative: lagged; null: no timing), its move in bps]
     return out;
   } catch { return undefined; }

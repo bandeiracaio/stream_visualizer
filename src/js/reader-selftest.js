@@ -230,6 +230,21 @@ const READER_SELFTEST=(()=>{
       &&COLLECT.leadText(up.items[0])==="Coinbase led by ~6 s"&&COLLECT.leadText(up.items[2])==="OKX swap lagged by ~6 s"&&COLLECT.leadText(up.items[1])==="Bybit perp with it"&&COLLECT.leadText(up.items[3])==="OKX spot flat"
       &&ctx.lead&&ctx.lead.items.length===4&&COLLECT.context([],tMs).lead===null,detail:J({slow:slow.none,up:kinds(up),dn:kinds(dn),flat,stale,ctx:ctx.lead&&ctx.lead.items.length})};
   });
+  add("collectors: forced flow: Binance and own-coin Hyperliquid liquidations in the minute before are summed by side, the tag needs the floor and ten times the hour's pace, other coins are only counted",E=>{
+    const R=COLLECT.rec,J=JSON.stringify,T=T0,tMs=T+3600000;
+    const bn=(t,side,qty,px)=>R("liq",t,{side,qty,px,status:"FILLED"}),hl=(t,coin,side,sz,px)=>R("hlLiq",t,{w:"0xa",coin,side,sz,px,liquidated:"0xb"});
+    const base=[R("feeds",T,{})];      // data reaches back an hour
+    for(let m=0;m<50;m+=5)base.push(bn(T+m*60000+1000,"SELL",1,80000));      // a quiet hour: 10 small ones, 80k each, 800k in 60 minutes (about 13k a minute)
+    const spike=base.concat([bn(tMs-30000,"SELL",5,80000),hl(tMs-20000,"BTC","B",4,80000),hl(tMs-10000,"ETH","B",50,2300),bn(tMs+5000,"SELL",99,80000),bn(tMs-70000,"SELL",1,80000)]);      // the last two: in the future, and just outside the window (counts as history)
+    const a=COLLECT.liqDriven(spike,tMs,{coin:"BTC"}),small=COLLECT.liqDriven(base.concat([bn(tMs-30000,"SELL",2,80000)]),tMs),buy=COLLECT.liqDriven(base.concat([bn(tMs-30000,"BUY",8,80000)]),tMs);
+    const busy=[R("feeds",T,{})];for(let m=0;m<59;m++)busy.push(bn(T+m*60000+1000,"SELL",20,80000));      // always liquidating: 1.6M a minute
+    const hot=COLLECT.liqDriven(busy.concat([bn(tMs-30000,"SELL",10,80000)]),tMs),short=COLLECT.liqDriven([R("feeds",tMs-120000,{}),bn(tMs-30000,"SELL",10,80000)],tMs),none=COLLECT.liqDriven([],tMs);
+    const eth=COLLECT.liqDriven([R("feeds",T,{}),hl(tMs-5000,"ETH","B",300,2300)],tMs,{coin:"BTC"});
+    return{ok:a.usd===720000&&a.bn.sell===400000&&a.bn.n===1&&a.hl.sell===320000&&a.hl.buy===0&&a.other===1&&a.side==="sells"&&a.tag&&a.x>40&&a.avg<20000&&a.histMin===59
+      &&!small.tag&&small.usd===160000&&buy.tag&&buy.side==="buys"&&buy.buy===640000&&!hot.tag&&hot.usd===800000&&hot.x<1&&short.tag&&short.avg===null&&short.histMin<10
+      &&none.usd===0&&none.side===null&&!none.tag&&!eth.tag&&eth.usd===0&&eth.other===1&&COLLECT.context([],tMs).liqx.usd===0&&COLLECT.usdText(1234567)==="$1.2M"&&COLLECT.usdText(48500)==="$49k"&&COLLECT.usdText(950)==="$950",
+      detail:J({a,small:small.usd,hot:[hot.tag,hot.x],short:[short.tag,short.avg,short.histMin],eth})};
+  });
   add("collectors: records among the inputs change no detection and no session quality",E=>{
     const e=E.create();e.startRecording();const a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:21,params:()=>burstSell});sim(e,{t0:b.t,mid0:b.mid,seconds:40,seed:22});
     const inputs=e.stopRecording(),mixed=[];inputs.forEach((r,i)=>{mixed.push(r);if(i%40===0)mixed.push(COLLECT.rec("feeds",T0+i,{src:"page",feeds:{bn:{n:1}}}));});

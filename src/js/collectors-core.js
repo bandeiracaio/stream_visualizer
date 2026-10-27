@@ -397,7 +397,7 @@ const COLLECT = (() => {
       items.push({f, label:info.label, x:q.x, dev:q.dev, mean, z:round(z, 2), unusual:Math.abs(z) >= zMin && mag >= (info.min || 0), text:cardText(info, q.dev, mean)});
     }
     items.sort((a, b) => Math.abs(b.z) - Math.abs(a.z));
-    return {t:tMs, items, liq:{bn:lb, hl:lh}, lead:venueLead(by.venues || [], tMs)};
+    return {t:tMs, items, liq:{bn:lb, hl:lh}, lead:venueLead(by.venues || [], tMs), liqx:liqDriven(recs, tMs, {coin:opt.coin})};
   }
   function cardText(info, dev, mean) {
     const sign = dev >= 0 ? "+" : "-", a = Math.abs(dev);
@@ -457,6 +457,35 @@ const COLLECT = (() => {
     }
   }
 
+  // ---- was it forced flow? (v080) The forced orders in the 60 s before an episode was detected: Binance liquidations of this symbol, and the Hyperliquid liquidation fills of the
+  // followed wallets in this coin only (the followed wallet is the counterparty: it BOUGHT when the liquidated trader was forced to sell). Notional in dollars.
+  // Rule, written before looking at episodes: "liquidation-driven" = at least `minUsd` (500k) in the window AND at least `ratio` (10) times the average minute of the previous
+  // hour (when less than 10 minutes of earlier data exist, the floor alone decides). Most minutes hold nothing (76% in the first 17 recordings), the 99th percentile of a minute was about 3.6M.
+  function liqDriven(recs, tMs, opt) {
+    opt = opt || {}; const winMs = (opt.winSec || 60)*1000, histMs = (opt.histMin || 60)*60000, minUsd = opt.minUsd == null ? 5e5 : opt.minUsd, ratio = opt.ratio || 10, coin = String(opt.coin || "BTC").toUpperCase();
+    const w = {bn:{sell:0, buy:0, n:0}, hl:{sell:0, buy:0, n:0}}; let hist = 0, first = Infinity, other = 0;
+    for (const r of recs) {
+      if (!isRec(r) || r[2] > tMs) continue;
+      if (r[2] < first) first = r[2];      // any record shows how far back the data reaches
+      const p = r[3] || {}; let k, sell, usd;
+      if (r[1] === "liq") { k = "bn"; sell = p.side === "SELL"; usd = (num(p.qty) || 0)*(num(p.px) || 0); }
+      else if (r[1] === "hlLiq") {
+        if (String(p.coin).toUpperCase() !== coin) { if (r[2] > tMs - winMs) other++; continue; }
+        k = "hl"; sell = p.side === "B"; usd = (num(p.sz) || 0)*(num(p.px) || 0);
+      } else continue;
+      if (!(usd > 0)) continue;
+      if (r[2] > tMs - winMs) { const x = w[k]; x[sell ? "sell" : "buy"] += usd; x.n++; }
+      else if (r[2] >= tMs - winMs - histMs) hist += usd;
+    }
+    const sell = w.bn.sell + w.hl.sell, buy = w.bn.buy + w.hl.buy, usd = sell + buy, avail = first === Infinity ? 0 : Math.min(histMs, tMs - winMs - first)/60000;
+    const avg = avail >= 10 ? hist/avail : null, x = avg ? usd/avg : null;
+    const tag = usd >= minUsd && (avg == null || avg === 0 || usd >= ratio*avg);
+    for (const k in w) for (const f of ["sell", "buy"]) w[k][f] = Math.round(w[k][f]);
+    return {t:tMs, usd:Math.round(usd), sell:Math.round(sell), buy:Math.round(buy), side:usd ? (sell/usd >= 0.7 ? "sells" : buy/usd >= 0.7 ? "buys" : "mixed") : null,
+      bn:w.bn, hl:w.hl, other, avg:avg == null ? null : Math.round(avg), x:x == null ? null : round(x, 1), histMin:Math.round(avail), tag};
+  }
+  const usdText = v => v >= 1e6 ? "$" + round(v/1e6, 1) + "M" : v >= 1e3 ? "$" + Math.round(v/1e3) + "k" : "$" + Math.round(v);
+
   // tape helpers on arrays of records
   const prune = (recs, nowMs, keepMs) => recs.filter(r => r[2] >= nowMs - (keepMs == null ? TAPE_MS : keepMs));
   const slice = (recs, t0, t1) => recs.filter(r => r[2] >= t0 && r[2] <= t1);
@@ -466,5 +495,5 @@ const COLLECT = (() => {
     for (let i = recs.length - 1; i >= 0; i--) { const b = JSON.stringify(recs[i]).length + 1; if (size + b > lim) break; size += b; out.push(recs[i]); }
     return out.reverse();
   }
-  return {REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, due, calendar, OWNER, EXPECT_MS, ownerOf, tally, ageText, health, FEATURES, FEATURE_INFO, featureSeries, featureMaxAge, context, venueLead, leadText, deribitCoin, optName, optionsChain, walletTracker, walletPosition, walletChanged, liqFills, predictedFunding, WALLET_TOP, WALLET_REFRESH_MS, MAJORS, venueSubs, venueParse, venueApply, venueRecord, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
+  return {REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, due, calendar, OWNER, EXPECT_MS, ownerOf, tally, ageText, health, FEATURES, FEATURE_INFO, featureSeries, featureMaxAge, context, venueLead, leadText, liqDriven, usdText, deribitCoin, optName, optionsChain, walletTracker, walletPosition, walletChanged, liqFills, predictedFunding, WALLET_TOP, WALLET_REFRESH_MS, MAJORS, venueSubs, venueParse, venueApply, venueRecord, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
 })();
