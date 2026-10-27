@@ -245,6 +245,21 @@ const READER_SELFTEST=(()=>{
       &&none.usd===0&&none.side===null&&!none.tag&&!eth.tag&&eth.usd===0&&eth.other===1&&COLLECT.context([],tMs).liqx.usd===0&&COLLECT.usdText(1234567)==="$1.2M"&&COLLECT.usdText(48500)==="$49k"&&COLLECT.usdText(950)==="$950",
       detail:J({a,small:small.usd,hot:[hot.tag,hot.x],short:[short.tag,short.avg,short.histMin],eth})};
   });
+  add("collectors: wall quality: share of the edge's depth, depth against usual, and what it did by the end; named verdicts; no reading says why",E=>{
+    const R=COLLECT.rec,J=JSON.stringify,T=T0,tS=T+35*60000,tE=tS+60000;
+    const mk=(dEnd,midEnd,o)=>{o=o||{};const recs=[];for(let t=T;t<=tS+120000;t+=o.step||2000){const late=t>=tS+50000,mid=t>=tS+30000?midEnd:80000,dep=t<tS?10:late?dEnd:14;
+      const e=x=>({"1":[o.nullBid?null:x,x],"5":[x*3,x*3],"10":[x*5,x*5],"20":[x*8,x*8]});if(t>=(o.from||T))recs.push(R(o.name||"bookBn",t,{mid,spr:.01,d:e(dep)}));}return recs;};
+    const g=(o)=>Object.assign({venue:"bn",wall:{side:"bid",px:79996,peak:4},tStart:tS,tEnd:tE,tUpdate:tE},o||{});
+    const Q=COLLECT.wallQuality,pulled=Q(mk(3,80030),g()),atWall=Q(mk(3,80010),g()),held=Q(mk(13,80000),g()),part=Q(mk(9,80000),g());
+    const ask=Q(mk(3,79980),g({wall:{side:"ask",px:80004,peak:4}})),open=Q(mk(3,80030),g({tEnd:null})),far=Q(mk(3,80030),g({wall:{side:"bid",px:79700,peak:4}})),nul=Q(mk(3,80030,{nullBid:1}),g());
+    const brief=Q(mk(3,80030,{from:tS-30000}),g()),weak=Q(mk(3,80030),g({wall:{side:"bid",px:79996,peak:1}})),none=Q([],g()),late=Q(mk(3,80030,{from:tS+60000}),g()),other=Q(mk(3,80030,{name:"bookHl"}),g()),hl=Q(mk(3,80030,{name:"bookHl"}),g({venue:"hl"})),nowall=Q(mk(3,80030),{venue:"bn"});
+    return{ok:pulled.verdict==="pulled before price arrived"&&pulled.edge===1&&pulled.share===.29&&pulled.usual===10&&pulled.x===1.4&&pulled.depth0===14&&pulled.end.depth===3&&pulled.end.ret===.21&&pulled.end.dist>4&&!pulled.open
+      &&atWall.verdict==="gone with price at the wall"&&atWall.end.dist>1&&atWall.end.dist<2&&held.verdict==="depth held"&&part.verdict==="partly gone"
+      &&ask.verdict==="pulled before price arrived"&&ask.end.dist>2.9&&ask.depth0===14&&open.open===true&&open.verdict==="pulled before price arrived"
+      &&/beyond the 20 bps/.test(far.none)&&/did not reach 1 bps on that side/.test(nul.none)&&brief.usual===null&&brief.x===null&&brief.share===.29&&brief.verdict
+      &&/no book records/.test(none.none)&&/no book records/.test(other.none)===true&&/no book record within 10 s/.test(late.none)&&hl.verdict&&nowall===null&&weak.weak===true&&weak.verdict===null&&weak.end.ret===.21&&pulled.weak===false,
+      detail:J({pulled,atWall:atWall.end,far:far.none,nul:nul.none,brief:[brief.usual,brief.x],late:late.none,other:other.none})};
+  });
   add("collectors: records among the inputs change no detection and no session quality",E=>{
     const e=E.create();e.startRecording();const a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:21,params:()=>burstSell});sim(e,{t0:b.t,mid0:b.mid,seconds:40,seed:22});
     const inputs=e.stopRecording(),mixed=[];inputs.forEach((r,i)=>{mixed.push(r);if(i%40===0)mixed.push(COLLECT.rec("feeds",T0+i,{src:"page",feeds:{bn:{n:1}}}));});

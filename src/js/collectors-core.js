@@ -486,6 +486,38 @@ const COLLECT = (() => {
   }
   const usdText = v => v >= 1e6 ? "$" + round(v/1e6, 1) + "M" : v >= 1e3 ? "$" + Math.round(v/1e3) + "k" : "$" + Math.round(v);
 
+  // ---- wall quality (v081): what the book depth summaries (collector "book", recordings only) say about a wall episode, as an independent view of the engine's own reading.
+  // wall = an episode group {venue "bn"|"hl", wall:{side "bid"|"ask", px, peak (base units)}, tStart, tEnd (null while open), tUpdate}. Depth is the quantity within an edge (1 / 5 / 10 / 20 bps)
+  // on the wall's side, taken at the smallest edge that holds the wall's distance from the mid at its start. Shown: the wall's share of that depth, that depth against its usual (median of the
+  // 30 minutes before), and what the depth did until the end. Fixed words: depth fell to half or less, with the mid still 2+ bps from the wall = "pulled before price arrived"; fell to half or less
+  // with the mid closer = "gone with price at the wall"; 80% or more kept = "depth held"; otherwise "partly gone". No verdict when the wall is under 20% of that depth. Records within 10 s of the moment count.
+  function wallQuality(recs, g, opt) {
+    opt = opt || {}; const name = g && g.venue === "bn" ? "bookBn" : g && g.venue === "hl" ? "bookHl" : null, none = why => ({none:why, venue:g && g.venue});
+    if (!name || !g.wall) return null;
+    const rows = recs.filter(r => isRec(r) && r[1] === name && r[3] && r[3].d).sort((x, y) => x[2] - y[2]);
+    if (!rows.length) return none("no book records (they exist only while recording)");
+    const nearest = t => { let b = null, bd = Infinity; for (const r of rows) { const d = Math.abs(r[2] - t); if (d < bd) { bd = d; b = r; } if (r[2] > t && d > bd) break; } return bd <= 10000 ? b : null; };
+    const w = g.wall, i = w.side === "bid" ? 0 : 1, r0 = nearest(g.tStart);
+    if (!r0) return none("no book record within 10 s of the wall's start");
+    const mid0 = num(r0[3].mid); if (!(mid0 > 0)) return none("book record without a mid");
+    const dist0 = Math.abs(w.px - mid0)/mid0*1e4, edge = BOOK_EDGES.find(e => e >= dist0);
+    if (!edge) return none("wall is " + round(dist0, 1) + " bps from the mid, beyond the " + BOOK_EDGES[BOOK_EDGES.length - 1] + " bps the summaries reach");
+    const d0 = r0[3].d[edge] && num(r0[3].d[edge][i]);
+    if (d0 == null || !(d0 > 0)) return none("the book did not reach " + edge + " bps on that side");
+    const prior = rows.filter(r => r[2] < g.tStart && r[2] >= g.tStart - 1800000).map(r => r[3].d[edge] && num(r[3].d[edge][i])).filter(v => v != null).sort((x, y) => x - y);
+    const usual = prior.length >= 20 ? (prior.length % 2 ? prior[(prior.length - 1)/2] : (prior[prior.length/2 - 1] + prior[prior.length/2])/2) : null;
+    const out = {venue:g.venue, side:w.side, edge, dist0:round(dist0, 2), depth0:round(d0, 3), peak:round(w.peak, 3), share:round(Math.min(1, w.peak/d0), 2), usual:usual == null ? null : round(usual, 3), x:usual ? round(d0/usual, 1) : null, open:g.tEnd == null};
+    const tE = g.tEnd != null ? g.tEnd : g.tUpdate, r1 = nearest(tE);
+    if (!r1 || r1 === r0) { out.end = null; out.verdict = null; return out; }
+    const m1 = num(r1[3].mid), d1 = r1[3].d[edge] && num(r1[3].d[edge][i]);
+    if (d1 == null || !(m1 > 0)) { out.end = null; out.verdict = null; return out; }
+    const dist1 = (w.side === "bid" ? m1 - w.px : w.px - m1)/m1*1e4, ret = d1/d0;      // negative distance: the mid went through the wall
+    out.end = {t:r1[2], depth:round(d1, 3), dist:round(dist1, 2), ret:round(ret, 2)};
+    out.weak = out.share < 0.2;      // a wall that is under a fifth of the depth says little through that depth
+    out.verdict = out.weak ? null : ret <= 0.5 ? (dist1 >= 2 ? "pulled before price arrived" : "gone with price at the wall") : ret >= 0.8 ? "depth held" : "partly gone";
+    return out;
+  }
+
   // tape helpers on arrays of records
   const prune = (recs, nowMs, keepMs) => recs.filter(r => r[2] >= nowMs - (keepMs == null ? TAPE_MS : keepMs));
   const slice = (recs, t0, t1) => recs.filter(r => r[2] >= t0 && r[2] <= t1);
@@ -495,5 +527,5 @@ const COLLECT = (() => {
     for (let i = recs.length - 1; i >= 0; i--) { const b = JSON.stringify(recs[i]).length + 1; if (size + b > lim) break; size += b; out.push(recs[i]); }
     return out.reverse();
   }
-  return {REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, due, calendar, OWNER, EXPECT_MS, ownerOf, tally, ageText, health, FEATURES, FEATURE_INFO, featureSeries, featureMaxAge, context, venueLead, leadText, liqDriven, usdText, deribitCoin, optName, optionsChain, walletTracker, walletPosition, walletChanged, liqFills, predictedFunding, WALLET_TOP, WALLET_REFRESH_MS, MAJORS, venueSubs, venueParse, venueApply, venueRecord, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
+  return {REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, due, calendar, OWNER, EXPECT_MS, ownerOf, tally, ageText, health, FEATURES, FEATURE_INFO, featureSeries, featureMaxAge, context, venueLead, leadText, liqDriven, usdText, wallQuality, deribitCoin, optName, optionsChain, walletTracker, walletPosition, walletChanged, liqFills, predictedFunding, WALLET_TOP, WALLET_REFRESH_MS, MAJORS, venueSubs, venueParse, venueApply, venueRecord, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
 })();
