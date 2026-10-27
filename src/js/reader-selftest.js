@@ -216,6 +216,20 @@ const READER_SELFTEST=(()=>{
       &&c.items.every((x,i,a)=>!i||Math.abs(a[i-1].z)>=Math.abs(x.z))&&COLLECT.REGISTRY.length===7&&Object.keys(COLLECT.FEATURES).length===21,
       detail:J({n:c.items.length,top:c.items.slice(0,4).map(x=>[x.f,x.z,x.text,x.unusual]),liq:c.liq,early:early.items.length})};
   });
+  add("collectors: who moved first: a venue that covered half of the move earlier led, one within 2 s is with it, a flat or silent one is named, and no clear or only a gradual move says so",E=>{
+    const R=COLLECT.rec,J=JSON.stringify,T=T0,tMs=T+60000;
+    const ramp=(s,st,base,sg,len)=>base*(1+sg*6e-4*Math.min(1,Math.max(0,(s-st)/(len||21))));
+    const mk=(sg,o)=>{o=o||{};const recs=[];for(let i=0;i<=60;i++){const s=i,q=(b,st,age)=>{const p=ramp(s,o.slow?st-20:st,b,sg,o.slow?70:0);return{b:p-.5,a:p+.5,age:age==null?50:age};};
+      const v={bnS:q(80000,20),cb:q(80100,14),byL:q(80020,20),okS:q(80010,26),okP:q(80030,-100)};if(o.stale)v.bnS.age=9000;if(o.flat)for(const k in v)v[k]=q(80000,-100);recs.push(R("venues",T+i*1000,v));}
+      recs.push(R("venues",tMs+5000,{bnS:{b:1,a:2,age:1}}));return recs;};      // the last record is in the future
+    const up=COLLECT.venueLead(mk(1),tMs),dn=COLLECT.venueLead(mk(-1),tMs),flat=COLLECT.venueLead(mk(1,{flat:1}),tMs),stale=COLLECT.venueLead(mk(1,{stale:1}),tMs),slow=COLLECT.venueLead(mk(1,{slow:1}),tMs),empty=COLLECT.venueLead([R("dvol",T,{vol:1})],tMs);
+    const kinds=r=>r.items.map(x=>x.src+":"+x.kind+":"+x.lead).join(",");
+    const ctx=COLLECT.context(mk(1),tMs);
+    return{ok:up.ref==="bnS"&&up.move>5.9&&up.move<6.1&&kinds(up)==="cb:led:6,byL:with:0,okS:lagged:-6,okP:flat:undefined"&&kinds(dn)===kinds(up)&&dn.move<-5.9
+      &&flat.none==="no clear move"&&slow.none==="gradual move, no timing"&&flat.items.length===0&&stale.none==="too few readings from Binance spot"&&empty===null&&COLLECT.venueLead([],tMs)===null
+      &&COLLECT.leadText(up.items[0])==="Coinbase led by ~6 s"&&COLLECT.leadText(up.items[2])==="OKX swap lagged by ~6 s"&&COLLECT.leadText(up.items[1])==="Bybit perp with it"&&COLLECT.leadText(up.items[3])==="OKX spot flat"
+      &&ctx.lead&&ctx.lead.items.length===4&&COLLECT.context([],tMs).lead===null,detail:J({slow:slow.none,up:kinds(up),dn:kinds(dn),flat,stale,ctx:ctx.lead&&ctx.lead.items.length})};
+  });
   add("collectors: records among the inputs change no detection and no session quality",E=>{
     const e=E.create();e.startRecording();const a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:21,params:()=>burstSell});sim(e,{t0:b.t,mid0:b.mid,seconds:40,seed:22});
     const inputs=e.stopRecording(),mixed=[];inputs.forEach((r,i)=>{mixed.push(r);if(i%40===0)mixed.push(COLLECT.rec("feeds",T0+i,{src:"page",feeds:{bn:{n:1}}}));});

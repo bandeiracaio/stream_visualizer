@@ -397,12 +397,64 @@ const COLLECT = (() => {
       items.push({f, label:info.label, x:q.x, dev:q.dev, mean, z:round(z, 2), unusual:Math.abs(z) >= zMin && mag >= (info.min || 0), text:cardText(info, q.dev, mean)});
     }
     items.sort((a, b) => Math.abs(b.z) - Math.abs(a.z));
-    return {t:tMs, items, liq:{bn:lb, hl:lh}};
+    return {t:tMs, items, liq:{bn:lb, hl:lh}, lead:venueLead(by.venues || [], tMs)};
   }
   function cardText(info, dev, mean) {
     const sign = dev >= 0 ? "+" : "-", a = Math.abs(dev);
     if (info.rel) return mean ? sign + round(a/Math.abs(mean)*100, a/Math.abs(mean) < 0.1 ? 2 : 1) + "%" : sign + round(a, 2);
     const v = a*(info.scale || 1); return sign + round(v, v < 10 ? 2 : 1) + (info.unit ? " " + info.unit : "");
+  }
+
+  // ---- who moved first (v079): over the 60 s before an episode was detected, when each venue's own price covered half of the move that all venues made, against Binance spot.
+  // Prices differ by level (Coinbase is USD, the others USDT, perps carry a basis), so only each venue's CHANGE over the window is used. The records come about once a second, so
+  // "with" means within `withSec` (2 s) of the reference; a venue that moved less than half of `minBps` is "flat", one that moved the other way "against".
+  const LEAD_SRC = {cb:"Coinbase", byL:"Bybit perp", byS:"Bybit spot", okS:"OKX swap", okP:"OKX spot", bnS:"Binance spot"}, LEAD_REF = "bnS";
+  function venueLead(rows, tMs, opt) {
+    opt = opt || {}; const winMs = (opt.winSec || 60)*1000, minBps = opt.minBps == null ? 2 : opt.minBps, withMs = (opt.withSec == null ? 2 : opt.withSec)*1000, maxAge = opt.maxAgeMs || 5000, t0 = tMs - winMs;
+    const rs = rows.filter(r => isRec(r) && r[1] === "venues" && r[2] <= tMs && r[2] >= t0).sort((a, b) => a[2] - b[2]);
+    if (!rs.length) return null;
+    const ser = {};
+    for (const r of rs) for (const s in LEAD_SRC) {
+      const q = r[3] && r[3][s]; if (!q || !(q.age <= maxAge)) continue;      // a source that had gone quiet is not a reading
+      const p = num(q.b) != null && num(q.a) != null ? (q.b + q.a)/2 : num(q.l);
+      if (p != null && p > 0) (ser[s] || (ser[s] = [])).push([r[2], p]);
+    }
+    const none = why => ({t:tMs, ref:LEAD_REF, none:why, items:[]}), mv = {};
+    for (const s in ser) {
+      const a = ser[s]; if (a.length < 15 || a[0][0] > t0 + winMs*0.3 || a[a.length - 1][0] < tMs - 5000) continue;      // needs most of the window
+      mv[s] = {a, p0:a[0][1], bps:(a[a.length - 1][1] - a[0][1])/a[0][1]*1e4};
+    }
+    if (!mv[LEAD_REF]) return none("too few readings from Binance spot");
+    const moves = Object.values(mv).map(m => m.bps).sort((x, y) => x - y);
+    if (moves.length < 3) return none("too few venues");
+    const cons = moves.length % 2 ? moves[(moves.length - 1)/2] : (moves[moves.length/2 - 1] + moves[moves.length/2])/2, sg = cons >= 0 ? 1 : -1;
+    if (Math.abs(cons) < minBps) return none("no clear move");
+    const reach = (m, f) => { const total = m.a[m.a.length - 1][1] - m.p0; for (const [t, p] of m.a) if ((p - m.p0)*sg >= Math.abs(total)*f) return t; return null; };      // first time it had covered the fraction f of its move
+    const half = m => reach(m, 0.5);
+    const tRef = mv[LEAD_REF].bps*sg >= minBps/2 ? half(mv[LEAD_REF]) : null;
+    if (tRef == null) return none("Binance spot did not move");
+    const q1 = reach(mv[LEAD_REF], 0.25), q3 = reach(mv[LEAD_REF], 0.75);
+    if (q1 == null || q3 == null || q3 - q1 > winMs*0.4) return none("gradual move, no timing");      // a drift that stepped along has no moment to compare
+    const items = [];
+    for (const s in mv) {
+      if (s === LEAD_REF) continue;
+      const m = mv[s], mine = m.bps*sg, row = {src:s, label:LEAD_SRC[s], move:round(m.bps, 1)};
+      if (Math.abs(m.bps) < minBps/2) row.kind = "flat";
+      else if (mine < 0) row.kind = "against";
+      else { const lead = (tRef - half(m))/1000; row.lead = round(lead, 1); row.kind = Math.abs(lead*1000) < withMs ? "with" : lead > 0 ? "led" : "lagged"; }
+      items.push(row);
+    }
+    items.sort((x, y) => (y.lead == null ? -1e9 : y.lead) - (x.lead == null ? -1e9 : x.lead));
+    return {t:tMs, ref:LEAD_REF, move:round(mv[LEAD_REF].bps, 1), cons:round(cons, 1), items};
+  }
+  function leadText(x) {
+    switch (x.kind) {
+      case "led": return x.label + " led by ~" + x.lead + " s";
+      case "lagged": return x.label + " lagged by ~" + (-x.lead) + " s";
+      case "with": return x.label + " with it";
+      case "flat": return x.label + " flat";
+      default: return x.label + " moved the other way";
+    }
   }
 
   // tape helpers on arrays of records
@@ -414,5 +466,5 @@ const COLLECT = (() => {
     for (let i = recs.length - 1; i >= 0; i--) { const b = JSON.stringify(recs[i]).length + 1; if (size + b > lim) break; size += b; out.push(recs[i]); }
     return out.reverse();
   }
-  return {REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, due, calendar, OWNER, EXPECT_MS, ownerOf, tally, ageText, health, FEATURES, FEATURE_INFO, featureSeries, featureMaxAge, context, deribitCoin, optName, optionsChain, walletTracker, walletPosition, walletChanged, liqFills, predictedFunding, WALLET_TOP, WALLET_REFRESH_MS, MAJORS, venueSubs, venueParse, venueApply, venueRecord, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
+  return {REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, due, calendar, OWNER, EXPECT_MS, ownerOf, tally, ageText, health, FEATURES, FEATURE_INFO, featureSeries, featureMaxAge, context, venueLead, leadText, deribitCoin, optName, optionsChain, walletTracker, walletPosition, walletChanged, liqFills, predictedFunding, WALLET_TOP, WALLET_REFRESH_MS, MAJORS, venueSubs, venueParse, venueApply, venueRecord, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
 })();

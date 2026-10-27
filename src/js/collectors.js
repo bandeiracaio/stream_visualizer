@@ -169,19 +169,30 @@ function colContextFor(ep) {
   const recs = replay ? (ext || []) : [].concat(...Object.values(CL.recent)), c = COLLECT.context(recs, t);
   if (CL.ctx.size > 400) CL.ctx.clear(); CL.ctx.set(key, c); return c;
 }
+// who moved first (v079): one row under the context chips, venues against Binance spot over the 60 s before detection
+function epLeadBar(c) {
+  const l = c.lead; if (!l) return "";
+  const head = `<span class="stat" title="Each venue's own price change over the 60 s before detection: when it covered half of the move that the venues made, against Binance spot. The records come about once a second, so 'with it' means within 2 s. Prices are compared as changes, not levels.">who moved first (vs Binance spot)</span>`;
+  if (l.none) return `<div class="epctx">${head}<span class="stat">no reading: ${l.none}</span></div>`;
+  const chips = l.items.map(x => `<span class="chip" title="${x.label}: ${x.move >= 0 ? "+" : ""}${x.move} bps over the window">${COLLECT.leadText(x)}</span>`).join("");
+  return `<div class="epctx">${head}<span class="stat">Binance spot ${l.move >= 0 ? "+" : ""}${l.move} bps</span>${chips}</div>`;
+}
 function epCtxBar(ep) {
   const c = colContextFor(ep); if (!c) return "";
+  const lead = epLeadBar(c);
   const head = `<span class="stat" title="Each reading against its own mean of the previous 30 minutes, in standard deviations; only the unusual ones (1.5 or more) are shown">collector context at detection</span>`;
-  if (!c.items.length) return `<div class="epctx">${head}<span class="stat">none at that time (the collectors were off, or the data does not reach back that far)</span></div>`;
+  if (!c.items.length) return `<div class="epctx">${head}<span class="stat">none at that time (the collectors were off, or the data does not reach back that far)</span></div>${lead}`;
   const chips = c.items.filter(x => x.unusual).slice(0, 6).map(x => `<span class="chip ${x.z > 0 ? "hi" : "lo"}" title="${x.label}: ${+x.x.toPrecision(6)} now, ${x.text} from its 30-minute mean (${x.z >= 99 ? "it had been constant" : x.z + " sd"})">${x.label} ${x.z > 0 ? "▲" : "▼"} ${x.text}</span>`).join("");
   const liq = c.liq.bn || c.liq.hl ? `<span class="chip" title="Binance liquidations and Hyperliquid liquidation fills (followed wallets) in the minute before detection">liquidations ${c.liq.bn} BN · ${c.liq.hl} HL</span>` : "";
-  return `<div class="epctx">${head}${chips || `<span class="stat">nothing unusual (${c.items.length} readings within 1.5 sd)</span>`}${liq}</div>`;
+  return `<div class="epctx">${head}${chips || `<span class="stat">nothing unusual (${c.items.length} readings within 1.5 sd)</span>`}${liq}</div>${lead}`;
 }
 // the compact snapshot stored with a label: {t, v:{feature:[value, deviation]}, liq:[binance, hyperliquid]}
 function colLabelCtx(ep) {
   try {
-    const c = colContextFor(ep); if (!c || !c.items.length) return undefined;
+    const c = colContextFor(ep); if (!c || !(c.items.length || c.lead && !c.lead.none)) return undefined;
     const v = {}; for (const x of c.items) v[x.f] = [+x.x.toPrecision(7), +x.dev.toPrecision(5)];
-    return {t:c.t, v, liq:[c.liq.bn, c.liq.hl]};
+    const out = {t:c.t, v, liq:[c.liq.bn, c.liq.hl]};
+    if (c.lead && !c.lead.none) { const lv = {}; for (const x of c.lead.items) lv[x.src] = x.lead == null ? [null, x.move] : [x.lead, x.move]; out.lead = {ref:c.lead.ref, move:c.lead.move, v:lv}; }      // v: venue -> [seconds it led the reference (negative: lagged; null: no timing), its move in bps]
+    return out;
   } catch { return undefined; }
 }
