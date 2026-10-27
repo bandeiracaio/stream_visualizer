@@ -1,6 +1,6 @@
 # Auto-record, full watch (decided 2026-10-26)
 
-Status: step 1 built and tested (v087); steps 2-4 not started.
+Status: step 1 done (v087); step 2 built (v088); steps 3-4 not started.
 
 ## Why
 The first Arm (01) watches only the Binance mark price volatility with one socket. Problems: it starts late (5 minutes of movement must
@@ -28,3 +28,9 @@ forced flow), the stop is a calm timer that can cut an aftermath, and the 10 min
 - Disconnecting by hand while waiting disarms. Arming during a manual recording is refused.
 - The price worker (volatility reading) is unchanged; a hidden tab still slows the page's own feeds (see Health log), the lead-in
   inherits that and session quality shows it.
+
+## Step 2 details (v088)
+- Setting `epTrig` (default on, box "also start on a Reader episode"). `AUTOREC.step(st, v, t, cfg, ep)` takes `ep = {active, live}`: Reader episodes that are active, and active or fading, walls left out (a wall can stand for hours).
+- Start: an active episode starts a recording in a calm market too (why "episode"); it still needs the 15 minute baseline, and the cooldown still applies.
+- Stop: a recording does not count as calm while an episode is live; the calm timer (calmMin) starts when the last one has ended and volatility is calm. maxMin still caps it.
+- Also fixes v087: one status separator was saved as a single byte instead of UTF-8.

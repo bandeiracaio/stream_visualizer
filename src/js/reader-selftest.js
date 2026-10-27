@@ -952,6 +952,13 @@ const READER_SELFTEST=(()=>{
     const a=[];for(let k=0;k<HIST.LOG_CAP+25;k++)HIST.push(a,{k});
     return{ok:a.length===HIST.LOG_CAP&&a[0].k===25&&a[a.length-1].k===HIST.LOG_CAP+24,detail:`${a.length} rows, first ${a[0].k}`};
   });
+  add("autorec: an active Reader episode starts a recording in a calm market, only when the setting is on and the baseline is ready; walls are not counted; a live episode keeps it from counting as calm",E=>{
+    const A=AUTOREC,calm={ready:true,ratio:1,fast:.3},ep1={active:1,live:1},T=T0;
+    const on=A.step({mode:"waiting"},calm,T,{},ep1),off=A.step({mode:"waiting"},calm,T,{epTrig:false},ep1),none=A.step({mode:"waiting"},calm,T,{},{active:0,live:0}),cold=A.step({mode:"waiting"},{ready:false,ratio:0,fast:0},T,{},ep1),cool=A.step({mode:"waiting",until:T+60000},calm,T,{},ep1);
+    let st=on.st,stop=null;for(let m=0;m<=20&&!stop;m++){const o=A.step(st,calm,T+m*60000,{},m<8?ep1:{active:0,live:0});st=o.st;if(o.action==="stop")stop=m;}
+    const old=A.step({mode:"waiting"},calm,T,{},undefined).action;
+    return{ok:on.action==="start"&&on.why==="episode"&&off.action==null&&none.action==null&&cold.action==null&&cool.why==="cooldown"&&old==null&&stop===13,detail:`stop after minute ${stop}`};
+  });
   add("autorec: after a recording it stays armed but waits out the cooldown, then starts again on the next jump",E=>{
     const A=AUTOREC,r=rng(9),h=A.createHistory(),cfg={cooldownMin:10};let px=82000,t=T0,st={mode:"waiting"};const ev=[];
     const run=(secs,vol)=>{for(let i=0;i<secs;i++){px*=1+(r()-.5)*2*vol/1e4;t+=1000;A.push(h,t,px);if(i%5===4){const v=A.vol(h,cfg),o=A.step(st,v,t,cfg);st=o.st;if(o.action){ev.push({a:o.action,why:o.why,t});if(o.action==="stop")st=A.afterStop(t,cfg);}}}};
