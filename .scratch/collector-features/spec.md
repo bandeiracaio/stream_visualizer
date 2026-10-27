@@ -79,3 +79,37 @@ A, B, C share the card-chip code and the label `ctx`, so they go first. D needs 
 - Coverage on the 13 recordings with book data (123 wall groups): about half (66) can be read at all; the rest have no book record within 10 s of the start or end (sessions keep only a fraction of the book records when the file budget is full) or a null edge (Binance's bid side often has no deep reach). The row then says why.
 - Honest limit (seen on the 15:19 recording): depth within an edge refills fast, so a wall the engine called "eaten" or "pulled" often shows "depth held" at the end (e.g. a pulled bid wall, edge depth 9.7 -> 50.4). This row is a second, weaker view of the same event, not a check on the engine; do not read a disagreement as an engine error. Whether it ever separates pulled from eaten is a question for labels and `analyze-episodes.mjs`, not for this release.
 - Engine, episode layer and register untouched.
+
+## D: market state strip. DRAFT RULES, awaiting the user's approval (2026-10-26). Nothing built.
+Written without looking at any episode, label or outcome. Only the available inputs and their units were checked.
+
+**Principle.** A state is a plain label for "what kind of market is this minute", worked out from the past only (never the future), with the reasons shown. It is not a signal and not a forecast. Its first job is to be a column: every label and episode group carries the state at detection, so agree / disagree can be sliced by it later (`analyze-episodes.mjs`, its own step). Its second job is the Overview card and a track under the Review timeline.
+
+**Four indicators**, each yes / no / no reading, evaluated at time t on records up to t:
+- **V, volatility is up**: the volatility index (`dvol.vol`) is above its own mean of the previous 30 minutes by 1.5 standard deviations or more AND by at least 0.3% (the existing `COLLECT.context` rule; no new maths).
+- **L, forced flow**: `liqDriven` (v080, 60 s window, $500k and 10 times the hour's pace) held at some moment in the last 5 minutes.
+- **F, venues disagree**: Coinbase vs Binance or Bybit vs Binance (`venues.*VsBinanceBps`) is unusual by the same `context` rule (1.5 sd and at least 0.5 bps), in either direction.
+- **C, crowded**: the absolute Binance funding rate is at least 3 bps per 8 h (the usual rate is 1 bps; 3 is my prior, not measured) AND Binance open interest is not below its own previous 30-minute mean. This is the only indicator with a fixed level, because funding has a natural scale; if you prefer, it can use the context rule too.
+
+**States** (first match wins):
+1. **stressed**: at least 2 of V, L, F are yes.
+2. **crowded**: C is yes (and not stressed).
+3. **calm**: none of V, L, F, C is yes, and at least 3 of the 4 had a reading.
+4. **unknown**: otherwise (not enough collectors running). Never guessed.
+
+Each state shows which indicators fired and which had no reading. No colour that means good or bad: the strip uses three neutral tokens plus a hatched "unknown".
+
+**What I will not do.** No fitted thresholds, no changing the rules after seeing which state an episode fell in. Any change is a new version of the rules (v2), noted here, and old labels keep the version they were made with (`ctx.st = {v:1, s:"calm", i:"VLFC letters that fired"}`).
+
+**Known weaknesses, stated up front.**
+- The indicators measure "unusual against the previous 30 minutes", so a long stretch of high volatility becomes the new normal and reads "calm" after half an hour. A slower baseline would need the 24 h tape (live) or longer lead-ins (recordings carry about 30 minutes).
+- Book depth is left out on purpose: it exists only while recording, so a state using it would flicker with the recording switch.
+- With about 17 hours of recordings, most minutes will read "calm" or "unknown". That is information, not a failure.
+
+**Where it would live (for the build, once approved).** `COLLECT.marketState(recs, tMs)` (pure, self-tested; it calls `context` and `liqDriven`), computed every 30 s for the strip and cached; the Overview card (`overview.js`, read-only); a track in the Review timeline (`reader-tools.js`); the chip row on episode cards and the label field (`collectors.js`). Engine, episode layer and register untouched.
+
+**Questions for the user before building.**
+1. Are three named states (calm, crowded, stressed) the right granularity, or would you rather see the four indicators only, with no names?
+2. Is 3 bps for funding a fair "crowded" line for how you read BTC perps, or should it use the context rule like the others?
+3. Should "stressed" need 2 of 3, or is any single one enough? (2 of 3 is stricter; one of 3 would label most volatile minutes stressed.)
+4. Do you want the state on the Overview as a card, as a header chip next to the status chips, or both?
