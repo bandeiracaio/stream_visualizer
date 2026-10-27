@@ -82,6 +82,21 @@ function renderOverview(){
     }
   }catch(e){ console.error("overview state", e); }
 
+  // Followed wallets (COLLECT.whaleFlow): the ten biggest Hyperliquid traders' position change against the crowd's taker flow; display only
+  try{
+    const W = typeof colWhaleLive === "function" ? colWhaleLive() : null, el = ov$("ovWhales");
+    if (W !== undefined && el){
+      const usd = v => v == null ? "–" : ovSigned(v, a=>"$"+fmtK(a)), coin = ov$("sym").value.trim().toUpperCase(), sz = v => ovSigned(v, a=>a.toFixed(1))+" "+coin;
+      const html = W ? `<div class="metrics">${item("followed net position", W.netUsd != null ? usd(W.netUsd) : sz(W.net), W.longs+" long · "+W.shorts+" short of "+W.n, ovCls(W.netUsd))}`
+        + `${item("their change (10 min)", W.deltaUsd != null ? usd(W.deltaUsd) : W.matched ? sz(W.delta) : "–", W.matched ? W.matched+" wallets matched"+(W.whales ? " · "+W.whales : "") : "needs two readings per wallet", ovCls(W.deltaUsd))}`
+        + `${item("crowd taker flow (10 min)", usd(W.crowdNet), W.crowd ? "crowd "+W.crowd : "needs the app connected", ovCls(W.crowdNet))}`
+        + `${item("whales vs crowd", W.relation || "–", "flat = under $1M")}</div>`
+        + `<div class="note">The followed wallets are the ten with the most traded notional (mostly market makers and bots): a changing position is often inventory, not a view. Rotates over time; only wallets read at both ends count in the change. Not a signal.</div>`
+        : `<div class="note" style="margin:0">No wallet data yet: the wallets collector runs while the app is connected or auto-record is armed.</div>`;
+      if (el.dataset.h !== html){ el.dataset.h = html; el.innerHTML = html; }
+    }
+  }catch(e){ console.error("overview wallets", e); }
+
   // Options lens (COLLECT.volLens): realized volatility against the volatility index, and the skew; display only
   try{
     const L = typeof colLensLive === "function" ? colLensLive() : null;
@@ -97,13 +112,14 @@ function renderOverview(){
 
   // Event clock: the next scheduled moments by rule (COLLECT.eventClock); display only
   try{
+    if (typeof COLLECT === "undefined") throw new Error("collectors not loaded yet");      // the first frame can run before collectors-core.js
     const now = Date.now(); if (!OV.clk || now-OV.clk.at > 60000 || [OV.clk.c.funding, OV.clk.c.expiry, OV.clk.c.stocks].some(e => e && e.t <= now)) OV.clk = {at:now, c:COLLECT.eventClock(now)};
     const c = OV.clk.c, utc = t => new Date(t).toISOString().slice(5,16).replace("T"," ")+" UTC";
     const tile = (k, e) => e ? `<div class="metric"><span>${k}</span><b>${COLLECT.evSpan(e.t-now)}</b><small>${e.label} · ${utc(e.t)}</small></div>` : "";
     const near = COLLECT.eventsNear(now, 600000), win = near.length ? `<div class="note">Inside an event window now: ${near.map(x => (Math.abs(x.off) < 60000 ? "at " : COLLECT.evSpan(x.off)+(x.off >= 0 ? " after " : " before ")) + x.label).join(" · ")}.</div>` : "";
     const html = `<div class="metrics">${tile("next funding", c.funding)}${tile("next options expiry", c.expiry)}${tile("bigger expiry", c.bigger)}${tile("US stocks", c.stocks)}</div>${win}<div class="note">Scheduled moments only, by rule. Macro releases (CPI, FOMC, jobs) are not in this clock. Times in UTC.</div>`;
     const el = ov$("ovEvents"); if (el.dataset.h !== html){ el.dataset.h = html; el.innerHTML = html; }
-  }catch(e){ console.error("overview events", e); }
+  }catch(e){ if (typeof COLLECT !== "undefined") console.error("overview events", e); }
 
   // Reader: the strongest active episodes, in plain language
   const act = READER.activeEpisodes().sort((x,y)=>y.intensity-x.intensity).slice(0,3);

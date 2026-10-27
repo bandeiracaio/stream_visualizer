@@ -300,6 +300,20 @@ const READER_SELFTEST=(()=>{
       &&ser.length===3&&ser[0].t===T+30*60000&&ser[0].w==="below"&&ser[1].w==="above"&&ser[2].w==="above"&&ser.every(x=>x.ratio!=null)&&COLLECT.LENS_TEXT.above==="realized above implied",
       detail:J({hi:[hi.realized,hi.ratio,hi.word,hi.n],lo:[lo.realized,lo.word],mid:[mid.ratio,mid.word],few:few.n,stale:[stale.implied,stale.ratio],sk:sk.skew,flat:flat.skew,future:future.implied,ser:ser.map(x=>x.w+":"+x.ratio)})};
   });
+  add("collectors: followed wallets: net position and the change over matched wallets only, stale readings drop out, the crowd's taker flow, fixed words, and the series",E=>{
+    const R=COLLECT.rec,J=JSON.stringify,T=T0,t=T+30*60000,P=80000;
+    const row=(w,sz)=>({w,sz,e:80000,lq:null,lev:3,up:0,av:1e7,n:1});
+    const recs=[R("walletsTop",t-600000,{rows:[row("a",10),row("b",-5),row("c",2)]}),R("walletsTop",t-300000,{rows:[row("a",10),row("b",-5)]}),R("walletsTop",t-60000,{rows:[row("a",30),row("b",-5),row("d",-8)]}),R("dvol",t,{vol:1,idx:1})];      // c drops out, d appears
+    const w=COLLECT.whaleFlow(recs,t,{px:P,crowdNet:-3e6}),flatW=COLLECT.whaleFlow(recs,t,{px:P,crowdNet:2e5,floorUsd:5e7}),noPx=COLLECT.whaleFlow(recs,t,{crowdNet:1e6}),none=COLLECT.whaleFlow([],t,{px:P}),stale=COLLECT.whaleFlow(recs,t+3600000,{px:P});
+    const trades=[],push=(tt,side,ntl,liq)=>trades.push(["t",{t:tt,v:"hl",side,px:P,q:ntl/P,ntl,liq:!!liq}]);
+    push(t-500000,"buy",3e6);push(t-400000,"sell",1e6);push(t-300000,"buy",5e5,true);push(t-100000,"sell",2e6);trades.push(["t",{t:t-100000,v:"bn",side:"buy",px:P,q:1,ntl:P}]);trades.push(["q","bn",1,2,3]);
+    const tk=COLLECT.takerNet(trades,"hl",t-600000,t),ix=COLLECT.crowdIndex(trades,"hl"),ca=COLLECT.crowdNetAt(ix,t-600000,t),cb=COLLECT.crowdNetAt(ix,t-450000,t-350000);
+    const ser=COLLECT.whaleSeries(recs,ix,t-120000,t,60000,{px:P});
+    return{ok:w.n===3&&w.longs===1&&w.shorts===2&&w.net===17&&w.netUsd===17*P&&w.matched===2&&w.delta===20&&w.deltaUsd===20*P&&w.whales==="buying"&&w.crowd==="selling"&&w.relation==="opposite directions"
+      &&flatW.whales==="flat"&&flatW.crowd==="flat"&&flatW.relation==="one side flat"&&noPx.whales===null&&noPx.deltaUsd===null&&noPx.crowd==="buying"&&noPx.relation===null&&none===null&&stale===null
+      &&tk.net===-2e6+2e6-0&&tk.gross===6e6&&tk.n===3&&ca.net===tk.net&&ca.gross===tk.gross&&cb.net===-1e6&&ser.length===3&&ser[2].w==="buying"&&ser[2].c==="flat"&&ser[0].w===null,
+      detail:J({w,flatW:[flatW.whales,flatW.crowd],noPx:[noPx.whales,noPx.crowd],tk,ca,cb,ser:ser.map(x=>x.w+"/"+x.c)})};
+  });
   add("collectors: records among the inputs change no detection and no session quality",E=>{
     const e=E.create();e.startRecording();const a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:21,params:()=>burstSell});sim(e,{t0:b.t,mid0:b.mid,seconds:40,seed:22});
     const inputs=e.stopRecording(),mixed=[];inputs.forEach((r,i)=>{mixed.push(r);if(i%40===0)mixed.push(COLLECT.rec("feeds",T0+i,{src:"page",feeds:{bn:{n:1}}}));});

@@ -599,6 +599,59 @@ const COLLECT = (() => {
     return out;
   }
 
+  // ---- followed wallets (v085): what the 10 biggest Hyperliquid traders (by traded notional, which favours market makers and bots) did over the last winMs, against the crowd's taker flow.
+  // Rules in .scratch/collector-features/spec.md (F). Positions are signed sizes in the coin (negative = short). A wallet counts at time t if its latest reading is at most 6 minutes old
+  // (they are refreshed every 5 minutes and whenever they change). The change is measured only over wallets read at both ends, because the followed set rotates.
+  const WHALE_STALE_MS = 360000, WHALE_WIN_MS = 600000;
+  function walletSeries(recs) {      // {address: [{t, sz, lq, lev, up, av}]} ascending
+    const by = {};
+    for (const r of recs) { if (!isRec(r) || r[1] !== "walletsTop" || !r[3] || !Array.isArray(r[3].rows)) continue; for (const x of r[3].rows) if (x && x.w && num(x.sz) != null) (by[x.w] || (by[x.w] = [])).push({t:r[2], sz:x.sz, lq:x.lq, lev:x.lev, up:x.up, av:x.av}); }
+    for (const w in by) by[w].sort((p, q) => p.t - q.t);
+    return by;
+  }
+  const walletAt = (rows, t) => { let r = null; for (const x of rows) { if (x.t > t) break; r = x; } return r && t - r.t <= WHALE_STALE_MS ? r : null; };
+  // aggregate taker flow of one venue from engine inputs, excluding liquidation fills: {net, gross} in dollars between t0 and t1 (buy minus sell)
+  function takerNet(inputs, venue, t0, t1) {
+    let net = 0, gross = 0, n = 0;
+    for (const r of inputs) { if (r[0] !== "t" || !r[1] || r[1].v !== venue || r[1].liq || !(r[1].t > t0 && r[1].t <= t1) || !(r[1].ntl > 0)) continue; net += r[1].side === "buy" ? r[1].ntl : -r[1].ntl; gross += r[1].ntl; n++; }
+    return {net:Math.round(net), gross:Math.round(gross), n};
+  }
+  // a running total of one venue's taker flow, for many windows over one input list: crowdNetAt(ix, t0, t1) = {net, gross}
+  function crowdIndex(inputs, venue) {
+    const t = [], net = [0], gross = [0];
+    for (const r of inputs) { if (r[0] !== "t" || !r[1] || r[1].v !== venue || r[1].liq || !(r[1].ntl > 0) || !(r[1].t > 0)) continue; t.push(r[1].t); net.push(net[net.length - 1] + (r[1].side === "buy" ? r[1].ntl : -r[1].ntl)); gross.push(gross[gross.length - 1] + r[1].ntl); }
+    return {t, net, gross};
+  }
+  function crowdNetAt(ix, t0, t1) {
+    const up = x => { let lo = 0, hi = ix.t.length; while (lo < hi) { const m = (lo + hi) >> 1; if (ix.t[m] <= x) lo = m + 1; else hi = m; } return lo; }, a = up(t0), b = up(t1);
+    return {net:Math.round(ix.net[b] - ix.net[a]), gross:Math.round(ix.gross[b] - ix.gross[a])};
+  }
+  // opt: px (price in dollars, for the dollar figures), crowdNet (the aggregate taker net over the same window, dollars), winMs, floorUsd (a net move under this is "flat")
+  function whaleFlow(recs, tMs, opt) {
+    opt = opt || {}; const win = opt.winMs || WHALE_WIN_MS, floor = opt.floorUsd == null ? WHALE_FLOOR_USD : opt.floorUsd, ser = opt.series || walletSeries(recs), px = num(opt.px);
+    let n = 0, net = 0, longs = 0, shorts = 0, m = 0, d = 0;
+    for (const w in ser) {
+      const now = walletAt(ser[w], tMs); if (!now) continue;
+      n++; net += now.sz; if (now.sz > 0) longs++; else if (now.sz < 0) shorts++;
+      const was = walletAt(ser[w], tMs - win); if (was) { m++; d += now.sz - was.sz; }
+    }
+    if (!n) return null;
+    const usd = v => px > 0 ? Math.round(v*px) : null, dUsd = usd(d), word = (v, f) => v == null ? null : v >= f ? "buying" : v <= -f ? "selling" : "flat";
+    const whales = m && dUsd != null ? word(dUsd, floor) : null, crowdNet = num(opt.crowdNet), crowd = crowdNet == null ? null : word(crowdNet, floor);
+    return {t:tMs, n, longs, shorts, net:round(net, 3), netUsd:usd(net), matched:m, delta:round(d, 3), deltaUsd:dUsd, whales, crowdNet:crowdNet == null ? null : Math.round(crowdNet), crowd,
+      relation:whales && crowd ? (whales === "flat" || crowd === "flat" ? "one side flat" : whales === crowd ? "same direction" : "opposite directions") : null};
+  }
+  // the words every stepMs from t0 to t1: [{t, w, c}] (whales' change and the crowd's flow over the window ending at t; null where unknown)
+  function whaleSeries(recs, ix, t0, t1, stepMs, opt) {
+    opt = opt || {}; const win = opt.winMs || WHALE_WIN_MS, ser = walletSeries(recs), out = [];
+    for (let t = t0; t <= t1; t += stepMs) {
+      const w = whaleFlow(recs, t, {series:ser, px:opt.px, winMs:win, floorUsd:opt.floorUsd, crowdNet:ix ? crowdNetAt(ix, t - win, t).net : opt.crowdAt ? opt.crowdAt(t - win, t) : null});
+      out.push({t, w:w ? w.whales : null, c:w ? w.crowd : null, rel:w ? w.relation : null});
+    }
+    return out;
+  }
+  const WHALE_FLOOR_USD = 1000000;      // a net move under this is "flat": about the 35th percentile of the whales' 10-minute change and the 20th of the crowd's flow in the first 13 recordings (104 windows)
+
   // tape helpers on arrays of records
   const prune = (recs, nowMs, keepMs) => recs.filter(r => r[2] >= nowMs - (keepMs == null ? TAPE_MS : keepMs));
   const slice = (recs, t0, t1) => recs.filter(r => r[2] >= t0 && r[2] <= t1);
@@ -608,5 +661,5 @@ const COLLECT = (() => {
     for (let i = recs.length - 1; i >= 0; i--) { const b = JSON.stringify(recs[i]).length + 1; if (size + b > lim) break; size += b; out.push(recs[i]); }
     return out.reverse();
   }
-  return {REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, due, calendar, OWNER, EXPECT_MS, ownerOf, tally, ageText, health, FEATURES, FEATURE_INFO, featureSeries, featureMaxAge, context, venueLead, leadText, liqDriven, usdText, wallQuality, marketState, marketStateSeries, STATE_VERSION, EVENT_LABEL, evSpan, eventsNear, eventClock, volLens, lensSeries, gridReturns, LENS_TEXT, deribitCoin, optName, optionsChain, walletTracker, walletPosition, walletChanged, liqFills, predictedFunding, WALLET_TOP, WALLET_REFRESH_MS, MAJORS, venueSubs, venueParse, venueApply, venueRecord, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
+  return {REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, due, calendar, OWNER, EXPECT_MS, ownerOf, tally, ageText, health, FEATURES, FEATURE_INFO, featureSeries, featureMaxAge, context, venueLead, leadText, liqDriven, usdText, wallQuality, marketState, marketStateSeries, STATE_VERSION, EVENT_LABEL, evSpan, eventsNear, eventClock, volLens, lensSeries, gridReturns, LENS_TEXT, walletSeries, takerNet, crowdIndex, crowdNetAt, whaleFlow, whaleSeries, WHALE_FLOOR_USD, deribitCoin, optName, optionsChain, walletTracker, walletPosition, walletChanged, liqFills, predictedFunding, WALLET_TOP, WALLET_REFRESH_MS, MAJORS, venueSubs, venueParse, venueApply, venueRecord, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
 })();

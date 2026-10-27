@@ -147,3 +147,19 @@ Two changes from the draft, found while writing the logic, both stated in the bu
 - Skew: read at the end of all 13 recordings, shifting unusually (1.5 sd and 1 point) in 3.
 - Real 25-delta skew still out (one request per option); its own spec.
 - Engine, episode layer and register untouched.
+
+## F rules (2026-10-26, written before the views; built although the plan advised waiting for more data, at the user's request)
+- **Whales** = the 10 Hyperliquid wallets with the most traded notional in this coin over the last 15 minutes (the collector's own ranking; it favours market makers and bots, there is no public ranking by position size). Their position is the signed size in the coin (negative = short), read every 30 s when it changes and at least every 5 minutes.
+- **Counts at time t** only if the wallet's latest reading is at most 6 minutes old. **Change over the last 10 minutes** is summed only over wallets read at both ends (the followed set rotates; comparing totals would mostly measure the rotation). The dollar figure is the change in coin times the price.
+- **Crowd** = the venue's aggregate taker flow over the same 10 minutes, buy minus sell notional, liquidation fills excluded (as the engine does). From the inputs in a replay; live, from the app's own running Hyperliquid CVD (the same number the Overview shows).
+- **Words** (fixed): a net move of at least $1,000,000 is "buying" / "selling", under that "flat". The floor was chosen from the marginal distribution of the two quantities in the first 13 recordings (104 ten-minute windows; the median absolute whale change was $1.9M, the median absolute crowd flow $3.0M): it is about the 35th percentile of the whales' change and the 20th of the crowd's flow. Relation words: "same direction", "opposite directions", "one side flat".
+- First look, descriptive only (104 windows): whales and crowd in the same direction in 47, opposite in 39, one side flat in 18: no relation visible, and far too few windows to say. Nothing here is a signal.
+- Weaknesses stated up front: the followed wallets are mostly market makers and bots, so a changing net position is often inventory management, not a view; the followed set rotates; a wallet that is a liquidation counterparty shows a position change that is not its choice; the replay needs the HL trade inputs (always in a recording), live needs the app connected.
+- Views: Overview card "Followed wallets"; a two-row "whale" strip (whales over crowd) under the "vol" strip of the Reader timeline, buy / sell tokens for the direction; label field `ctx.wh = {w, c, d}`.
+
+## F built (v085, 2026-10-26)
+- `COLLECT.walletSeries`, `whaleFlow`, `whaleSeries`, `takerNet`, `crowdIndex` / `crowdNetAt` (pure, self-tested). Views: Overview card "Followed wallets (Hyperliquid)" (net position, their 10-minute change over matched wallets, the crowd's taker flow, the relation; coin units when no price is available), a two-row "whales" strip under the "vol" strip of the Reader timeline (top whales, bottom crowd; buy / sell colours, faint = flat, blank = unknown), label field `ctx.wh = {w, c, d}` (whales' word, crowd's word, whales' dollar change).
+- Crowd flow: a replay from the session's inputs (a running total, one pass per session; first open of a big recording takes about a second), live from the Overview's running Hyperliquid CVD. The Overview card always reads live data, also while a replay is open.
+- Real recording (24 Oct 15:19 UTC, 65 minutes): about 12 wallets read at a time, 6 matched over 10 minutes, whales net buying and crowd net buying in the last minutes; the strip shows both rows changing sign over the hour. Descriptive only.
+- Also fixed in this release: the Event clock card (v083) referenced `COLLECT` on the very first frame, before collectors-core.js had loaded, and logged a harmless ReferenceError once at every page start; it is now guarded.
+- Engine, episode layer and register untouched.

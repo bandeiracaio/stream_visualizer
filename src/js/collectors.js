@@ -260,6 +260,46 @@ function colLensStrip(t0, t1) {
   if (CL.lensStrip && CL.lensStrip.key === key) return CL.lensStrip;
   CL.lensStrip = {key, step, rows:src.recs.length ? COLLECT.lensSeries(src.recs, colPricePts(src.replay), a, b, step) : []}; return CL.lensStrip;
 }
+// ---- followed wallets (v085, rules in .scratch/collector-features/spec.md F): the ten biggest Hyperliquid traders' position change against the crowd's taker flow. Display only.
+// The crowd's flow: in a replay from the session's inputs (a running total, built once), live from the app's own running Hyperliquid CVD kept in the Overview history.
+function colCrowdFn(replay) {
+  if (replay) {
+    const k = (RT.session ? RT.session.startedAt : 0) + ":" + (RT.session && RT.session.inputs ? RT.session.inputs.length : 0);
+    if (!CL.crowd || CL.crowd.key !== k) CL.crowd = {key:k, ix:COLLECT.crowdIndex(RT.session && RT.session.inputs || [], "hl")};
+    return (a, b) => COLLECT.crowdNetAt(CL.crowd.ix, a, b).net;
+  }
+  return (a, b) => {
+    const h = typeof OV !== "undefined" ? OV.hist : []; if (!h.length) return null;
+    const near = t => { let best = null, bd = 1e12; for (const x of h) { const d = Math.abs(x.t - t); if (d < bd) { bd = d; best = x; } } return bd <= 15000 ? best : null; };
+    const x0 = near(a), x1 = near(b); return x0 && x1 ? x1.ch - x0.ch : null;
+  };
+}
+function colWhaleBase(src) {      // the wallet series (built once per source), the price and the crowd function
+  const k = (src.replay ? "r" + (RT.session ? RT.session.startedAt : 0) : "l") + ":" + src.recs.length + ":" + (src.recs.length ? src.recs[src.recs.length - 1][2] : 0);
+  if (!CL.whaleSer || CL.whaleSer.key !== k) CL.whaleSer = {key:k, ser:COLLECT.walletSeries(src.recs)};
+  const pts = colPricePts(src.replay), px = pts.length ? pts[pts.length - 1][1] : null;
+  return {ser:CL.whaleSer.ser, px, crowd:colCrowdFn(src.replay)};
+}
+function colWhaleAt(t, src) {
+  src = src || colStateSource(); const b = colWhaleBase(src), c = b.crowd(t - 600000, t);
+  return COLLECT.whaleFlow(src.recs, t, {series:b.ser, px:b.px, crowdNet:c});
+}
+function colWhaleLive() {      // recomputed every 10 s
+  const k = Math.floor(Date.now()/10000); if (CL.whaleNow && CL.whaleNow.k === k) return CL.whaleNow.m;
+  const m = colWhaleAt(Date.now(), {replay:false, recs:[].concat(...Object.values(CL.recent)), coin:cl$("sym").value}); CL.whaleNow = {k, m}; return m;
+}
+function colWhaleFor(ep) {
+  const src = colStateSource(), key = (src.replay ? "r" + (RT.session ? RT.session.startedAt : 0) + ":" + src.recs.length : "l") + "|h|" + ep.id + "|" + ep.tDetected;
+  if (CL.ctx.has(key)) return CL.ctx.get(key);
+  const m = colWhaleAt(ep.tDetected); if (CL.ctx.size > 400) CL.ctx.clear(); CL.ctx.set(key, m); return m;
+}
+function colWhaleStrip(t0, t1) {
+  const src = colStateSource(), step = Math.max(30000, Math.round((t1 - t0)/60/1000)*1000), a = Math.floor(t0/step)*step, b = Math.floor(t1/step)*step;
+  const key = (src.replay ? "r" + (RT.session ? RT.session.startedAt : 0) + ":" + src.recs.length : "l") + "|" + step + "|" + a + "|" + b;
+  if (CL.whaleStrip && CL.whaleStrip.key === key) return CL.whaleStrip;
+  const base = colWhaleBase(src);
+  CL.whaleStrip = {key, step, rows:src.recs.length ? COLLECT.whaleSeries(src.recs, null, a, b, step, {px:base.px, crowdAt:base.crowd}) : []}; return CL.whaleStrip;
+}
 function epCtxBar(ep) {
   const c = colContextFor(ep); if (!c) return "";
   const lead = epLeadBar(c) + epWallBar(ep);
@@ -276,6 +316,7 @@ function colLabelCtx(ep) {
     const v = {}; for (const x of c.items) v[x.f] = [+x.x.toPrecision(7), +x.dev.toPrecision(5)];
     const out = {t:c.t, v, liq:[c.liq.bn, c.liq.hl], st:{v:st.v, s:st.s, i:st.i}};      // st: the market state at detection (rules version, state, letters of the indicators that fired)
     if (c.liqx && (c.liqx.usd || c.liqx.other)) { const q = c.liqx; out.lq = {bn:[q.bn.sell, q.bn.buy], hl:[q.hl.sell, q.hl.buy], x:q.x, other:q.other, tag:q.tag ? 1 : 0}; }      // dollars forced to sell / buy in the 60 s before, by venue
+    const wh = colWhaleFor(ep); if (wh && (wh.whales || wh.crowd)) out.wh = {w:wh.whales, c:wh.crowd, d:wh.deltaUsd};      // followed wallets' change over the last 10 minutes (words, dollars) and the crowd's taker-flow word
     const ol = colLensFor(ep, c); if (ol.ratio != null || ol.skew) out.ol = {r:ol.ratio, w:ol.word, sk:ol.skew ? ol.skew.x : null};      // realized / implied volatility at detection, its word, the option skew (-5% minus +5%, points)
     const ev = colEventsFor(ep); if (ev.length) out.ev = ev.slice(0, 3).map(x => [x.tag, Math.round(x.off/1000)]);      // scheduled events within 10 minutes: [tag, seconds after it (negative: before)]
     if (wq && !wq.none) out.wq = {e:wq.edge, sh:wq.share, x:wq.x, ret:wq.end ? wq.end.ret : null, dist:wq.end ? wq.end.dist : null, v:wq.verdict || null};      // the wall's share of the depth within its edge, depth against usual, what the depth did by the end, the mid's distance from the wall

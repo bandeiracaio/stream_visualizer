@@ -164,7 +164,7 @@ function rtTimeline(s){
     for (const e of list){ let r = ends.findIndex(x => x <= e.tStart); if (r < 0){ r = ends.length; ends.push(0); } ends[r] = e.tEnd || now; rowOf.set(e, r); }
     return {f, list, rows:Math.max(1, ends.length)};
   });
-  const SB = 28;      // the market-state and options-lens strips between the price panel and the lanes
+  const SB = 42;      // the market-state, options-lens and followed-wallets strips between the price panel and the lanes
   const H = T + PH + B + SB + lanes.reduce((a,l) => a + l.rows*(rowH+gap) + laneGap, 0);
   cv.style.height = H + "px";
   const {ctx, w, h} = prep(cv); if (w < 40) return;
@@ -204,6 +204,18 @@ function rtTimeline(s){
       ctx.fillStyle = TH.a("accent", r.w === "above" ? .95 : r.w === "inline" ? .5 : .2); ctx.fillRect(xa, y1, xb-xa+0.5, SH);
     });
   }catch(e){ console.error("lens strip", e); }
+  // followed-wallets strip: top row the ten biggest Hyperliquid traders' net change over the last 10 minutes, bottom row the crowd's taker flow; buying / selling in the buy / sell colours, flat faint, blank unknown
+  try{
+    const ws = typeof colWhaleStrip === "function" ? colWhaleStrip(t0, now) : null, y2 = T+PH+B+28, hh = 4;
+    ctx.fillStyle = TH.dim; ctx.textAlign = "right"; ctx.fillText("whales", L-4, y2+hh+3);
+    const col = v => v === "buying" ? TH.a("buy",.8) : v === "selling" ? TH.a("sell",.8) : v === "flat" ? TH.a("text",.12) : null;
+    if (ws) ws.rows.forEach((r, i) => {
+      const xa = X(Math.max(r.t, t0)), xb = X(Math.min(i+1 < ws.rows.length ? ws.rows[i+1].t : now, now)); if (!(xb > xa)) return;
+      const a = col(r.w), c = col(r.c);
+      if (a){ ctx.fillStyle = a; ctx.fillRect(xa, y2, xb-xa+0.5, hh); }
+      if (c){ ctx.fillStyle = c; ctx.fillRect(xa, y2+hh+1, xb-xa+0.5, hh); }
+    });
+  }catch(e){ console.error("whale strip", e); }
   RT.hits = []; let y = T+PH+B+SB;
   for (const lane of lanes){
     ctx.fillStyle = RT_COLORS[lane.f]; ctx.textAlign = "right"; ctx.fillText(RT_SHORT[lane.f], L-4, y+rowH);
@@ -231,7 +243,7 @@ rt$("tlCv").onclick = e => {
   RT.sel = hit ? hit.ep.id : null; if (hit) epOpen.add(String(hit.ep.id)); RT.last.detail = null; renderReader();
 };
 rt$("tlLegend").innerHTML = Object.keys(RT_COLORS).map(f => `<span><i style="background:${RT_COLORS[f]}"></i>${READER_EPISODES.FAMILY_LABEL[f]}</span>`).join("")
-  + `<span><i style="background:${TH.a("text",.16)}"></i>state: calm</span><span><i style="background:${TH.a("text",.5)}"></i>unsettled</span><span><i style="background:${TH.accent}"></i>crowded</span><span><i style="background:${TH.a("text",.9)}"></i>stressed</span><span><i style="background:${TH.a("accent",.2)}"></i>vol: realized below implied</span><span><i style="background:${TH.a("accent",.5)}"></i>in line</span><span><i style="background:${TH.a("accent",.95)}"></i>above</span><span><i style="background:${TH.buy};border-radius:50%"></i>you agreed</span><span><i style="background:${TH.sell};border-radius:50%"></i>you disagreed</span><span><i style="background:#c792ea"></i>you marked missed</span><span>dark tick = resumed</span>`;
+  + `<span><i style="background:${TH.a("text",.16)}"></i>state: calm</span><span><i style="background:${TH.a("text",.5)}"></i>unsettled</span><span><i style="background:${TH.accent}"></i>crowded</span><span><i style="background:${TH.a("text",.9)}"></i>stressed</span><span><i style="background:${TH.a("accent",.2)}"></i>vol: realized below implied</span><span><i style="background:${TH.a("accent",.5)}"></i>in line</span><span><i style="background:${TH.a("accent",.95)}"></i>above</span><span><i style="background:${TH.a("buy",.8)}"></i>whales / crowd: net buying</span><span><i style="background:${TH.a("sell",.8)}"></i>net selling</span><span><i style="background:${TH.buy};border-radius:50%"></i>you agreed</span><span><i style="background:${TH.sell};border-radius:50%"></i>you disagreed</span><span><i style="background:#c792ea"></i>you marked missed</span><span>dark tick = resumed</span>`;
 
 // ---------- assumption register (measures only; see reader-register.js) ----------
 const rgMsg = t => { rt$("rgMsg").textContent = t; };
