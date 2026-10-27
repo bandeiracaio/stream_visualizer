@@ -23,7 +23,7 @@ option{background:var(--panel2);color:var(--text)}
 button{cursor:pointer}button.primary{background:var(--accent);color:var(--ink);border-color:var(--accent);font-weight:600}button.primary:hover:not(:disabled){color:var(--ink);opacity:.9}
 button.on{border-color:var(--accent);color:var(--accent)}
 #arHdr.on{border-color:var(--warn);color:var(--warn)}#arHdrMsg{max-width:100%}#arHdrMsg:empty{display:none}
-.stat{font-family:var(--mono);color:var(--dim);font-size:12px}.stat b{color:var(--text);font-weight:600}
+.stat{font-family:var(--mono);color:var(--dim);font-size:12px}.stat b{color:var(--text);font-weight:600}#hlList .stat{overflow-wrap:anywhere}
 nav{display:flex;gap:4px;overflow-x:auto;width:100%;padding-top:2px;scrollbar-width:none}
 nav button{flex:none;padding:4px 10px;font-size:12px}
 nav button.act{color:var(--accent);border-color:var(--accent);font-weight:600}
