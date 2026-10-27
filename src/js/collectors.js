@@ -227,10 +227,19 @@ function colStateStrip(t0, t1) {
   if (CL.strip && CL.strip.key === key) return CL.strip;
   CL.strip = {key, step, rows:src.recs.length ? COLLECT.marketStateSeries(src.recs, a, b, step, {coin:src.coin}) : []}; return CL.strip;
 }
+// scheduled events within 10 minutes of detection (v083): funding, options expiry, US stock open / close; by rule, macro releases are not known
+function colEventsFor(ep) {
+  const key = "e|" + ep.tDetected; if (CL.ctx.has(key)) return CL.ctx.get(key);
+  const e = COLLECT.eventsNear(ep.tDetected, 600000); if (CL.ctx.size > 400) CL.ctx.clear(); CL.ctx.set(key, e); return e;
+}
+function epEventChip(ep) {
+  const e = colEventsFor(ep); if (!e.length) return "";
+  return `<span class="chip" title="Scheduled events within 10 minutes of detection, by rule (funding, options expiry, US stock open and close). Macro releases (CPI, FOMC, jobs) are not known to the app.">${e.slice(0, 3).map(x => (Math.abs(x.off) < 60000 ? "at " : COLLECT.evSpan(x.off) + (x.off >= 0 ? " after " : " before ")) + x.label).join(" · ")}</span>`;
+}
 function epCtxBar(ep) {
   const c = colContextFor(ep); if (!c) return "";
   const lead = epLeadBar(c) + epWallBar(ep);
-  const head = `<span class="stat" title="Each reading against its own mean of the previous 30 minutes, in standard deviations; only the unusual ones (1.5 or more) are shown">collector context at detection</span>` + epStateChip(ep, c);
+  const head = `<span class="stat" title="Each reading against its own mean of the previous 30 minutes, in standard deviations; only the unusual ones (1.5 or more) are shown">collector context at detection</span>` + epStateChip(ep, c) + epEventChip(ep);
   if (!c.items.length) return `<div class="epctx">${head}<span class="stat">none at that time (the collectors were off, or the data does not reach back that far)</span></div>${lead}`;
   const chips = c.items.filter(x => x.unusual).slice(0, 6).map(x => `<span class="chip ${x.z > 0 ? "hi" : "lo"}" title="${x.label}: ${+x.x.toPrecision(6)} now, ${x.text} from its 30-minute mean (${x.z >= 99 ? "it had been constant" : x.z + " sd"})">${x.label} ${x.z > 0 ? "▲" : "▼"} ${x.text}</span>`).join("");
   const liq = epLiqChip(c);
@@ -239,10 +248,11 @@ function epCtxBar(ep) {
 // the compact snapshot stored with a label: {t, v:{feature:[value, deviation]}, liq:[binance, hyperliquid]}
 function colLabelCtx(ep) {
   try {
-    const c = colContextFor(ep), wq = colWallFor(ep); if (!c) return undefined; const st = colStateFor(ep, c); if (!(st.s !== "unknown" || c.items.length || c.lead && !c.lead.none || c.liqx && (c.liqx.usd || c.liqx.other) || (wq && !wq.none))) return undefined;
+    const c = colContextFor(ep), wq = colWallFor(ep); if (!c) return undefined; const st = colStateFor(ep, c); if (!(st.s !== "unknown" || colEventsFor(ep).length || c.items.length || c.lead && !c.lead.none || c.liqx && (c.liqx.usd || c.liqx.other) || (wq && !wq.none))) return undefined;
     const v = {}; for (const x of c.items) v[x.f] = [+x.x.toPrecision(7), +x.dev.toPrecision(5)];
     const out = {t:c.t, v, liq:[c.liq.bn, c.liq.hl], st:{v:st.v, s:st.s, i:st.i}};      // st: the market state at detection (rules version, state, letters of the indicators that fired)
     if (c.liqx && (c.liqx.usd || c.liqx.other)) { const q = c.liqx; out.lq = {bn:[q.bn.sell, q.bn.buy], hl:[q.hl.sell, q.hl.buy], x:q.x, other:q.other, tag:q.tag ? 1 : 0}; }      // dollars forced to sell / buy in the 60 s before, by venue
+    const ev = colEventsFor(ep); if (ev.length) out.ev = ev.slice(0, 3).map(x => [x.tag, Math.round(x.off/1000)]);      // scheduled events within 10 minutes: [tag, seconds after it (negative: before)]
     if (wq && !wq.none) out.wq = {e:wq.edge, sh:wq.share, x:wq.x, ret:wq.end ? wq.end.ret : null, dist:wq.end ? wq.end.dist : null, v:wq.verdict || null};      // the wall's share of the depth within its edge, depth against usual, what the depth did by the end, the mid's distance from the wall
     if (c.lead && !c.lead.none) { const lv = {}; for (const x of c.lead.items) lv[x.src] = x.lead == null ? [null, x.move] : [x.lead, x.move]; out.lead = {ref:c.lead.ref, move:c.lead.move, v:lv}; }      // v: venue -> [seconds it led the reference (negative: lagged; null: no timing), its move in bps]
     return out;

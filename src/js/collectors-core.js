@@ -543,6 +543,23 @@ const COLLECT = (() => {
   // the state every stepMs from t0 to t1 (for the strip under the Review timeline)
   function marketStateSeries(recs, t0, t1, stepMs, opt) { const out = []; for (let t = t0; t <= t1; t += stepMs) { const m = marketState(recs, t, opt); out.push({t, s:m.s, i:m.i}); } return out; }
 
+  // ---- event clock (v083): the scheduled moments around now, all from the calendar rule above (no network). Funding (00 / 08 / 16 UTC), options expiry (08:00 UTC; the level is
+  // daily, weekly, monthly or quarterly), US stock open and close. Macro releases (CPI, FOMC, jobs) follow no rule and are NOT here.
+  const EVENT_LABEL = {funding:"funding", "optExp:daily":"options expiry (daily)", "optExp:weekly":"options expiry (weekly)", "optExp:monthly":"options expiry (monthly)", "optExp:quarterly":"options expiry (quarterly)", usOpen:"US stock open", usClose:"US stock close"};
+  function evSpan(ms) { const m = Math.round(Math.abs(ms)/60000); return m < 90 ? m + " min" : m < 2880 ? Math.floor(m/60) + " h " + (m % 60) + " min" : Math.floor(m/1440) + " d " + Math.floor(m % 1440/60) + " h"; }
+  // events within winMs either side of tMs: [{tag, label, t, off}] with off = tMs - t (positive: it was that long ago), nearest first
+  function eventsNear(tMs, winMs) {
+    const out = [];
+    for (const c of calendar(tMs - winMs - 1, tMs + winMs)) for (const tag of c.tags) if (EVENT_LABEL[tag]) out.push({tag, label:EVENT_LABEL[tag], t:c.t, off:tMs - c.t});
+    return out.sort((x, y) => Math.abs(x.off) - Math.abs(y.off) || (x.tag < y.tag ? -1 : 1));
+  }
+  // the next of each kind after tMs: {funding, expiry (nearest, any level), bigger (nearest weekly or larger, null when `expiry` already is one), stocks (next open or close)}; each {tag, label, t, in}
+  function eventClock(tMs) {
+    const next = (pred, spanMs) => { for (const c of calendar(tMs, tMs + spanMs)) for (const tag of c.tags) if (pred(tag)) return {tag, label:EVENT_LABEL[tag], t:c.t, in:c.t - tMs}; return null; };
+    const expiry = next(g => g.indexOf("optExp:") === 0, 3*86400000), big = g => g === "optExp:weekly" || g === "optExp:monthly" || g === "optExp:quarterly";
+    return {t:tMs, funding:next(g => g === "funding", 9*3600000), expiry, bigger:expiry && big(expiry.tag) ? null : next(big, 100*86400000), stocks:next(g => g === "usOpen" || g === "usClose", 5*86400000)};
+  }
+
   // tape helpers on arrays of records
   const prune = (recs, nowMs, keepMs) => recs.filter(r => r[2] >= nowMs - (keepMs == null ? TAPE_MS : keepMs));
   const slice = (recs, t0, t1) => recs.filter(r => r[2] >= t0 && r[2] <= t1);
@@ -552,5 +569,5 @@ const COLLECT = (() => {
     for (let i = recs.length - 1; i >= 0; i--) { const b = JSON.stringify(recs[i]).length + 1; if (size + b > lim) break; size += b; out.push(recs[i]); }
     return out.reverse();
   }
-  return {REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, due, calendar, OWNER, EXPECT_MS, ownerOf, tally, ageText, health, FEATURES, FEATURE_INFO, featureSeries, featureMaxAge, context, venueLead, leadText, liqDriven, usdText, wallQuality, marketState, marketStateSeries, STATE_VERSION, deribitCoin, optName, optionsChain, walletTracker, walletPosition, walletChanged, liqFills, predictedFunding, WALLET_TOP, WALLET_REFRESH_MS, MAJORS, venueSubs, venueParse, venueApply, venueRecord, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
+  return {REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, due, calendar, OWNER, EXPECT_MS, ownerOf, tally, ageText, health, FEATURES, FEATURE_INFO, featureSeries, featureMaxAge, context, venueLead, leadText, liqDriven, usdText, wallQuality, marketState, marketStateSeries, STATE_VERSION, EVENT_LABEL, evSpan, eventsNear, eventClock, deribitCoin, optName, optionsChain, walletTracker, walletPosition, walletChanged, liqFills, predictedFunding, WALLET_TOP, WALLET_REFRESH_MS, MAJORS, venueSubs, venueParse, venueApply, venueRecord, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
 })();

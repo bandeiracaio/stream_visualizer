@@ -276,6 +276,16 @@ const READER_SELFTEST=(()=>{
       &&early.s!=="stressed"&&series.length===4&&series[0].t===T+36*60000&&series[3].s==="stressed"&&series[0].s==="calm",
       detail:J({all:[all.s,all.i],two:[two.s,two.i],crowd:[crowd.s,crowd.i],one:[one.s,one.i],oneL:[oneL.s,oneL.i],calm:[calm.s,calm.n],few:[few.s,few.n,few.ind],none:none.s,early:early.s,series:series.map(x=>x.s+x.i)})};
   });
+  add("collectors: event clock: next funding, expiry, bigger expiry and US stock event by rule (daylight saving followed); events near a moment with their offset; macro releases are not invented",E=>{
+    const J=JSON.stringify,U=Date.UTC,mon=U(2026,9,26,6,30),c=COLLECT.eventClock(mon);      // Monday 26 Oct 2026, 06:30 UTC, New York still on summer time
+    const n1=COLLECT.eventsNear(U(2026,9,26,8,3),600000),n2=COLLECT.eventsNear(U(2026,9,26,8,20),600000),n3=COLLECT.eventsNear(U(2026,9,26,13,35),600000),tue=COLLECT.eventClock(U(2026,10,3,6,0)),sat=COLLECT.eventClock(U(2026,9,24,12,0)),fri=COLLECT.eventClock(U(2026,9,30,7,0)),q=COLLECT.eventClock(U(2026,11,20,12,0));
+    const tags=a=>a.map(x=>x.tag+":"+x.off/1000).join(",");
+    return{ok:c.funding.t===U(2026,9,26,8)&&c.funding.in===90*60000&&c.expiry.tag==="optExp:daily"&&c.expiry.t===U(2026,9,26,8)&&c.bigger.tag==="optExp:monthly"&&c.bigger.t===U(2026,9,30,8)
+      &&c.stocks.tag==="usOpen"&&c.stocks.t===U(2026,9,26,13,30)&&tue.stocks.t===U(2026,10,3,14,30)&&sat.stocks.tag==="usOpen"&&sat.stocks.t===U(2026,9,26,13,30)
+      &&tags(n1)==="funding:180,optExp:daily:180"&&n2.length===0&&tags(n3)==="usOpen:300"&&fri.expiry.tag==="optExp:monthly"&&fri.bigger===null&&q.bigger.tag==="optExp:quarterly"&&q.bigger.t===U(2026,11,25,8)
+      &&COLLECT.evSpan(90*60000)==="1 h 30 min"&&COLLECT.evSpan(45*60000)==="45 min"&&COLLECT.evSpan(3*86400000+5*3600000)==="3 d 5 h"&&!JSON.stringify(c).match(/cpi|fomc/i),
+      detail:J({c:[c.funding.in,c.expiry.tag,c.bigger&&c.bigger.tag,c.stocks.tag,c.stocks.t-mon],n1:tags(n1),n3:tags(n3),tue:tue.stocks.t-U(2026,10,3,6),sat:sat.stocks.t,fri:fri.expiry.tag,q:q.bigger&&q.bigger.tag})};
+  });
   add("collectors: records among the inputs change no detection and no session quality",E=>{
     const e=E.create();e.startRecording();const a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:21,params:()=>burstSell});sim(e,{t0:b.t,mid0:b.mid,seconds:40,seed:22});
     const inputs=e.stopRecording(),mixed=[];inputs.forEach((r,i)=>{mixed.push(r);if(i%40===0)mixed.push(COLLECT.rec("feeds",T0+i,{src:"page",feeds:{bn:{n:1}}}));});

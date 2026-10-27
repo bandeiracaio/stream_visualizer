@@ -82,6 +82,16 @@ function renderOverview(){
     }
   }catch(e){ console.error("overview state", e); }
 
+  // Event clock: the next scheduled moments by rule (COLLECT.eventClock); display only
+  try{
+    const now = Date.now(); if (!OV.clk || now-OV.clk.at > 60000 || [OV.clk.c.funding, OV.clk.c.expiry, OV.clk.c.stocks].some(e => e && e.t <= now)) OV.clk = {at:now, c:COLLECT.eventClock(now)};
+    const c = OV.clk.c, utc = t => new Date(t).toISOString().slice(5,16).replace("T"," ")+" UTC";
+    const tile = (k, e) => e ? `<div class="metric"><span>${k}</span><b>${COLLECT.evSpan(e.t-now)}</b><small>${e.label} · ${utc(e.t)}</small></div>` : "";
+    const near = COLLECT.eventsNear(now, 600000), win = near.length ? `<div class="note">Inside an event window now: ${near.map(x => (Math.abs(x.off) < 60000 ? "at " : COLLECT.evSpan(x.off)+(x.off >= 0 ? " after " : " before ")) + x.label).join(" · ")}.</div>` : "";
+    const html = `<div class="metrics">${tile("next funding", c.funding)}${tile("next options expiry", c.expiry)}${tile("bigger expiry", c.bigger)}${tile("US stocks", c.stocks)}</div>${win}<div class="note">Scheduled moments only, by rule. Macro releases (CPI, FOMC, jobs) are not in this clock. Times in UTC.</div>`;
+    const el = ov$("ovEvents"); if (el.dataset.h !== html){ el.dataset.h = html; el.innerHTML = html; }
+  }catch(e){ console.error("overview events", e); }
+
   // Reader: the strongest active episodes, in plain language
   const act = READER.activeEpisodes().sort((x,y)=>y.intensity-x.intensity).slice(0,3);
   const lastEnded = READER.episodes.filter(e=>e.stage==="ended").slice(-1)[0];
