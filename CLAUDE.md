@@ -16,7 +16,7 @@ Single-context: one `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/age
 
 The app ships as ONE self-contained HTML file (must run offline-capable from a phone or PC, no external assets). Source lives in `src/` (`index.html` with `<!--@include path-->` markers, `styles.css`, `js/*.js`). Never edit the built HTML by hand.
 
-- `node build.mjs` runs the Reader self-test, then writes `dist/stream-visualizer.html` (dev build).
+- `node build.mjs` runs the Reader self-test, compiles every included `.js` file (a syntax error in a page file aborts the build; the self-test alone does not parse them), then writes `dist/stream-visualizer.html` (dev build).
 - `node build.mjs --release` writes the next `stream-visualizer_vNNN.html` in the repo root (never overwrites an existing version). Release after each finished step so the user always has an up-to-date single file.
 - Publishing: the repo is public and `.github/workflows/pages.yml` serves the newest `stream-visualizer_vNNN.html` in the repo root as the GitHub Pages site (https://bandeiracaio.github.io/stream_visualizer/) on every push to `main`. So after `--release`, commit and push; unreleased `src/` work never goes live. Pages caches for about 10 minutes, so a phone may need a reload to see a new version.
 - Line endings are mixed: `app.js`, `reader-episodes.js`, `reader-register.js`, `reader-tools.js` are CRLF, the rest LF. Edit without converting (Python `open(..., newline="")`), then check `git diff --stat`: a whole-file diff means the endings changed.

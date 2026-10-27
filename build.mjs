@@ -2,7 +2,7 @@
 //   node build.mjs            -> dist/stream-visualizer.html   (dev build)
 //   node build.mjs --release  -> stream-visualizer_vNNN.html   (next free version, never overwrites)
 //   node build.mjs --out FILE -> FILE
-// The Reader self-test runs first; a failing scenario aborts the build.
+// The Reader self-test runs first; a failing scenario aborts the build. Every included .js file must also compile (a syntax error aborts it).
 import fs from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
@@ -20,12 +20,19 @@ function selfTest() {
   if (bad.length) { console.error(`\n${bad.length}/${results.length} self-test scenarios failed; build aborted.`); process.exit(1); }
 }
 
+// The self-test only runs the pure files, so a syntax error in a page file (app.js, a view, a worker source) would pass it and break the page. Compile each included script (not run) to catch that.
+function syntaxCheck(name, body) {
+  try { new vm.Script(body, { filename: "src/" + name }); }
+  catch (e) { console.error("\nsyntax error in src/" + name + ": " + e.message + "\n" + (e.stack || "").split("\n").slice(0, 4).join("\n") + "\nbuild aborted."); process.exit(1); }
+}
+
 function assemble() {
   return read("index.html").split("\n").map(line => {
     const m = line.match(/^<!--@include (\S+)-->$/);
     if (!m) return line;
     const body = read(m[1]);
     if (/<\/script/i.test(body)) throw new Error(`${m[1]} contains "</script", which would end the inline script early`);
+    if (m[1].endsWith(".js")) syntaxCheck(m[1], body);
     return body;
   }).join("\n");
 }
