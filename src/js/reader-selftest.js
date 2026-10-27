@@ -973,7 +973,7 @@ const READER_SELFTEST=(()=>{
     run(180,2.5);const v=A.vol(h,cfg),wouldTrigger=v.fast>=cfg.trigSigma||v.ratio>=1.8&&v.fast>=.4,blocked=ev.length===n1&&st.mode==="waiting";   // wild again 3 minutes later, inside the cooldown
     run(600,2.5);const second=ev.filter(x=>x.a==="start")[1];                  // still wild once the cooldown is over
     const none=A.step({mode:"waiting"},{ready:true,ratio:3,fast:2},T0,cfg).action==="start";   // a state with no cooldown starts at once
-    return{ok:!!stop&&n1===2&&wouldTrigger&&blocked&&!!second&&second.t>=stop.t+600000&&none&&A.afterStop(T0,{}).until===T0+600000,detail:JSON.stringify({n1,wouldTrigger,blocked,second:second&&(second.t-stop.t)/1000,none})};
+    return{ok:!!stop&&n1===2&&wouldTrigger&&blocked&&!!second&&second.t>=stop.t+600000&&none&&A.afterStop(T0,{}).until===T0+180000&&A.afterStop(T0,{},"calm").until===T0+180000&&A.afterStop(T0,{},"max").until===T0&&A.step(A.afterStop(T0,{},"max"),{ready:true,ratio:3,fast:2},T0,{}).action==="start"&&A.step(A.afterStop(T0,{},"calm"),{ready:true,ratio:3,fast:2},T0+60000,{}).why==="cooldown",detail:JSON.stringify({n1,wouldTrigger,blocked,second:second&&(second.t-stop.t)/1000,none})};
   });
   add("status: auto-record shows the cooldown after a recording and how many it has made",E=>{
     const base={connected:false,paused:false,online:true,venues:{},rec:{on:false},kept:0},t=l=>l.map(c=>c.text).join(" | ");

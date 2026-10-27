@@ -5,13 +5,13 @@
 const AR = {on:false, ws:null, gen:0, h:null, st:null, cfg:null, timer:null, lock:null, byUs:false, t0:0, lastMsg:0, runs:0, drops:[], worker:null, volAt:0, unlock:null, v:null, pre:null, preMeta:null};
 const ar$ = id => document.getElementById(id);
 const AR_FIELDS = {arTrigRatio:"trigRatio", arTrigSigma:"trigSigma", arExitRatio:"exitRatio", arExitSigma:"exitSigma", arCalmMin:"calmMin", arMaxMin:"maxMin", arCooldown:"cooldownMin", arPreMin:"preMin"};
-const arCfgFromUi = () => { const c = {}; for (const id in AR_FIELDS){ const v = +ar$(id).value; if (v > 0) c[AR_FIELDS[id]] = v; } c.rearm = ar$("arRearm").checked; c.epTrig = ar$("arEpTrig").checked; c.colTrig = ar$("arColTrig").checked; return Object.assign({}, AUTOREC.DEFAULTS, c); };
+const arCfgFromUi = () => { const c = {}; for (const id in AR_FIELDS){ const v = +ar$(id).value; if (v > 0) c[AR_FIELDS[id]] = v; } c.v = 2; c.rearm = ar$("arRearm").checked; c.epTrig = ar$("arEpTrig").checked; c.colTrig = ar$("arColTrig").checked; return Object.assign({}, AUTOREC.DEFAULTS, c); };
 const arMsg = t => { ar$("arMsg").textContent = t; };
 const arDur = ms => { const m = Math.floor(ms/60000); return ms < 60000 ? Math.round(ms/1000) + " s" : m >= 60 ? Math.floor(m/60) + " h " + (m%60) + " min" : m + " min"; };
 
 (function arInit() {
   const saved = store.get("ar.cfg", {});
-  for (const id in AR_FIELDS){ const k = AR_FIELDS[id]; ar$(id).value = saved && saved[k] > 0 ? saved[k] : AUTOREC.DEFAULTS[k]; ar$(id).onchange = () => store.set("ar.cfg", arCfgFromUi()); }
+  for (const id in AR_FIELDS){ const k = AR_FIELDS[id]; ar$(id).value = saved && saved[k] > 0 && !(k === "cooldownMin" && saved.v !== 2) ? saved[k] : AUTOREC.DEFAULTS[k]; ar$(id).onchange = () => store.set("ar.cfg", arCfgFromUi()); }      // the cooldown default changed from 10 to 3 minutes (v090): a value saved before that is dropped once
   ar$("arRearm").checked = !saved || saved.rearm !== false; ar$("arRearm").onchange = () => store.set("ar.cfg", arCfgFromUi());
   ar$("arEpTrig").checked = !saved || saved.epTrig !== false; ar$("arEpTrig").onchange = () => store.set("ar.cfg", arCfgFromUi());
   ar$("arColTrig").checked = !saved || saved.colTrig !== false; ar$("arColTrig").onchange = () => store.set("ar.cfg", arCfgFromUi());
@@ -125,8 +125,8 @@ function arStop(why) {
   const saved = `${mins} recorded and saved: downloaded, and kept on this device under Saved recordings (Share sends it to mail or Drive).`, how = why === "calm" ? "calm again" : "time limit";
   AR.runs++;
   if (!AR.cfg.rearm || AR.runs >= AR.cfg.maxRuns) return arFinish(`Done (${how}), ${saved}${AR.cfg.rearm ? ` That was recording ${AR.runs} of at most ${AR.cfg.maxRuns} per arming, so it is off now.` : ""}`);
-  AR.st = AUTOREC.afterStop(Date.now(), AR.cfg); arRoll();      // stay armed: the price stream and its history keep running (no new 15 minutes to learn) and so do the feeds, which buffer the lead-in of the next one
-  arMsg(`Recording ${AR.runs} done (${how}), ${saved} Still armed: it can start again after a ${AR.cfg.cooldownMin} minute cooldown.`); arTick();
+  AR.st = AUTOREC.afterStop(Date.now(), AR.cfg, why); arRoll();      // stay armed: the price stream and its history keep running (no new 15 minutes to learn) and so do the feeds, which buffer the lead-in of the next one
+  arMsg(`Recording ${AR.runs} done (${how}), ${saved} Still armed: it can start again ${why === "max" ? "at once (the market may still be wild)" : `after a ${AR.cfg.cooldownMin} minute cooldown`}.`); arTick();
 }
 function arFinish(msg) {
   AR.on = false; AR.gen++; clearInterval(AR.timer); AR.timer = null;

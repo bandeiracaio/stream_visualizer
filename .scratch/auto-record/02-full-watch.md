@@ -1,6 +1,6 @@
 # Auto-record, full watch (decided 2026-10-26)
 
-Status: steps 1-2 done (v087, v088); step 3 built (v089); step 4 not started.
+Status: all four steps built (v087-v090).
 
 ## Why
 The first Arm (01) watches only the Binance mark price volatility with one socket. Problems: it starts late (5 minutes of movement must
@@ -40,3 +40,8 @@ forced flow), the stop is a calm timer that can cut an aftermath, and the 10 min
 - The venue gap alone does not trigger (its rule is 1.5 sd of the last 30 minutes, which noise reaches often). Funding and open interest do not trigger either: they are a slow regime, not an event, and would keep it recording for hours.
 - A recording does not count as calm while `ep.col` holds; forced flow lasts at most 5 minutes after the last liquidation, maxMin still caps it.
 - Needs the collectors' records in memory (`CL.recent`, filled while armed by the always-on worker and the page); with none, the state reads unknown and nothing triggers.
+
+## Step 4 details (v090)
+- Default cooldown 10 -> 3 minutes. A stop at the time limit (`max`) has no cooldown: the market may still be wild, so the next trigger can start at once (still bounded by maxRuns, 8 per arming). A calm stop already means 5 quiet minutes with no episode and no forced flow, so the short cooldown only keeps a flickering trigger from making tiny files.
+- A cooldown saved before v090 (10) is dropped once (saved settings now carry `v: 2`).
+- Known gap: after a stop the lead-in buffer starts empty, so a trigger inside the cooldown or soon after has a shorter lead-in than `preMin` (the earlier minutes are in the file just saved).
