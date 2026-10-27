@@ -121,7 +121,8 @@ const READER_ENGINE = (() => {
     Object.assign(api,{formingEpisodes:()=>eps.forming(now),episodeGroups:()=>eps.groups(),activeEpisodes:()=>eps.active(),subscribeEpisodes:eps.subscribe,setFamily:eps.setFamily,closeEpisodes:t=>eps.closeAll(t==null?now:t,"closed")});
     Object.assign(dbg,{isCalibrated,stat:(vn,k)=>stat(venues[vn],k),robustZ,sigmaBps,emit,walletEvidence,typicalDepth});
     Object.assign(api,{onTrade,onQuote,onSweep,onBook,advance,windowMs,horizon,state,setSensitivity,setDetector});
-    Object.assign(api,{startRecording:o=>{rec=[];recQ={};recQuoteMs=(o&&o.quoteMs)||0;},stopRecording:()=>{const r=rec||[];rec=null;return r;},recording:()=>({on:!!rec,n:rec?rec.length:0}),priceHistory:vn=>venues[vn]?venues[vn].pxHist:[]});
+    Object.assign(api,{startRecording:o=>{rec=[];recQ={};recQuoteMs=(o&&o.quoteMs)||0;},stopRecording:()=>{const r=rec||[];rec=null;return r;},recording:()=>({on:!!rec,n:rec?rec.length:0}),priceHistory:vn=>venues[vn]?venues[vn].pxHist:[],
+      trimRecording:t=>{if(!rec)return 0;let i=0;for(;i<rec.length;i++){const r=rec[i],k=r[0],x=k==="t"?(r[1]&&r[1].t):k==="a"?r[1]:k==="x"?null:r[2];if(x!=null&&x>=t)break;}if(i)rec.splice(0,i);return i;}});
     return api;
   }
   function feed(e,inputs,i0,i1){for(let i=i0;i<i1&&i<inputs.length;i++){const r=inputs[i];switch(r[0]){case"t":e.onTrade(r[1]);break;case"q":e.onQuote(r[1],r[2],r[3],r[4]);break;case"b":e.onBook(r[1],r[2],r[3],r[4]);break;case"s":e.onSweep(r[1],r[2],r[3],r[4],r[5]);break;case"a":e.advance(r[1]);break;case"x":e.reset();break;}}}

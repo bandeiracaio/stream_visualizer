@@ -314,6 +314,12 @@ const READER_SELFTEST=(()=>{
       &&tk.net===-2e6+2e6-0&&tk.gross===6e6&&tk.n===3&&ca.net===tk.net&&ca.gross===tk.gross&&cb.net===-1e6&&ser.length===3&&ser[2].w==="buying"&&ser[2].c==="flat"&&ser[0].w===null,
       detail:J({w,flatW:[flatW.whales,flatW.crowd],noPx:[noPx.whales,noPx.crowd],tk,ca,cb,ser:ser.map(x=>x.w+"/"+x.c)})};
   });
+  add("recording: trimming drops the inputs older than the cutoff and keeps the rest in order (a rolling lead-in)",E=>{
+    const e=E.create();e.startRecording();const a=calm(e,200),cut=a.t-60000,n0=e.recording().n,drop=e.trimRecording(cut),n1=e.recording().n,again=e.trimRecording(cut);
+    const r=e.stopRecording(),tm=x=>x[0]==="t"?x[1]&&x[1].t:x[0]==="a"?x[1]:x[0]==="x"?null:x[2],ts=r.map(tm).filter(x=>x!=null);
+    const none=E.create().trimRecording(cut);
+    return{ok:drop>0&&n1===n0-drop&&again===0&&ts.length>0&&Math.min(...ts)>=cut&&none===0&&E.replayEngine(r).events!=null,detail:`${n0} inputs, ${drop} dropped, ${n1} kept`};
+  });
   add("collectors: records among the inputs change no detection and no session quality",E=>{
     const e=E.create();e.startRecording();const a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:21,params:()=>burstSell});sim(e,{t0:b.t,mid0:b.mid,seconds:40,seed:22});
     const inputs=e.stopRecording(),mixed=[];inputs.forEach((r,i)=>{mixed.push(r);if(i%40===0)mixed.push(COLLECT.rec("feeds",T0+i,{src:"page",feeds:{bn:{n:1}}}));});

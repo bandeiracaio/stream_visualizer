@@ -4,7 +4,7 @@
 // has been calm long enough (or the time limit hits) it stops, saves the file, and disconnects again if it was the one who connected.
 const AR = {on:false, ws:null, gen:0, h:null, st:null, cfg:null, timer:null, lock:null, byUs:false, t0:0, lastMsg:0, runs:0, drops:[], worker:null, volAt:0, unlock:null, v:null, pre:null, preMeta:null};
 const ar$ = id => document.getElementById(id);
-const AR_FIELDS = {arTrigRatio:"trigRatio", arTrigSigma:"trigSigma", arExitRatio:"exitRatio", arExitSigma:"exitSigma", arCalmMin:"calmMin", arMaxMin:"maxMin", arCooldown:"cooldownMin"};
+const AR_FIELDS = {arTrigRatio:"trigRatio", arTrigSigma:"trigSigma", arExitRatio:"exitRatio", arExitSigma:"exitSigma", arCalmMin:"calmMin", arMaxMin:"maxMin", arCooldown:"cooldownMin", arPreMin:"preMin"};
 const arCfgFromUi = () => { const c = {}; for (const id in AR_FIELDS){ const v = +ar$(id).value; if (v > 0) c[AR_FIELDS[id]] = v; } c.rearm = ar$("arRearm").checked; return Object.assign({}, AUTOREC.DEFAULTS, c); };
 const arMsg = t => { ar$("arMsg").textContent = t; };
 const arDur = ms => { const m = Math.floor(ms/60000); return ms < 60000 ? Math.round(ms/1000) + " s" : m >= 60 ? Math.floor(m/60) + " h " + (m%60) + " min" : m + " min"; };
@@ -58,11 +58,12 @@ async function arLock() { try { if (navigator.wakeLock && !AR.lock) { AR.lock = 
 
 function arToggle() {
   if (AR.on) return arFinish(AR.st.mode === "recording" ? "Disarmed. The recording and the connection keep running: stop them by hand (Stop recording, then Save session)." : "Disarmed.");
-  if (connected){ arMsg("Disconnect first (the Disconnect button at the top): while it waits the app should listen to one stream only."); return; }
+  if (RT.rec){ arMsg("A recording is running: stop it first (Stop recording), then Arm."); return; }
   AR.cfg = arCfgFromUi(); store.set("ar.cfg", AR.cfg);
-  AR.on = true; AR.gen++; AR.h = AUTOREC.createHistory(); AR.st = {mode:"waiting"}; AR.byUs = false; AR.t0 = Date.now(); AR.runs = 0; AR.drops = [];
-  arStartFeed(); arKeepAlive(); arLock(); AR.timer = setInterval(arTick, 5000);
-  arLabels(); arMsg("Armed. It needs 15 minutes of prices to know what a normal hour looks like before it can judge."); arTick();
+  AR.on = true; AR.gen++; AR.h = AUTOREC.createHistory(); AR.st = {mode:"waiting"}; AR.byUs = !connected; AR.t0 = Date.now(); AR.runs = 0; AR.drops = [];
+  if (!connected) $("go").click();      // full watch: the feeds and the Reader engine run while armed, with a rolling lead-in of the real inputs
+  arRoll(); arStartFeed(); arKeepAlive(); arLock(); AR.timer = setInterval(arTick, 5000);
+  arLabels(); arMsg(`Armed (full watch: the feeds run and the last ${AR.cfg.preMin} minutes of inputs are kept, so a recording starts with its lead-in). It needs 15 minutes of prices to know what a normal hour looks like before it can judge.`); arTick();
 }
 function arTick() {
   if (!AR.on) return;
@@ -72,6 +73,8 @@ function arTick() {
     if (AR.ws && now - AR.lastMsg > 15000) try { AR.ws.close(); } catch {}     // a socket that went silent without closing: close it so onclose reopens it
     v = AR.v = AUTOREC.vol(AR.h, AR.cfg, now);      // AR.v is read by the header status (status-bar.js)
   }
+  if (AR.st.mode === "waiting" && !connected) return arFinish("You disconnected, so auto-record is off.");
+  if (AR.st.mode === "waiting") arRoll();
   if (AR.st.mode === "recording" && !RT.rec){
     if (AR.byUs && connected) $("go").click();
     return arFinish("The recording stopped on its own (by hand or at its input limit), so auto-record is off. The session is loaded: use Save session.");
@@ -80,12 +83,18 @@ function arTick() {
   if (r.action === "start") arStart(r.why, v); else if (r.action === "stop") arStop(r.why);
   if (AR.on) arStatus(v, now);
 }
+// The rolling lead-in: the engine's own input recording, trimmed to the last preMin minutes every tick. At a start it becomes the recording.
+function arRoll() {
+  if (RT.rec) return;
+  if (!AR.roll || !READER.recording().on){ READER.startRecording({quoteMs:100}); AR.roll = true; AR.leadFrom = Date.now(); }
+  READER.trimRecording(Date.now() - AR.cfg.preMin*60000); AR.leadMs = Math.min(AR.cfg.preMin*60000, Date.now() - AR.leadFrom);
+}
 function arStatus(v, now) {
   const c = AR.cfg, fx = x => x.toFixed(2);
   let t;
   if (!v.ready) t = v.nSlow >= AR.cfg.minSlow ? "price stream stalled: waiting for fresh prices" : `learning the last hour: ${Math.min(15, Math.round(v.nSlow/60))} of 15 min`;
   else if (AR.st.mode === "waiting" && AR.st.until > now) t = `cooldown after recording ${AR.runs}: ${Math.ceil((AR.st.until - now)/60000)} min left before it can start again`;
-  else if (AR.st.mode === "waiting") t = `waiting · sigma ${fx(v.fast)} (x${fx(v.ratio)} of the hour) · starts at x${c.trigRatio} or ${c.trigSigma}`;
+  else if (AR.st.mode === "waiting") t = `lead-in ${arDur(AR.leadMs)} kept � waiting · sigma ${fx(v.fast)} (x${fx(v.ratio)} of the hour) · starts at x${c.trigRatio} or ${c.trigSigma}`;
   else t = `recording ${arDur(now - AR.st.since)} of at most ${c.maxMin} min · sigma ${fx(v.fast)} (x${fx(v.ratio)}) · calm ${AR.st.calmSince == null ? 0 : Math.floor((now - AR.st.calmSince)/60000)} of ${c.calmMin} min`;
   if (AR.drops.length) t += ` · price stream dropped ${AR.drops.length}x, last at ${new Date(AR.drops[AR.drops.length - 1].at).toLocaleTimeString()}`;
   ar$("arStat").textContent = t;
@@ -94,25 +103,29 @@ function arStart(why, v) {
   // keep the last 30 minutes of the mark price (one point a second) with this recording: what led up to the trigger, which no feed was recording yet
   AR.preMeta = {at:Date.now(), why, fast:v.fast, slow:v.slow, ratio:v.ratio, trigRatio:AR.cfg.trigRatio, trigSigma:AR.cfg.trigSigma}; AR.pre = null;
   if (AR.worker) AR.worker.postMessage({t:"dump", secs:1800}); else AR.pre = Object.assign({}, AR.preMeta, {prices:AUTOREC.dump(AR.h, Date.now(), 1800)});
-  AR.byUs = !connected;
-  if (!connected) $("go").click();
+  if (!connected){ AR.byUs = true; $("go").click(); }
   RT.recLimit = {ms:(AR.cfg.maxMin + 2)*60000, n:2000000};
-  if (!RT.rec) ar$("rtRec").click();
+  if (!RT.rec){      // adopt the rolling lead-in as the recording (the engine has been recording since the arming); startedAt is the trigger, the inputs begin earlier
+    if (!READER.recording().on) READER.startRecording({quoteMs:100});
+    RT.rec = {t0:Date.now(), sym:ar$("sym").value.trim().toUpperCase(), baseline:READER.register.snapshot()}; AR.roll = false;
+    ar$("rtRec").textContent = "Stop recording"; RT.recTimer = setInterval(rtRecTick, 1000); rtRecTick();
+  }
   arMsg(`Recording since ${new Date().toLocaleTimeString()}: the last 5 minutes are x${v.ratio.toFixed(2)} of the hour (sigma ${v.fast.toFixed(2)}). It stops after ${AR.cfg.calmMin} calm minutes or ${AR.cfg.maxMin} minutes in all.`);
 }
 function arStop(why) {
   const mins = AR.st.since ? arDur(Date.now() - AR.st.since) : "";
   if (RT.rec) rtRecStop();
   ar$("rtSave").click();                                           // downloads the file; the session also stays loaded, so Save session still works
-  if (AR.byUs && connected) $("go").click();
   const saved = `${mins} recorded and saved: downloaded, and kept on this device under Saved recordings (Share sends it to mail or Drive).`, how = why === "calm" ? "calm again" : "time limit";
   AR.runs++;
   if (!AR.cfg.rearm || AR.runs >= AR.cfg.maxRuns) return arFinish(`Done (${how}), ${saved}${AR.cfg.rearm ? ` That was recording ${AR.runs} of at most ${AR.cfg.maxRuns} per arming, so it is off now.` : ""}`);
-  AR.st = AUTOREC.afterStop(Date.now(), AR.cfg); AR.byUs = false;      // stay armed: the price stream and its history keep running, so there is no new 15 minutes to learn
+  AR.st = AUTOREC.afterStop(Date.now(), AR.cfg); arRoll();      // stay armed: the price stream and its history keep running (no new 15 minutes to learn) and so do the feeds, which buffer the lead-in of the next one
   arMsg(`Recording ${AR.runs} done (${how}), ${saved} Still armed: it can start again after a ${AR.cfg.cooldownMin} minute cooldown.`); arTick();
 }
 function arFinish(msg) {
   AR.on = false; AR.gen++; clearInterval(AR.timer); AR.timer = null;
+  if (AR.roll && !RT.rec){ READER.stopRecording(); AR.roll = false; }      // the lead-in buffer is dropped when nothing started
+  if (AR.byUs && connected) $("go").click(); AR.byUs = false;
   try { if (AR.worker) { AR.worker.postMessage({t:"stop"}); AR.worker.terminate(); } } catch {} AR.worker = null;
   try { if (AR.ws) AR.ws.close(); } catch {} AR.ws = null;
   if (AR.unlock) { AR.unlock(); AR.unlock = null; }
