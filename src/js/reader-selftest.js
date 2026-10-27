@@ -959,6 +959,12 @@ const READER_SELFTEST=(()=>{
     const old=A.step({mode:"waiting"},calm,T,{},undefined).action;
     return{ok:on.action==="start"&&on.why==="episode"&&off.action==null&&none.action==null&&cold.action==null&&cool.why==="cooldown"&&old==null&&stop===13,detail:`stop after minute ${stop}`};
   });
+  add("autorec: forced flow or a stressed market (ep.col) starts a recording in a calm market, only with colTrig on, and keeps it from counting as calm; an episode takes the reason when both hold",E=>{
+    const A=AUTOREC,calm={ready:true,ratio:1,fast:.3},T=T0,col={active:0,live:0,col:true};
+    const on=A.step({mode:"waiting"},calm,T,{},col),off=A.step({mode:"waiting"},calm,T,{colTrig:false},col),both=A.step({mode:"waiting"},calm,T,{},{active:1,live:1,col:true}),cold=A.step({mode:"waiting"},{ready:false,ratio:0,fast:0},T,{},col);
+    let st=on.st,stop=null;for(let m=0;m<=20&&!stop;m++){const o=A.step(st,calm,T+m*60000,{},{active:0,live:0,col:m<6});st=o.st;if(o.action==="stop")stop=m;}
+    return{ok:on.action==="start"&&on.why==="collectors"&&off.action==null&&both.why==="episode"&&cold.action==null&&stop===11,detail:`stop after minute ${stop}`};
+  });
   add("autorec: after a recording it stays armed but waits out the cooldown, then starts again on the next jump",E=>{
     const A=AUTOREC,r=rng(9),h=A.createHistory(),cfg={cooldownMin:10};let px=82000,t=T0,st={mode:"waiting"};const ev=[];
     const run=(secs,vol)=>{for(let i=0;i<secs;i++){px*=1+(r()-.5)*2*vol/1e4;t+=1000;A.push(h,t,px);if(i%5===4){const v=A.vol(h,cfg),o=A.step(st,v,t,cfg);st=o.st;if(o.action){ev.push({a:o.action,why:o.why,t});if(o.action==="stop")st=A.afterStop(t,cfg);}}}};

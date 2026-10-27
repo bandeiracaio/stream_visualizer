@@ -320,6 +320,7 @@
       <label title="Never record longer than this">at most (min) <input id="arMaxMin" type="number" step="5" min="5"></label>
       <label title="After a recording is saved, stay armed and watch for the next volatile stretch (up to 8 recordings per arming)">keep watching after a recording <input id="arRearm" type="checkbox"></label>
       <label title="Also start when the Reader sees an absorption, exhaustion or burst episode (no big price move needed); a recording then stays open while one is active or fading">also start on a Reader episode <input id="arEpTrig" type="checkbox"></label>
+      <label title="Also start when the collectors read forced flow (liquidations of at least $500k in a minute and 10x the usual) or a stressed market (two of: volatility index up, forced flow, venue price gap). Funding and open interest are slow and do not trigger">also start on forced flow or a stressed market <input id="arColTrig" type="checkbox"></label>
       <label title="Minutes of the real inputs (trades, book) kept while it waits, so a recording starts with what led up to the trigger">lead-in kept (min) <input id="arPreMin" type="number" step="1" min="1" max="30"></label>
       <label title="Minutes after a recording during which it will not start another">cooldown after one (min) <input id="arCooldown" type="number" step="1" min="1"></label>
     </div>

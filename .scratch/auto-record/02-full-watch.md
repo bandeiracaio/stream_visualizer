@@ -1,6 +1,6 @@
 # Auto-record, full watch (decided 2026-10-26)
 
-Status: step 1 done (v087); step 2 built (v088); steps 3-4 not started.
+Status: steps 1-2 done (v087, v088); step 3 built (v089); step 4 not started.
 
 ## Why
 The first Arm (01) watches only the Binance mark price volatility with one socket. Problems: it starts late (5 minutes of movement must
@@ -34,3 +34,9 @@ forced flow), the stop is a calm timer that can cut an aftermath, and the 10 min
 - Start: an active episode starts a recording in a calm market too (why "episode"); it still needs the 15 minute baseline, and the cooldown still applies.
 - Stop: a recording does not count as calm while an episode is live; the calm timer (calmMin) starts when the last one has ended and volatility is calm. maxMin still caps it.
 - Also fixes v087: one status separator was saved as a single byte instead of UTF-8.
+
+## Step 3 details (v089)
+- Setting `colTrig` (default on, box "also start on forced flow or a stressed market"). `ep.col` is true when the market state (`colStateLive`, rules v1, unchanged) reads forced flow (`L`: at least $500k liquidated in a minute and 10x the usual, in the last 5 minutes) or "stressed" (two of volatility index, forced flow, venue gap). Why "collectors".
+- The venue gap alone does not trigger (its rule is 1.5 sd of the last 30 minutes, which noise reaches often). Funding and open interest do not trigger either: they are a slow regime, not an event, and would keep it recording for hours.
+- A recording does not count as calm while `ep.col` holds; forced flow lasts at most 5 minutes after the last liquidation, maxMin still caps it.
+- Needs the collectors' records in memory (`CL.recent`, filled while armed by the always-on worker and the page); with none, the state reads unknown and nothing triggers.

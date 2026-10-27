@@ -5,7 +5,7 @@
 const AR = {on:false, ws:null, gen:0, h:null, st:null, cfg:null, timer:null, lock:null, byUs:false, t0:0, lastMsg:0, runs:0, drops:[], worker:null, volAt:0, unlock:null, v:null, pre:null, preMeta:null};
 const ar$ = id => document.getElementById(id);
 const AR_FIELDS = {arTrigRatio:"trigRatio", arTrigSigma:"trigSigma", arExitRatio:"exitRatio", arExitSigma:"exitSigma", arCalmMin:"calmMin", arMaxMin:"maxMin", arCooldown:"cooldownMin", arPreMin:"preMin"};
-const arCfgFromUi = () => { const c = {}; for (const id in AR_FIELDS){ const v = +ar$(id).value; if (v > 0) c[AR_FIELDS[id]] = v; } c.rearm = ar$("arRearm").checked; c.epTrig = ar$("arEpTrig").checked; return Object.assign({}, AUTOREC.DEFAULTS, c); };
+const arCfgFromUi = () => { const c = {}; for (const id in AR_FIELDS){ const v = +ar$(id).value; if (v > 0) c[AR_FIELDS[id]] = v; } c.rearm = ar$("arRearm").checked; c.epTrig = ar$("arEpTrig").checked; c.colTrig = ar$("arColTrig").checked; return Object.assign({}, AUTOREC.DEFAULTS, c); };
 const arMsg = t => { ar$("arMsg").textContent = t; };
 const arDur = ms => { const m = Math.floor(ms/60000); return ms < 60000 ? Math.round(ms/1000) + " s" : m >= 60 ? Math.floor(m/60) + " h " + (m%60) + " min" : m + " min"; };
 
@@ -14,6 +14,7 @@ const arDur = ms => { const m = Math.floor(ms/60000); return ms < 60000 ? Math.r
   for (const id in AR_FIELDS){ const k = AR_FIELDS[id]; ar$(id).value = saved && saved[k] > 0 ? saved[k] : AUTOREC.DEFAULTS[k]; ar$(id).onchange = () => store.set("ar.cfg", arCfgFromUi()); }
   ar$("arRearm").checked = !saved || saved.rearm !== false; ar$("arRearm").onchange = () => store.set("ar.cfg", arCfgFromUi());
   ar$("arEpTrig").checked = !saved || saved.epTrig !== false; ar$("arEpTrig").onchange = () => store.set("ar.cfg", arCfgFromUi());
+  ar$("arColTrig").checked = !saved || saved.colTrig !== false; ar$("arColTrig").onchange = () => store.set("ar.cfg", arCfgFromUi());
   ar$("arArm").onclick = arToggle;
   ar$("arHdr").onclick = () => {      // the same switch from the header: arms with the settings of the Reader tab and shows the answer here for a few seconds
     arToggle(); const full = ar$("arMsg").textContent, m = /^Disconnect first/.test(full) ? "Disconnect first, then press Arm." : full.split(/(?<=\.)\s/)[0], box = ar$("arHdrMsg"); box.textContent = m.length > 140 ? m.slice(0, 137) + "…" : m;      // the first sentence only: "Armed." / "Disarmed." / the reason it refused (a phone header must not grow for long)
@@ -81,7 +82,9 @@ function arTick() {
     return arFinish("The recording stopped on its own (by hand or at its input limit), so auto-record is off. The session is loaded: use Save session.");
   }
   const eps = READER.activeEpisodes().filter(e => e.family !== "wall");      // walls can stand for hours: they neither start a recording nor keep one open
-  AR.ep = {active:eps.filter(e => e.stage === "active").length, live:eps.length, fams:[...new Set(eps.map(e => e.family))]};
+  let col = false, colWhy = [];      // what the collectors read (collectors.js, the market state): forced flow, or a stressed market (two of volatility index, forced flow, venue gap)
+  try { const m = typeof colStateLive === "function" ? colStateLive() : null; if (m){ if (m.ind.L === true) colWhy.push("forced flow"); if (m.s === "stressed" && m.ind.L !== true) colWhy.push("stressed market (" + m.i + ")"); col = colWhy.length > 0; } } catch {}
+  AR.ep = {active:eps.filter(e => e.stage === "active").length, live:eps.length, fams:[...new Set(eps.map(e => e.family))], col, colWhy};
   const r = AUTOREC.step(AR.st, v, now, AR.cfg, AR.ep); AR.st = r.st;
   if (r.action === "start") arStart(r.why, v); else if (r.action === "stop") arStop(r.why);
   if (AR.on) arStatus(v, now);
@@ -104,7 +107,7 @@ function arStatus(v, now) {
 }
 function arStart(why, v) {
   // keep the last 30 minutes of the mark price (one point a second) with this recording: what led up to the trigger, which no feed was recording yet
-  AR.preMeta = {at:Date.now(), why, eps:why === "episode" ? AR.ep : undefined, fast:v.fast, slow:v.slow, ratio:v.ratio, trigRatio:AR.cfg.trigRatio, trigSigma:AR.cfg.trigSigma}; AR.pre = null;
+  AR.preMeta = {at:Date.now(), why, eps:why === "episode" || why === "collectors" ? AR.ep : undefined, fast:v.fast, slow:v.slow, ratio:v.ratio, trigRatio:AR.cfg.trigRatio, trigSigma:AR.cfg.trigSigma}; AR.pre = null;
   if (AR.worker) AR.worker.postMessage({t:"dump", secs:1800}); else AR.pre = Object.assign({}, AR.preMeta, {prices:AUTOREC.dump(AR.h, Date.now(), 1800)});
   if (!connected){ AR.byUs = true; $("go").click(); }
   RT.recLimit = {ms:(AR.cfg.maxMin + 2)*60000, n:2000000};
@@ -113,7 +116,7 @@ function arStart(why, v) {
     RT.rec = {t0:Date.now(), sym:ar$("sym").value.trim().toUpperCase(), baseline:READER.register.snapshot()}; AR.roll = false;
     ar$("rtRec").textContent = "Stop recording"; RT.recTimer = setInterval(rtRecTick, 1000); rtRecTick();
   }
-  arMsg(`Recording since ${new Date().toLocaleTimeString()}: ${why === "episode" ? `the Reader sees ${AR.ep.fams.join(", ")} (volatility is x${v.ratio.toFixed(2)} of the hour).` : `the last 5 minutes are x${v.ratio.toFixed(2)} of the hour (sigma ${v.fast.toFixed(2)}).`} It stops after ${AR.cfg.calmMin} calm minutes or ${AR.cfg.maxMin} minutes in all.`);
+  arMsg(`Recording since ${new Date().toLocaleTimeString()}: ${why === "collectors" ? `the collectors read ${AR.ep.colWhy.join(" and ")} (volatility is x${v.ratio.toFixed(2)} of the hour).` : why === "episode" ? `the Reader sees ${AR.ep.fams.join(", ")} (volatility is x${v.ratio.toFixed(2)} of the hour).` : `the last 5 minutes are x${v.ratio.toFixed(2)} of the hour (sigma ${v.fast.toFixed(2)}).`} It stops after ${AR.cfg.calmMin} calm minutes or ${AR.cfg.maxMin} minutes in all.`);
 }
 function arStop(why) {
   const mins = AR.st.since ? arDur(Date.now() - AR.st.since) : "";
