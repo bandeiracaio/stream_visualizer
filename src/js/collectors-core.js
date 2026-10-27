@@ -560,6 +560,45 @@ const COLLECT = (() => {
     return {t:tMs, funding:next(g => g === "funding", 9*3600000), expiry, bigger:expiry && big(expiry.tag) ? null : next(big, 100*86400000), stocks:next(g => g === "usOpen" || g === "usClose", 5*86400000)};
   }
 
+  // ---- options lens (v084): realized volatility against the volatility index, and the skew shift. Rules in .scratch/collector-features/spec.md (G), fixed words.
+  // pts = [[t, price]] ascending (the engine's one-per-second price history). Realized = sqrt(mean of squared 1-minute log returns * minutes per year), in percent, not demeaned.
+  const YEAR_MIN = 525960, LENS_WIN_MS = 1800000, LENS_HI = 1.25, LENS_LO = 0.75;
+  function gridReturns(pts, a, b) {      // [[t, log return]] on a 60 s grid; a grid price is the last point at most 10 s old
+    const out = []; let j = 0, prev = null;
+    for (let g = Math.ceil(a/60000)*60000; g <= b; g += 60000) {
+      while (j + 1 < pts.length && pts[j + 1][0] <= g) j++;
+      const ok = pts.length && pts[j][0] <= g && g - pts[j][0] <= 10000 && pts[j][1] > 0, p = ok ? pts[j][1] : null;
+      if (p != null && prev != null) out.push([g, Math.log(p/prev)]);
+      prev = p;
+    }
+    return out;
+  }
+  function realizedAt(rets, tMs, winMs) {
+    let n = 0, ss = 0; for (const r of rets) if (r[0] > tMs - winMs && r[0] <= tMs) { n++; ss += r[1]*r[1]; }
+    return n >= 20 ? {vol:Math.sqrt(ss/n*YEAR_MIN)*100, n} : null;
+  }
+  const lensWord = ratio => ratio >= LENS_HI ? "above" : ratio <= LENS_LO ? "below" : "inline";
+  const LENS_TEXT = {above:"realized above implied", below:"realized below implied", inline:"about in line"};
+  function volLens(recs, pts, tMs, opt) {
+    opt = opt || {}; const c = opt.ctx || context(recs, tMs, {coin:opt.coin}), win = opt.winMs || LENS_WIN_MS;
+    let dv = null; for (const r of recs) if (isRec(r) && r[1] === "dvol" && r[2] <= tMs && (!dv || r[2] > dv[2])) dv = r;
+    const implied = dv && tMs - dv[2] <= 300000 && num(dv[3] && dv[3].vol) > 0 ? dv[3].vol : null;
+    const rl = pts && pts.length ? realizedAt(gridReturns(pts, tMs - win - 60000, tMs), tMs, win) : null;
+    const ratio = rl && implied ? rl.vol/implied : null, sk = c.items.find(x => x.f === "optChain.skew5");
+    return {t:tMs, implied:implied == null ? null : round(implied, 2), realized:rl ? round(rl.vol, 2) : null, n:rl ? rl.n : 0, ratio:ratio == null ? null : round(ratio, 2), word:ratio == null ? null : lensWord(ratio),
+      skew:sk ? {x:round(sk.x, 2), dev:round(sk.dev, 2), unusual:sk.unusual, text:sk.text, side:sk.x > 0 ? "puts richer" : sk.x < 0 ? "calls richer" : "level"} : null};
+  }
+  // the ratio word every stepMs from t0 to t1: [{t, w, ratio}] (the grid returns and the index readings are worked out once)
+  function lensSeries(recs, pts, t0, t1, stepMs, opt) {
+    const win = (opt && opt.winMs) || LENS_WIN_MS, rets = pts && pts.length ? gridReturns(pts, t0 - win - 60000, t1) : [], dv = recs.filter(r => isRec(r) && r[1] === "dvol").sort((a, b) => a[2] - b[2]), out = []; let j = -1;
+    for (let t = t0; t <= t1; t += stepMs) {
+      while (j + 1 < dv.length && dv[j + 1][2] <= t) j++;
+      const imp = j >= 0 && t - dv[j][2] <= 300000 ? num(dv[j][3] && dv[j][3].vol) : null, rl = realizedAt(rets, t, win), ratio = rl && imp > 0 ? rl.vol/imp : null;
+      out.push({t, w:ratio == null ? null : lensWord(ratio), ratio:ratio == null ? null : round(ratio, 2)});
+    }
+    return out;
+  }
+
   // tape helpers on arrays of records
   const prune = (recs, nowMs, keepMs) => recs.filter(r => r[2] >= nowMs - (keepMs == null ? TAPE_MS : keepMs));
   const slice = (recs, t0, t1) => recs.filter(r => r[2] >= t0 && r[2] <= t1);
@@ -569,5 +608,5 @@ const COLLECT = (() => {
     for (let i = recs.length - 1; i >= 0; i--) { const b = JSON.stringify(recs[i]).length + 1; if (size + b > lim) break; size += b; out.push(recs[i]); }
     return out.reverse();
   }
-  return {REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, due, calendar, OWNER, EXPECT_MS, ownerOf, tally, ageText, health, FEATURES, FEATURE_INFO, featureSeries, featureMaxAge, context, venueLead, leadText, liqDriven, usdText, wallQuality, marketState, marketStateSeries, STATE_VERSION, EVENT_LABEL, evSpan, eventsNear, eventClock, deribitCoin, optName, optionsChain, walletTracker, walletPosition, walletChanged, liqFills, predictedFunding, WALLET_TOP, WALLET_REFRESH_MS, MAJORS, venueSubs, venueParse, venueApply, venueRecord, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
+  return {REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, due, calendar, OWNER, EXPECT_MS, ownerOf, tally, ageText, health, FEATURES, FEATURE_INFO, featureSeries, featureMaxAge, context, venueLead, leadText, liqDriven, usdText, wallQuality, marketState, marketStateSeries, STATE_VERSION, EVENT_LABEL, evSpan, eventsNear, eventClock, volLens, lensSeries, gridReturns, LENS_TEXT, deribitCoin, optName, optionsChain, walletTracker, walletPosition, walletChanged, liqFills, predictedFunding, WALLET_TOP, WALLET_REFRESH_MS, MAJORS, venueSubs, venueParse, venueApply, venueRecord, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
 })();

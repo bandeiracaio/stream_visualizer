@@ -131,3 +131,19 @@ Two changes from the draft, found while writing the logic, both stated in the bu
 - Not in the clock, and said so on the card: macro releases (CPI, FOMC, jobs) follow no rule and the app has no calendar feed; exchange holidays are not known either (the US open and close are listed on weekdays only).
 - Rule: the window is plus or minus 10 minutes, fixed in advance. By rule that covers roughly 5 to 7% of clock time (funding at 00 / 08 / 16 UTC, plus the US open and close on weekdays), so a chip is the exception, not the rule. Whether episodes cluster near events is a question for `analyze-episodes.mjs` with labels; the stored offsets are what it would need.
 - Engine, episode layer and register untouched.
+
+## G rules (2026-10-26, written before building)
+- **Realized volatility**: annualized from 1-minute log returns of the Binance mid over the last 30 minutes: sqrt(mean(r^2) * minutes-per-year) in percent, not demeaned, at least 20 valid returns (a grid price must be at most 10 s old). Chosen over the engine's sigma (a MAD scale per root second) because it must be comparable with an implied vol, which is a standard deviation. The relative error of such an estimate on 30 returns is about 13%, so the thresholds sit near two of those.
+- **Implied**: the volatility index (DVOL) reading, at most 5 minutes old.
+- **Ratio words** (fixed): realized / implied >= 1.25 "realized above implied", <= 0.75 "realized below implied", otherwise "about in line".
+- **Skew shift**: the existing `optChain.skew5` (vol at -5% minus vol at +5% moneyness, first expiry; positive = puts richer) and its `context` deviation from its own previous 30 minutes (unusual at 1.5 sd and 1 point).
+- Known weaknesses: DVOL is a 30-day measure and the realized window is 30 minutes (intraday seasonality, weekends, a single jump in 30 minutes all move the ratio without meaning anything); price history exists only while the app is connected (live) or in a replay. A label, not a signal.
+- Views: Overview card "Options lens"; a second strip under the state strip in the Reader timeline (accent ramp: below / in line / above); label field `ctx.ol = {r, w, sk}`.
+
+## G built (v084, 2026-10-26)
+- `COLLECT.volLens(recs, pts, tMs, {ctx, coin})`, `lensSeries`, `gridReturns`, `LENS_TEXT` (pure, self-tested). Views: Overview card "Options lens" (implied DVOL, realized 30 min, the ratio with its word, the skew with its side and shift); a "vol" strip under the "state" strip in the Reader timeline (accent ramp: below / in line / above, blank = no reading); label field `ctx.ol = {r, w, sk}`.
+- Price source: live, the engine's one-per-second history (only while connected); in a replay, the auto-recording's `pre` (30 minutes of mark price before the trigger) followed by the replay's own history. A manual recording has no `pre`, so its first ratio comes 20 minutes after it starts (seen: a recording at 14:15 UTC first reads at 14:36).
+- First numbers (13 recordings with DVOL, 1-minute steps, 311 minutes with a ratio of 597): realized below implied in 191 (62%), in line in 50, above in 70. Implied sits above realized most of the time (the risk premium), so "below" is the usual reading and says nothing about the market being quiet. The rules stay fixed at version 1 as written; a version 2 should measure the ratio against its own typical level (for example its median over the tape) instead of against 1. The Overview card says "below is the usual reading".
+- Skew: read at the end of all 13 recordings, shifting unusually (1.5 sd and 1 point) in 3.
+- Real 25-delta skew still out (one request per option); its own spec.
+- Engine, episode layer and register untouched.

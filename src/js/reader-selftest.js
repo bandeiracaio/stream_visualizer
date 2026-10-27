@@ -286,6 +286,20 @@ const READER_SELFTEST=(()=>{
       &&COLLECT.evSpan(90*60000)==="1 h 30 min"&&COLLECT.evSpan(45*60000)==="45 min"&&COLLECT.evSpan(3*86400000+5*3600000)==="3 d 5 h"&&!JSON.stringify(c).match(/cpi|fomc/i),
       detail:J({c:[c.funding.in,c.expiry.tag,c.bigger&&c.bigger.tag,c.stocks.tag,c.stocks.t-mon],n1:tags(n1),n3:tags(n3),tue:tue.stocks.t-U(2026,10,3,6),sat:sat.stocks.t,fri:fri.expiry.tag,q:q.bigger&&q.bigger.tag})};
   });
+  add("collectors: options lens: realized volatility from 1-minute returns against the index, fixed words, too little price or a stale index is no reading, skew shift, and the series",E=>{
+    const R=COLLECT.rec,J=JSON.stringify,T=Math.ceil(T0/60000)*60000,now=T+40*60000;
+    const px=(m,from)=>{const a=[];let p=80000;for(let k=0;k<=40;k++){const mm=typeof m==="function"?m(k):m;p*=Math.exp((k%2?1:-1)*mm);if(!from||k>=from)a.push([T+k*60000,p]);}return a;};      // alternating returns of size m: realized vol is m * sqrt(525960) * 100 percent
+    const dv=(v,t)=>[R("dvol",t==null?now-30000:t,{vol:v,idx:1})];
+    const opt=(late)=>{const a=[];for(let i=0;i<=20;i++)a.push(R("optChain",T+i*120000,{exps:[{atm:40,s:{"-5":i>=19&&late?44:40,"5":35}}]}));return a;};
+    const hi=COLLECT.volLens(dv(50),px(.001),now),lo=COLLECT.volLens(dv(50),px(.0005),now),mid=COLLECT.volLens(dv(50),px(.0007),now),few=COLLECT.volLens(dv(50),px(.001,25),now),stale=COLLECT.volLens(dv(50,now-600000),px(.001),now),nopx=COLLECT.volLens(dv(50),[],now);
+    const sk=COLLECT.volLens(opt(true).concat(dv(50)),px(.001),now),flat=COLLECT.volLens(opt(false).concat(dv(50)),px(.001),now),future=COLLECT.volLens(dv(50,now+1000),px(.001),now);
+    const dvs=[];for(let k=20;k<=40;k++)dvs.push(R("dvol",T+k*60000,{vol:k<33?100:30,idx:1}));const ser=COLLECT.lensSeries(dvs,px(.0007),T+30*60000,now,300000);      // the index falls from 100 to 30 at minute 33
+    return{ok:hi.realized>72.4&&hi.realized<72.7&&hi.ratio>1.44&&hi.ratio<1.46&&hi.word==="above"&&hi.implied===50&&hi.n>=29&&lo.word==="below"&&lo.realized>36.2&&lo.realized<36.4&&mid.word==="inline"&&mid.ratio>1&&mid.ratio<1.05
+      &&few.realized===null&&few.ratio===null&&few.word===null&&few.implied===50&&stale.implied===null&&stale.ratio===null&&stale.realized>72&&nopx.realized===null&&future.implied===null
+      &&sk.skew&&sk.skew.x===9&&sk.skew.side==="puts richer"&&sk.skew.unusual===true&&flat.skew&&flat.skew.x===5&&flat.skew.unusual===false&&hi.skew===null
+      &&ser.length===3&&ser[0].t===T+30*60000&&ser[0].w==="below"&&ser[1].w==="above"&&ser[2].w==="above"&&ser.every(x=>x.ratio!=null)&&COLLECT.LENS_TEXT.above==="realized above implied",
+      detail:J({hi:[hi.realized,hi.ratio,hi.word,hi.n],lo:[lo.realized,lo.word],mid:[mid.ratio,mid.word],few:few.n,stale:[stale.implied,stale.ratio],sk:sk.skew,flat:flat.skew,future:future.implied,ser:ser.map(x=>x.w+":"+x.ratio)})};
+  });
   add("collectors: records among the inputs change no detection and no session quality",E=>{
     const e=E.create();e.startRecording();const a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:21,params:()=>burstSell});sim(e,{t0:b.t,mid0:b.mid,seconds:40,seed:22});
     const inputs=e.stopRecording(),mixed=[];inputs.forEach((r,i)=>{mixed.push(r);if(i%40===0)mixed.push(COLLECT.rec("feeds",T0+i,{src:"page",feeds:{bn:{n:1}}}));});

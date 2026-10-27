@@ -236,6 +236,30 @@ function epEventChip(ep) {
   const e = colEventsFor(ep); if (!e.length) return "";
   return `<span class="chip" title="Scheduled events within 10 minutes of detection, by rule (funding, options expiry, US stock open and close). Macro releases (CPI, FOMC, jobs) are not known to the app.">${e.slice(0, 3).map(x => (Math.abs(x.off) < 60000 ? "at " : COLLECT.evSpan(x.off) + (x.off >= 0 ? " after " : " before ")) + x.label).join(" · ")}</span>`;
 }
+// ---- options lens (v084, rules in .scratch/collector-features/spec.md G): realized volatility against the volatility index, and the skew shift. Display only.
+// price points [[ms, price]]: live from the engine's history (only while connected); in a replay the auto-recording's `pre` (30 minutes of mark price before the trigger) followed by the replay's own
+function colPricePts(replay) {
+  if (replay) {
+    const eng = rdView.engine, h1 = eng.priceHistory("bn"), ph = h1.length ? h1 : eng.priceHistory("hl"), pre = RT.session && RT.session.pre && RT.session.pre.prices;
+    return (Array.isArray(pre) ? pre.map(p => [p[0]*1000, p[1]]).filter(p => !ph.length || p[0] < ph[0][0]) : []).concat(ph);
+  }
+  const h = READER.priceHistory("bn"); return h.length ? h : READER.priceHistory("hl");
+}
+function colLensLive() {      // recomputed every 10 s
+  const k = Math.floor(Date.now()/10000); if (CL.lensNow && CL.lensNow.k === k) return CL.lensNow.m;
+  const m = COLLECT.volLens([].concat(...Object.values(CL.recent)), colPricePts(false), Date.now(), {coin:cl$("sym").value}); CL.lensNow = {k, m}; return m;
+}
+function colLensFor(ep, c) {
+  const src = colStateSource(), key = (src.replay ? "r" + (RT.session ? RT.session.startedAt : 0) + ":" + src.recs.length : "l") + "|o|" + ep.id + "|" + ep.tDetected;
+  if (CL.ctx.has(key)) return CL.ctx.get(key);
+  const m = COLLECT.volLens(src.recs, colPricePts(src.replay), ep.tDetected, {ctx:c, coin:src.coin}); if (CL.ctx.size > 400) CL.ctx.clear(); CL.ctx.set(key, m); return m;
+}
+function colLensStrip(t0, t1) {
+  const src = colStateSource(), step = Math.max(30000, Math.round((t1 - t0)/60/1000)*1000), a = Math.floor(t0/step)*step, b = Math.floor(t1/step)*step;
+  const key = (src.replay ? "r" + (RT.session ? RT.session.startedAt : 0) + ":" + src.recs.length : "l") + "|" + step + "|" + a + "|" + b;
+  if (CL.lensStrip && CL.lensStrip.key === key) return CL.lensStrip;
+  CL.lensStrip = {key, step, rows:src.recs.length ? COLLECT.lensSeries(src.recs, colPricePts(src.replay), a, b, step) : []}; return CL.lensStrip;
+}
 function epCtxBar(ep) {
   const c = colContextFor(ep); if (!c) return "";
   const lead = epLeadBar(c) + epWallBar(ep);
@@ -252,6 +276,7 @@ function colLabelCtx(ep) {
     const v = {}; for (const x of c.items) v[x.f] = [+x.x.toPrecision(7), +x.dev.toPrecision(5)];
     const out = {t:c.t, v, liq:[c.liq.bn, c.liq.hl], st:{v:st.v, s:st.s, i:st.i}};      // st: the market state at detection (rules version, state, letters of the indicators that fired)
     if (c.liqx && (c.liqx.usd || c.liqx.other)) { const q = c.liqx; out.lq = {bn:[q.bn.sell, q.bn.buy], hl:[q.hl.sell, q.hl.buy], x:q.x, other:q.other, tag:q.tag ? 1 : 0}; }      // dollars forced to sell / buy in the 60 s before, by venue
+    const ol = colLensFor(ep, c); if (ol.ratio != null || ol.skew) out.ol = {r:ol.ratio, w:ol.word, sk:ol.skew ? ol.skew.x : null};      // realized / implied volatility at detection, its word, the option skew (-5% minus +5%, points)
     const ev = colEventsFor(ep); if (ev.length) out.ev = ev.slice(0, 3).map(x => [x.tag, Math.round(x.off/1000)]);      // scheduled events within 10 minutes: [tag, seconds after it (negative: before)]
     if (wq && !wq.none) out.wq = {e:wq.edge, sh:wq.share, x:wq.x, ret:wq.end ? wq.end.ret : null, dist:wq.end ? wq.end.dist : null, v:wq.verdict || null};      // the wall's share of the depth within its edge, depth against usual, what the depth did by the end, the mid's distance from the wall
     if (c.lead && !c.lead.none) { const lv = {}; for (const x of c.lead.items) lv[x.src] = x.lead == null ? [null, x.move] : [x.lead, x.move]; out.lead = {ref:c.lead.ref, move:c.lead.move, v:lv}; }      // v: venue -> [seconds it led the reference (negative: lagged; null: no timing), its move in bps]

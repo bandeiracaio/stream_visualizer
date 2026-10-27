@@ -82,6 +82,19 @@ function renderOverview(){
     }
   }catch(e){ console.error("overview state", e); }
 
+  // Options lens (COLLECT.volLens): realized volatility against the volatility index, and the skew; display only
+  try{
+    const L = typeof colLensLive === "function" ? colLensLive() : null;
+    if (L){
+      const sk = L.skew, html = `<div class="metrics">${item("implied vol (DVOL)", L.implied==null ? "–" : L.implied.toFixed(1)+"%", L.implied==null ? "no recent reading" : "30-day, annualized")}`
+        + `${item("realized vol (30 min)", L.realized==null ? "–" : L.realized.toFixed(1)+"%", L.realized==null ? "needs 20 minutes of price: connect" : L.n+" one-minute returns")}`
+        + `${item("realized / implied", L.ratio==null ? "–" : L.ratio.toFixed(2)+"×", L.word ? COLLECT.LENS_TEXT[L.word] : "")}`
+        + `${item("option skew (-5% / +5%)", sk ? ovSigned(sk.x, a=>a.toFixed(1))+" pts" : "–", sk ? sk.side+(sk.unusual ? " · shift "+sk.text : "") : "no reading")}</div>`
+        + `<div class="note">Implied vol usually sits above realized (it carries a risk premium), so "below" is the usual reading. Realized is from the last 30 minutes, implied is a 30-day measure. A label, not a signal.</div>`;
+      const el = ov$("ovLens"); if (el.dataset.h !== html){ el.dataset.h = html; el.innerHTML = html; }
+    }
+  }catch(e){ console.error("overview lens", e); }
+
   // Event clock: the next scheduled moments by rule (COLLECT.eventClock); display only
   try{
     const now = Date.now(); if (!OV.clk || now-OV.clk.at > 60000 || [OV.clk.c.funding, OV.clk.c.expiry, OV.clk.c.stocks].some(e => e && e.t <= now)) OV.clk = {at:now, c:COLLECT.eventClock(now)};
