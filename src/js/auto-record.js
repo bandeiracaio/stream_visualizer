@@ -122,7 +122,7 @@ function arStop(why) {
   const mins = AR.st.since ? arDur(Date.now() - AR.st.since) : "";
   if (RT.rec) rtRecStop();
   ar$("rtSave").click();                                           // downloads the file; the session also stays loaded, so Save session still works
-  const saved = `${mins} recorded and saved: downloaded, and kept on this device under Saved recordings (Share sends it to mail or Drive).`, how = why === "calm" ? "calm again" : "time limit";
+  const saved = `${mins} recorded and saved: written to the save folder or downloaded, and kept on this device under Saved recordings (Share sends it to mail or Drive).`, how = why === "calm" ? "calm again" : "time limit";
   AR.runs++;
   if (!AR.cfg.rearm || AR.runs >= AR.cfg.maxRuns) return arFinish(`Done (${how}), ${saved}${AR.cfg.rearm ? ` That was recording ${AR.runs} of at most ${AR.cfg.maxRuns} per arming, so it is off now.` : ""}`);
   AR.st = AUTOREC.afterStop(Date.now(), AR.cfg, why); arRoll();      // stay armed: the price stream and its history keep running (no new 15 minutes to learn) and so do the feeds, which buffer the lead-in of the next one

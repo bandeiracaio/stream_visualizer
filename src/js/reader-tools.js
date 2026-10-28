@@ -71,9 +71,10 @@ rt$("rtSave").onclick = async () => {
   const text = JSON.stringify({kind:"sv-session", v:1, sym:s.sym, startedAt:s.startedAt, baseline:s.baseline || null, quality, health, pre, ext, inputs:s.inputs});
   const gz = typeof CompressionStream !== "undefined", name = base + (gz ? ".json.gz" : ".json");
   const blob = gz ? await new Response(new Blob([text]).stream().pipeThrough(new CompressionStream("gzip"))).blob() : new Blob([text], {type:"application/json"});
-  rtDownload(blob, name);
+  const inFolder = typeof fsSave === "function" ? await fsSave(name, blob) : false;      // the chosen save folder (folder-save.js); if there is none, or it failed, download as before
+  if (!inFolder) rtDownload(blob, name);
   const kept = typeof rcKeep === "function" ? await rcKeep(name, blob, {sym:s.sym, startedAt:s.startedAt, quality}) : false;      // a copy stays on the device (recordings.js)
-  rtMsg("Saved" + (quality.verdict === "complete" ? "" : ` (${SQ.line(quality)})`) + "." + (kept ? " A copy is kept on this device (Recordings, Saved)." : "") + " Load it later (or on another device) with Load session.");
+  rtMsg("Saved" + (quality.verdict === "complete" ? "" : ` (${SQ.line(quality)})`) + (inFolder ? ` into the folder "${FS.name}".` : ".") + (kept ? " A copy is kept on this device (Recordings, Saved)." : "") + " Load it later (or on another device) with Load session.");
 };
 rt$("rtLoadBtn").onclick = () => rt$("rtLoad").click();
 async function rtReadSessionFile(f){
