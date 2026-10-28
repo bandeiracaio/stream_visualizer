@@ -19,6 +19,7 @@ import { loadEngine } from "./compare-detections.mjs";
 
 export const PLAN = { horizonsSec:[60, 300, 900], minN:8, sigmaLagSec:15, sigmaFloor:0.05, randomStepSec:10, z:1.96 };
 const rtSide = g => g.aggressor || (g.wall && g.wall.side) || "";
+export const sideDir = side => side === "buy" || side === "bid" ? 1 : side === "sell" || side === "ask" ? -1 : 0;      // aggressors are buy / sell; a wall's side is bid / ask (a bid wall protects upward)
 const median = a => { if (!a.length) return null; const s = a.slice().sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m])/2; };
 const r2 = x => x == null ? null : +x.toFixed(2);
 
@@ -59,7 +60,7 @@ export function scoreboard(sessions, labels, E, cfg, plan = PLAN) {
     for (const vn of ["bn", "hl"]) { hist[vn] = e.priceHistory(vn) || []; sig[vn] = sigmaOf(hist[vn], plan); }
     for (const H of plan.horizonsSec) for (const vn of ["bn", "hl"]) { const x = typicalAbs(hist[vn], H, sig[vn], plan.randomStepSec); if (x != null) (typ[H] ||= []).push(x); }
     for (const g of e.episodeGroups()) {
-      const vn = g.venues && g.venues.length > 1 ? (g.venues.includes("bn") ? "bn" : g.venues[0]) : g.venue, side = rtSide(g), dir = side === "buy" ? 1 : side === "sell" ? -1 : 0, fwd = {};
+      const vn = g.venues && g.venues.length > 1 ? (g.venues.includes("bn") ? "bn" : g.venues[0]) : g.venue, side = rtSide(g), dir = sideDir(side), fwd = {};
       for (const H of plan.horizonsSec) fwd[H] = dir && hist[vn] ? forwardMove(hist[vn], g.tDetected, H, dir, sig[vn]) : null;
       rows.push({ session:s.file, family:g.family, side:side || "-", venue:vn, tDetected:g.tDetected, day:new Date(g.tDetected).toISOString().slice(0, 10), label:labelFor(labels, g), fwd, g });
     }
@@ -148,6 +149,7 @@ function selfTest() {
     ["sell burst in a falling market: price went with the aggressor in most groups", f.forward[60].all.median > 0 && f.forward[60].all.withShare >= 0.7],
     ["sigma: a flat price sits on the floor; a moving one is above it", sigmaOf(flat) === PLAN.sigmaFloor && sigmaOf(hist) > PLAN.sigmaFloor],
     ["typical |move| of a steady rise is positive; of a flat price is zero", typicalAbs(hist, 60, 0.5) > 0 && typicalAbs(flat, 60, 0.5) === 0],
+    ["side direction: buy and a bid wall are up, sell and an ask wall are down, no side is none", sideDir("buy") === 1 && sideDir("bid") === 1 && sideDir("sell") === -1 && sideDir("ask") === -1 && sideDir("") === 0],
     ["wilson: 5 of 10 is centred near half; 0 of 10 starts at 0; no sample is null", w1[0] < 0.5 && w1[1] > 0.5 && Math.abs((w1[0] + w1[1])/2 - 0.5) < 0.02 && w0[0] === 0 && w0[1] > 0 && w00 === null],
     ["recall: missed labels outside the sessions are ignored; one is caught now, one is still missed", sb.missed.total === 2 && mf.burst && mf.burst.missed === 1 && mf.burst.caughtNow === 1 && mf.wall && mf.wall.missed === 1 && mf.wall.stillMissed === 1],
     ["recall counts what was called real: agree groups plus caught missed", mf.burst.real === 7 && Math.abs(mf.burst.recall - 7/7) < 1e-9],
