@@ -239,3 +239,18 @@ td.up{color:var(--buy)}td.dn{color:var(--sell)}
   .rv-keys td{border:0;padding:1px 6px}
   .rv-keys td:nth-child(3),.rv-keys td:nth-child(4){grid-column:1/-1}
 }
+
+/* Arm mode (Now): the leave-it-open screen. Colours are tokens only. */
+.am-hero{display:flex;flex-wrap:wrap;gap:10px 24px;justify-content:space-between;align-items:center;border-left:6px solid var(--edge);padding:6px 0 6px 14px}
+.am-h-ok{border-color:var(--buy)}.am-h-warn{border-color:var(--warn)}.am-h-rec{border-color:var(--sell)}.am-h-info{border-color:var(--accent)}
+.am-big{font-size:26px;font-weight:700;color:var(--hi);letter-spacing:.5px}.am-h-rec .am-big{color:var(--sell)}.am-h-ok .am-big{color:var(--buy)}.am-h-warn .am-big{color:var(--warn)}
+.am-subline{color:var(--text);font-size:13px;margin-top:4px}
+.am-side{text-align:right}.am-clock{font-size:22px;color:var(--hi)}.am-side button{margin-top:6px}
+.am-alert{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px;color:var(--text)}
+.am-a-bad{color:var(--sell)}.am-a-warn{color:var(--warn)}.am-a-ok{color:var(--buy)}
+.am-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;flex:none;background:var(--dim)}
+.am-ok{background:var(--buy)}.am-warn{background:var(--warn)}.am-bad{background:var(--sell)}.am-info{background:var(--accent)}.am-off{background:var(--dim)}
+.am-kv{display:flex;justify-content:space-between;gap:12px;padding:4px 0;border-bottom:1px solid var(--line);font-size:12.5px}.am-kv span{color:var(--dim)}.am-kv b{color:var(--hi);text-align:right;font-weight:600}
+.am-t-ok,.am-t-up{color:var(--buy)!important}.am-t-warn{color:var(--warn)!important}.am-t-bad,.am-t-dn,.am-t-rec{color:var(--sell)!important}
+.am-sub{color:var(--dim);font-size:11.5px;margin:8px 0 3px}.am-chip{display:inline-block;margin:2px 10px 2px 0;font-size:12px;color:var(--text)}
+.am-ep{font-size:12px;padding:3px 0;color:var(--text);border-bottom:1px solid var(--line)}.am-ep b{color:var(--accent)}
