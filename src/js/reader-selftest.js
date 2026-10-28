@@ -980,6 +980,18 @@ const READER_SELFTEST=(()=>{
     const cd=STATUS.chips(Object.assign({},base,{ar:{on:true,ready:true,mode:"waiting",wake:true,runs:1,cooldownMin:7}})),after=STATUS.chips(Object.assign({},base,{ar:{on:true,ready:true,mode:"waiting",wake:true,runs:2,cooldownMin:0}}));
     return{ok:t(cd)==="armed · cooldown 7 min"&&t(after)==="armed · waiting · 2 recorded",detail:t(cd)+" // "+t(after)};
   });
+  add("label queue: oldest first, skips labelled and forming groups, wraps, honours the family filter",E=>{
+    const g=(id,t,f)=>({id,tDetected:t,tStart:t-5,family:f||"burst"}),gs=[g(3,300),g(1,100),g(2,200,"wall"),g("f|9",50),g(4,400)],done=new Set([1]),lab=x=>done.has(x.id);
+    const order=LABELQ.sorted(gs).map(x=>x.id).join(","),first=LABELQ.pick(gs,lab,null,1),last=LABELQ.pick(gs,lab,null,-1),after2=LABELQ.pick(gs,lab,2,1),before3=LABELQ.pick(gs,lab,3,-1);
+    done.add(3);const wrap=LABELQ.pick(gs,lab,4,1),onlyWall=LABELQ.pick(gs,lab,null,1,new Set(["wall"])),noBurstOpen=LABELQ.pick(gs,lab,2,1,new Set(["burst"]));
+    done.add(2);done.add(4);const none=LABELQ.pick(gs,lab,2,1),prog=LABELQ.progress(gs,lab),none2=LABELQ.pick([],lab,null,1);
+    return{ok:order==="1,2,3,4"&&first===2&&last===4&&after2===3&&before3===2&&wrap===2&&onlyWall===2&&noBurstOpen===4&&none===null&&none2===null&&prog.total===4&&prog.labelled===4&&prog.open===0,detail:JSON.stringify({order,first,last,after2,before3,wrap,onlyWall,noBurstOpen,none,prog})};
+  });
+  add("label queue: after labelling the current group the next open one follows it, not the start of the list",E=>{
+    const gs=[1,2,3,4,5].map(i=>({id:i,tDetected:i*100,family:"burst"})),done=new Set(),lab=x=>done.has(x.id);
+    done.add(3);const a=LABELQ.pick(gs,lab,3,1);done.add(a);const b=LABELQ.pick(gs,lab,a,1);done.add(1);const c=LABELQ.pick(gs,lab,5,1),self=LABELQ.pick([{id:7,tDetected:1,family:"wall"}],()=>false,7,1);
+    return{ok:a===4&&b===5&&c===2&&self===7,detail:JSON.stringify({a,b,c,self})};
+  });
   function run(Eng){return scenarios.map(sc=>{try{const r=sc.run(Eng);return{name:sc.name,ok:!!r.ok,detail:r.detail};}catch(err){return{name:sc.name,ok:false,detail:String(err&&err.stack||err)};}});}
   return {T0,rng,poisson,levels,sim,scenarios,run};
 })();

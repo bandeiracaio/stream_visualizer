@@ -258,6 +258,8 @@
     <h2>Timeline <span class="ctl"><label>window <select id="tlWin"><option value="300000">5 min</option><option value="900000" selected>15 min</option><option value="1800000">30 min</option><option value="0">all</option></select></label></span></h2>
     <canvas id="tlCv" class="chart" style="height:260px"></canvas>
     <div class="legend" id="tlLegend"></div>
+    <div class="lqbar" id="lqBar"><span class="stat" id="lqInfo"></span><button id="lqPrev" title="Previous unlabelled episode (key: left arrow or P)">&larr; prev</button><button id="lqNext" title="Next unlabelled episode (key: right arrow or N)">next &rarr;</button><label><input type="checkbox" id="lqAuto" checked> next after a label</label></div>
+    <div class="note" id="lqKeys">Going through episodes: tap a bar or use next, then agree / disagree. Keys on a computer: &rarr; or N next, &larr; or P previous, A agree, D disagree.</div>
     <div id="tlDetail"></div>
   </section>
 
@@ -593,6 +595,12 @@
 </script>
 <script>
 <!--@include js/arm-mode.js-->
+</script>
+<script>
+<!--@include js/label-queue-core.js-->
+</script>
+<script>
+<!--@include js/label-queue.js-->
 </script>
 </body>
 </html>
