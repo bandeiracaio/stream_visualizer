@@ -13,7 +13,7 @@ const src = p => path.join(root, "src", p);
 const read = p => fs.readFileSync(src(p), "utf8");
 
 function selfTest() {
-  const code = read("js/reader-drift.js") + "\n" + read("js/reader-proposals.js") + "\n" + read("js/reader-register.js") + "\n" + read("js/reader-episodes.js") + "\n" + read("js/reader-engine.js") + "\n" + read("js/reader-landscape.js") + "\n" + read("js/auto-record-core.js") + "\n" + read("js/status-core.js") + "\n" + read("js/session-quality.js") + "\n" + read("js/history-core.js") + "\n" + read("js/collectors-core.js") + "\n" + read("js/label-queue-core.js") + "\n" + read("js/reader-selftest.js") + "\n;READER_SELFTEST.run(READER_ENGINE);";
+  const code = read("js/reader-drift.js") + "\n" + read("js/reader-proposals.js") + "\n" + read("js/reader-register.js") + "\n" + read("js/reader-episodes.js") + "\n" + read("js/reader-engine.js") + "\n" + read("js/reader-landscape.js") + "\n" + read("js/auto-record-core.js") + "\n" + read("js/status-core.js") + "\n" + read("js/session-quality.js") + "\n" + read("js/history-core.js") + "\n" + read("js/collectors-core.js") + "\n" + read("js/label-queue-core.js") + "\n" + read("js/lab-core.js") + "\n" + read("js/reader-selftest.js") + "\n;READER_SELFTEST.run(READER_ENGINE);";
   const results = vm.runInNewContext(code, {}, { timeout: 120000 });
   const bad = results.filter(r => !r.ok);
   for (const r of results) console.log((r.ok ? "  pass  " : "  FAIL  ") + r.name + (r.ok ? "" : "\n        " + r.detail));
@@ -26,8 +26,23 @@ function syntaxCheck(name, body) {
   catch (e) { console.error("\nsyntax error in src/" + name + ": " + e.message + "\n" + (e.stack || "").split("\n").slice(0, 4).join("\n") + "\nbuild aborted."); process.exit(1); }
 }
 
+// The lab entries (docs/lab/*.json) are checked with LAB.validate (a bad one aborts the build) and embedded as LAB_ENTRIES, so the Analysis tab works offline.
+function labEntries() {
+  const LAB = vm.runInNewContext(read("js/lab-core.js") + "\n;LAB", {});
+  const dir = path.join(root, "docs", "lab"), list = [], seen = new Set();
+  for (const f of fs.existsSync(dir) ? fs.readdirSync(dir).filter(f => f.endsWith(".json")).sort() : []) {
+    const text = fs.readFileSync(path.join(dir, f), "utf8");
+    let e; try { e = JSON.parse(text); } catch (err) { console.error("\ndocs/lab/" + f + ": not valid JSON (" + err.message + ")\nbuild aborted."); process.exit(1); }
+    const bad = LAB.validate(e); if (Buffer.byteLength(text) > LAB.MAX_BYTES) bad.push("larger than " + LAB.MAX_BYTES / 1024 + " KB"); if (seen.has(e.id)) bad.push("duplicate id " + e.id); seen.add(e.id);
+    if (bad.length) { console.error("\ndocs/lab/" + f + " is not a valid lab entry:\n  " + bad.join("\n  ") + "\nbuild aborted."); process.exit(1); }
+    list.push(e);
+  }
+  return list;
+}
+
 function assemble() {
   return read("index.html").split("\n").map(line => {
+    if (line === "<!--@lab-entries-->") return "const LAB_ENTRIES = " + JSON.stringify(labEntries()).replace(/</g, "\\u003c") + ";";
     const m = line.match(/^<!--@include (\S+)-->$/);
     if (!m) return line;
     const body = read(m[1]);

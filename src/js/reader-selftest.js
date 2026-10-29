@@ -992,6 +992,16 @@ const READER_SELFTEST=(()=>{
     done.add(3);const a=LABELQ.pick(gs,lab,3,1);done.add(a);const b=LABELQ.pick(gs,lab,a,1);done.add(1);const c=LABELQ.pick(gs,lab,5,1),self=LABELQ.pick([{id:7,tDetected:1,family:"wall"}],()=>false,7,1);
     return{ok:a===4&&b===5&&c===2&&self===7,detail:JSON.stringify({a,b,c,self})};
   });
+  add("lab: entry validation, filter, order and number format",E=>{
+    const ok={kind:"sv-lab-entry",version:1,id:"a-b",title:"T",date:"2026-10-29",verdict:"idea",question:"Q?",tags:["x"],method:{summary:"m"},results:[{type:"text",text:"t"},{type:"table",columns:["a","b"],rows:[[1,2]]},{type:"bars",items:[{label:"l",value:-1}]},{type:"series",x:[0,1],y:[2,3]}]};
+    const bad=(f)=>{const e=JSON.parse(JSON.stringify(ok));f(e);return LAB.validate(e).length;};
+    const mk=(id,date,v,t)=>Object.assign(JSON.parse(JSON.stringify(ok)),{id,date,verdict:v,title:t});
+    const L=[mk("b","2026-10-28","idea","Flow bars"),mk("a","2026-10-29","confirmed","Wall hold"),mk("c","2026-10-29","rejected","Sigma")];
+    const order=LAB.sorted(L).map(e=>e.id).join(","),byV=LAB.filter(L,"idea","").length,byQ=LAB.filter(L,"all","wall").map(e=>e.id).join(","),byTag=LAB.filter(L,"all","X").length,cnt=LAB.counts(L);
+    const f=[LAB.fmt(0),LAB.fmt(0.123456),LAB.fmt(12.3456),LAB.fmt(1234.56),LAB.fmt(2500000),LAB.fmt(null),LAB.fmt("s"),LAB.fmt(NaN)].join("|");
+    const good=LAB.validate(ok).length===0&&bad(e=>{e.kind="x"})===1&&bad(e=>{e.id="Bad Id"})===1&&bad(e=>{e.verdict="maybe"})===1&&bad(e=>{e.date="29/10/2026"})===1&&bad(e=>{e.results[1].rows=[[1]]})===1&&bad(e=>{e.results[3].y=[1]})===1&&bad(e=>{e.results.push({type:"pie"})})===1&&bad(e=>{delete e.method})===1&&bad(e=>{e.results=null})===1&&LAB.validate(null).length===1;
+    return{ok:good&&order==="a,c,b"&&byV===1&&byQ==="a"&&byTag===3&&cnt.idea===1&&cnt.confirmed===1&&cnt.rejected===1&&f==="0|0.12|12.35|1235|2.50M|–|s|NaN",detail:JSON.stringify({good,order,byV,byQ,byTag,cnt,f})};
+  });
   function run(Eng){return scenarios.map(sc=>{try{const r=sc.run(Eng);return{name:sc.name,ok:!!r.ok,detail:r.detail};}catch(err){return{name:sc.name,ok:false,detail:String(err&&err.stack||err)};}});}
   return {T0,rng,poisson,levels,sim,scenarios,run};
 })();

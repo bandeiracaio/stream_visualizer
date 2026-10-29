@@ -62,6 +62,35 @@ td.px.b{color:var(--buy)}td.px.a{color:var(--sell)}
 pre.inspect{margin:0;max-height:300px;overflow:auto;background:var(--canvas);border-radius:var(--r);padding:8px;font-size:11px;font-family:var(--mono);color:var(--text)}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .note{color:var(--dim);font-size:11px;margin-top:6px}
+/* Analysis lab (lab.js) */
+#labRoot{margin-top:8px}
+#labRoot input[type=search]{flex:1 1 180px;min-width:0}
+.labrow{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;margin-top:6px;padding:8px 10px;text-align:left;text-transform:none;letter-spacing:0;white-space:normal;background:var(--panel2);color:var(--text);border:1px solid var(--line)}
+.labrow:hover{border-color:var(--accent)}
+.labrt{color:var(--hi);font-weight:600}
+.labrm,.labrq{color:var(--dim);font-size:11px}
+.labv{font-weight:600;text-transform:uppercase;letter-spacing:.8px;font-size:10.5px}
+.labt{margin:12px 0 4px;font-size:13px;color:var(--hi)}
+.labblock{margin-top:10px;padding:8px 10px;background:var(--panel2);border:1px solid var(--line)}
+.labblock p{margin:4px 0}
+.labblock ul{margin:4px 0;padding-left:18px}
+.labbt{font-size:10.5px;text-transform:uppercase;letter-spacing:1.2px;color:var(--accent)}
+.labsub{margin-top:6px;color:var(--dim);font-size:11px}
+.labkv{display:flex;gap:10px;font-size:11.5px;margin-top:3px}
+.labkv span:first-child{flex:0 0 70px;color:var(--dim)}
+.labkv span:last-child{min-width:0;overflow-wrap:anywhere}
+.labwarn{margin-top:8px;padding:6px 10px;border:1px solid var(--warn);color:var(--warn)}
+.labtbl{overflow-x:auto;margin-top:4px}
+.labtbl th{text-align:left;color:var(--dim);font-weight:400;border-bottom:1px solid var(--line);padding:3px 8px 3px 0}
+.labtbl td{padding:3px 8px 3px 0;border-bottom:1px solid var(--line)}
+.labbars{margin-top:4px}
+.labbar{display:flex;align-items:center;gap:8px;font-size:11.5px;margin-top:3px}
+.labbar .lbl{flex:0 0 70px;color:var(--dim);overflow-wrap:anywhere}
+.labbar .trk{position:relative;flex:1;height:10px;background:var(--canvas)}
+.labbar .trk i{position:absolute;top:0;bottom:0}
+.labbar .val{flex:0 0 52px;text-align:right}
+.labsvg{width:100%;max-width:520px;display:block;background:var(--canvas);margin-top:4px}
+.labsvg text{fill:var(--dim);font:9px var(--mono)}
 .full{grid-column:1/-1}
 canvas.chart{width:100%;display:block;background:var(--canvas);border-radius:var(--r)}
 #cvBub{height:340px}#cvCvd{height:200px}#cvHeat{height:400px}.mchart{height:170px}#cvHist{height:190px}
