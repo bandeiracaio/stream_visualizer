@@ -16,7 +16,7 @@ import { quantile, median, mean, spearman, finite } from "./lab-stats.mjs";
 export const PARAMS = { venue: "bn", targetSec: 10, gapSec: 60, depthLevels: 10, sigmaLagSec: 15, sigmaWinSec: 1800, sigmaMinN: 60, sigmaFloor: 0.05, q75k: 1.1503 };
 
 // robust sigma (bps per root second) at grid second `idx`, from the overlapping `lag`-second returns that ended in the `win` seconds up to idx
-function sigmaAt(grid, idx, P) {
+export function sigmaAt(grid, idx, P = PARAMS) {
   const lag = P.sigmaLagSec, r = [];
   for (let k = Math.max(lag, idx - P.sigmaWinSec + 1); k <= idx && k < grid.length; k++) { const a = grid[k - lag], b = grid[k]; if (a > 0 && b > 0) r.push(1e4 * Math.log(b / a)); }
   if (r.length < P.sigmaMinN) return P.sigmaFloor;

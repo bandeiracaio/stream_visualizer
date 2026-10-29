@@ -1,0 +1,213 @@
+{
+ "kind": "sv-lab-entry",
+ "version": 1,
+ "id": "dependence-slicing-vs-persistence-2026-10-29",
+ "title": "Is the bar-to-bar dependence slicing or real persistence of flow?",
+ "date": "2026-10-29",
+ "verdict": "confirmed",
+ "tags": [
+  "bars",
+  "flow",
+  "persistence",
+  "plan"
+ ],
+ "verdictNote": "slicing supported: rho at 10 s delay is 0.028 (< 0.05). The same pairs on the bars (lag 1) give rho 0.257 (p 0.001). Reading: the dependence is 0.257 between consecutive bars, only 0.082 between adjacent clock windows, and 0.028 once a 10 s pause separates them. So most of what the bars showed comes from cutting bursts into bars, with a small real same-direction carry-over between neighbouring windows that does not last 10 s. Bars are still fine as a unit for describing and clustering, but a bar's flow should not be read as a signal for the next bar. Sessions are one short run each on a few days, so the result is about those days only.",
+ "question": "The bars showed the next bar's return moving with this bar's flow imbalance (rho 0.26), which we had expected to be near zero. Is that an artifact of cutting continuous bursts into bars, or does the flow really persist in clock time?",
+ "data": {
+  "files": [
+   "session_BTC_202610182330.json.gz",
+   "session_BTC_202610220335.json.gz",
+   "session_BTC_202610220600.json.gz",
+   "session_BTC_202610220634.json.gz",
+   "session_BTC_202610220709.json.gz",
+   "session_BTC_202610220914.json.gz",
+   "session_BTC_202610221331.json.gz",
+   "session_BTC_202610230501.json.gz",
+   "session_BTC_202610230534.json.gz",
+   "session_BTC_202610230735.json.gz",
+   "session_BTC_202610230931.json.gz",
+   "session_BTC_202610231331.json.gz",
+   "session_BTC_202610231415.json.gz",
+   "session_BTC_202610232204.json.gz",
+   "session_BTC_202610240229.json.gz",
+   "session_BTC_202610240350.json.gz",
+   "session_BTC_202610160029.json.gz",
+   "session_BTC_202610240734.json.gz",
+   "session_BTC_202610240841.json.gz",
+   "session_BTC_202610240935.json.gz",
+   "session_BTC_202610241335.json.gz",
+   "session_BTC_202610241415.json.gz",
+   "session_BTC_202610241519.json.gz",
+   "session_BTC_202610241605.json.gz",
+   "session_BTC_202610241651.json.gz",
+   "session_BTC_202610241859.json.gz",
+   "session_BTC_202610242001.json.gz",
+   "session_BTC_202610270439.json.gz",
+   "session_BTC_202610270523.json.gz",
+   "session_BTC_202610270624.json.gz",
+   "session_BTC_202610270726.json.gz",
+   "session_BTC_202610270826.json.gz",
+   "session_BTC_202610270927.json.gz",
+   "session_BTC_202610271028.json.gz",
+   "session_BTC_202610280329.json.gz",
+   "session_BTC_202610282344.json.gz"
+  ],
+  "range": "same sessions as the bars entry",
+  "counts": {
+   "sessions": 36,
+   "windows": 5621,
+   "decidingHalfSessions": 28,
+   "bars": 5676
+  }
+ },
+ "method": {
+  "summary": "Binance trades cut into non-overlapping 10 s clock windows (independent of bar boundaries). Flow imbalance of a window against the sigma-scaled return of a later window starting 0, 10, 30 or 60 s after it ends. Spearman rank correlation, circular-shift permutation p-values (999 shifts per session, so the autocorrelation of both series is kept), deciding and confirming halves in time.",
+  "params": {
+   "windowSec": 10,
+   "deltasSec": [
+    0,
+    10,
+    30,
+    60
+   ],
+   "permutations": 999,
+   "seed": 20261029,
+   "sigma": "ADR 0004, previous 30 minutes",
+   "alphaPerTest": 0.0125
+  },
+  "plan": [
+   "Decision fixed in advance. Slicing supported if rho at a 10 s pause is below 0.05 over all windows.",
+   "Slicing rejected if rho at a 10 s pause is above 0.1 in both halves and significant (p < 0.0125) in the confirming half.",
+   "Anything else is inconclusive. Four pauses were tested, so the per-test level is 0.05 / 4.",
+   "The bars' lag-1 pairs get the same permutation test, and are split by the duration of the next bar (descriptive)."
+  ],
+  "rerun": "node lab-persist.mjs session_*.json.gz --bars lab-data/bars.json --entry docs/lab/lab_2026-10-29_dependence.json --date 2026-10-29"
+ },
+ "results": [
+  {
+   "type": "text",
+   "text": "Associated with, not caused by: this is about how a window's flow relates to a later window's price move, in these sessions. The pairs of neighbouring windows overlap in what they describe, which is why p-values come from shifting the series, not from a formula."
+  },
+  {
+   "type": "table",
+   "title": "Flow imbalance of a 10 s window vs the return of a later 10 s window (Spearman rho, shift-test p)",
+   "columns": [
+    "pause (s)",
+    "pairs",
+    "rho all",
+    "p all",
+    "rho deciding half",
+    "p deciding",
+    "rho confirming half",
+    "p confirming"
+   ],
+   "rows": [
+    [
+     0,
+     5568,
+     0.082,
+     "0.001",
+     0.064,
+     "0.03",
+     0.098,
+     "0.007"
+    ],
+    [
+     10,
+     5514,
+     0.028,
+     "0.09",
+     0.01,
+     "0.666",
+     0.046,
+     "0.045"
+    ],
+    [
+     30,
+     5437,
+     -0.026,
+     "0.115",
+     -0.035,
+     "0.182",
+     -0.021,
+     "0.314"
+    ],
+    [
+     60,
+     5329,
+     0.002,
+     "0.925",
+     0,
+     "0.998",
+     0.002,
+     "0.928"
+    ]
+   ]
+  },
+  {
+   "type": "bars",
+   "title": "Clock-time dependence by pause: rho over all windows",
+   "unit": "rho",
+   "items": [
+    {
+     "label": "0 s",
+     "value": 0.082
+    },
+    {
+     "label": "10 s",
+     "value": 0.028
+    },
+    {
+     "label": "30 s",
+     "value": -0.026
+    },
+    {
+     "label": "60 s",
+     "value": 0.002
+    }
+   ]
+  },
+  {
+   "type": "table",
+   "title": "The bars' lag-1 pairs",
+   "columns": [
+    "pairs",
+    "rho",
+    "shift-test p"
+   ],
+   "rows": [
+    [
+     5636,
+     0.257,
+     "0.001"
+    ]
+   ]
+  },
+  {
+   "type": "table",
+   "title": "The bars' lag-1 dependence by the duration of the next bar (descriptive: a bar's duration is only known after it closes, so this explains the dependence, it is not usable as a signal)",
+   "columns": [
+    "group",
+    "pairs",
+    "rho"
+   ],
+   "rows": [
+    [
+     "shortest third (next bar < 1.2 s)",
+     1879,
+     0.408
+    ],
+    [
+     "middle third",
+     1879,
+     0.187
+    ],
+    [
+     "longest third (next bar > 8.3 s)",
+     1878,
+     0.056
+    ]
+   ]
+  }
+ ]
+}
