@@ -4,3 +4,4 @@ reader_register_*.json
 *.jfif
 tape_*.json
 health_*.json
+lab-data/

@@ -1,0 +1,515 @@
+{
+ "kind": "sv-lab-entry",
+ "version": 1,
+ "id": "bars-coverage-2026-10-29",
+ "title": "Event-time bars from saved sessions: coverage and feature distributions",
+ "date": "2026-10-29",
+ "verdict": "inconclusive",
+ "tags": [
+  "bars",
+  "data",
+  "flow"
+ ],
+ "verdictNote": "The bars are built correctly as far as we can check: flow imbalance moves with the same bar's return (rho 0.638), no bar spans a session or a long silence, and the spread, trade counts and sizes match what the market looks like. But the second check fixed in advance FAILED: we expected the next bar's return to be nearly unrelated to this bar's flow and return, and it is not (rho 0.257 and 0.171). Consecutive bars tile one continuous trade stream, so a burst of orders can be cut into several bars; the dependence may be that slicing rather than anything tradable, and the pairs overlap in time so no p-value is claimed. The lag table below shows how far it reaches. To be examined with a proper plan before anything is built on it. Near-touch depth is the top 10 levels (Binance snapshots hold only about 0.5 bps of the book); wider depth lives in the collector data and comes later.",
+ "question": "Can our saved sessions be turned into event-time bars with a sensible feature vector, and what do the bars look like (size, duration, flow, price, depth, time of day)?",
+ "data": {
+  "files": [
+   "session_BTC_202610182330.json.gz",
+   "session_BTC_202610220335.json.gz",
+   "session_BTC_202610220600.json.gz",
+   "session_BTC_202610220634.json.gz",
+   "session_BTC_202610220709.json.gz",
+   "session_BTC_202610220914.json.gz",
+   "session_BTC_202610221331.json.gz",
+   "session_BTC_202610230501.json.gz",
+   "session_BTC_202610230534.json.gz",
+   "session_BTC_202610230735.json.gz",
+   "session_BTC_202610230931.json.gz",
+   "session_BTC_202610231331.json.gz",
+   "session_BTC_202610231415.json.gz",
+   "session_BTC_202610232204.json.gz",
+   "session_BTC_202610240229.json.gz",
+   "session_BTC_202610240350.json.gz",
+   "session_BTC_202610160029.json.gz",
+   "session_BTC_202610240734.json.gz",
+   "session_BTC_202610240841.json.gz",
+   "session_BTC_202610240935.json.gz",
+   "session_BTC_202610241335.json.gz",
+   "session_BTC_202610241415.json.gz",
+   "session_BTC_202610241519.json.gz",
+   "session_BTC_202610241605.json.gz",
+   "session_BTC_202610241651.json.gz",
+   "session_BTC_202610241859.json.gz",
+   "session_BTC_202610242001.json.gz",
+   "session_BTC_202610270439.json.gz",
+   "session_BTC_202610270523.json.gz",
+   "session_BTC_202610270624.json.gz",
+   "session_BTC_202610270726.json.gz",
+   "session_BTC_202610270826.json.gz",
+   "session_BTC_202610270927.json.gz",
+   "session_BTC_202610271028.json.gz",
+   "session_BTC_202610280329.json.gz",
+   "session_BTC_202610282344.json.gz"
+  ],
+  "range": "2026-10-18 .. 2026-10-29",
+  "counts": {
+   "sessions": 36,
+   "dataMinutes": 871,
+   "bars": 5676,
+   "partialDroppedAtGap": 18,
+   "partialDroppedAtEnd": 36
+  }
+ },
+ "method": {
+  "summary": "Dollar bars on Binance trades: a bar closes when its trades add up to the bar size, so activity sets the clock. Bar size chosen from the data so a bar lasts about 10 s on average (the median is 3.721 s: activity comes in bursts, so most bars are short and a few are long; 6.7% close within the same millisecond) (1,300,000 USD). Per bar: aggressor flow and imbalance, OHLC, return in bps and in sigmas (ADR 0004 scale, from the previous 30 minutes only), near-touch depth and its imbalance and change, spread, Hyperliquid flow in the same window, Binance sweeps, largest-trade share, hour of day. Bars never span sessions or a silence over 60 s.",
+  "params": {
+   "barUsd": 1300000,
+   "venue": "bn",
+   "targetSec": 10,
+   "gapSec": 60,
+   "depthLevels": 10,
+   "sigmaLagSec": 15,
+   "sigmaWinSec": 1800
+  },
+  "plan": [
+   "Bar size is decided from the data before looking at any relationship, and is not tuned afterwards.",
+   "Sanity checks fixed in advance: flow imbalance should correlate positively with the same bar's return; the next bar's return should be nearly unrelated to this bar's flow (did not hold, see the verdict).",
+   "Rank (Spearman) correlation, descriptive only; no test is claimed in this entry."
+  ],
+  "rerun": "node lab-bars.mjs session_*.json.gz --entry docs/lab/lab_2026-10-29_bars-coverage.json --date 2026-10-29"
+ },
+ "results": [
+  {
+   "type": "text",
+   "text": "Bars are descriptive. A correlation here is a check that the bars are built correctly, not a market finding."
+  },
+  {
+   "type": "table",
+   "title": "Feature distributions over all bars (5th / 25th / 50th / 75th / 95th percentile, share missing)",
+   "columns": [
+    "feature",
+    "p5",
+    "p25",
+    "median",
+    "p75",
+    "p95",
+    "missing"
+   ],
+   "rows": [
+    [
+     "duration (s)",
+     0,
+     0.403,
+     3.721,
+     12.264,
+     42.03,
+     0
+    ],
+    [
+     "trades",
+     82,
+     206,
+     345,
+     508,
+     814,
+     0
+    ],
+    [
+     "taker-flow imbalance",
+     -1,
+     -0.597,
+     -0.058,
+     0.507,
+     1,
+     0
+    ],
+    [
+     "return (bps)",
+     -3.227,
+     -1.087,
+     0,
+     1.096,
+     3.161,
+     0
+    ],
+    [
+     "return (sigmas)",
+     -4.225,
+     -0.758,
+     0,
+     0.724,
+     3.072,
+     0
+    ],
+    [
+     "range (bps)",
+     0.099,
+     0.899,
+     1.668,
+     2.676,
+     4.515,
+     0
+    ],
+    [
+     "largest trade share",
+     0.048,
+     0.075,
+     0.11,
+     0.163,
+     0.369,
+     0
+    ],
+    [
+     "spread (bps)",
+     0.012,
+     0.012,
+     0.012,
+     0.013,
+     0.123,
+     0
+    ],
+    [
+     "top-10 depth (USD)",
+     498646.786,
+     823907.666,
+     1158044.488,
+     1645557.149,
+     3006818.313,
+     0
+    ],
+    [
+     "depth imbalance",
+     -0.924,
+     -0.502,
+     0.014,
+     0.569,
+     0.94,
+     0
+    ],
+    [
+     "depth change (log)",
+     -0.919,
+     -0.272,
+     0,
+     0.259,
+     0.932,
+     0.007
+    ],
+    [
+     "Hyperliquid flow imbalance",
+     -1,
+     -0.809,
+     0.134,
+     0.874,
+     1,
+     0.213
+    ],
+    [
+     "Binance sweeps",
+     0,
+     3,
+     8,
+     16,
+     30,
+     0
+    ],
+    [
+     "sigma (bps/√s)",
+     0.05,
+     0.358,
+     0.573,
+     1.384,
+     2.011,
+     0
+    ]
+   ]
+  },
+  {
+   "type": "table",
+   "title": "Sanity checks (Spearman rank correlation)",
+   "columns": [
+    "pair",
+    "rho",
+    "pairs"
+   ],
+   "rows": [
+    [
+     "flow imbalance vs the same bar's return (sigmas)",
+     0.638,
+     5676
+    ],
+    [
+     "flow imbalance vs the NEXT bar's return",
+     0.257,
+     5676
+    ],
+    [
+     "this bar's return vs the NEXT bar's return",
+     0.171,
+     5676
+    ]
+   ]
+  },
+  {
+   "type": "table",
+   "title": "How far the dependence reaches: a bar vs the bar L bars later (Spearman)",
+   "columns": [
+    "L bars later",
+    "pairs",
+    "flow imbalance vs that return",
+    "return vs that return"
+   ],
+   "rows": [
+    [
+     1,
+     5636,
+     0.257,
+     0.171
+    ],
+    [
+     2,
+     5596,
+     0.117,
+     0.077
+    ],
+    [
+     3,
+     5556,
+     0.087,
+     0.059
+    ],
+    [
+     5,
+     5476,
+     0.072,
+     0.045
+    ],
+    [
+     10,
+     5278,
+     0.068,
+     0.048
+    ],
+    [
+     20,
+     4923,
+     0.015,
+     0.025
+    ]
+   ]
+  },
+  {
+   "type": "text",
+   "text": "8.6% of bars sit at the sigma floor (the first ~75 s of a session, before 60 returns exist); their return in sigmas is not comparable with the rest."
+  },
+  {
+   "type": "series",
+   "title": "Bars by hour of day (UTC): when our recordings were active",
+   "xLabel": "hour (UTC)",
+   "yLabel": "bars",
+   "x": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23
+   ],
+   "y": [
+    27,
+    0,
+    20,
+    226,
+    184,
+    202,
+    285,
+    568,
+    151,
+    362,
+    383,
+    123,
+    0,
+    591,
+    1787,
+    430,
+    148,
+    0,
+    5,
+    53,
+    16,
+    0,
+    8,
+    107
+   ]
+  },
+  {
+   "type": "bars",
+   "title": "Bars per session",
+   "unit": "bars",
+   "items": [
+    {
+     "label": "s1",
+     "value": 83
+    },
+    {
+     "label": "s2",
+     "value": 0
+    },
+    {
+     "label": "s3",
+     "value": 65
+    },
+    {
+     "label": "s4",
+     "value": 58
+    },
+    {
+     "label": "s5",
+     "value": 239
+    },
+    {
+     "label": "s6",
+     "value": 63
+    },
+    {
+     "label": "s7",
+     "value": 399
+    },
+    {
+     "label": "s8",
+     "value": 52
+    },
+    {
+     "label": "s9",
+     "value": 21
+    },
+    {
+     "label": "s10",
+     "value": 15
+    },
+    {
+     "label": "s11",
+     "value": 62
+    },
+    {
+     "label": "s12",
+     "value": 286
+    },
+    {
+     "label": "s13",
+     "value": 635
+    },
+    {
+     "label": "s14",
+     "value": 8
+    },
+    {
+     "label": "s15",
+     "value": 20
+    },
+    {
+     "label": "s16",
+     "value": 167
+    },
+    {
+     "label": "s17",
+     "value": 41
+    },
+    {
+     "label": "s18",
+     "value": 14
+    },
+    {
+     "label": "s19",
+     "value": 20
+    },
+    {
+     "label": "s20",
+     "value": 110
+    },
+    {
+     "label": "s21",
+     "value": 19
+    },
+    {
+     "label": "s22",
+     "value": 1049
+    },
+    {
+     "label": "s23",
+     "value": 420
+    },
+    {
+     "label": "s24",
+     "value": 73
+    },
+    {
+     "label": "s25",
+     "value": 75
+    },
+    {
+     "label": "s26",
+     "value": 58
+    },
+    {
+     "label": "s27",
+     "value": 16
+    },
+    {
+     "label": "s28",
+     "value": 62
+    },
+    {
+     "label": "s29",
+     "value": 162
+    },
+    {
+     "label": "s30",
+     "value": 203
+    },
+    {
+     "label": "s31",
+     "value": 211
+    },
+    {
+     "label": "s32",
+     "value": 134
+    },
+    {
+     "label": "s33",
+     "value": 197
+    },
+    {
+     "label": "s34",
+     "value": 377
+    },
+    {
+     "label": "s35",
+     "value": 211
+    },
+    {
+     "label": "s36",
+     "value": 51
+    }
+   ]
+  }
+ ]
+}
