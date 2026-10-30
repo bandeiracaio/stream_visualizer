@@ -40,7 +40,7 @@ export function coverage(records, a, b) {
   for (const r of records) { (byName[r[1]] ||= []).push(r[2]); const o = COLLECT.ownerOf(r[1]); if (o) (byOwner[o] ||= []).push(r[2]); }
   const total = Math.max(1, Math.floor(b/MIN) - Math.floor(a/MIN) + 1);
   const sum = (times, expect) => {
-    const t = times.filter(x => x >= a && x <= b).sort((x, y) => x - y), g = gapsOf(t), mx = g.length ? Math.max(...g) : null;
+    const t = times.filter(x => x >= a && x <= b).sort((x, y) => x - y), g = gapsOf(t), mx = g.length ? g.reduce((m, x) => x > m ? x : m, -Infinity) : null;
     return { n:t.length, medianGapMs:median(g), maxGapMs:mx, minutes:minutesWith(t, a, b), minutesPct:Math.round(100*minutesWith(t, a, b)/total), onTimePct:expect && g.length ? Math.round(100*g.filter(x => x <= 3*expect).length/g.length) : null };
   };
   const owners = {}, names = {};
@@ -70,7 +70,7 @@ export function fieldStats(records) {
     out[name] = {};
     for (const k in by[name]) {
       const a = by[name][k], n = a.length, mean = a.reduce((x, y) => x + y, 0)/n, sd = Math.sqrt(a.reduce((x, y) => x + (y - mean)**2, 0)/n);
-      out[name][k] = { n, distinct:new Set(a).size, min:Math.min(...a), max:Math.max(...a), sd:+sd.toPrecision(4) };
+      out[name][k] = { n, distinct:new Set(a).size, min:a.reduce((m, x) => x < m ? x : m, Infinity), max:a.reduce((m, x) => x > m ? x : m, -Infinity), sd:+sd.toPrecision(4) };
     }
   }
   return out;
@@ -177,7 +177,7 @@ export function evaluate(records, plan = PLAN) {
 const dur = ms => ms == null ? "-" : ms < 90000 ? Math.round(ms/1000) + "s" : ms < 5400000 ? Math.round(ms/MIN) + "m" : (ms/3600000).toFixed(1) + "h";
 export function analyze(input, plan = PLAN) {
   const recs = input.records, times = recs.map(r => r[2]);
-  const a = input.t0 != null ? input.t0 - 30*MIN : Math.min(...times), b = input.t1 != null ? input.t1 : Math.max(...times);
+  const a = input.t0 != null ? input.t0 - 30*MIN : times.reduce((m, x) => x < m ? x : m, Infinity), b = input.t1 != null ? input.t1 : times.reduce((m, x) => x > m ? x : m, -Infinity);
   const cov = recs.length ? coverage(recs, a, b) : null, st = recs.length ? fieldStats(recs) : {};
   return { file:input.file, kind:input.kind, window:{ from:a, to:b, minutes:cov ? cov.totalMinutes : 0 }, records:recs.length, coverage:cov, leadIn:input.t0 != null ? leadIn(recs, input.t0) : null, auto:!!input.auto, constants:constantFields(st), fields:st, evaluation:evaluate(recs, plan) };
 }

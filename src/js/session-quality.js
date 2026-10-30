@@ -22,7 +22,8 @@ const SQ = (() => {
     let gap = Math.max(0, ts.length ? ts[0] - first : last - first);
     for (let i = 1; i < ts.length; i++) gap = Math.max(gap, ts[i] - ts[i - 1]);
     gap = Math.max(gap, ts.length ? last - ts[ts.length - 1] : 0);
-    const dataMinutes = data.filter(c => c >= MIN_PER_MINUTE).length, sorted = tk.slice().sort((a, b) => a - b), ticksPerMin = sorted[sorted.length >> 1];
+    const tail = Math.min(1, ((last - first) - (n - 1) * 60000) / 60000);   // the last minute is usually a sliver: it needs only its share of the quotes
+    const dataMinutes = data.filter((c, i) => c >= MIN_PER_MINUTE * (i === n - 1 ? tail : 1)).length, sorted = tk.slice().sort((a, b) => a - b), ticksPerMin = sorted[sorted.length >> 1];
     const verdict = dataMinutes < n * .5 ? "hollow" : dataMinutes < n || gap > 60000 ? "holes" : "complete";
     return {spanMin:Math.round((last - first) / 6000) / 10, minutes:n, dataMinutes, longestGapSec:Math.round(gap / 1000), ticksPerMin, clock:Math.round(100 * Math.min(1, ticksPerMin / TICKS_PER_MINUTE)), verdict};
   }
