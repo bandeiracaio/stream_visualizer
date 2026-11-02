@@ -68,6 +68,25 @@ Both minus a single-venue set, anchored: every Holm value is 1.000 (Binance path
 
 Reading (lead, not proof): the large continuation after "both venues" is selection. The label is learned about 3 s (median) after the first detection, and the price had moved on by then. From the moment it is known there is no measurable continuation in this sample; a small remainder (up to about +0.3 sigma at 10 s against Binance-only groups under the matched control) is not resolved after correction. Binance-only groups are slightly negative at 10 s (-0.251 [-0.432, -0.065], raw shift p .015, Holm .36), not established.
 
+## B7. The same check on the other grouped families (ALL 52 sessions only)
+Scripts `grp_members.mjs` (one replay recording every non-wall group's members) and `grp_anch.mjs <cachedir> <memberdir> <family> venue|horizon all 1000`. Same method as B6: a multi-valued group (both venues, or fast and mid horizons) is anchored at the moment its composition was complete (the latest of the first detections per value), single-valued groups at `tDetected`, plus a matched control (single-valued groups anchored with the multi-valued groups' delays and kept only if still active). Cluster bootstrap CIs, label-permutation p, Holm within each block. NO-HOLES and COMPLETE were not run for these.
+
+Delay until the composition was complete (median; share above 10 s): burst venues 3 s (20%), burst horizons 5 s (27%), absorption horizons 5 s (27%), absorption venues 8 s (41%), exhaustion venues 5 s (32%). Median duration of multi-valued groups is 12 to 22 s against 2 to 6 s for single-valued ones.
+
+| family, split | from `tDetected`, multi minus single | anchored at composition complete |
+|---|---|---|
+| burst, venues (check on the new pipeline) | both minus Binance-only +0.826 at 10 s, Holm .016 | +0.248 [-0.057, +0.541], Holm 1.0; matched control +0.334 [+0.034, +0.602], Holm 1.0 |
+| burst, horizons | both minus fast +0.762 at 10 s (Holm .008), both minus mid +0.701 (Holm .008) | +0.169 [-0.213, +0.484] and +0.108 [-0.131, +0.369], Holm 1.0; matched control +0.318 and +0.276 [+0.045, +0.519] (raw p .076 and .047, Holm .53 and .38) |
+| absorption, venues | all differences within +-0.2, Holm 1.0 | the same, Holm 1.0 |
+| absorption, horizons | all Holm 1.0 | one raw hint, both minus mid -0.234 [-0.454, +0.006] at 30 s (raw p .025, Holm .20) |
+| exhaustion, venues | both minus Binance-only -0.139 at 10 s (Binance path), Holm 1.0 | see below |
+
+Reading (lead, not proof):
+- Burst: the horizon split has the same selection effect as the venue split. Groups that run on both horizons look much stronger from `tDetected` and show no corrected difference once the moment the composition was known is used.
+- Absorption: no contrast in either form, so there is nothing for the selection to inflate. The composition is learned late (venues: 41% of groups need over 10 s).
+- Exhaustion: from the moment both venues have an episode, price moves against the dominant side: -0.166 [-0.343, -0.011] sigma at 10 s on the Binance path and -0.325 [-0.509, -0.192] on the Hyperliquid path (interval unadjusted). Against Binance-only groups on the Hyperliquid path: -0.345 [-0.565, -0.186], raw p .010, Holm .16 (matched control -0.336, raw p .005, Holm .08); against Hyperliquid-only -0.174 [-0.390, -0.009], Holm 1.0. Anchoring made this stronger, not weaker (the unanchored contrast is about -0.14 and not significant), so it is not an artefact of the late label, but it does not survive correction and is a small sample (85 groups). The sign is the one exhaustion implies (reversal). Unresolved.
+- Use: the group labels shown in the app (venues, horizons) are accurate summaries but are known late. Any filter or analysis built on them has to anchor at the time the label became known. The earlier absorption and exhaustion tests anchored at `tDetected` and did not split by composition, so they are unaffected. `reader-scoreboard.mjs` picks the price path from the group's venue set, which is known late; the size of that effect was not measured.
+
 ## Candidate variables
 | Candidate (burst.md section 6) | Tested? | Note |
 |---|---|---|
