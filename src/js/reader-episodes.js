@@ -255,6 +255,7 @@ const READER_EPISODES = (() => {
         let n = 0; for (const o of walls.values()) if (o.venue===vn && o.wall.side===w.side) n++;
         if (n >= c.wallMaxActive || ratio < ctx.th("wallRatio")*c.wallMinMult) return;
         if (w.peak*w.px < c.wallMinUsd) return;                                                  // too small to matter (a thin median level inflates the multiple)
+        if (w.size <= w.peak*c.wallFadeFrac) return;                                             // already fading: a card born ending (it can resolve in the same tick) tells the user nothing
         const near = o => o.venue===vn && o.wall.side===w.side && Math.abs(o.wall.px-w.px)/w.px*1e4 <= c.wallMergeBps;
         for (const o of walls.values()) if (near(o)) return;      // one resting region seen at several nearby prices is one episode
         for (let i = episodes.length-1, k = 0; i >= 0 && k < 40; i--){ const o = episodes[i]; if (o.family!=="wall") continue; k++; if (o.tEnd != null && t-o.tEnd <= c.wallMergeMs && near(o)) return; }      // and so is one that re-appears nearby right after the last one ended

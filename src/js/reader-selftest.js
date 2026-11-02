@@ -51,6 +51,11 @@ const READER_SELFTEST=(()=>{
     const big=run({wallMinUsd:1e9}),zero=run({wallMinUsd:0});
     return{ok:big===0&&zero===1,detail:JSON.stringify({big,zero})};
   });
+  add("wall episodes: a wall that is already fading when it would open (below the fade fraction of its peak) does not open an episode; one that holds does",E=>{
+    const run=(low)=>{const e=E.create(),a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:75,seed:11,params:sec=>({vol:0,bidWalls:[{idx:12,size:sec<50?20:low}]})});sim(e,{t0:b.t,mid0:b.mid,seconds:4,seed:12,params:()=>({vol:0})});return eps(e,"wall").length;};
+    const fading=run(8),holding=run(18);      // 8 is 40% of the peak (20) yet still well over the opening ratio; 18 is 90%
+    return{ok:fading===0&&holding===1,detail:JSON.stringify({fading,holding})};
+  });
   add("exhaustion: only counts while price is still near the extreme; after the price has already come back it does not fire (a wide setting restores it)",E=>{
     const run=(cfg,back)=>{const e=E.create({ep:Object.assign({famHorizons:{exhaustion:["fast"]}},cfg)}),a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:14,seed:31,params:()=>({rate:200,buyP:.9,driftBps:6})});sim(e,{t0:b.t,mid0:b.mid,seconds:40,seed:32,params:()=>({rate:12,vol:.05,driftBps:back?-14:0})});return eps(e,"exhaustion",p=>p.aggressor==="buy").length;};
     const near=run({},false),back=run({},true),wide=run({exhNear:1e9},true);
