@@ -6,8 +6,11 @@ const FUTSTACK = (() => {
   const BASE_MS = 5000, VENUES = ["bn", "hl", "by", "ok"], PRICE = ["bn", "hl"];      // by = Bybit, ok = OKX: liquidations only (the other venues give price, delta and open interest)
   const DEFAULTS = { minLiqUsd:100000, liqMult:3, deltaMult:1.5, oiDropPct:0.0005, oiLag:2, gap:2 };
   const slot = t => Math.floor(t / BASE_MS);
-  const blank = () => ({ o:null, h:null, l:null, c:null, bl:0, sl:0, b:0, s:0, oi:null });
-  const newStore = () => ({ bins:new Map(), oi:{ bn:null, hl:null } });
+  const blank = () => ({ o:null, h:null, l:null, c:null, bl:0, sl:0, b:0, s:0, n:0, p:null, oi:null });      // n = trades, p = Map(price bucket -> [buy $, sell $]) for the volume profile
+  const newStore = () => ({ bins:new Map(), oi:{ bn:null, hl:null }, tick:null, bf:null });
+  // price bucket for the volume profile: about 1/10000 of the price, rounded down to 1, 2 or 5 x 10^k; fixed from the first price seen
+  const niceTick = px => { const t = px * 1e-4, e = Math.pow(10, Math.floor(Math.log10(t))), m = t / e; return (m >= 5 ? 5 : m >= 2 ? 2 : 1) * e; };
+  function addProfile(st, x, px, buy, sell) { if (!st.tick) st.tick = niceTick(px); const k = Math.floor(px / st.tick); if (!x.p) x.p = new Map(); const e = x.p.get(k); if (e) { e[0] += buy; e[1] += sell; } else x.p.set(k, [buy, sell]); }
   function cell(st, k, v) { let b = st.bins.get(k); if (!b) { b = { k }; for (const x of VENUES) b[x] = blank(); st.bins.set(k, b); } return b[v]; }
   // t: {t, v, side, px, ntl, liq}. side is the aggressor side; for a liquidation it is the side of the forced order (sell = a long was closed out).
   function addTrade(st, t) {
@@ -16,7 +19,7 @@ const FUTSTACK = (() => {
     if (!PRICE.includes(t.v)) { if (t.liq) { if (t.side === "sell") x.sl += t.ntl; else x.bl += t.ntl; } return; }
     if (x.o == null) x.o = x.h = x.l = x.c = t.px; else { if (t.px > x.h) x.h = t.px; if (t.px < x.l) x.l = t.px; x.c = t.px; }
     if (t.liq) { if (t.side === "sell") x.sl += t.ntl; else x.bl += t.ntl; }
-    else if (t.side === "buy") x.b += t.ntl; else x.s += t.ntl;
+    else { x.n++; if (t.side === "buy") x.b += t.ntl; else x.s += t.ntl; addProfile(st, x, t.px, t.side === "buy" ? t.ntl : 0, t.side === "buy" ? 0 : t.ntl); }
   }
   function setOi(st, v, val) { if (PRICE.includes(v)) st.oi[v] = val > 0 ? +val : null; }
   function stamp(st, t) { for (const v of VENUES) if (st.oi[v] != null) cell(st, slot(t), v).oi = st.oi[v]; }   // open interest is polled, so it is written into the current bin every tick
@@ -27,21 +30,31 @@ const FUTSTACK = (() => {
     const per = Math.max(1, Math.round(o.binMs / BASE_MS)), t0 = Math.floor(o.t0 / o.binMs) * o.binMs, n = Math.max(1, Math.ceil((o.t1 - t0) / o.binMs));
     const vs = o.venue === "all" ? PRICE : [o.venue], lv = o.liqAll ? VENUES : vs, out = [];
     for (let j = 0; j < n; j++) {
-      const r = { t:t0 + j*o.binMs, o:null, h:null, l:null, c:null, bl:0, sl:0, b:0, s:0, oi:null, has:false }, k0 = slot(r.t), pv = {}, oiV = {};
+      const r = { t:t0 + j*o.binMs, o:null, h:null, l:null, c:null, bl:0, sl:0, b:0, s:0, n:0, oi:null, has:false }, k0 = slot(r.t), pv = {}, oiV = {};
       for (const v of vs) pv[v] = { o:null, h:null, l:null, c:null };
       for (let k = k0; k < k0 + per; k++) {
         const bin = st.bins.get(k); if (!bin) continue; r.has = true;
         for (const v of lv) { r.bl += bin[v].bl; r.sl += bin[v].sl; }
         for (const v of vs) {
-          const x = bin[v], p = pv[v]; r.b += x.b; r.s += x.s; if (x.oi != null) oiV[v] = x.oi;
+          const x = bin[v], p = pv[v]; r.b += x.b; r.s += x.s; r.n += x.n; if (x.oi != null) oiV[v] = x.oi;
           if (x.o != null) { if (p.o == null) { p.o = x.o; p.h = x.h; p.l = x.l; } else { if (x.h > p.h) p.h = x.h; if (x.l < p.l) p.l = x.l; } p.c = x.c; }
         }
       }
       const pick = vs.find(v => pv[v].o != null); if (pick) Object.assign(r, pv[pick]);
       const known = vs.filter(v => oiV[v] != null); if (known.length) r.oi = known.reduce((a, v) => a + oiV[v], 0);
-      r.liq = r.bl + r.sl; r.delta = r.b - r.s; r.vol = r.b + r.s; out.push(r);
+      r.liq = r.bl + r.sl; r.delta = r.b - r.s; r.vol = r.b + r.s; r.range = r.o != null && r.l > 0 ? (r.h - r.l) / r.l * 1e4 : null; r.dpct = r.vol > 0 ? r.delta / r.vol : null; out.push(r);   // range in bps, dpct = delta / volume
+    }
+    let prev = null; for (const r of out) { r.doi = r.oi != null && prev != null && prev > 0 ? (r.oi - prev) / prev : null; if (r.oi != null) prev = r.oi; }
+    {
     }
     return out;
+  }
+
+  // Volume at price over a time range, for the shown venue(s): {tick, rows:[{px, b, s}] ascending by price, max}. px is the bucket centre.
+  function profile(st, o) {
+    const vs = o.venue === "all" ? PRICE : [o.venue], acc = new Map();
+    if (st.tick) for (let k = slot(o.t0); k <= slot(o.t1); k++) { const bin = st.bins.get(k); if (!bin) continue; for (const v of vs) { const p = bin[v].p; if (!p) continue; for (const [kb, e] of p) { const a = acc.get(kb); if (a) { a[0] += e[0]; a[1] += e[1]; } else acc.set(kb, [e[0], e[1]]); } } }
+    const rows = [...acc].sort((a, b) => a[0] - b[0]).map(([kb, e]) => ({ px:(kb + .5) * (st.tick || 1), b:e[0], s:e[1] })); return { tick:st.tick, rows, max:rows.reduce((m, r) => Math.max(m, r.b + r.s), 0) };
   }
 
   // History for the start of a session: Binance 1-minute klines (price, and taker buy quote volume = delta) and 5-minute open interest history, spread over the 5 s base bins.
@@ -51,13 +64,14 @@ const FUTSTACK = (() => {
   function backfill(st, klines, oiHist, until) {
     const per = 60000 / BASE_MS, res = { t0:null, t1:null, minutes:0, oiPoints:0 };
     for (const r of klines || []) {
-      const t0 = +r[0], o = +r[1], h = +r[2], l = +r[3], c = +r[4], qv = +r[7], tb = +r[10]; if (!(o > 0) || !(h > 0) || !(l > 0) || !(c > 0)) continue;
-      const wp = c >= o ? [[0, o], [4, l], [8, h], [per - 1, c]] : [[0, o], [4, h], [8, l], [per - 1, c]], k0 = slot(t0), buy = (tb > 0 ? tb : 0) / per, sell = Math.max(0, qv - (tb > 0 ? tb : 0)) / per; let wrote = false;
+      const t0 = +r[0], o = +r[1], h = +r[2], l = +r[3], c = +r[4], qv = +r[7], tb = +r[10], cnt = +r[8] > 0 ? +r[8] : 0; if (!(o > 0) || !(h > 0) || !(l > 0) || !(c > 0)) continue;
+      const wp = c >= o ? [[0, o], [4, l], [8, h], [per - 1, c]] : [[0, o], [4, h], [8, l], [per - 1, c]], k0 = slot(t0), buy = (tb > 0 ? tb : 0) / per, sell = Math.max(0, qv - (tb > 0 ? tb : 0)) / per; let wrote = false, prof = false;
       for (let i = 0; i < per; i++) {
         const x = cell(st, k0 + i, "bn"); if (x.o != null) continue;
         let j = 0; while (j < wp.length - 2 && i > wp[j + 1][0]) j++;
         const [i0, p0] = wp[j], [i1, p1] = wp[j + 1], px = p0 + (p1 - p0) * (i - i0) / (i1 - i0);
-        x.o = x.h = x.l = x.c = px; x.b = buy; x.s = sell; wrote = true;
+        x.o = x.h = x.l = x.c = px; x.b = buy; x.s = sell; x.n = cnt / per; wrote = true;
+        if (!prof) { prof = true; if (!st.tick) st.tick = niceTick(c); const ka = Math.floor(l / st.tick), kz = Math.floor(h / st.tick), nb = kz - ka + 1; for (let kb = ka; kb <= kz; kb++) addProfile(st, x, (kb + .5) * st.tick, buy * per / nb, sell * per / nb); }      // the minute's volume spread evenly over its high-low range (approximate)
       }
       if (wrote) { res.minutes++; res.t0 = res.t0 == null ? t0 : Math.min(res.t0, t0); res.t1 = Math.max(res.t1 || 0, t0 + 60000); }
     }
@@ -66,7 +80,7 @@ const FUTSTACK = (() => {
     if (res.t0 != null) st.bf = { t0:res.t0, t1:res.t1 };
     return res;
   }
-  function reset(st) { st.bins.clear(); st.oi.bn = st.oi.hl = null; st.bf = null; }
+  function reset(st) { st.bins.clear(); st.oi.bn = st.oi.hl = null; st.bf = null; st.tick = null; }
 
   // One liquidation message from Bybit (v5 public linear, topic allLiquidation.<COIN>USDT) or OKX (public, channel liquidation-orders, instType SWAP) -> trades {t, v, side, px, ntl, liq:true}.
   // side is the side of the forced order: "sell" = a long was closed out. Bybit S "Buy" means a long was liquidated, size v in coin, p the bankruptcy price. OKX gives side directly, sz in contracts (x ctVal coin), bkPx.
@@ -167,8 +181,14 @@ const FUTSTACK = (() => {
     ok("backfill: open interest carried forward from each point", ab[0].oi === 1000 && ab[1].oi === 990, JSON.stringify([ab[0].oi, ab[1].oi]));
     ok("backfill: live data wins over backfill in the same bin", ab[1].b >= 500 && ab[1].o === 102.5 && rb.minutes === 2 && sb.bf.t0 === TB, JSON.stringify([ab[1], rb, sb.bf]));
     ok("backfill: no liquidations invented, junk rows skipped", ab.every(b => b.liq === 0) && backfill(newStore(), [["x"], [TB, "0", "0", "0", "0"]], [{ timestamp:"a" }], 0).minutes === 0, "");
+    const sp = newStore(); addTrade(sp, { t:T, v:"bn", side:"buy", px:60000, ntl:1000 }); addTrade(sp, { t:T + 1, v:"bn", side:"sell", px:60000.5, ntl:400 }); addTrade(sp, { t:T + 2, v:"bn", side:"buy", px:60020, ntl:700 }); addTrade(sp, { t:T + 3, v:"hl", side:"buy", px:60000, ntl:99 });
+    const pf = profile(sp, { venue:"bn", t0:T, t1:T + 60000 }), tot = pf.rows.reduce((a, r) => [a[0] + r.b, a[1] + r.s], [0, 0]), pa = aggregate(sp, { venue:"bn", t0:T, t1:T + 60000, binMs:60000 })[0];
+    ok("profile: volume at price by venue, buy and sell kept apart", pf.rows.length === 2 && tot[0] === 1700 && tot[1] === 400 && pf.tick === 5 && pf.max === 1400, JSON.stringify(pf));
+    ok("bin stats: trade count, delta share, range in bps, open interest change", pa.n === 3 && Math.abs(pa.dpct - 1300 / 2100) < 1e-9 && pa.range > 3 && pa.range < 3.5 && pa.doi === null, JSON.stringify(pa));
+    ok("bin stats: open interest change against the previous bin", aggregate(st, { venue:"bn", t0:T, t1:T + 600000, binMs:15000 }).filter(b => b.doi != null && b.doi < -0.004).length === 1, "");
+    const pb = profile(sb, { venue:"bn", t0:TB, t1:TB + 120000 }); ok("backfill: profile keeps the minute's volume and its trade count", Math.abs(pb.rows.reduce((a, r) => a + r.b + r.s, 0) - (60000 + 30000 - 0)) < 600 + 1 && aggregate(sb, { venue:"bn", t0:TB, t1:TB + 60000, binMs:60000 })[0].n === 10, JSON.stringify([pb.rows.length, pb.max]));
     const before = st.bins.size; prune(st, 60000, T + 600000); ok("prune drops old bins", st.bins.size < before && st.bins.size > 0, st.bins.size);
     return out;
   }
-  return { BASE_MS, DEFAULTS, newStore, addTrade, setOi, stamp, prune, aggregate, highlights, summary, reading, parseLiq, backfill, reset, usd, selftest };
+  return { BASE_MS, DEFAULTS, newStore, addTrade, setOi, stamp, prune, aggregate, highlights, summary, reading, parseLiq, backfill, reset, profile, usd, selftest };
 })();

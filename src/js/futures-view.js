@@ -7,7 +7,7 @@
   const g = id => document.getElementById(id), KEEP = 4 * 3600e3, MARK = getComputedStyle(document.documentElement).getPropertyValue("--mark").trim() || "#ff00ff";
   const st = FUTSTACK.newStore(), seen = new WeakSet(), heats = { bn:[], hl:[] }, fills = [];            // fills: what this page placed from the buttons ({t, side, px}), drawn on the price panel
   const lastHeat = { bn:0, hl:0 };
-  let watermark = 0, hovX = null, hits = [], bins = [], geo = null, heatImg = null, heatKey = "";
+  let profData = { rows:[] }, profKey = "", watermark = 0, hovX = null, hits = [], bins = [], geo = null, heatImg = null, heatKey = "";
   const heatOff = document.createElement("canvas");
 
   // ---- backfill: on every connect (and when the header coin changes) fetch the last 4 hours from Binance so the chart is not empty ----
@@ -96,10 +96,11 @@
     const { ctx, w, h } = prep(cv), venue = g("fsVenue").value, win = +g("fsWin").value, binMs = +g("fsBin").value, t1 = nowEx();
     let all = FUTSTACK.aggregate(st, { venue, t0:t1 - win, t1, binMs, liqAll:liqAll() }); const first = all.findIndex(b => b.has);
     if (first < 0) { bins = []; geo = null; hits = []; return emptyMsg(ctx, w, h, connected ? "collecting… history starts when you press Connect" : "press Connect"); }
-    bins = all.slice(first); const n = bins.length, L = 6, R = 64, B = 16, gap = 6, avail = h - B - gap * 3, hP = avail * .5, hL = avail * .14, hD = avail * .18, hO = avail - hP - hL - hD;
-    const top = [4, 4 + hP + gap, 4 + hP + hL + gap * 2, 4 + hP + hL + hD + gap * 3], pw = w - L - R, t0 = bins[0].t, span = n * binMs, bw = pw / n;
+    const showProf = g("fsProf").checked, showStats = g("fsStats").checked, STAT_ROWS = 5, rowH = 12, stripH = showStats ? STAT_ROWS * rowH : 0;
+    bins = all.slice(first); const n = bins.length, L = 6, R = 64, PG = showProf ? 84 : 0, B = 16, gap = 6, avail = h - B - gap * (showStats ? 4 : 3) - stripH, hP = avail * .5, hL = avail * .14, hD = avail * .18, hO = avail - hP - hL - hD;
+    const top = [4, 4 + hP + gap, 4 + hP + hL + gap * 2, 4 + hP + hL + hD + gap * 3, 4 + hP + hL + hD + hO + gap * 4], pw = w - L - R - PG, t0 = bins[0].t, span = n * binMs, bw = pw / n, bottom = showStats ? top[4] + stripH : top[3] + hO;
     const X = t => L + (t - t0) / span * pw, xc = j => L + (j + .5) * bw;
-    geo = { L, pw, n, bw, top, hs:[hP, hL, hD, hO], h };
+    geo = { L, pw, n, bw, top, hs:[hP, hL, hD, hO], h, bottom };
     hits = g("fsMark").checked ? FUTSTACK.highlights(bins, cfg()) : [];
     // price range
     let lo = Infinity, hi = -Infinity; for (const b of bins) if (b.o != null) { if (b.l < lo) lo = b.l; if (b.h > hi) hi = b.h; }
@@ -108,7 +109,7 @@
     const Yp = p => top[0] + (hi - p) / (hi - lo) * hP;
     // panel frames and titles
     ctx.fillStyle = TH.dim; ctx.textAlign = "left";
-    const titles = ["", "Liquidations $ (" + (liqAll() ? "Binance + Bybit + OKX" : venue === "bn" ? "Binance" : venue === "hl" ? "Hyperliquid: no feed" : "Binance") + ")   ▲ shorts liquidated   ▼ longs liquidated", "Volume delta $  (taker buy − sell)", "Open interest (" + (venue === "all" ? "BN + HL" : venue.toUpperCase()) + ", coin)"];
+    const titles = ["", "Liquidations $ (" + (liqAll() ? "Binance + Bybit + OKX" : venue === "bn" ? "Binance" : venue === "hl" ? "Hyperliquid: no feed" : "Binance") + ")   ▲ shorts liquidated   ▼ longs liquidated", "Volume delta $  (taker buy − sell)", "Open interest (" + (venue === "all" ? "BN + HL" : venue.toUpperCase()) + ", coin)   green = rising, red = falling"];
     for (let k = 0; k < 4; k++) { ctx.strokeStyle = TH.line; ctx.strokeRect(L + .5, top[k] + .5, pw, [hP, hL, hD, hO][k]); if (titles[k]) ctx.fillText(titles[k], L + 4, top[k] + 11); }
     // heatmap
     if (g("fsHeat").checked && venue !== "all") {
@@ -123,6 +124,18 @@
       const b = bins[j]; if (b.o == null) continue; const up = b.c >= b.o, col = up ? TH.buy : TH.sell, x = xc(j), bodyW = Math.max(1, bw * .7);
       ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, Yp(b.h)); ctx.lineTo(x, Yp(b.l)); ctx.stroke();
       ctx.fillRect(x - bodyW / 2, Math.min(Yp(b.o), Yp(b.c)), bodyW, Math.max(1, Math.abs(Yp(b.o) - Yp(b.c))));
+    }
+    // volume profile: volume at price over the shown window, buy part then sell part, the busiest price (POC) outlined
+    if (showProf) {
+      const key = [venue, t0, span, Math.floor(nowEx() / 5000)].join("|"); if (key !== profKey) { profData = FUTSTACK.profile(st, { venue, t0, t1:t0 + span }); profKey = key; }
+      const rowsPx = new Map(); for (const r of profData.rows) { if (r.px < lo || r.px > hi) continue; const k = Math.floor(Yp(r.px) / 3), a = rowsPx.get(k) || { y:k * 3, b:0, s:0 }; a.b += r.b; a.s += r.s; rowsPx.set(k, a); }
+      let mx = 0, poc = null; for (const a of rowsPx.values()) { const t = a.b + a.s; if (t > mx) { mx = t; poc = a; } }
+      const x0 = L + pw + 8, wmax = PG - 12; ctx.fillStyle = TH.dim; ctx.fillText("volume profile", x0, top[0] + 11);
+      if (mx > 0) {
+        for (const a of rowsPx.values()) { const bw1 = a.b / mx * wmax, sw1 = a.s / mx * wmax; ctx.fillStyle = TH.a("buy", .8); ctx.fillRect(x0, a.y, bw1, 2.6); ctx.fillStyle = TH.a("sell", .8); ctx.fillRect(x0 + bw1, a.y, sw1, 2.6); }
+        ctx.strokeStyle = TH.hi; ctx.lineWidth = 1; ctx.strokeRect(x0 - .5, poc.y - .5, (poc.b + poc.s) / mx * wmax + 1, 3.6);
+        ctx.setLineDash([2, 5]); ctx.strokeStyle = TH.a("hi", .3); ctx.beginPath(); ctx.moveTo(L, poc.y + 1); ctx.lineTo(L + pw, poc.y + 1); ctx.stroke(); ctx.setLineDash([]);
+      }
     }
     // my fills and entry price
     if (pos && pos.entry) { ctx.setLineDash([5, 4]); ctx.strokeStyle = TH.hi; ctx.beginPath(); ctx.moveTo(L, Yp(pos.entry)); ctx.lineTo(L + pw, Yp(pos.entry)); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = TH.hi; ctx.fillText("entry " + fmt(pos.entry, 1), L + 4, Yp(pos.entry) - 3); }
@@ -143,18 +156,29 @@
     let oLo = Infinity, oHi = -Infinity; for (const b of bins) if (b.oi != null) { if (b.oi < oLo) oLo = b.oi; if (b.oi > oHi) oHi = b.oi; }
     if (isFinite(oLo)) {
       const op = Math.max((oHi - oLo) * .15, oHi * .00002); oLo -= op; oHi += op; const Yo = v => top[3] + 14 + (oHi - v) / (oHi - oLo) * (hO - 20);
-      ctx.strokeStyle = TH.accent; ctx.lineWidth = 1.6; ctx.beginPath(); let go = false;
-      for (let j = 0; j < n; j++) { const b = bins[j]; if (b.oi == null) { go = false; continue; } go ? ctx.lineTo(xc(j), Yo(b.oi)) : ctx.moveTo(xc(j), Yo(b.oi)); go = true; } ctx.stroke(); ctx.lineWidth = 1;
+      ctx.lineWidth = 1.6; let pj = -1, dirCol = TH.dim;                                       // each segment is coloured by the direction of the change: rising = positions opening, falling = closing
+      for (let j = 0; j < n; j++) { const b = bins[j]; if (b.oi == null) continue; if (pj >= 0 && j - pj <= 3) { const d = b.oi - bins[pj].oi; dirCol = d > 0 ? TH.buy : d < 0 ? TH.sell : TH.dim; ctx.strokeStyle = dirCol; ctx.beginPath(); ctx.moveTo(xc(pj), Yo(bins[pj].oi)); ctx.lineTo(xc(j), Yo(b.oi)); ctx.stroke(); } pj = j; } ctx.lineWidth = 1;
       ctx.fillStyle = TH.dim; ctx.fillText(fmtK(oHi - op), w - R + 4, top[3] + 18); ctx.fillText(fmtK(oLo + op), w - R + 4, top[3] + hO - 4);
-      const lo2 = [...bins].reverse().find(b => b.oi != null); if (lo2) { const y = Yo(lo2.oi); ctx.fillStyle = TH.accent; ctx.fillRect(w - R + 1, y - 7, R - 2, 14); ctx.fillStyle = TH.ink; ctx.fillText(fmtK(lo2.oi), w - R + 4, y + 3.5); }
+      const lo2 = [...bins].reverse().find(b => b.oi != null); if (lo2) { const y = Yo(lo2.oi); ctx.fillStyle = dirCol === TH.dim ? TH.accent : dirCol; ctx.fillRect(w - R + 1, y - 7, R - 2, 14); ctx.fillStyle = TH.ink; ctx.fillText(fmtK(lo2.oi), w - R + 4, y + 3.5); }
     } else { ctx.fillStyle = TH.dim; ctx.textAlign = "center"; ctx.fillText("no open interest reading yet (needs the openInterest stream on)", L + pw / 2, top[3] + hO / 2); ctx.textAlign = "left"; }
+    // bar stats: one row per measure, one cell per candle. Diverging rows (green up / red down) are scaled by the 90th percentile of the window; the others by the 95th.
+    if (showStats) {
+      const pc = (arr, q) => { const a = arr.filter(x => x != null && isFinite(x)).sort((x, y) => x - y); return a.length ? a[Math.min(a.length - 1, Math.floor(a.length * q))] : 0; };
+      const rowsDef = [["Δ share", b => b.dpct, true], ["OI Δ", b => b.doi, true], ["Volume", b => b.has ? b.vol : null, false], ["Trades", b => b.has ? b.n : null, false], ["Range", b => b.range, false]];
+      rowsDef.forEach(([nm, fn, div], ri) => {
+        const vals = bins.map(fn), ref = div ? pc(vals.map(v => v == null ? null : Math.abs(v)), .9) : pc(vals, .95), y = top[4] + ri * rowH;
+        ctx.fillStyle = TH.dim; ctx.textAlign = "left"; ctx.fillText(nm, w - R + 4, y + rowH - 2);
+        if (!(ref > 0)) return;
+        for (let j = 0; j < n; j++) { const v = vals[j]; if (v == null) continue; const m = Math.min(1, Math.abs(v) / ref); ctx.fillStyle = div ? (v >= 0 ? TH.a("buy", .12 + .88 * m) : TH.a("sell", .12 + .88 * m)) : TH.a("accent", .08 + .92 * m); ctx.fillRect(L + j * bw, y, Math.ceil(bw) + .5, rowH - 1); }
+      });
+    }
     // time axis
     ctx.fillStyle = TH.dim; ctx.textAlign = "center"; const every = Math.max(1, Math.round(90 / bw));
     for (let j = 0; j < n; j += every) ctx.fillText(hhmm(bins[j].t).slice(0, binMs >= 60000 ? 5 : 8), xc(j), h - 4);
     ctx.textAlign = "left";
     // highlights: one cyan box through every panel, with the three checks above it
     for (const hl of hits) {
-      const x0 = L + hl.i0 * bw - 2, x1 = L + (hl.i1 + 1 + Math.min(2, n - 1 - hl.i1)) * bw + 2, y0 = top[0] + 2, y1 = top[3] + hO - 1;
+      const x0 = L + hl.i0 * bw - 2, x1 = L + (hl.i1 + 1 + Math.min(2, n - 1 - hl.i1)) * bw + 2, y0 = top[0] + 2, y1 = bottom - 1;
       ctx.strokeStyle = MARK; ctx.lineWidth = hl.strong ? 2.6 : 1.4; ctx.setLineDash(hl.strong ? [] : [5, 3]);
       ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x0, y0, Math.max(8, x1 - x0), y1 - y0, 5); else ctx.rect(x0, y0, Math.max(8, x1 - x0), y1 - y0); ctx.stroke(); ctx.setLineDash([]); ctx.lineWidth = 1;
       const lab = [["LIQ", true], ["Δ", hl.checks.delta], ["OI", hl.checks.oi]]; let lx = Math.min(Math.max(L + 2, x0 + 3), L + pw - 112); const ly = top[0] + 22;
@@ -164,18 +188,18 @@
     }
     // where the backfilled history ends and live data starts
     if (st.bf && liveFrom != null && liveFrom > t0 && liveFrom < t0 + span) {
-      const x = X(liveFrom); ctx.setLineDash([2, 4]); ctx.strokeStyle = TH.a("hi", .5); ctx.beginPath(); ctx.moveTo(x, top[0]); ctx.lineTo(x, top[3] + hO); ctx.stroke(); ctx.setLineDash([]);
+      const x = X(liveFrom); ctx.setLineDash([2, 4]); ctx.strokeStyle = TH.a("hi", .5); ctx.beginPath(); ctx.moveTo(x, top[0]); ctx.lineTo(x, bottom); ctx.stroke(); ctx.setLineDash([]);
       ctx.fillStyle = TH.dim; ctx.textAlign = "right"; ctx.fillText("backfilled ◂", x - 4, top[0] + hP - 6); ctx.textAlign = "left"; ctx.fillText("▸ live", x + 4, top[0] + hP - 6);
     }
     // crosshair
     if (hovX != null && hovX >= L && hovX <= L + pw) {
-      const j = Math.min(n - 1, Math.floor((hovX - L) / bw)), x = xc(j); ctx.strokeStyle = TH.a("hi", .6); ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(x, top[0]); ctx.lineTo(x, top[3] + hO); ctx.stroke(); ctx.setLineDash([]);
+      const j = Math.min(n - 1, Math.floor((hovX - L) / bw)), x = xc(j); ctx.strokeStyle = TH.a("hi", .6); ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(x, top[0]); ctx.lineTo(x, bottom); ctx.stroke(); ctx.setLineDash([]);
     }
   }
   const hoverText = j => {
     const b = bins[j]; if (!b) return "Move over the chart (or tap it) to read one candle.";
     const prev = bins.slice(0, j).reverse().find(x => x.oi != null), dOi = prev && b.oi != null && prev.oi > 0 ? (b.oi - prev.oi) / prev.oi : null, rd = FUTSTACK.reading(b.delta, dOi), hit = hits.find(x => j >= x.i0 && j <= x.i1 + 2);
-    return `${hhmm(b.t)} · ${b.o != null ? `O ${fmt(b.o, 1)} H ${fmt(b.h, 1)} L ${fmt(b.l, 1)} C ${fmt(b.c, 1)}` : "no trades"} · liq shorts $${fmtK(b.bl)} / longs $${fmtK(b.sl)} · delta ${sgn(b.delta)} · OI ${fmtOi(b.oi)} (${pct(dOi)}) · ${rd.text}${hit ? " · " + hit.text : ""}`;
+    return `${hhmm(b.t)} · ${b.o != null ? `O ${fmt(b.o, 1)} H ${fmt(b.h, 1)} L ${fmt(b.l, 1)} C ${fmt(b.c, 1)}` : "no trades"} · liq shorts $${fmtK(b.bl)} / longs $${fmtK(b.sl)} · delta ${sgn(b.delta)}${b.dpct == null ? "" : " (" + (b.dpct * 100).toFixed(0) + "% of " + "$" + fmtK(b.vol) + ")"} · trades ${Math.round(b.n)}${b.range == null ? "" : " · range " + b.range.toFixed(1) + " bps"} · OI ${fmtOi(b.oi)} (${pct(dOi)}) · ${rd.text}${hit ? " · " + hit.text : ""}`;
   };
   function onPointer(e) { const r = cv.getBoundingClientRect(); hovX = e.clientX - r.left; if (geo && geo.n) { const j = Math.min(geo.n - 1, Math.max(0, Math.floor((hovX - geo.L) / geo.bw))); g("fsHover").textContent = hoverText(j); } requestAnimationFrame(draw); }
   cv.addEventListener("pointermove", onPointer); cv.addEventListener("pointerdown", onPointer);
@@ -223,7 +247,7 @@
   g("fsClose").onclick = () => { const p = position(); if (p) send(p.qty > 0 ? "SELL" : "BUY", 0, Math.abs(p.qty)); };
   g("fsStart").onclick = () => { g("simGo").click(); tradeUi(); };
   g("fsSize").oninput = tradeUi;
-  for (const id of ["fsVenue", "fsWin", "fsBin", "fsHeat", "fsMark", "fsMin", "fsLiqAll"]) g(id).onchange = g(id).oninput = () => { heatKey = ""; futuresRender(); };
+  for (const id of ["fsVenue", "fsWin", "fsBin", "fsHeat", "fsMark", "fsMin", "fsLiqAll", "fsProf", "fsStats"]) g(id).onchange = g(id).oninput = () => { heatKey = ""; futuresRender(); };
 
   window.futuresRender = function futuresRender() { try { draw(); panels(); tradeUi(); } catch (e) { console.error("futures", e); } };
   window.futuresRender.store = st;                                          // for tests: fill the store with simulated history from the console
