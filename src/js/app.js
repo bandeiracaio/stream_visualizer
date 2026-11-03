@@ -102,178 +102,6 @@ function addTrade(t){
   if (!t.liq && !t.bf) cvd[t.v] += t.side==="buy" ? t.ntl : -t.ntl; // liquidations already appear as trades
 }
 
-// ---------- market reader: instance and hooks ----------
-const READER = READER_ENGINE.create();
-READER.selfTest = () => READER_SELFTEST.run(READER_ENGINE);
-// Time spent inside the Reader engine per call, for Diagnostics: one bucket per second (last 60) and the last 2000 call times for a percentile.
-const rdPerf = {sec:[], durs:new Float32Array(2000), i:0, n:0, slow:0, SLOW_MS:8};
-function rdPerfAdd(d){
-  const sec = Math.floor(performance.now()/1000), q = rdPerf.sec;
-  let b = q.length ? q[q.length-1] : null;
-  if (!b || b.s !== sec){ b = {s:sec, n:0, ms:0, max:0, slow:0}; q.push(b); if (q.length > 60) q.shift(); }
-  b.n++; b.ms += d; if (d > b.max) b.max = d; if (d > rdPerf.SLOW_MS){ b.slow++; rdPerf.slow++; }
-  rdPerf.durs[rdPerf.i] = d; rdPerf.i = (rdPerf.i+1) % rdPerf.durs.length; if (rdPerf.n < rdPerf.durs.length) rdPerf.n++;
-}
-const rdSafe = fn => { const t0 = performance.now(); try{ fn(); }catch(e){ console.error("reader", e); } rdPerfAdd(performance.now() - t0); };
-const rdLastBook = {bn:0, hl:0};
-let rdWorker = null;
-function rdStopHeartbeat(){ if(rdWorker){ try{rdWorker.terminate();URL.revokeObjectURL(rdWorker._url);}catch{} rdWorker=null; } }
-function rdStartHeartbeat(){
-  rdStopHeartbeat();
-  try{
-    const url=URL.createObjectURL(new Blob(["setInterval(()=>postMessage(0),250)"],{type:"text/javascript"}));
-    rdWorker=new Worker(url); rdWorker._url=url;
-    rdWorker.onmessage=()=>rdSafe(()=>READER.advance(nowEx() - 1500));
-  }catch(e){ rdWorker=null; }
-}
-function rdBook(v, t){
-  rdSafe(() => {
-    if (!(t - rdLastBook[v] >= 250)) return;
-    rdLastBook[v] = t;
-    const b = v==="bn" ? bnTopN(30) : hlTop();
-    if (b) READER.onBook(v, t, b.bids, b.asks);
-  });
-}
-
-// ---------- Binance ----------
-const bnStats = {cur:0, bytes:0};
-let bnSockets = [], bnGen = 0, oiTimer = null, bnBook = null;
-const BN_REST = "https://fapi.binance.com";
-const bnSym = () => $("sym").value.trim().toLowerCase() + "usdt";
-
-function bnConnect(isRetry){
-  bnDisconnect();
-  if (isRetry) health.bnReconnects++;
-  const gen = ++bnGen, sym = bnSym(), route = $("route").value;
-  const active = STREAMS.filter(d => d.v==="bn" && !d.rest && S[d.id].on);
-  const groups = {}, lookup = {};
-  for (const d of active){ (groups[route==="routed" ? d.sock : "legacy"] ||= []).push(d.sub(sym)); lookup[d.sub(sym)] = d.id; }
-  if (S["bn.depth"].on) bnBook = {bids:new Map(), asks:new Map(), lastU:null, buffer:[], ready:false, gaps:bnBook?bnBook.gaps:0};
-  const keys = Object.keys(groups);
-  if (!keys.length && !S["bn.oi"].on){ $("bnState").textContent="off"; return; }
-  let open = 0; $("bnState").textContent = "connecting…";
-  for (const key of keys){
-    const url = key==="legacy" ? `wss://fstream.binance.com/stream?streams=${groups[key].join("/")}`
-                               : `wss://fstream.binance.com/${key}/stream?streams=${groups[key].join("/")}`;
-    let ws; try{ ws = new WebSocket(url); }catch{ $("bnState").textContent="blocked by page"; return; }
-    bnSockets.push(ws);
-    ws.onopen = () => { if(gen!==bnGen) return; open++; $("bnState").textContent = `${open}/${keys.length} sockets`; };
-    ws.onmessage = ev => { if(gen===bnGen) bnHandle(ev.data, lookup); };
-    ws.onclose = () => { if(gen!==bnGen) return; $("bnState").textContent="reconnecting…"; setTimeout(()=>{ if(gen===bnGen) bnConnect(true); }, 3000); };
-    ws.onerror = () => { if(gen===bnGen) $("bnState").textContent = "blocked / failed"; };
-  }
-  if (!keys.length) $("bnState").textContent = "REST only";
-  if (S["bn.depth"].on) bnSnapshot(gen);
-  if (S["bn.oi"].on){ pollOI(); oiTimer = setInterval(pollOI, 10000); }
-}
-function bnDisconnect(){ bnGen++; for (const w of bnSockets) try{w.close()}catch{}; bnSockets=[]; clearInterval(oiTimer); oiTimer=null; $("bnState").textContent="off"; }
-
-function bnHandle(raw, lookup){
-  let msg; try{ msg = JSON.parse(raw); }catch{ return; }
-  const id = lookup[msg.stream]; const d = msg.data; if (!id || !d) return;
-  let evt = d.E;
-  switch(id){
-    case "bn.trade": case "bn.aggTrade": {
-      evt = d.T;
-      const px=+d.p, q=+d.q; if (!q) break;               // settlement prints with p=q=0
-      if (id === $("bnSrc").value){ const tr={t:d.T, v:"bn", side:d.m?"sell":"buy", px, q, ntl:px*q}; addTrade(tr); bnSweepFeed(tr); }
-      break;
-    }
-    case "bn.depth": evt = d.T || d.E; bnDepth(d); break;
-    case "bn.bookTicker": evt = d.T || d.E; M.bnBid=+d.b; M.bnAsk=+d.a; M.bnBidSz=+d.B; M.bnAskSz=+d.A; rdSafe(() => READER.onQuote("bn", evt, M.bnBid, M.bnAsk)); break;
-    case "bn.markPrice": M.bnMark=+d.p; M.bnIndex=+d.i; M.bnFund=+d.r; M.bnNextFund=d.T; break; // T here is next funding, not event time
-    case "bn.forceOrder": {
-      const o=d.o; evt=o.T; const px=+(o.ap||o.p), q=+(o.z||o.q);
-      M.liqs++; M.liqUsd += px*q;
-      addTrade({t:o.T, v:"bn", side:o.S==="SELL"?"sell":"buy", px, q, ntl:px*q, liq:true});
-      break;
-    }
-  }
-  record(id, raw, evt, d);
-}
-async function bnSnapshot(gen){
-  try{
-    const r = await fetch(`${BN_REST}/fapi/v1/depth?symbol=${bnSym().toUpperCase()}&limit=1000`);
-    const snap = await r.json(); if (gen!==bnGen || !bnBook) return;
-    bnBook.bids = new Map(snap.bids.map(([p,q])=>[p,+q]));
-    bnBook.asks = new Map(snap.asks.map(([p,q])=>[p,+q]));
-    bnBook.lastU = snap.lastUpdateId; bnBook.ready = true; bnBook.first = true;
-    const buf = bnBook.buffer; bnBook.buffer = [];
-    for (const d of buf) bnDepth(d);
-  }catch{ $("bnBookAge").textContent = "snapshot failed (CORS/network)"; }
-}
-function bnDepth(d){
-  const b = bnBook; if (!b) return;
-  if (!b.ready){ b.buffer.push(d); return; }
-  if (d.u < b.lastU) return;
-  if (b.first){ if (d.U > b.lastU) return bnResync(); b.first=false; }
-  else if (d.pu !== b.lastU) return bnResync();
-  for (const [p,q] of d.b){ +q ? b.bids.set(p,+q) : b.bids.delete(p); }
-  for (const [p,q] of d.a){ +q ? b.asks.set(p,+q) : b.asks.delete(p); }
-  b.lastU = d.u;
-  rdBook("bn", d.T || d.E);
-}
-function bnResync(){ const g=(bnBook.gaps||0)+1; bnBook={bids:new Map(),asks:new Map(),lastU:null,buffer:[],ready:false,gaps:g}; bnSnapshot(bnGen); }
-async function pollOI(){
-  const gen = bnGen;
-  try{
-    const r = await fetch(`${BN_REST}/fapi/v1/openInterest?symbol=${bnSym().toUpperCase()}`);
-    const txt = await r.text(); if (gen!==bnGen) return;
-    const d = JSON.parse(txt); M.bnOI = +d.openInterest;
-    record("bn.oi", txt, d.time, d, {noLat:true}); // polled: its time field is not a delivery time
-  }catch{}
-}
-
-// ---------- Hyperliquid ----------
-const hlStats = {cur:0, bytes:0};
-let hlWs = null, hlGen = 0, hlPing = null, hlFirstTrades = true;
-function hlConnect(isRetry){
-  hlDisconnect();
-  if (isRetry) health.hlReconnects++;
-  const gen = ++hlGen, coin = $("sym").value.trim().toUpperCase();
-  const active = STREAMS.filter(d => d.v==="hl" && S[d.id].on);
-  if (!active.length){ $("hlState").textContent="off"; return; }
-  hlFirstTrades = true; $("hlState").textContent = "connecting…";
-  let ws; try{ ws = hlWs = new WebSocket("wss://api.hyperliquid.xyz/ws"); }catch{ $("hlState").textContent="blocked by page"; return; }
-  ws.onopen = () => {
-    if (gen!==hlGen) return;
-    for (const d of active) ws.send(JSON.stringify({method:"subscribe", subscription:d.hl(coin)}));
-    hlPing = setInterval(()=>{ try{ ws.send('{"method":"ping"}'); }catch{} }, 20000);
-    $("hlState").textContent = "connected";
-  };
-  ws.onmessage = ev => { if (gen===hlGen) hlHandle(ev.data); };
-  ws.onclose = () => { if (gen!==hlGen) return; clearInterval(hlPing); $("hlState").textContent="reconnecting…"; setTimeout(()=>{ if(gen===hlGen) hlConnect(true); }, 3000); };
-  ws.onerror = () => { if(gen===hlGen) $("hlState").textContent = "blocked / failed"; };
-}
-function hlDisconnect(){ hlGen++; clearInterval(hlPing); try{hlWs&&hlWs.close()}catch{}; hlWs=null; $("hlState").textContent="off"; }
-
-function hlHandle(raw){
-  let msg; try{ msg = JSON.parse(raw); }catch{ return; }
-  const id = HL_CHANNEL[msg.channel]; const d = msg.data; if (!id) return;
-  let evt = null, opts = {};
-  switch(id){
-    case "hl.trades": {
-      if (hlFirstTrades){ hlFirstTrades=false; health.hlReplays++; opts={backfill:true, noLat:true}; } // replay of recent trades on subscribe
-      for (const t of d){
-        const px=+t.px, q=+t.sz;
-        addTrade({t:t.time, v:"hl", side:t.side==="B"?"buy":"sell", px, q, ntl:px*q, users:t.users, bf:opts.backfill});
-        evt = t.time;
-      }
-      if (!opts.backfill){                                   // fills of one aggressive order share a hash
-        const g = {};
-        for (const t of d) (g[t.hash] ||= []).push({px:+t.px, ntl:+t.px*+t.sz, t:t.time, side:t.side==="B"?"buy":"sell"});
-        for (const h in g) addSweep("hl", g[h][0].t, g[h][0].side, g[h]);
-      }
-      break;
-    }
-    case "hl.l2Book": evt = d.time; hlBook = d.levels; hlBookT = Date.now(); rdBook("hl", d.time); break;
-    case "hl.bbo": evt = d.time; if (d.bbo[0]){ M.hlBid=+d.bbo[0].px; M.hlBidSz=+d.bbo[0].sz; } if (d.bbo[1]){ M.hlAsk=+d.bbo[1].px; M.hlAskSz=+d.bbo[1].sz; } rdSafe(() => READER.onQuote("hl", d.time, M.hlBid, M.hlAsk)); break;
-    case "hl.ctx": { const c=d.ctx; M.hlMark=+c.markPx; M.hlOracle=+c.oraclePx; M.hlFund=+c.funding; M.hlOI=+c.openInterest; M.hlVol=+c.dayNtlVlm; break; }
-    case "hl.candle": break;
-  }
-  record(id, raw, evt, d, opts);
-}
-
 // ---------- sampling for charts ----------
 setInterval(()=>{
   if (!connected) return;
@@ -1117,10 +945,35 @@ function renderViz(){
 $("vwin").onchange = $("profVenue").onchange = () => { if (visible("viz")) renderViz(); };
 
 // ---------- tabs ----------
-const TABS = [["overview","Overview"],["armmode","Arm mode"],["charts","Charts"],["micro","Microstructure"],["viz","Visuals"],["tape","Tape"],["market","Market"],["reader","Episodes"],["signals","Signals"],["drift","Drift"],["assumptions","Assumptions"],["record","Record"],["saved","Saved"],["healthlog","Health log"],["collectors","Collectors"],["replay","Replay and labels"],["trading","Trading"],["accounts","Accounts"],["history","History"],["accinfo","Account info"],["streams","Streams"],["health","Feed health"],["raw","Raw"],["engine","Engine"]];
-// Six areas by what you are doing; an area with several views shows them as a sub-row. A "view" is what data-tab on a <section> names.
-const GROUPS = [["now","Now",["overview","armmode","charts","micro","viz","tape","market"]],["reader","Reader",["reader","signals"]],["review","Review",["replay","drift","assumptions"]],["rec","Recordings",["record","saved","healthlog","collectors"]],["trade","Trade",["trading","accounts","history","accinfo"]],["system","System",["streams","health","raw","engine"]]];
-const READER_VIEWS = ["reader","signals","replay","drift","assumptions","record","saved","healthlog","collectors","engine"];   // all drawn by renderReader
+// Six areas by what you are doing; an area with several views shows them as a sub-row. Every view is one VIEWS.register (views.js): its place in
+// the navigation, and (render + minIntervalMs) how the frame loop draws it. Views of one slot (reader) share one render and one throttle.
+for (const [id, l] of [["now","Now"],["reader","Reader"],["review","Review"],["rec","Recordings"],["trade","Trade"],["system","System"]]) VIEWS.area(id, l);
+const READER_SLOT = {slot:"reader", render:()=>renderReader(), minIntervalMs:250};   // renderReader draws all of these views
+VIEWS.register({id:"overview", label:"Overview", area:"now", minIntervalMs:250, render:()=>{ try{ renderOverview(); }catch(e){ console.error("overview", e); } }});
+VIEWS.register({id:"armmode", label:"Arm mode", area:"now"});
+VIEWS.register({id:"charts", label:"Charts", area:"now", minIntervalMs:100, render:()=>{ drawBubbles(); drawCvd(); }});
+VIEWS.register({id:"micro", label:"Microstructure", area:"now", minIntervalMs:250, render:()=>renderMicro()});
+VIEWS.register({id:"viz", label:"Visuals", area:"now", minIntervalMs:400, render:()=>renderViz()});
+VIEWS.register({id:"tape", label:"Tape", area:"now"});
+VIEWS.register({id:"market", label:"Market", area:"now"});
+VIEWS.register(Object.assign({id:"reader", label:"Episodes", area:"reader"}, READER_SLOT));
+VIEWS.register({id:"signals", label:"Signals", area:"reader", slot:"reader"});
+VIEWS.register({id:"replay", label:"Replay and labels", area:"review", slot:"reader"});
+VIEWS.register({id:"drift", label:"Drift", area:"review", slot:"reader"});
+VIEWS.register({id:"assumptions", label:"Assumptions", area:"review", slot:"reader"});
+VIEWS.register({id:"record", label:"Record", area:"rec", slot:"reader"});
+VIEWS.register({id:"saved", label:"Saved", area:"rec", slot:"reader"});
+VIEWS.register({id:"healthlog", label:"Health log", area:"rec", slot:"reader"});
+VIEWS.register({id:"collectors", label:"Collectors", area:"rec", slot:"reader"});
+VIEWS.register({id:"trading", label:"Trading", area:"trade", minIntervalMs:400, render:()=>renderTrading()});
+VIEWS.register({id:"accounts", label:"Accounts", area:"trade"});
+VIEWS.register({id:"history", label:"History", area:"trade"});
+VIEWS.register({id:"accinfo", label:"Account info", area:"trade"});
+VIEWS.register({id:"streams", label:"Streams", area:"system"});
+VIEWS.register({id:"health", label:"Feed health", area:"system"});
+VIEWS.register({id:"raw", label:"Raw", area:"system"});
+VIEWS.register({id:"engine", label:"Engine", area:"system", slot:"reader"});
+const TABS = VIEWS.tabs(), GROUPS = VIEWS.groups();
 const GICON = {now:"M3 12h4l3-8 4 16 3-8h4", reader:"M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 9a3 3 0 100 6 3 3 0 000-6z", review:"M4 6l2 2 3-3M4 14l2 2 3-3M13 7h8M13 15h8", rec:"M12 4a8 8 0 100 16 8 8 0 000-16zM12 9a3 3 0 100 6 3 3 0 000-6z", trade:"M7 4v16M7 4L4 7M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3", system:"M4 7h8M18 7h2M4 17h2M10 17h10M14 4v6M8 14v6"};
 const groupOf = v => GROUPS.find(g=>g[2].includes(v)) || GROUPS[0];
 let tab = "overview";
@@ -1132,6 +985,7 @@ function setTab(t){
   $("views").innerHTML = g[2].length < 2 ? "" : g[2].map(v=>`<button data-t="${v}" class="${v===t?"act":""}">${TABS.find(x=>x[0]===v)[1]}</button>`).join("");
   document.querySelectorAll("main section").forEach(s=>s.classList.toggle("hide", s.dataset.tab!==t));
   dirty = true; renderSlow();
+  VIEWS.open(t);
 }
 const visible = name => tab===name || (tab==="trading" && !!document.querySelector(`#tgrid section[data-home="${name}"]`));
 $("groups").innerHTML = GROUPS.map(([id,l])=>`<button data-g="${id}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${GICON[id]}"/></svg><span>${l}</span></button>`).join("");
@@ -1297,6 +1151,7 @@ async function cancelAll(){
 function logout(){
   Object.assign(ACC, {mode:null, key:null, secret:null, base:null, maxUsd:Infinity, status:"", data:null});
   SIM = null; renderAccount();
+  HOOKS.emit("logout");
 }
 function renderAccount(){
   const b = $("accBadge"); b.className = ACC.mode || ""; b.textContent = ACC.mode ? ACC.mode.toUpperCase() : "";
@@ -1522,13 +1377,14 @@ function renderReader(){
   const s=RD().state(),card=(k,v,cls)=>`<div class="rd-card ${cls||""}"><span>${k}</span><b>${v}</b></div>`;
   $("rdStatus").textContent=s.calibrated?"armed":`calibrating ${(s.calibratingPct*100).toFixed(0)}%`;
   renderEpisodes(s);
-  if (typeof rdToolsRender==="function") rdToolsRender(s);
+  rdToolsRender(s);
   $("rdStrip").innerHTML=[card("activity",`${s.regime} (x${s.ratio.toFixed(2)})`)].concat(["fast","mid","slow"].map(k=>{const h=s.horizons[k];return h?card(`${k} - window ${rdMs(h.ms)}`,`${h.side} (${(h.share*100).toFixed(0)}% buy)`,h.side==="buyers"?"buy":h.side==="sellers"?"sell":""):card(k,"-");})).concat([card("episodes active",String(s.episodesActive))]).join("");
   const rows=RD().events.slice().reverse().filter(e=>(!rdFilter.family.size||rdFilter.family.has(e.family))&&(!rdFilter.venue.size||rdFilter.venue.has(e.venue))&&e.strength>=rdFilter.min).slice(0,100);
   $("rdFeed").innerHTML=`<tr><th>time</th><th>type</th><th>venue</th><th>price</th><th>horizon</th><th>strength</th><th>evidence</th></tr>`+rows.map(e=>`<tr class="neutral"><td>${hhmmss(e.t)}</td><td>${e.type.replace(/_/g," ")}</td><td><span class="venue v-${e.venue}">${e.venue.toUpperCase()}</span></td><td>${fmt(e.px,1)}</td><td>${e.horizon}</td><td><i class="rd-str" style="width:${Math.round(e.strength*60)}px"></i> ${(e.strength*100).toFixed(0)}</td><td style="white-space:normal">${rdEsc(e.evidence)}</td></tr>`).join("");
   const hs=["bn.trade","bn.depth","bn.bookTicker","hl.trades","hl.l2Book","hl.bbo"].map(id=>[id.replace("."," "),S[id].on?(status(S[id])||"-"):"off"]);
   hs.push(["signals / min",s.eventsPerMin],["BN book age",s.bookAgeMs.bn==null?"-":s.bookAgeMs.bn+" ms"],["HL book age",s.bookAgeMs.hl==null?"-":s.bookAgeMs.hl+" ms"],["heartbeat",rdWorker?"on":"off"]);
   $("rdHealth").innerHTML=hs.map(([k,v])=>`<div class="metric"><span>${k}</span><b>${v}</b></div>`).join("");
+  HOOKS.emit("renderReader");
 }
 
 // ---------- loops ----------
@@ -1544,15 +1400,10 @@ setInterval(()=>{
   for (const [st,pre] of [[bnStats,"bn"],[hlStats,"hl"]]){ $(pre+"Rate").textContent=st.cur; $(pre+"Bytes").textContent=(st.bytes/1024).toFixed(1); st.cur=0; st.bytes=0; }
   prune(); renderSlow();
 }, 1000);
-let lastOv = 0, lastFast = 0, lastChart = 0, lastMicro = 0, lastViz = 0, lastTrade = 0, lastReader = 0;
+let lastFast = 0;
 (function frame(ts){
   if (!paused){
-    if (visible("overview") && ts - lastOv > 250){ lastOv = ts; try{ renderOverview(); }catch(e){ console.error("overview", e); } }
-    if (visible("charts") && ts - lastChart > 100){ lastChart = ts; drawBubbles(); drawCvd(); }
-    if (visible("micro") && ts - lastMicro > 250){ lastMicro = ts; renderMicro(); }
-    if (visible("viz") && ts - lastViz > 400){ lastViz = ts; renderViz(); }
-    if (READER_VIEWS.some(visible) && ts - lastReader > 250){ lastReader = ts; renderReader(); }
-    if (tab==="trading" && ts - lastTrade > 400){ lastTrade = ts; renderTrading(); }
+    VIEWS.tick(ts, visible);   // overview, charts, micro, viz, the reader views, trading: registered above
     if (dirty && ts - lastFast > 150){
       dirty = false; lastFast = ts;
       if (visible("market")){ renderMetrics(); renderBooks(); }

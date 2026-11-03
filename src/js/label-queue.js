@@ -53,5 +53,5 @@
     if (info.dataset.keep && Date.now() - info.dataset.keep < 3000) return;
     if (info.textContent !== txt) info.textContent = txt;
   }
-  if (typeof renderReader === "function") { const original = renderReader; renderReader = function () { original.apply(this, arguments); try { update(); } catch (err) { /* contained */ } }; }
+  HOOKS.on("renderReader", update);
 })();
