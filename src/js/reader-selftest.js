@@ -203,6 +203,18 @@ const READER_SELFTEST=(()=>{
       &&COLLECT.ageText(4000)==="4 s"&&COLLECT.ageText(120000)==="2 min"&&COLLECT.ageText(7200000)==="2 h"
       &&COLLECT.REGISTRY.every(c=>owners.includes(c.id)&&COLLECT.EXPECT_MS[c.id]>0),detail:J({t,ok,slow,idle,idleN,start,silent,off})};
   });
+  add("collectors: registry: every collector declares owner, interval and records; OWNER, EXPECT_MS, FEATURES and FEATURE_INFO are exactly what the collectors contribute, in the fixed feature order",E=>{
+    const J=JSON.stringify,R=COLLECT.REGISTRY,ids=R.map(c=>c.id),recNames=R.reduce((a,c)=>a.concat(c.records),[]);
+    const union=[];R.forEach(c=>Object.keys(c.features).forEach(f=>union.push(f)));
+    const feats=Object.keys(COLLECT.FEATURES),info=Object.keys(COLLECT.FEATURE_INFO);
+    const ORDER_HEAD=["dvol.vol","bnDerivs.fund","bnDerivs.basisBps","bnDerivs.oi","hlCtx.fund","hlCtx.prem","hlCtx.oi","ratios.accountLS","ratios.topLS","ratios.taker","basis.bps","bookBn.spread","bookBn.imbalance5","bookBn.depth5","bookHl.spread","bookHl.imbalance5","bookHl.depth5","venues.coinbaseVsBinanceBps","venues.bybitVsBinanceBps","optChain.atmVol","optChain.skew5"];      // the order analysis plans depend on
+    const ok1=ids.length===new Set(ids).size&&R.every(c=>(c.owner==="worker"||c.owner==="page")&&c.expectMs>0&&c.records.length>0&&c.features&&c.info&&typeof c.label==="string"&&(c.speed==="fast"||c.speed==="slow"));
+    const ok2=recNames.length===new Set(recNames).size&&recNames.every(n=>COLLECT.ownerOf(n)&&R.find(c=>c.id===COLLECT.ownerOf(n)).records.includes(n))&&Object.keys(COLLECT.OWNER).length===recNames.length;
+    const ok3=Object.keys(COLLECT.EXPECT_MS).length===R.length&&R.every(c=>COLLECT.EXPECT_MS[c.id]===c.expectMs);
+    const ok4=feats.length===union.length&&union.every(f=>feats.includes(f))&&J(feats)===J(ORDER_HEAD);      // FEATURE_ORDER lists every contribution (a new one not in it lands last and fails the next line)
+    const ok5=R.every(c=>Object.keys(c.info).every(f=>c.features[f]))&&info.every(f=>feats.includes(f))&&Object.keys(COLLECT.FEATURES).every(f=>R.find(c=>c.features[f]).records.includes(COLLECT.FEATURES[f][0]));
+    return{ok:ok1&&ok2&&ok3&&ok4&&ok5,detail:J({ok1,ok2,ok3,ok4,ok5,feats:feats.length,union:union.length})};
+  });
   add("collectors: context at a moment: a feature far from its own recent mean is unusual, a constant one that moves is too, stale or future readings are ignored, liquidations are counted",E=>{
     const R=COLLECT.rec,recs=[],T=T0,J=JSON.stringify;
     for(let i=0;i<=240;i++){const t=T+i*10000;      // 40 minutes

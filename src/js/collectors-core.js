@@ -4,14 +4,20 @@
 // the Reader engine never sees them (its replay ignores them), so they cannot change a detection. Spec: .scratch/collectors/01-collectors.md.
 // (The record type letter is "c": "x" is already the engine's reset marker.)
 const COLLECT = (() => {
+  // The collector registry: ONE declaration per collector. OWNER, EXPECT_MS, FEATURES, FEATURE_INFO, the status list and the analysis scripts are all derived from it.
+  //   id        name of the collector (what ownerOf() answers)       label / speed / on   shown in the list; "fast" ones write only while recording, "slow" ones always; default switch
+  //   owner     where it runs: "worker" (collectors-worker.js) or "page" (collectors.js)      expectMs   how often it writes while working (three times that late is "slow")
+  //   records   the record names it writes
+  //   features  {feature name: [record name, fn(payload) -> number | null]}  and  info  {feature name: card display info}: added below, after the helpers they use
+  // A new collector is one entry here (plus its own worker or page code); consumers iterate REGISTRY instead of naming collectors.
   const REGISTRY = [
-    {id:"telemetry", label:"Self-telemetry: feed latency, message rates, gaps, clock offset", speed:"slow", on:true},
-    {id:"derivs", label:"Derivatives context: funding, open interest, basis, liquidations, long/short and taker ratios (Binance, Hyperliquid)", speed:"slow", on:true},
-    {id:"calendar", label:"Calendar tags: funding times, 15m / 1h / 4h / daily / weekly / monthly closes, US open and close, options expiry (rules, no network)", speed:"slow", on:true},
-    {id:"book", label:"Book depth (while recording): depth within 1 / 5 / 10 / 25 bps, spread, touch size, size added and removed per side (Binance, Hyperliquid)", speed:"fast", on:true},
-    {id:"venues", label:"Extra venues (while recording or armed): Coinbase, Bybit and OKX quotes, Binance spot, perp marks and indexes, and the ETH / SOL / BNB / XRP / DOGE marks", speed:"fast", on:true},
-    {id:"wallets", label:"Hyperliquid wallets: position and liquidation price of the 10 biggest traders, their liquidation fills, predicted funding across venues", speed:"slow", on:true},
-    {id:"options", label:"Options and volatility (Deribit, BTC and ETH): volatility index, at-the-money implied vol, skew, open interest and busiest strikes by expiry", speed:"slow", on:true},
+    {id:"telemetry", label:"Self-telemetry: feed latency, message rates, gaps, clock offset", speed:"slow", on:true, owner:"worker", expectMs:30000, records:["feeds", "markPrice"]},
+    {id:"derivs", label:"Derivatives context: funding, open interest, basis, liquidations, long/short and taker ratios (Binance, Hyperliquid)", speed:"slow", on:true, owner:"worker", expectMs:60000, records:["bnDerivs", "hlCtx", "ratios", "basis", "liq"]},
+    {id:"calendar", label:"Calendar tags: funding times, 15m / 1h / 4h / daily / weekly / monthly closes, US open and close, options expiry (rules, no network)", speed:"slow", on:true, owner:"worker", expectMs:900000, records:["cal"]},
+    {id:"book", label:"Book depth (while recording): depth within 1 / 5 / 10 / 25 bps, spread, touch size, size added and removed per side (Binance, Hyperliquid)", speed:"fast", on:true, owner:"page", expectMs:10000, records:["bookBn", "bookHl"]},
+    {id:"venues", label:"Extra venues (while recording or armed): Coinbase, Bybit and OKX quotes, Binance spot, perp marks and indexes, and the ETH / SOL / BNB / XRP / DOGE marks", speed:"fast", on:true, owner:"worker", expectMs:10000, records:["venues"]},
+    {id:"wallets", label:"Hyperliquid wallets: position and liquidation price of the 10 biggest traders, their liquidation fills, predicted funding across venues", speed:"slow", on:true, owner:"worker", expectMs:180000, records:["walletsTop", "hlLiq", "fundPred"]},
+    {id:"options", label:"Options and volatility (Deribit, BTC and ETH): volatility index, at-the-money implied vol, skew, open interest and busiest strikes by expiry", speed:"slow", on:true, owner:"worker", expectMs:60000, records:["dvol", "optChain"]},
   ];
   const TAPE_MS = 24*3600*1000, FILE_BUDGET = 8*1024*1024;      // the rolling tape keeps 24 h; one session file takes at most about 8 MB of them (5 MB until v058: book depth and the extra venues fill about 2 MB an hour each while recording)
   const round = (x, d) => Math.round(x*Math.pow(10, d))/Math.pow(10, d);
@@ -302,10 +308,10 @@ const COLLECT = (() => {
   }
 
   // ---- status of each collector, for the list in the Reader tab (view: collectors.js)
-  // which collector writes which record name; how often (ms) a collector writes while it is working (three times that late is "slow")
-  const OWNER = {feeds:"telemetry", markPrice:"telemetry", bnDerivs:"derivs", hlCtx:"derivs", ratios:"derivs", basis:"derivs", liq:"derivs", cal:"calendar", walletsTop:"wallets", hlLiq:"wallets", fundPred:"wallets",
-                 dvol:"options", optChain:"options", venues:"venues", bookBn:"book", bookHl:"book"};
-  const EXPECT_MS = {telemetry:30000, derivs:60000, calendar:900000, wallets:180000, options:60000, venues:10000, book:10000};
+  // derived from REGISTRY: which collector writes which record name; how often (ms) a collector writes while it is working (three times that late is "slow")
+  const OWNER = {}; for (const c of REGISTRY) for (const n of c.records) OWNER[n] = c.id;
+  const EXPECT_ORDER = ["telemetry", "derivs", "calendar", "wallets", "options", "venues", "book"];      // the order the analysis reports list collectors in (it is not the registry order); kept as it was
+  const EXPECT_MS = {}; for (const id of EXPECT_ORDER) EXPECT_MS[id] = REGISTRY.find(c => c.id === id).expectMs;
   const ownerOf = name => OWNER[name] || null;
   // records -> {collectorId: {n, last}} (last = the newest record time)
   function tally(recs) {
@@ -329,38 +335,70 @@ const COLLECT = (() => {
   const fmid = q => (q && num(q.b) != null && num(q.a) != null ? (q.b + q.a)/2 : null);
   const fimb = (p, e) => { const d = p && p.d && p.d[e]; return d && num(d[0]) != null && num(d[1]) != null && d[0] + d[1] > 0 ? (d[0] - d[1])/(d[0] + d[1]) : null; };
   const fdep = (p, e) => { const d = p && p.d && p.d[e]; return d && num(d[0]) != null && num(d[1]) != null ? d[0] + d[1] : null; };
-  const FEATURES = {
-    "dvol.vol":           ["dvol", p => num(p.vol)],
-    "bnDerivs.fund":      ["bnDerivs", p => p.prem && num(p.prem.fund)],
-    "bnDerivs.basisBps":  ["bnDerivs", p => p.prem && num(p.prem.mark) != null && p.prem.index ? (p.prem.mark - p.prem.index)/p.prem.index*1e4 : null],
-    "bnDerivs.oi":        ["bnDerivs", p => p.oi && num(p.oi.oi)],
-    "hlCtx.fund":         ["hlCtx", p => num(p.fund)],
-    "hlCtx.prem":         ["hlCtx", p => num(p.prem)],
-    "hlCtx.oi":           ["hlCtx", p => num(p.oi)],
-    "ratios.accountLS":   ["ratios", p => p.acct && num(p.acct.ratio)],
-    "ratios.topLS":       ["ratios", p => p.top && num(p.top.ratio)],
-    "ratios.taker":       ["ratios", p => p.taker && num(p.taker.ratio)],
-    "basis.bps":          ["basis", p => num(p.bps)],
-    "bookBn.spread":      ["bookBn", p => num(p.spr)],
-    "bookBn.imbalance5":  ["bookBn", p => fimb(p, 5)],
-    "bookBn.depth5":      ["bookBn", p => fdep(p, 5)],
-    "bookHl.spread":      ["bookHl", p => num(p.spr)],
-    "bookHl.imbalance5":  ["bookHl", p => fimb(p, 5)],
-    "bookHl.depth5":      ["bookHl", p => fdep(p, 5)],
-    "venues.coinbaseVsBinanceBps": ["venues", p => { const m = fmid(p.bnS), c = p.cb && num(p.cb.l); return m && c != null ? (c - m)/m*1e4 : null; }],
-    "venues.bybitVsBinanceBps":    ["venues", p => { const m = fmid(p.bnS), c = p.byL && num(p.byL.l); return m && c != null ? (c - m)/m*1e4 : null; }],
-    "optChain.atmVol":    ["optChain", p => p.exps && p.exps[0] && num(p.exps[0].atm)],
-    "optChain.skew5":     ["optChain", p => p.exps && p.exps[0] && p.exps[0].s && num(p.exps[0].s["-5"]) != null && num(p.exps[0].s["5"]) != null ? p.exps[0].s["-5"] - p.exps[0].s["5"] : null],
+  // What each collector contributes (see REGISTRY): its features and how a card shows them. Added to the registry entry here because the functions use the helpers above.
+  const CONTRIB = {
+    derivs: {
+      features: {
+        "bnDerivs.fund":      ["bnDerivs", p => p.prem && num(p.prem.fund)],
+        "bnDerivs.basisBps":  ["bnDerivs", p => p.prem && num(p.prem.mark) != null && p.prem.index ? (p.prem.mark - p.prem.index)/p.prem.index*1e4 : null],
+        "bnDerivs.oi":        ["bnDerivs", p => p.oi && num(p.oi.oi)],
+        "hlCtx.fund":         ["hlCtx", p => num(p.fund)],
+        "hlCtx.prem":         ["hlCtx", p => num(p.prem)],
+        "hlCtx.oi":           ["hlCtx", p => num(p.oi)],
+        "ratios.accountLS":   ["ratios", p => p.acct && num(p.acct.ratio)],
+        "ratios.topLS":       ["ratios", p => p.top && num(p.top.ratio)],
+        "ratios.taker":       ["ratios", p => p.taker && num(p.taker.ratio)],
+        "basis.bps":          ["basis", p => num(p.bps)],
+      },
+      info: {
+        "bnDerivs.fund":{label:"Binance funding", unit:"bps", scale:1e4, min:0.2}, "bnDerivs.basisBps":{label:"Binance basis", unit:"bps", min:0.3}, "bnDerivs.oi":{label:"Binance open interest", rel:true, min:0.1},
+        "hlCtx.fund":{label:"Hyperliquid funding", unit:"bps", scale:1e4, min:0.2}, "hlCtx.prem":{label:"Hyperliquid premium", unit:"bps", scale:1e4, min:0.3}, "hlCtx.oi":{label:"Hyperliquid open interest", rel:true, min:0.1},
+        "ratios.taker":{label:"taker buy/sell", unit:"", min:0.1}, "basis.bps":{label:"mark vs index", unit:"bps", min:0.3},
+      },
+    },
+    book: {
+      features: {
+        "bookBn.spread":      ["bookBn", p => num(p.spr)],
+        "bookBn.imbalance5":  ["bookBn", p => fimb(p, 5)],
+        "bookBn.depth5":      ["bookBn", p => fdep(p, 5)],
+        "bookHl.spread":      ["bookHl", p => num(p.spr)],
+        "bookHl.imbalance5":  ["bookHl", p => fimb(p, 5)],
+        "bookHl.depth5":      ["bookHl", p => fdep(p, 5)],
+      },
+      info: {
+        "bookBn.imbalance5":{label:"Binance book imbalance (5 bps)", unit:"", min:0.1}, "bookBn.depth5":{label:"Binance depth (5 bps)", rel:true, min:10}, "bookHl.depth5":{label:"Hyperliquid depth (5 bps)", rel:true, min:10}, "bookHl.imbalance5":{label:"Hyperliquid book imbalance (5 bps)", unit:"", min:0.1},
+      },
+    },
+    venues: {
+      features: {
+        "venues.coinbaseVsBinanceBps": ["venues", p => { const m = fmid(p.bnS), c = p.cb && num(p.cb.l); return m && c != null ? (c - m)/m*1e4 : null; }],
+        "venues.bybitVsBinanceBps":    ["venues", p => { const m = fmid(p.bnS), c = p.byL && num(p.byL.l); return m && c != null ? (c - m)/m*1e4 : null; }],
+      },
+      info: {"venues.coinbaseVsBinanceBps":{label:"Coinbase vs Binance", unit:"bps", min:0.5}, "venues.bybitVsBinanceBps":{label:"Bybit vs Binance", unit:"bps", min:0.5}},
+    },
+    options: {
+      features: {
+        "dvol.vol":           ["dvol", p => num(p.vol)],
+        "optChain.atmVol":    ["optChain", p => p.exps && p.exps[0] && num(p.exps[0].atm)],
+        "optChain.skew5":     ["optChain", p => p.exps && p.exps[0] && p.exps[0].s && num(p.exps[0].s["-5"]) != null && num(p.exps[0].s["5"]) != null ? p.exps[0].s["-5"] - p.exps[0].s["5"] : null],
+      },
+      info: {
+        "dvol.vol":{label:"volatility index", rel:true, min:0.3},
+        "optChain.atmVol":{label:"option ATM vol", rel:true, min:1}, "optChain.skew5":{label:"option skew (-5/+5%)", unit:"pts", min:1},
+      },
+    },
   };
-  // how a feature is shown on a card: a short name, and whether its change reads as a percentage of its recent level (`rel`) or in its own unit (`unit`)
-  const FEATURE_INFO = {
-    "dvol.vol":{label:"volatility index", rel:true, min:0.3}, "bnDerivs.fund":{label:"Binance funding", unit:"bps", scale:1e4, min:0.2}, "bnDerivs.basisBps":{label:"Binance basis", unit:"bps", min:0.3}, "bnDerivs.oi":{label:"Binance open interest", rel:true, min:0.1},
-    "hlCtx.fund":{label:"Hyperliquid funding", unit:"bps", scale:1e4, min:0.2}, "hlCtx.prem":{label:"Hyperliquid premium", unit:"bps", scale:1e4, min:0.3}, "hlCtx.oi":{label:"Hyperliquid open interest", rel:true, min:0.1},
-    "ratios.taker":{label:"taker buy/sell", unit:"", min:0.1}, "basis.bps":{label:"mark vs index", unit:"bps", min:0.3},
-    "bookBn.imbalance5":{label:"Binance book imbalance (5 bps)", unit:"", min:0.1}, "bookBn.depth5":{label:"Binance depth (5 bps)", rel:true, min:10}, "bookHl.depth5":{label:"Hyperliquid depth (5 bps)", rel:true, min:10}, "bookHl.imbalance5":{label:"Hyperliquid book imbalance (5 bps)", unit:"", min:0.1},
-    "venues.coinbaseVsBinanceBps":{label:"Coinbase vs Binance", unit:"bps", min:0.5}, "venues.bybitVsBinanceBps":{label:"Bybit vs Binance", unit:"bps", min:0.5},
-    "optChain.atmVol":{label:"option ATM vol", rel:true, min:1}, "optChain.skew5":{label:"option skew (-5/+5%)", unit:"pts", min:1},
-  };
+  for (const c of REGISTRY) { const k = CONTRIB[c.id] || {}; c.features = k.features || {}; c.info = k.info || {}; }      // every collector has both, empty if it contributes none
+  // FEATURES: name -> [record name, function(payload) -> number | null], FEATURE_INFO: name -> how a card shows it (a short name, and whether its change reads as a percentage of
+  // its recent level (`rel`) or in its own unit (`unit`)). Both are the union of the registry's contributions. The ORDER of FEATURES is fixed (analysis plans depend on it, the
+  // multiple-comparison count and the report lines follow it); the self-test checks that this list and the contributions are the same set.
+  const FEATURE_ORDER = ["dvol.vol", "bnDerivs.fund", "bnDerivs.basisBps", "bnDerivs.oi", "hlCtx.fund", "hlCtx.prem", "hlCtx.oi", "ratios.accountLS", "ratios.topLS", "ratios.taker", "basis.bps",
+    "bookBn.spread", "bookBn.imbalance5", "bookBn.depth5", "bookHl.spread", "bookHl.imbalance5", "bookHl.depth5", "venues.coinbaseVsBinanceBps", "venues.bybitVsBinanceBps", "optChain.atmVol", "optChain.skew5"];
+  const FEATURES = {}, FEATURE_INFO = {}, allF = {}, allI = {};
+  for (const c of REGISTRY) { Object.assign(allF, c.features); Object.assign(allI, c.info); }
+  for (const f of FEATURE_ORDER) { if (allF[f]) FEATURES[f] = allF[f]; if (allI[f]) FEATURE_INFO[f] = allI[f]; }
+  for (const f in allF) if (!(f in FEATURES)) FEATURES[f] = allF[f];      // a feature of a new collector not yet in the list goes last (the self-test flags it)
+  for (const f in allI) if (!(f in FEATURE_INFO)) FEATURE_INFO[f] = allI[f];
   // the feature over time: at most one value per step, with `dev` = value minus the mean of the previous winMs (null until 5 earlier values exist)
   function featureSeries(rows, fn, stepMs, winMs) {
     const out = [], win = []; let sum = 0, lastT = -Infinity;
