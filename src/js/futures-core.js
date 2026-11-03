@@ -21,29 +21,35 @@ const FUTSTACK = (() => {
     if (t.liq) { if (t.side === "sell") x.sl += t.ntl; else x.bl += t.ntl; }
     else { x.n++; if (t.side === "buy") x.b += t.ntl; else x.s += t.ntl; addProfile(st, x, t.px, t.side === "buy" ? t.ntl : 0, t.side === "buy" ? 0 : t.ntl); }
   }
-  function setOi(st, v, val) { if (PRICE.includes(v)) st.oi[v] = val > 0 ? +val : null; }
+  function setOi(st, v, val) { if (VENUES.includes(v)) st.oi[v] = val > 0 ? +val : null; }
   function stamp(st, t) { for (const v of VENUES) if (st.oi[v] != null) cell(st, slot(t), v).oi = st.oi[v]; }   // open interest is polled, so it is written into the current bin every tick
   function prune(st, keepMs, now) { const cut = slot(now - keepMs); for (const k of st.bins.keys()) if (k < cut) st.bins.delete(k); }
 
-  // o: {venue:"bn"|"hl"|"all", t0, t1, binMs, liqAll}. "all" = Binance + Hyperliquid for price, delta and open interest. liqAll adds the liquidations of every venue (Bybit and OKX too) to whichever venue is shown. One entry per display bin, including empty ones, so the time axis is even.
+  // o: {venue:"bn"|"hl"|"all", t0, t1, binMs, liqAll}. "all" = Binance + Hyperliquid for price, delta and open interest. liqAll adds the liquidations AND the open interest of every venue (Bybit and OKX too) to whichever venue is shown;
+  // a venue's open interest is only added when it has a reading near the start of the window (first 10% of the bins), and is carried back to the start and forward over gaps, so a venue that appears late never makes a step. The result's .oiVenues lists the ones used. One entry per display bin, including empty ones, so the time axis is even.
   function aggregate(st, o) {
     const per = Math.max(1, Math.round(o.binMs / BASE_MS)), t0 = Math.floor(o.t0 / o.binMs) * o.binMs, n = Math.max(1, Math.ceil((o.t1 - t0) / o.binMs));
-    const vs = o.venue === "all" ? PRICE : [o.venue], lv = o.liqAll ? VENUES : vs, out = [];
+    const vs = o.venue === "all" ? PRICE : [o.venue], lv = o.liqAll ? VENUES : vs, ov = o.liqAll ? VENUES : vs, out = [];
     for (let j = 0; j < n; j++) {
       const r = { t:t0 + j*o.binMs, o:null, h:null, l:null, c:null, bl:0, sl:0, b:0, s:0, n:0, oi:null, has:false }, k0 = slot(r.t), pv = {}, oiV = {};
       for (const v of vs) pv[v] = { o:null, h:null, l:null, c:null };
       for (let k = k0; k < k0 + per; k++) {
         const bin = st.bins.get(k); if (!bin) continue; r.has = true;
         for (const v of lv) { r.bl += bin[v].bl; r.sl += bin[v].sl; }
+        for (const v of ov) if (bin[v].oi != null) oiV[v] = bin[v].oi;
         for (const v of vs) {
-          const x = bin[v], p = pv[v]; r.b += x.b; r.s += x.s; r.n += x.n; if (x.oi != null) oiV[v] = x.oi;
+          const x = bin[v], p = pv[v]; r.b += x.b; r.s += x.s; r.n += x.n;
           if (x.o != null) { if (p.o == null) { p.o = x.o; p.h = x.h; p.l = x.l; } else { if (x.h > p.h) p.h = x.h; if (x.l < p.l) p.l = x.l; } p.c = x.c; }
         }
       }
       const pick = vs.find(v => pv[v].o != null); if (pick) Object.assign(r, pv[pick]);
-      const known = vs.filter(v => oiV[v] != null); if (known.length) r.oi = known.reduce((a, v) => a + oiV[v], 0);
+      r._oiv = oiV;
       r.liq = r.bl + r.sl; r.delta = r.b - r.s; r.vol = r.b + r.s; r.range = r.o != null && r.l > 0 ? (r.h - r.l) / r.l * 1e4 : null; r.dpct = r.vol > 0 ? r.delta / r.vol : null; out.push(r);   // range in bps, dpct = delta / volume
     }
+    const firstOi = out.findIndex(r => ov.some(v => r._oiv[v] != null)), reach = firstOi < 0 ? 0 : firstOi + Math.ceil(out.length * .1), inc = [], carry = {};
+    for (const v of ov) { const j = out.findIndex(r => r._oiv[v] != null); if (j >= 0 && j <= reach) { inc.push(v); carry[v] = out[j]._oiv[v]; } }
+    for (const r of out) { let sum = 0; for (const v of inc) { if (r._oiv[v] != null) carry[v] = r._oiv[v]; sum += carry[v]; } r.oi = inc.length ? sum : null; delete r._oiv; }
+    out.oiVenues = inc;
     let prev = null; for (const r of out) { r.doi = r.oi != null && prev != null && prev > 0 ? (r.oi - prev) / prev : null; if (r.oi != null) prev = r.oi; }
     {
     }
@@ -61,6 +67,12 @@ const FUTSTACK = (() => {
   // klines: rows of /fapi/v1/klines ([openTime, o, h, l, c, vol, closeTime, quoteVol, trades, takerBuyBase, takerBuyQuote]); oiHist: rows of /futures/data/openInterestHist ({timestamp, sumOpenInterest}); until: the time the open interest is held to.
   // Live data wins: a base bin that already has live price keeps it, one that already has open interest keeps it. Detail inside a minute is invented (price walks open -> low/high -> close, volume is split evenly), so 1-minute and 5-minute bins are exact and 15-second bins are approximate.
   // Liquidations cannot be backfilled (Binance keeps no public history), and the kline delta includes liquidation prints. Returns {t0, t1, minutes, oiPoints} of what was written.
+  // Open interest history of one venue: pts = [{t, v}] (any order, v in coin); each reading is held until the next one, the last until `until`. A bin that already has a reading keeps it. Returns the number of points used.
+  function backfillOi(st, venue, pts, until) {
+    if (!VENUES.includes(venue)) return 0; const a = (pts || []).filter(p => p.t > 0 && p.v > 0).sort((x, y) => x.t - y.t);
+    a.forEach((p, j) => { const end = j + 1 < a.length ? a[j + 1].t : Math.max(p.t + 300000, until || 0); for (let k = slot(p.t); k < slot(end); k++) { const x = cell(st, k, venue); if (x.oi == null) x.oi = p.v; } });
+    return a.length;
+  }
   function backfill(st, klines, oiHist, until) {
     const per = 60000 / BASE_MS, res = { t0:null, t1:null, minutes:0, oiPoints:0 };
     for (const r of klines || []) {
@@ -75,8 +87,7 @@ const FUTSTACK = (() => {
       }
       if (wrote) { res.minutes++; res.t0 = res.t0 == null ? t0 : Math.min(res.t0, t0); res.t1 = Math.max(res.t1 || 0, t0 + 60000); }
     }
-    const pts = (oiHist || []).map(r => ({ t:+r.timestamp, v:+r.sumOpenInterest })).filter(p => p.t > 0 && p.v > 0).sort((a, b) => a.t - b.t);
-    pts.forEach((p, j) => { const end = j + 1 < pts.length ? pts[j + 1].t : Math.max(p.t + 300000, until || 0); for (let k = slot(p.t); k < slot(end); k++) { const x = cell(st, k, "bn"); if (x.oi == null) x.oi = p.v; } res.oiPoints++; });
+    res.oiPoints = backfillOi(st, "bn", (oiHist || []).map(r => ({ t:+r.timestamp, v:+r.sumOpenInterest })), until);
     if (res.t0 != null) st.bf = { t0:res.t0, t1:res.t1 };
     return res;
   }
@@ -187,8 +198,13 @@ const FUTSTACK = (() => {
     ok("bin stats: trade count, delta share, range in bps, open interest change", pa.n === 3 && Math.abs(pa.dpct - 1300 / 2100) < 1e-9 && pa.range > 3 && pa.range < 3.5 && pa.doi === null, JSON.stringify(pa));
     ok("bin stats: open interest change against the previous bin", aggregate(st, { venue:"bn", t0:T, t1:T + 600000, binMs:15000 }).filter(b => b.doi != null && b.doi < -0.004).length === 1, "");
     const pb = profile(sb, { venue:"bn", t0:TB, t1:TB + 120000 }); ok("backfill: profile keeps the minute's volume and its trade count", Math.abs(pb.rows.reduce((a, r) => a + r.b + r.s, 0) - (60000 + 30000 - 0)) < 600 + 1 && aggregate(sb, { venue:"bn", t0:TB, t1:TB + 60000, binMs:60000 })[0].n === 10, JSON.stringify([pb.rows.length, pb.max]));
+    const so = newStore(), TO = 6e9; for (let k = 0; k < 120; k++) addTrade(so, { t:TO + k * BASE_MS, v:"bn", side:"buy", px:100, ntl:10 });
+    backfillOi(so, "bn", [{ t:TO, v:1000 }, { t:TO + 300000, v:990 }], TO + 600000); backfillOi(so, "by", [{ t:TO + 60000, v:500 }, { t:TO + 300000, v:480 }], TO + 600000); backfillOi(so, "ok", [{ t:TO + 540000, v:300 }], TO + 600000);
+    const oa = aggregate(so, { venue:"bn", t0:TO, t1:TO + 600000, binMs:60000, liqAll:true }), ob = aggregate(so, { venue:"bn", t0:TO, t1:TO + 600000, binMs:60000 });
+    ok("open interest of all venues is summed, a venue starting a little late is carried back", oa.oiVenues.includes("bn") && oa.oiVenues.includes("by") && oa[0].oi === 1500 && oa[5].oi === 1470 && oa[9].oi === 1470, JSON.stringify([oa.oiVenues, oa[0].oi, oa[5].oi, oa[9].oi]));
+    ok("a venue whose open interest starts late in the window is left out (no step)", !oa.oiVenues.includes("ok") && ob[0].oi === 1000 && ob.oiVenues.join() === "bn", JSON.stringify([oa.oiVenues, ob.oiVenues]));
     const before = st.bins.size; prune(st, 60000, T + 600000); ok("prune drops old bins", st.bins.size < before && st.bins.size > 0, st.bins.size);
     return out;
   }
-  return { BASE_MS, DEFAULTS, newStore, addTrade, setOi, stamp, prune, aggregate, highlights, summary, reading, parseLiq, backfill, reset, profile, usd, selftest };
+  return { BASE_MS, DEFAULTS, newStore, addTrade, setOi, stamp, prune, aggregate, highlights, summary, reading, parseLiq, backfill, backfillOi, reset, profile, usd, selftest };
 })();

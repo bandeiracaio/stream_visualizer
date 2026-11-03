@@ -19,7 +19,11 @@
       const [kl, oh] = await Promise.all([get(`${BN_REST}/fapi/v1/klines?symbol=${sym}&interval=1m&limit=241`), get(`${BN_REST}/futures/data/openInterestHist?symbol=${sym}&period=5m&limit=60`).catch(() => [])]);
       if (gen !== bfGen) return; if (!Array.isArray(kl)) throw new Error("no klines for " + sym);
       const now = nowEx(), r = FUTSTACK.backfill(st, kl.filter(x => +x[6] < now), Array.isArray(oh) ? oh : [], now);
-      bfMsg = r.minutes ? `backfilled ${r.minutes} min of price and delta${r.oiPoints ? " and open interest" : " (no open interest history)"} from Binance: 1-minute detail, no liquidations before you connected` : "nothing to backfill";
+      const hist = await Promise.allSettled([get(`https://api.bybit.com/v5/market/open-interest?category=linear&symbol=${sym}&intervalTime=5min&limit=60`), get(`https://www.okx.com/api/v5/rubik/stat/contracts/open-interest-history?instId=${coin}-USDT-SWAP&period=5m&limit=60`)]);
+      if (gen !== bfGen) return; const exOi = [];
+      if (hist[0].status === "fulfilled" && hist[0].value.result && Array.isArray(hist[0].value.result.list) && FUTSTACK.backfillOi(st, "by", hist[0].value.result.list.map(x => ({ t:+x.timestamp, v:+x.singleOpenInterest })), now)) exOi.push("Bybit");   // singleOpenInterest: one side, the same scale as Binance and OKX (openInterest counts both sides)
+      if (hist[1].status === "fulfilled" && Array.isArray(hist[1].value.data) && FUTSTACK.backfillOi(st, "ok", hist[1].value.data.map(x => ({ t:+x[0], v:+x[2] })), now)) exOi.push("OKX");
+      bfMsg = r.minutes ? `backfilled ${r.minutes} min of price and delta${r.oiPoints ? " and open interest" : " (no open interest history)"} from Binance: 1-minute detail, no liquidations before you connected${exOi.length ? "; open interest history also from " + exOi.join(" and ") : ""}` : "nothing to backfill";
     } catch (e) { if (gen === bfGen) bfMsg = "backfill failed: " + e.message; }
     if (gen === bfGen && typeof futuresRender === "function") futuresRender();
   }
@@ -28,6 +32,15 @@
     if (!on) { wasConn = false; return; }
     if (coin && coin !== curCoin) { if (curCoin != null) { FUTSTACK.reset(st); heats.bn.length = heats.hl.length = 0; fills.length = 0; watermark = 0; heatKey = ""; } curCoin = coin; wasConn = false; }
     if (!wasConn && coin) { wasConn = true; liveFrom = nowEx(); backfill(coin); }
+  }
+
+  // ---- Bybit and OKX open interest: polled every 10 s while connected (public REST, one side, in coin) ----
+  const OIX = { by:"–", ok:"–" }; let lastOiPoll = 0;
+  function oiPoll(coin) {
+    if (!coin || Date.now() - lastOiPoll < 10000) return; lastOiPoll = Date.now();
+    const one = (k, url, pick) => fetch(url).then(r => r.json()).then(j => { if (coin !== curCoin) return; const v = pick(j); if (v > 0) { FUTSTACK.setOi(st, k, v); OIX[k] = "live"; } else OIX[k] = "no reading"; }).catch(() => { OIX[k] = "error"; });
+    one("by", `https://api.bybit.com/v5/market/tickers?category=linear&symbol=${coin}USDT`, j => +(j.result && j.result.list && j.result.list[0] && j.result.list[0].singleOpenInterest));
+    one("ok", `https://www.okx.com/api/v5/public/open-interest?instType=SWAP&instId=${coin}-USDT-SWAP`, j => +(j.data && j.data[0] && j.data[0].oiCcy));
   }
 
   // ---- Bybit and OKX liquidation sockets: open while the page is connected, for the coin in the header (own sockets; the collectors' worker is untouched) ----
@@ -54,7 +67,7 @@
 
   // ---- history: runs once a second while connected, whether or not the view is open ----
   setInterval(() => {
-    histManage((typeof accAsset === "function" ? accAsset() : "").replace(/[^A-Z0-9]/g, "")); lqManage(); if (typeof connected === "undefined" || !connected) return; const now = nowEx();
+    const coinNow = (typeof accAsset === "function" ? accAsset() : "").replace(/[^A-Z0-9]/g, ""); histManage(coinNow); lqManage(); if (typeof connected !== "undefined" && connected) oiPoll(coinNow); if (typeof connected === "undefined" || !connected) return; const now = nowEx();
     for (let i = trades.length - 1; i >= 0; i--) {
       const t = trades[i]; if (t.t < watermark - 5000) break;
       if (seen.has(t) || t.bf) continue; seen.add(t); if (t.t > watermark) watermark = t.t;
@@ -68,6 +81,7 @@
     }
   }, 1000);
 
+  const oiNote = () => { const v = bins.oiVenues; return (v && v.length ? v.map(x => ({ bn:"Binance", hl:"Hyperliquid", by:"Bybit", ok:"OKX" }[x])).join(" + ") : "none yet") + ` (Bybit ${OIX.by}${v && v.includes("by") ? "" : ", left out of this window"}, OKX ${OIX.ok}${v && v.includes("ok") ? "" : ", left out of this window: live only, no history the browser may read"})`; };
   const cfg = () => ({ minLiqUsd:Math.max(0, +g("fsMin").value || 0) }), liqAll = () => g("fsLiqAll").checked;
   const fmtOi = v => v == null ? "–" : fmtK(v);
   const pct = x => x == null ? "–" : (x >= 0 ? "+" : "") + (x * 100).toFixed(3) + "%";
@@ -97,7 +111,7 @@
     let all = FUTSTACK.aggregate(st, { venue, t0:t1 - win, t1, binMs, liqAll:liqAll() }); const first = all.findIndex(b => b.has);
     if (first < 0) { bins = []; geo = null; hits = []; return emptyMsg(ctx, w, h, connected ? "collecting… history starts when you press Connect" : "press Connect"); }
     const showProf = g("fsProf").checked, showStats = g("fsStats").checked, STAT_ROWS = 5, rowH = 12, stripH = showStats ? STAT_ROWS * rowH : 0;
-    bins = all.slice(first); const n = bins.length, L = 6, R = 64, PG = showProf ? 84 : 0, B = 16, gap = 6, avail = h - B - gap * (showStats ? 4 : 3) - stripH, hP = avail * .5, hL = avail * .14, hD = avail * .18, hO = avail - hP - hL - hD;
+    bins = all.slice(first); bins.oiVenues = all.oiVenues; const n = bins.length, L = 6, R = 64, PG = showProf ? 84 : 0, B = 16, gap = 6, avail = h - B - gap * (showStats ? 4 : 3) - stripH, hP = avail * .5, hL = avail * .14, hD = avail * .18, hO = avail - hP - hL - hD;
     const top = [4, 4 + hP + gap, 4 + hP + hL + gap * 2, 4 + hP + hL + hD + gap * 3, 4 + hP + hL + hD + hO + gap * 4], pw = w - L - R - PG, t0 = bins[0].t, span = n * binMs, bw = pw / n, bottom = showStats ? top[4] + stripH : top[3] + hO;
     const X = t => L + (t - t0) / span * pw, xc = j => L + (j + .5) * bw;
     geo = { L, pw, n, bw, top, hs:[hP, hL, hD, hO], h, bottom };
@@ -109,7 +123,7 @@
     const Yp = p => top[0] + (hi - p) / (hi - lo) * hP;
     // panel frames and titles
     ctx.fillStyle = TH.dim; ctx.textAlign = "left";
-    const titles = ["", "Liquidations $ (" + (liqAll() ? "Binance + Bybit + OKX" : venue === "bn" ? "Binance" : venue === "hl" ? "Hyperliquid: no feed" : "Binance") + ")   ▲ shorts liquidated   ▼ longs liquidated", "Volume delta $  (taker buy − sell)", "Open interest (" + (venue === "all" ? "BN + HL" : venue.toUpperCase()) + ", coin)   green = rising, red = falling"];
+    const titles = ["", "Liquidations $ (" + (liqAll() ? "Binance + Bybit + OKX" : venue === "bn" ? "Binance" : venue === "hl" ? "Hyperliquid: no feed" : "Binance") + ")   ▲ shorts liquidated   ▼ longs liquidated", "Volume delta $  (taker buy − sell)", "Open interest (" + (bins.oiVenues && bins.oiVenues.length ? bins.oiVenues.map(x => x.toUpperCase()).join(" + ") : venue.toUpperCase()) + ", coin)   green = rising, red = falling"];
     for (let k = 0; k < 4; k++) { ctx.strokeStyle = TH.line; ctx.strokeRect(L + .5, top[k] + .5, pw, [hP, hL, hD, hO][k]); if (titles[k]) ctx.fillText(titles[k], L + 4, top[k] + 11); }
     // heatmap
     if (g("fsHeat").checked && venue !== "all") {
@@ -208,7 +222,7 @@
   // ---- the live reading beside the chart ----
   const setHtml = (el, html) => { if (el.dataset.h !== html) { el.dataset.h = html; el.innerHTML = html; } };
   function panels() {
-    setHtml(g("fsLiqSrc"), `Liquidation feeds: Binance ${connected ? "(app feed)" : "off"} · Bybit ${LQ.by.st} · OKX ${LQ.ok.st} · Hyperliquid: its feed does not flag liquidations${bfMsg ? " · History: " + bfMsg : ""}`);
+    setHtml(g("fsLiqSrc"), `Liquidation feeds: Binance ${connected ? "(app feed)" : "off"} · Bybit ${LQ.by.st} · OKX ${LQ.ok.st} · Hyperliquid: its feed does not flag liquidations · Open interest: ${oiNote()}${bfMsg ? " · History: " + bfMsg : ""}`);
     if (!bins.length) { setHtml(g("fsCheck"), `<b>Reading</b><div class="note">Waiting for data.</div>`); setHtml(g("fsHits"), `<b>Boxed moments</b><div class="note">None yet.</div>`); return; }
     const n = Math.max(1, Math.ceil(300000 / (+g("fsBin").value))), s = FUTSTACK.summary(bins, n), cls = ok => ok ? "yes" : "no";
     const liqHit = s.bl + s.sl >= (cfg().minLiqUsd || 1), dHit = s.vol > 0 && Math.abs(s.delta) / s.vol > .1, oHit = s.oiPct != null && Math.abs(s.oiPct) >= .0002;

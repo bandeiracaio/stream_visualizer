@@ -133,7 +133,7 @@
       <label><input type="checkbox" id="fsProf" checked> volume profile</label>
       <label><input type="checkbox" id="fsStats" checked> bar stats</label>
       <label><input type="checkbox" id="fsMark" checked> highlights</label>
-      <label title="Add Bybit and OKX liquidations to the liquidation panel (delta and open interest stay Binance / Hyperliquid)"><input type="checkbox" id="fsLiqAll" checked> liq: all venues</label>
+      <label title="Add Bybit and OKX to the liquidation panel and to open interest (price, delta and the book stay Binance / Hyperliquid)"><input type="checkbox" id="fsLiqAll" checked> all venues: liq + OI</label>
       min liq $ <input id="fsMin" type="number" value="100000" step="50000" min="0" style="width:90px"></span></h2>
     <canvas id="cvFut" class="chart" style="height:660px;touch-action:pan-y"></canvas>
     <div class="note" id="fsLiqSrc"></div>
@@ -164,7 +164,7 @@
       <li><b>Look for rotations</b>: a liquidation spike on one side, a delta spike the same way, and open interest dropping at the same moment (the cyan boxes). That is positions being closed by force, often near where a move stalls or turns.</li>
       <li>Delta up with open interest up is new longs opening; delta up with open interest down is shorts closing; delta down with open interest up is new shorts; delta down with open interest down is longs closing.</li>
       <li><b>Use small size</b>, get screen time, catch rotations, build experience. The point is to learn to read it fast.</li></ol>
-      <div class="note">From a trader's post. This view only shows and marks; the boxes are a reading aid, not a signal, and nothing here is validated. History starts when you press Connect and is not kept after a reload. Liquidations come from Binance, Bybit and OKX (the original shows nine venues); Hyperliquid's feed does not flag liquidations, so it adds none. Delta and open interest are Binance and Hyperliquid only.</div>
+      <div class="note">From a trader's post. This view only shows and marks; the boxes are a reading aid, not a signal, and nothing here is validated. History starts when you press Connect and is not kept after a reload. Liquidations come from Binance, Bybit and OKX (the original shows nine venues); Hyperliquid's feed does not flag liquidations, so it adds none. Open interest is Binance, Bybit and OKX (Hyperliquid's is live only, so it joins once the window starts after you connected); price, delta and the book are Binance and Hyperliquid only.</div>
     </details>
   </section>
 
