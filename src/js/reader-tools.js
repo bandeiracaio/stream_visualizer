@@ -354,16 +354,8 @@ rt$("rvReport").onclick = () => { rtDownload(new Blob([rvReportText()], {type:"t
 
 // ---------- threshold proposals: built from confirmed drifts, checked by replaying recordings (Part 3b) ----------
 const PX = {res:null, running:false, arm:null, importOv:null};
-const pxLink = k => READER_REGISTER.LINKS.find(l => l.k === k);
-const pxPct = x => (x >= 0 ? "+" : "") + Math.round(x * 100) + "%";
-const pxFam = f => READER_EPISODES.FAMILY_LABEL[f] || f;
-function pxCfg(changes){
-  const c = rtCfg();
-  for (const l of READER_REGISTER.LINKS) if (l.at === "cfg") c[l.k] = READER.cfg[l.k];
-  c.ep.keepEpisodes = 5000; c.ep.keepWalls = 500;
-  for (const k in changes){ const l = pxLink(k); if (l.at === "ep") c.ep[k] = changes[k]; else c[k] = changes[k]; }
-  return c;
-}
+const pxLink = READER_REVIEW.link, pxPct = READER_REVIEW.pct, pxFam = READER_REVIEW.fam;
+const pxCfg = changes => READER_REVIEW.replayCfg(READER.cfg, changes);
 async function pxReplay(inputs, cfg, label){
   const e = READER_ENGINE.create(cfg), eps = {};
   e.subscribeEpisodes((ep, ch) => { if (ch === "started") eps[ep.family] = (eps[ep.family] || 0) + 1; });
@@ -371,19 +363,14 @@ async function pxReplay(inputs, cfg, label){
     READER_ENGINE.feed(e, inputs, i, i + 4000);
     if ((i / 4000) % 3 === 0){ rt$("pxStat").textContent = label + " " + Math.min(100, Math.round(i / inputs.length * 100)) + "%"; await new Promise(r => setTimeout(r)); }
   }
-  const d = e.debug(), t0 = d.firstT, t1 = d.now, L = RT.labels.filter(l => l.t1 >= t0 && l.t0 <= t1), lab = {a:0, aF:0, dn:0, dS:0, m:0, mD:0};
-  for (const l of L){
-    const hit = e.episodes.some(ep => rtMatch(l, ep));
-    if (l.verdict === "agree"){ lab.a++; if (hit) lab.aF++; } else if (l.verdict === "disagree"){ lab.dn++; if (hit) lab.dS++; } else { lab.m++; if (hit) lab.mD++; }
-  }
-  return {eps, labels:lab};
+  const d = e.debug(), t0 = d.firstT, t1 = d.now;
+  return {eps, labels:READER_REVIEW.tally(RT.labels, e.episodes, t0, t1, rtMatch)};
 }
 async function pxRun(files){
   const rv = READER.register.review(), pend = rv.proposals.filter(p => p.status === "pending");
   if (!pend.length){ rt$("pxStat").textContent = "No pending proposals."; return; }
   files = files.slice(0, 8); PX.running = true; rt$("pxPick").disabled = true;
-  const cfgs = [{name:"current", changes:{}, what:"current thresholds"}].concat(pend.map((p, i) => ({name:p.id, changes:{[p.k]:p.to}, what:"proposal " + (i + 1) + " of " + pend.length})));
-  if (pend.length > 1) cfgs.push({name:"together", changes:Object.fromEntries(pend.map(p => [p.k, p.to])), what:"all proposals together"});
+  const cfgs = READER_REVIEW.plan(pend);
   const runs = []; let skipped = 0;
   try{
     for (let i = 0; i < files.length; i++){
@@ -393,21 +380,14 @@ async function pxRun(files){
       runs.push(one);
     }
   } finally { PX.running = false; rt$("pxPick").disabled = false; }
-  const per = {};
-  for (const p of pend){
-    const mkRun = (r, key) => ({tag:r.t0 >= p.driftFrom ? "after" : "before", labels:r.by[key].labels, eps:r.by[key].eps, hours:r.hours, name:r.name});
-    const base = runs.map(r => mkRun(r, "current")), prop = runs.map(r => mkRun(r, p.id));
-    per[p.id] = {rev:p.rev || 0, base, prop, v:READER_PROPOSALS.verdict({proposal:p, base, prop, oldRates:READER.register.oldRates(p.id)})};
-  }
-  const tog = pend.length > 1 && runs.length ? {base:runs.map(r => ({labels:r.by.current.labels, eps:r.by.current.eps, hours:r.hours})), prop:runs.map(r => ({labels:r.by.together.labels, eps:r.by.together.eps, hours:r.hours})), ids:pend.map(p => p.id), revs:pend.map(p => p.rev || 0)} : null;
+  const {per, together:tog} = READER_REVIEW.verdicts(pend, runs, id => READER.register.oldRates(id));
   PX.res = {at:Date.now(), per, runs, skipped, together:tog, epoch:READER.register.epoch};
   rt$("pxStat").textContent = runs.length ? `Checked ${runs.length} recording${runs.length === 1 ? "" : "s"}${skipped ? ", " + skipped + " could not be read" : ""}.` : "None of the files could be read.";
   RT.last.px = null; pxRender();
 }
 rt$("pxPick").onclick = () => rt$("pxFiles").click();
 rt$("pxFiles").onchange = e => { const fl = Array.from(e.target.files); e.target.value = ""; if (fl.length && !PX.running) pxRun(fl); };
-const pxLabTxt = l => l.a + l.dn + l.m ? `agreed ${l.aF}/${l.a} · disagreed shown ${l.dS}/${l.dn} · missed found ${l.mD}/${l.m}` : "no labels";
-const pxRateTxt = (runs, f) => { const r = READER_PROPOSALS.rate(runs, f); return r == null ? "–" : r.toFixed(1) + "/h"; };
+const pxLabTxt = READER_REVIEW.labTxt, pxRateTxt = READER_REVIEW.rateTxt;
 function pxResultHtml(p, r){
   const v = r.v;
   const conds = v.conds.map(c => `<li>${c.ok ? "✓" : "✗"} ${c.text}</li>`).join("");
@@ -428,7 +408,7 @@ function pxRender(){
       + `<div class="row" style="margin-top:4px"><button data-px-do="recompute" data-id="${p.id}">Recompute</button><input data-px-reason="${p.id}" placeholder="reason (optional)" style="max-width:200px"><button data-px-do="reject" data-id="${p.id}">Reject</button>${pxApproveBtn(p, fresh)}</div>${pxArmHtml(p)}`
       + (r ? (fresh ? pxResultHtml(p, r) : `<div class="note">The proposal changed since the last check. Check it against recordings again.</div>`) : `<div class="note">Not checked against recordings yet.</div>`) + `</div>`;
   }).join("");
-  const T = PX.res && PX.res.together, showTog = T && PX.res.epoch === READER.register.epoch && T.ids.every((id, i) => pend.some(p => p.id === id && (p.rev || 0) === T.revs[i]));
+  const T = PX.res && PX.res.together, showTog = READER_REVIEW.togetherShown(PX.res, READER.register.epoch, pend);
   const fams = ["absorption", "exhaustion", "burst", "wall"];
   const tog = showTog ? `<div class="rv-row" style="display:block"><b>All pending proposals together</b><table class="rv-tbl"><thead><tr><th>Family</th><th>current</th><th>together</th></tr></thead><tbody>${fams.map(f => `<tr><td>${pxFam(f)}</td><td>${pxRateTxt(T.base, f)}</td><td>${pxRateTxt(T.prop, f)}</td></tr>`).join("")}</tbody></table><div class="stat">Your labels: current ${pxLabTxt(READER_PROPOSALS.lab(T.base))}; together ${pxLabTxt(READER_PROPOSALS.lab(T.prop))}.</div>${pxApproveAll(T)}</div>` : "";
   const done = other.length ? `<details><summary class="stat">${other.length} earlier proposal${other.length === 1 ? "" : "s"} (rejected, withdrawn, superseded or expired)</summary>${other.slice().reverse().map(p => `<div class="rv-row"><span class="chip">${p.status}</span> ${p.label}: ${p.from} → ${p.to}${p.reason ? " — " + p.reason : ""}</div>`).join("")}</details>` : "";
@@ -441,7 +421,7 @@ rt$("pxList").onclick = e => {
   if (act === "approve" || act === "approveAll"){
     const T = PX.res && PX.res.together, pend = READER.register.review().proposals.filter(p => p.status === "pending");
     const ids = act === "approve" ? [b.dataset.id] : (T ? T.ids.slice() : []);
-    const ok = act === "approve" ? pxFresh(pend.find(p => p.id === ids[0]) || {}, PX.res && PX.res.per[ids[0]]) : !!T && PX.res.epoch === READER.register.epoch;
+    const ok = act === "approve" ? pxFresh(pend.find(p => p.id === ids[0]) || {}, PX.res && PX.res.per[ids[0]]) : READER_REVIEW.togetherOk(PX.res, READER.register.epoch);
     if (!ok || !ids.length) return;
     if (pxArmed(ids)) return doApprove(ids);
     pxArm(ids); RT.last.px = null; pxRender(); return;
@@ -452,10 +432,10 @@ rt$("pxList").onclick = e => {
 };
 
 // ---------- approval: an accepted proposal becomes a local override and a dated revision file (Part 3c) ----------
-const pxCur = k => { const l = pxLink(k); return l.at === "ep" ? READER.cfg.ep[k] : READER.cfg[k]; };
-const pxBuiltIn = k => { const l = pxLink(k); return l.at === "ep" ? READER_EPISODES.DEFAULTS[k] : READER_ENGINE.DEFAULTS[k]; };
-function ovApplyOne(k, v){ if (pxLink(k).at === "ep") READER.cfg.ep[k] = v; else READER.cfg[k] = v; }
-const pxFresh = (p, r) => !!r && r.rev === (p.rev || 0) && !!PX.res && PX.res.epoch === READER.register.epoch;
+const pxCur = k => READER_REVIEW.curValue(READER.cfg, k);
+const pxBuiltIn = READER_REVIEW.builtIn;
+const ovApplyOne = (k, v) => READER_REVIEW.setValue(READER.cfg, k, v);
+const pxFresh = (p, r) => READER_REVIEW.isFresh(p, r, PX.res, READER.register.epoch);
 const pxArmed = ids => !!PX.arm && Date.now() < PX.arm.until && PX.arm.ids.join() === ids.join();
 function pxArm(ids){ PX.arm = {ids, until:Date.now() + 8000}; setTimeout(() => { if (PX.arm && Date.now() >= PX.arm.until){ PX.arm = null; RT.last.px = null; pxRender(); } }, 8200); }
 function pxApproveBtn(p, fresh){
@@ -471,27 +451,8 @@ function pxApproveAll(T){
   return `<div class="row" style="margin-top:6px"><button data-px-do="approveAll">${pxArmed(ids) ? "Confirm approve all" : "Approve all together"}</button></div>`
     + (pxArmed(ids) ? `<div class="note">Approving applies ${ids.length} changes together (${ids.map(i => { const p = READER.register.proposals.find(x => x.id === i); return p.k + " " + p.from + " → " + p.to; }).join("; ")}) and downloads ${ids.length} revision files marked as one group.</div>` : "");
 }
-const FENCE = "\x60\x60\x60";
-function pxRevisionFile(p, r, group, res, done){
-  const d = new Date().toISOString().slice(0, 10), v = r.v;
-  const json = {kind:"approval", v:1, id:p.id, group, key:p.k, where:p.at, label:p.label, from:p.from, to:p.to, change:+p.change.toFixed(4), approvedAt:p.approvedAt, date:d, provisional:p.provisional, large:p.large,
-    verdict:v.verdict, conditions:v.conds.map(c => ({k:c.k, ok:c.ok, text:c.text})), cause:{driftId:p.driftId, driftKey:p.driftKey, driftFrom:p.driftFrom, driftAt:p.driftAt, per:p.per},
-    replay:{checkedAt:res.at, recordings:r.base.map(b => ({name:b.name, tag:b.tag, hours:+b.hours.toFixed(3)})), labels:v.labels, rates:v.rates}, together:group ? done.map(x => x.k) : null};
-  const lines = [`# Revision: ${p.label}`, "", "Status: approved", "Folded: no", `Date: ${d}`, `Threshold: ${p.k} (${p.at === "ep" ? "episode settings" : "engine settings"})`, `Change: ${p.from} -> ${p.to} (${pxPct(p.change)})${p.provisional ? ", provisional" : ""}${p.large ? ", large change" : ""}`,
-    `Group: ${group ? group + " (approved together with " + done.filter(x => x.k !== p.k).map(x => x.k).join(", ") + ")" : "none"}`, "",
-    "## Why", "", `${rvName(p.driftKey)} drifted (${rvWhen(p.driftAt)}). The old number sat at: ${p.per.map(q => rvName(q.key) + ": " + (q.p * 100).toFixed(2) + "th percentile").join("; ")}. The new value is taken at the same percentile of the new distribution.`, "",
-    "## Evidence", "", `Verdict: **${v.verdict}**`, ""].concat(v.conds.map(c => `- ${c.ok ? "ok" : "MISSING"}: ${c.text}`));
-  lines.push("", `Recordings replayed: ${r.base.map(b => b.name + " (" + b.tag + " the drift)").join(", ") || "none"}.`, "", "| Family | usual | current | proposed |", "|---|---|---|---|");
-  for (const f of p.families) lines.push(`| ${pxFam(f)} | ${v.rates[f] && v.rates[f].old != null ? v.rates[f].old.toFixed(1) + "/h" : "-"} | ${pxRateTxt(r.base, f)} | ${pxRateTxt(r.prop, f)} |`);
-  lines.push("", `Labels, current: ${pxLabTxt(v.labels.base)}. Labels, proposed: ${pxLabTxt(v.labels.prop)}.`, "", "## Machine-readable", "", FENCE + "json", JSON.stringify(json, null, 1), FENCE, "");
-  return {name: `${d}-${p.k}${group ? "-" + group : ""}.md`, text: lines.join("\n")};
-}
-function pxRevertFile(rec, reason){
-  const d = new Date().toISOString().slice(0, 10), json = {kind:"revert", v:1, key:rec.k, where:rec.at, of:rec.of, from:rec.from, to:rec.to, reason:rec.reason, date:d, time:rec.time};
-  const lines = [`# Revert: ${pxLink(rec.k).label}`, "", "Status: approved", "Folded: no", `Date: ${d}`, `Threshold: ${rec.k}`, `Change: ${rec.from} -> ${rec.to} (back to the built-in default)`, `Reverts: ${rec.of}`, `Reason: ${rec.reason || "none given"}`, "",
-    "## Machine-readable", "", FENCE + "json", JSON.stringify(json, null, 1), FENCE, ""];
-  return {name: `${d}-${rec.k}-revert.md`, text: lines.join("\n")};
-}
+const pxRevisionFile = (p, r, group, res, done) => READER_REVIEW.revisionFile(p, r, group, res, done, rvName, new Date().toISOString().slice(0, 10));
+const pxRevertFile = rec => READER_REVIEW.revertFile(rec, new Date().toISOString().slice(0, 10));
 async function pxDownloads(files){ for (const f of files){ rtDownload(new Blob([f.text], {type:"text/markdown"}), f.name); await new Promise(r => setTimeout(r, 500)); } }
 function doApprove(ids){
   const res = PX.res, group = ids.length > 1 ? "g" + Date.now().toString(36) : null, done = READER.register.approve(ids, {group}), files = [];
@@ -554,7 +515,7 @@ rt$("rgImport").onchange = async e => {
   try{
     const o = JSON.parse(await f.text()), ov = o && o.state && o.state.overrides; if (o && o.state) delete o.state.overrides;
     if (!o || o.kind !== "sv-register" || !READER.register.load(o.state)) throw new Error("not a register file from this app");
-    rgPersist(); RT.last.reg = null; RT.last.regAt = 0; rgRender(); PX.importOv = ov && typeof ov === "object" ? Object.fromEntries(Object.entries(ov).filter(([k, x]) => pxLink(k) && x && isFinite(x.value) && x.value !== pxCur(k))) : null; if (PX.importOv && !Object.keys(PX.importOv).length) PX.importOv = null; RT.last.px = null; pxRender(); rgMsg("Imported. It replaced the register on this device." + (PX.importOv ? " The file also carries threshold overrides; see Threshold proposals to apply or ignore them." : ""));
+    rgPersist(); RT.last.reg = null; RT.last.regAt = 0; rgRender(); PX.importOv = READER_REVIEW.importCandidates(ov, pxCur); RT.last.px = null; pxRender(); rgMsg("Imported. It replaced the register on this device." + (PX.importOv ? " The file also carries threshold overrides; see Threshold proposals to apply or ignore them." : ""));
   }catch(err){ rgMsg("Could not import that file: " + err.message); }
 };
 
