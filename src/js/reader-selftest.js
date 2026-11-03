@@ -997,6 +997,12 @@ const READER_SELFTEST=(()=>{
     done.add(3);const a=LABELQ.pick(gs,lab,3,1);done.add(a);const b=LABELQ.pick(gs,lab,a,1);done.add(1);const c=LABELQ.pick(gs,lab,5,1),self=LABELQ.pick([{id:7,tDetected:1,family:"wall"}],()=>false,7,1);
     return{ok:a===4&&b===5&&c===2&&self===7,detail:JSON.stringify({a,b,c,self})};
   });
+  add("disk space: tone from room left and from hours left at the current rate; the rate needs recent saved files",E=>{
+    const G=1e9,H=3600000,now=100*H,rows=[{at:now-5*H,size:6e6},{at:now-1*H,size:6e6},{at:now-30*H,size:9e9}];
+    const r=DISK.rate(rows,now),none=DISK.rate([],now),old=DISK.rate([{at:now-30*H,size:5e6}],now),fresh=DISK.rate([{at:now-60000,size:3e6}],now);
+    const ok=DISK.assess(50*G,r),warnRoom=DISK.assess(4*G,r),badRoom=DISK.assess(1.5*G,r),warnRate=DISK.assess(10*G,1e9),badRate=DISK.assess(10*G,3e9),unk=DISK.assess(undefined,r),noRate=DISK.assess(50*G,null);
+    return{ok:Math.abs(r-2.4e6)<1&&none===null&&old===null&&Math.abs(fresh-3e6)<1&&ok.tone==="ok"&&warnRoom.tone==="warn"&&badRoom.tone==="bad"&&warnRate.tone==="warn"&&badRate.tone==="bad"&&unk.tone==="off"&&noRate.tone==="ok"&&noRate.hours===null&&/about 50\.0 GB left/.test(ok.text),detail:JSON.stringify({r,none,old,fresh,ok:ok.text,warnRoom:warnRoom.tone,badRoom:badRoom.tone,warnRate:warnRate.tone,badRate:badRate.tone,unk:unk.tone,noRate})};
+  });
   function run(Eng){return scenarios.map(sc=>{try{const r=sc.run(Eng);return{name:sc.name,ok:!!r.ok,detail:r.detail};}catch(err){return{name:sc.name,ok:false,detail:String(err&&err.stack||err)};}});}
   return {T0,rng,poisson,levels,sim,scenarios,run};
 })();

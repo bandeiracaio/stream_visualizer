@@ -41,6 +41,8 @@ function amAlerts(now, snap) {
     else if (FS.perm !== "granted") out.push(["warn", `Save folder "${FS.name}" needs your OK again (Recordings, Saved, Allow): recordings are downloaded meanwhile`]);
     else if (FS.log.length && !FS.log[0].ok) out.push(["bad", `The last save into the folder failed (${FS.log[0].err}); it was downloaded instead`]);
   }
+  const dk = typeof DW !== "undefined" ? amTry(() => DW.assess(), null) : null;
+  if (dk && (dk.tone === "bad" || dk.tone === "warn")) out.push([dk.tone, `Low disk space: ${dk.text}. Free some room or move the save folder: collecting stops when the drive is full`]);
   const ago = amTry(() => HL.ev.filter(e => e.t > now - 600000 && e.k !== "load").length, 0);
   if (ago >= 3) out.push(["info", `${ago} Health log notes in the last 10 minutes`]);
   return out;
@@ -59,6 +61,8 @@ function amQuality(now, snap) {
   h += amRow("Price stream", !AR.on ? "off (not armed)" : AR.v && AR.v.ready && px != null && px < 20000 ? `ok · ${AR.worker ? "worker" : "page"} · ${AR.drops.length} drop${AR.drops.length === 1 ? "" : "s"}` : AR.v && !AR.v.ready && AR.v.nSlow < AR.cfg.minSlow ? `learning (${Math.min(15, Math.round(AR.v.nSlow / 60))} of 15 min)` : "stalled", AR.on && AR.v && AR.v.nSlow >= AR.cfg.minSlow && !(AR.v.ready && px < 20000) ? "warn" : "");
   h += amRow("Tab", document.hidden ? "hidden (slowed)" : "visible", document.hidden ? "warn" : "");
   h += amRow("Wake lock", AR.on ? (AR.lock ? "held" : "lost") : "–", AR.on && !AR.lock ? "warn" : "");
+  const dsk = typeof DW !== "undefined" ? amTry(() => DW.assess(), null) : null;
+  if (dsk) h += amRow("Disk space", dsk.text, dsk.tone === "bad" || dsk.tone === "warn" ? dsk.tone : "");
   if (typeof COLLECT !== "undefined" && typeof CL !== "undefined") {
     const rows = COLLECT.REGISTRY.map(c => { const s = CL.stat[c.id], hh = COLLECT.health({on:colOn(c.id), why:colWhy(c.id), n:s ? s.n : 0, ageMs:s && s.last ? now - s.last : null, expectMs:COLLECT.EXPECT_MS[c.id] || 60000, sinceMs:now - CL.t0}); return {c, hh}; });
     const live = rows.filter(r => r.hh.tone === "ok").length, bad = rows.filter(r => r.hh.tone === "warn");
