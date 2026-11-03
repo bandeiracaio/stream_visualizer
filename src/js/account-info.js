@@ -59,6 +59,6 @@ function aiRender() {
 }
 
 ai$("aiRefresh").onclick = aiLoad;
-HOOKS.on("setTab", t => { if (t === "accinfo" && Date.now() - AI.at > 5000) aiLoad(); });   // open the view: load (not more than once in 5 s)
+VIEWS.onOpen("accinfo", () => { if (Date.now() - AI.at > 5000) aiLoad(); });   // open the view: load (not more than once in 5 s)
 HOOKS.on("logout", () => { AI.data = null; AI.errs = []; AI.mode = null; AI.at = 0; aiRender(); });      // another account must never show this one's balances
 aiRender();

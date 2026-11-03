@@ -1010,6 +1010,21 @@ const READER_SELFTEST=(()=>{
     let threw=false;console.error=()=>{};try{H.emit(n,7);H.emit("selftest-none",1);}catch(e){threw=true;}finally{console.error=err;}
     return{ok:!threw&&log.join(",")==="a7,c7",detail:log.join(",")+(threw?" threw":"")};
   });
+  add("views: areas and labels in registration order, a shared slot draws once per tick on its own throttle, onOpen runs per view",E=>{
+    const V=VIEWS,log=[],p="st"+Math.random().toString(36).slice(2,6),A=p+"a";
+    V.area(A,"Test");
+    V.register({id:p+"x",label:"X",area:A,minIntervalMs:100,render:()=>log.push("x")});
+    V.register({id:p+"y",label:"Y",area:A,minIntervalMs:50,render:()=>log.push("y"),onOpen:id=>log.push("open "+id)});
+    V.register({id:p+"z",label:"Z",area:A,slot:p+"y"});
+    V.onOpen(p+"z",()=>{throw new Error("boom");});V.onOpen(p+"z",id=>log.push("open2 "+id));
+    const vis=set=>id=>set.includes(id),g=V.groups().find(x=>x[0]===A),tb=V.tabs().filter(t=>t[0].startsWith(p)).map(t=>t[1]).join("");
+    V.tick(1000,vis([p+"x"]));V.tick(1050,vis([p+"x"]));V.tick(1101,vis([p+"x"]));          // x: 1000 and 1101, not 1050
+    V.tick(2000,vis([p+"y",p+"z"]));V.tick(2040,vis([p+"z"]));V.tick(2060,vis([p+"z"]));    // shared slot y/z: once per due tick
+    V.tick(3000,vis([]));                                                                     // nothing visible
+    const err=console.error;console.error=()=>{};try{V.open(p+"y");V.open(p+"z");V.open("none-"+p);}finally{console.error=err;}
+    const got=log.join(",");
+    return{ok:got==="x,x,y,y,open "+p+"y,open2 "+p+"z"&&g[2].join(",")===[p+"x",p+"y",p+"z"].join(",")&&tb==="XYZ",detail:got};
+  });
   add("label queue: after labelling the current group the next open one follows it, not the start of the list",E=>{
     const gs=[1,2,3,4,5].map(i=>({id:i,tDetected:i*100,family:"burst"})),done=new Set(),lab=x=>done.has(x.id);
     done.add(3);const a=LABELQ.pick(gs,lab,3,1);done.add(a);const b=LABELQ.pick(gs,lab,a,1);done.add(1);const c=LABELQ.pick(gs,lab,5,1),self=LABELQ.pick([{id:7,tDetected:1,family:"wall"}],()=>false,7,1);
