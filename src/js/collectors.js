@@ -139,7 +139,7 @@ function colStatus() {
   const now = Date.now();
   for (const c of COLLECT.REGISTRY) {
     const el = cl$("colSt-" + c.id); if (!el) continue;
-    const s = CL.stat[c.id], h = COLLECT.health({on:colOn(c.id), why:colWhy(c.id), n:s ? s.n : 0, ageMs:s && s.last ? now - s.last : null, expectMs:COLLECT.EXPECT_MS[c.id] || 60000, sinceMs:now - CL.t0});
+    const s = CL.stat[c.id], h = COLLECT.health({on:colOn(c.id), why:colWhy(c.id), n:s ? s.n : 0, ageMs:s && s.last ? now - s.last : null, expectMs:COLLECT.EXPECT_MS[c.id], sinceMs:now - CL.t0});
     el.textContent = h.text; el.className = "stat" + (h.tone === "ok" || h.tone === "warn" || h.tone === "info" ? " sb-" + h.tone : "");
   }
 }

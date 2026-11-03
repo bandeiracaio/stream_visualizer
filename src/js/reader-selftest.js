@@ -1012,7 +1012,7 @@ const READER_SELFTEST=(()=>{
   });
   add("views: areas and labels in registration order, a shared slot draws once per tick on its own throttle, onOpen runs per view",E=>{
     const V=VIEWS,log=[],p="st"+Math.random().toString(36).slice(2,6),A=p+"a";
-    V.area(A,"Test");
+    V.area(A,"Test","M0 0");
     V.register({id:p+"x",label:"X",area:A,minIntervalMs:100,render:()=>log.push("x")});
     V.register({id:p+"y",label:"Y",area:A,minIntervalMs:50,render:()=>log.push("y"),onOpen:id=>log.push("open "+id)});
     V.register({id:p+"z",label:"Z",area:A,slot:p+"y"});
@@ -1023,7 +1023,7 @@ const READER_SELFTEST=(()=>{
     V.tick(3000,vis([]));                                                                     // nothing visible
     const err=console.error;console.error=()=>{};try{V.open(p+"y");V.open(p+"z");V.open("none-"+p);}finally{console.error=err;}
     const got=log.join(",");
-    return{ok:got==="x,x,y,y,open "+p+"y,open2 "+p+"z"&&g[2].join(",")===[p+"x",p+"y",p+"z"].join(",")&&tb==="XYZ",detail:got};
+    return{ok:got==="x,x,y,y,open "+p+"y,open2 "+p+"z"&&g[2].join(",")===[p+"x",p+"y",p+"z"].join(",")&&tb==="XYZ"&&V.icons()[A]==="M0 0",detail:got};
   });
   add("label queue: after labelling the current group the next open one follows it, not the start of the list",E=>{
     const gs=[1,2,3,4,5].map(i=>({id:i,tDetected:i*100,family:"burst"})),done=new Set(),lab=x=>done.has(x.id);

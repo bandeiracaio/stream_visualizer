@@ -64,7 +64,7 @@ function amQuality(now, snap) {
   const dsk = typeof DW !== "undefined" ? amTry(() => DW.assess(), null) : null;
   if (dsk) h += amRow("Disk space", dsk.text, dsk.tone === "bad" || dsk.tone === "warn" ? dsk.tone : "");
   if (typeof COLLECT !== "undefined" && typeof CL !== "undefined") {
-    const rows = COLLECT.REGISTRY.map(c => { const s = CL.stat[c.id], hh = COLLECT.health({on:colOn(c.id), why:colWhy(c.id), n:s ? s.n : 0, ageMs:s && s.last ? now - s.last : null, expectMs:COLLECT.EXPECT_MS[c.id] || 60000, sinceMs:now - CL.t0}); return {c, hh}; });
+    const rows = COLLECT.REGISTRY.map(c => { const s = CL.stat[c.id], hh = COLLECT.health({on:colOn(c.id), why:colWhy(c.id), n:s ? s.n : 0, ageMs:s && s.last ? now - s.last : null, expectMs:COLLECT.EXPECT_MS[c.id], sinceMs:now - CL.t0}); return {c, hh}; });
     const live = rows.filter(r => r.hh.tone === "ok").length, bad = rows.filter(r => r.hh.tone === "warn");
     h += `<div class="am-sub">Collectors: ${live} of ${rows.filter(r => r.hh.tone !== "off").length} active · ${CL.count.toLocaleString("en-US")} records on the tape</div>`;
     h += rows.map(r => `<div class="am-chip" title="${amEsc(r.c.label + " — " + r.hh.text)}">${amDot(r.hh.tone === "ok" ? "ok" : r.hh.tone === "warn" ? "bad" : r.hh.tone === "info" ? "info" : "off")}${amEsc(amShort(r.c.label))}</div>`).join("");

@@ -947,7 +947,7 @@ $("vwin").onchange = $("profVenue").onchange = () => { if (visible("viz")) rende
 // ---------- tabs ----------
 // Six areas by what you are doing; an area with several views shows them as a sub-row. Every view is one VIEWS.register (views.js): its place in
 // the navigation, and (render + minIntervalMs) how the frame loop draws it. Views of one slot (reader) share one render and one throttle.
-for (const [id, l] of [["now","Now"],["reader","Reader"],["review","Review"],["rec","Recordings"],["trade","Trade"],["system","System"]]) VIEWS.area(id, l);
+for (const [id, l, icon] of [["now","Now","M3 12h4l3-8 4 16 3-8h4"],["reader","Reader","M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 9a3 3 0 100 6 3 3 0 000-6z"],["review","Review","M4 6l2 2 3-3M4 14l2 2 3-3M13 7h8M13 15h8"],["rec","Recordings","M12 4a8 8 0 100 16 8 8 0 000-16zM12 9a3 3 0 100 6 3 3 0 000-6z"],["trade","Trade","M7 4v16M7 4L4 7M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3"],["system","System","M4 7h8M18 7h2M4 17h2M10 17h10M14 4v6M8 14v6"]]) VIEWS.area(id, l, icon);
 const READER_SLOT = {slot:"reader", render:()=>renderReader(), minIntervalMs:250};   // renderReader draws all of these views
 VIEWS.register({id:"overview", label:"Overview", area:"now", minIntervalMs:250, render:()=>{ try{ renderOverview(); }catch(e){ console.error("overview", e); } }});
 VIEWS.register({id:"armmode", label:"Arm mode", area:"now"});
@@ -974,7 +974,7 @@ VIEWS.register({id:"health", label:"Feed health", area:"system"});
 VIEWS.register({id:"raw", label:"Raw", area:"system"});
 VIEWS.register({id:"engine", label:"Engine", area:"system", slot:"reader"});
 const TABS = VIEWS.tabs(), GROUPS = VIEWS.groups();
-const GICON = {now:"M3 12h4l3-8 4 16 3-8h4", reader:"M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 9a3 3 0 100 6 3 3 0 000-6z", review:"M4 6l2 2 3-3M4 14l2 2 3-3M13 7h8M13 15h8", rec:"M12 4a8 8 0 100 16 8 8 0 000-16zM12 9a3 3 0 100 6 3 3 0 000-6z", trade:"M7 4v16M7 4L4 7M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3", system:"M4 7h8M18 7h2M4 17h2M10 17h10M14 4v6M8 14v6"};
+const GICON = VIEWS.icons();
 const groupOf = v => GROUPS.find(g=>g[2].includes(v)) || GROUPS[0];
 let tab = "overview";
 function setTab(t){
