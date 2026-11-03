@@ -1118,10 +1118,35 @@ function renderViz(){
 $("vwin").onchange = $("profVenue").onchange = () => { if (visible("viz")) renderViz(); };
 
 // ---------- tabs ----------
-const TABS = [["overview","Overview"],["armmode","Arm mode"],["charts","Charts"],["micro","Microstructure"],["viz","Visuals"],["tape","Tape"],["market","Market"],["reader","Episodes"],["signals","Signals"],["drift","Drift"],["assumptions","Assumptions"],["record","Record"],["saved","Saved"],["healthlog","Health log"],["collectors","Collectors"],["replay","Replay and labels"],["trading","Trading"],["accounts","Accounts"],["history","History"],["accinfo","Account info"],["streams","Streams"],["health","Feed health"],["raw","Raw"],["engine","Engine"]];
-// Six areas by what you are doing; an area with several views shows them as a sub-row. A "view" is what data-tab on a <section> names.
-const GROUPS = [["now","Now",["overview","armmode","charts","micro","viz","tape","market"]],["reader","Reader",["reader","signals"]],["review","Review",["replay","drift","assumptions"]],["rec","Recordings",["record","saved","healthlog","collectors"]],["trade","Trade",["trading","accounts","history","accinfo"]],["system","System",["streams","health","raw","engine"]]];
-const READER_VIEWS = ["reader","signals","replay","drift","assumptions","record","saved","healthlog","collectors","engine"];   // all drawn by renderReader
+// Six areas by what you are doing; an area with several views shows them as a sub-row. Every view is one VIEWS.register (views.js): its place in
+// the navigation, and (render + minIntervalMs) how the frame loop draws it. Views of one slot (reader) share one render and one throttle.
+for (const [id, l] of [["now","Now"],["reader","Reader"],["review","Review"],["rec","Recordings"],["trade","Trade"],["system","System"]]) VIEWS.area(id, l);
+const READER_SLOT = {slot:"reader", render:()=>renderReader(), minIntervalMs:250};   // renderReader draws all of these views
+VIEWS.register({id:"overview", label:"Overview", area:"now", minIntervalMs:250, render:()=>{ try{ renderOverview(); }catch(e){ console.error("overview", e); } }});
+VIEWS.register({id:"armmode", label:"Arm mode", area:"now"});
+VIEWS.register({id:"charts", label:"Charts", area:"now", minIntervalMs:100, render:()=>{ drawBubbles(); drawCvd(); }});
+VIEWS.register({id:"micro", label:"Microstructure", area:"now", minIntervalMs:250, render:()=>renderMicro()});
+VIEWS.register({id:"viz", label:"Visuals", area:"now", minIntervalMs:400, render:()=>renderViz()});
+VIEWS.register({id:"tape", label:"Tape", area:"now"});
+VIEWS.register({id:"market", label:"Market", area:"now"});
+VIEWS.register(Object.assign({id:"reader", label:"Episodes", area:"reader"}, READER_SLOT));
+VIEWS.register({id:"signals", label:"Signals", area:"reader", slot:"reader"});
+VIEWS.register({id:"replay", label:"Replay and labels", area:"review", slot:"reader"});
+VIEWS.register({id:"drift", label:"Drift", area:"review", slot:"reader"});
+VIEWS.register({id:"assumptions", label:"Assumptions", area:"review", slot:"reader"});
+VIEWS.register({id:"record", label:"Record", area:"rec", slot:"reader"});
+VIEWS.register({id:"saved", label:"Saved", area:"rec", slot:"reader"});
+VIEWS.register({id:"healthlog", label:"Health log", area:"rec", slot:"reader"});
+VIEWS.register({id:"collectors", label:"Collectors", area:"rec", slot:"reader"});
+VIEWS.register({id:"trading", label:"Trading", area:"trade", minIntervalMs:400, render:()=>renderTrading()});
+VIEWS.register({id:"accounts", label:"Accounts", area:"trade"});
+VIEWS.register({id:"history", label:"History", area:"trade"});
+VIEWS.register({id:"accinfo", label:"Account info", area:"trade"});
+VIEWS.register({id:"streams", label:"Streams", area:"system"});
+VIEWS.register({id:"health", label:"Feed health", area:"system"});
+VIEWS.register({id:"raw", label:"Raw", area:"system"});
+VIEWS.register({id:"engine", label:"Engine", area:"system", slot:"reader"});
+const TABS = VIEWS.tabs(), GROUPS = VIEWS.groups();
 const GICON = {now:"M3 12h4l3-8 4 16 3-8h4", reader:"M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 9a3 3 0 100 6 3 3 0 000-6z", review:"M4 6l2 2 3-3M4 14l2 2 3-3M13 7h8M13 15h8", rec:"M12 4a8 8 0 100 16 8 8 0 000-16zM12 9a3 3 0 100 6 3 3 0 000-6z", trade:"M7 4v16M7 4L4 7M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3", system:"M4 7h8M18 7h2M4 17h2M10 17h10M14 4v6M8 14v6"};
 const groupOf = v => GROUPS.find(g=>g[2].includes(v)) || GROUPS[0];
 let tab = "overview";
@@ -1133,7 +1158,7 @@ function setTab(t){
   $("views").innerHTML = g[2].length < 2 ? "" : g[2].map(v=>`<button data-t="${v}" class="${v===t?"act":""}">${TABS.find(x=>x[0]===v)[1]}</button>`).join("");
   document.querySelectorAll("main section").forEach(s=>s.classList.toggle("hide", s.dataset.tab!==t));
   dirty = true; renderSlow();
-  HOOKS.emit("setTab", t);
+  VIEWS.open(t);
 }
 const visible = name => tab===name || (tab==="trading" && !!document.querySelector(`#tgrid section[data-home="${name}"]`));
 $("groups").innerHTML = GROUPS.map(([id,l])=>`<button data-g="${id}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${GICON[id]}"/></svg><span>${l}</span></button>`).join("");
@@ -1548,15 +1573,10 @@ setInterval(()=>{
   for (const [st,pre] of [[bnStats,"bn"],[hlStats,"hl"]]){ $(pre+"Rate").textContent=st.cur; $(pre+"Bytes").textContent=(st.bytes/1024).toFixed(1); st.cur=0; st.bytes=0; }
   prune(); renderSlow();
 }, 1000);
-let lastOv = 0, lastFast = 0, lastChart = 0, lastMicro = 0, lastViz = 0, lastTrade = 0, lastReader = 0;
+let lastFast = 0;
 (function frame(ts){
   if (!paused){
-    if (visible("overview") && ts - lastOv > 250){ lastOv = ts; try{ renderOverview(); }catch(e){ console.error("overview", e); } }
-    if (visible("charts") && ts - lastChart > 100){ lastChart = ts; drawBubbles(); drawCvd(); }
-    if (visible("micro") && ts - lastMicro > 250){ lastMicro = ts; renderMicro(); }
-    if (visible("viz") && ts - lastViz > 400){ lastViz = ts; renderViz(); }
-    if (READER_VIEWS.some(visible) && ts - lastReader > 250){ lastReader = ts; renderReader(); }
-    if (tab==="trading" && ts - lastTrade > 400){ lastTrade = ts; renderTrading(); }
+    VIEWS.tick(ts, visible);   // overview, charts, micro, viz, the reader views, trading: registered above
     if (dirty && ts - lastFast > 150){
       dirty = false; lastFast = ts;
       if (visible("market")){ renderMetrics(); renderBooks(); }
