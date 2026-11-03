@@ -992,6 +992,12 @@ const READER_SELFTEST=(()=>{
     done.add(2);done.add(4);const none=LABELQ.pick(gs,lab,2,1),prog=LABELQ.progress(gs,lab),none2=LABELQ.pick([],lab,null,1);
     return{ok:order==="1,2,3,4"&&first===2&&last===4&&after2===3&&before3===2&&wrap===2&&onlyWall===2&&noBurstOpen===4&&none===null&&none2===null&&prog.total===4&&prog.labelled===4&&prog.open===0,detail:JSON.stringify({order,first,last,after2,before3,wrap,onlyWall,noBurstOpen,none,prog})};
   });
+  add("hooks: subscribers run in subscription order with the emitted arguments, a throwing one is contained, an unknown name is a no-op",E=>{
+    const log=[],H=HOOKS,n="selftest-"+Math.random(),err=console.error;
+    H.on(n,x=>log.push("a"+x));H.on(n,()=>{throw new Error("boom");});H.on(n,x=>log.push("c"+x));
+    let threw=false;console.error=()=>{};try{H.emit(n,7);H.emit("selftest-none",1);}catch(e){threw=true;}finally{console.error=err;}
+    return{ok:!threw&&log.join(",")==="a7,c7",detail:log.join(",")+(threw?" threw":"")};
+  });
   add("label queue: after labelling the current group the next open one follows it, not the start of the list",E=>{
     const gs=[1,2,3,4,5].map(i=>({id:i,tDetected:i*100,family:"burst"})),done=new Set(),lab=x=>done.has(x.id);
     done.add(3);const a=LABELQ.pick(gs,lab,3,1);done.add(a);const b=LABELQ.pick(gs,lab,a,1);done.add(1);const c=LABELQ.pick(gs,lab,5,1),self=LABELQ.pick([{id:7,tDetected:1,family:"wall"}],()=>false,7,1);

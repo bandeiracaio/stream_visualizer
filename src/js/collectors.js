@@ -91,7 +91,7 @@ function colBookObserve(d) {      // before bnDepth applies the update: compare 
     for (const [p, q] of d.a) CB.flow.note("a", b.asks.get(p), +q, (p - mid)*k);
   } catch {}
 }
-if (typeof bnDepth === "function") { const bnDepthOrig = bnDepth; bnDepth = function(d) { colBookObserve(d); return bnDepthOrig.call(this, d); }; }
+HOOKS.on("bnDepth", colBookObserve);
 function colBookTick() {
   if (!colBookOn()) { CB.flow.take(); return; }
   const now = Date.now(), arr = m => { const a = []; for (const [p, q] of m) a.push([+p, q]); return a; };

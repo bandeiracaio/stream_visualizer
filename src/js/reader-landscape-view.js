@@ -219,8 +219,4 @@ function lsKick() { LV.dirty = true; if (!LV.raf) { LV.lastFrame = performance.n
 })();
 
 // Draw with the Reader tab's own refresh (every 250 ms while it is visible); a failure here is contained.
-(function lsHook() {
-  if (typeof renderReader !== "function") return;
-  const original = renderReader;
-  renderReader = function () { original.apply(this, arguments); try { if (!LV.play && !LV.drag) lsRender(); } catch (e) { /* contained */ } };
-})();
+HOOKS.on("renderReader", () => { if (!LV.play && !LV.drag) lsRender(); });
