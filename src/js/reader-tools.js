@@ -36,7 +36,7 @@ function rtSpan(inputs){
 }
 function rtSetSession(s){
   const span = rtSpan(s.inputs); RT.session = {...s, span};
-  if (!s.ext && typeof colSlice === "function") colSlice(s.startedAt, 1800000).then(x => { if (RT.session && RT.session.startedAt === s.startedAt && !RT.session.ext) { RT.session.ext = x; if (typeof renderReader === "function") renderReader(); } });      // a recording made on this page: its collector records come from the tape
+  if (!s.ext) colSlice(s.startedAt, 1800000).then(x => { if (RT.session && RT.session.startedAt === s.startedAt && !RT.session.ext) { RT.session.ext = x; if (typeof renderReader === "function") renderReader(); } });      // a recording made on this page: its collector records come from the tape
   rtMsg(span ? `Session ready: ${s.sym || "?"}, ${rtDur(span.t1-span.t0)}, ${s.inputs.length.toLocaleString()} inputs.${span.t1-span.t0 < 150000 ? " It is shorter than the 2-minute warm-up, so a replay will find nothing." : ""}` : "That session has no usable data.");
   rtButtons();
 }
@@ -67,7 +67,7 @@ rt$("rtSave").onclick = async () => {
   const stamp = new Date(s.startedAt || Date.now()).toISOString().slice(0,16).replace(/[-:T]/g, ""), base = `session_${String(s.sym || "X").replace(/[^A-Za-z0-9_-]/g, "") || "X"}_${stamp}`;
   const quality = SQ.of(s.inputs), health = typeof HL !== "undefined" ? HL.ev.filter(e => e.t >= (s.startedAt || 0) - 60000).slice(-60) : null;      // how complete it is, and what the page noted meanwhile
   const pre = typeof AR !== "undefined" && AR.pre && AR.pre.at >= (s.startedAt || 0) - 120000 && AR.pre.at <= (s.startedAt || 0) + 120000 ? AR.pre : null;      // auto-record's 30 minutes of mark price before the trigger
-  const ext = typeof colSlice === "function" ? await colSlice(s.startedAt, pre ? 1800000 : 60000) : [];      // collector records (collectors.js); the engine never sees them. An auto-recording takes 30 minutes before the trigger, like its `pre` prices
+  const ext = await colSlice(s.startedAt, pre ? 1800000 : 60000);      // collector records (collectors.js); the engine never sees them. An auto-recording takes 30 minutes before the trigger, like its `pre` prices
   const text = JSON.stringify({kind:"sv-session", v:1, sym:s.sym, startedAt:s.startedAt, baseline:s.baseline || null, quality, health, pre, ext, inputs:s.inputs});
   const gz = typeof CompressionStream !== "undefined", name = base + (gz ? ".json.gz" : ".json");
   const blob = gz ? await new Response(new Blob([text]).stream().pipeThrough(new CompressionStream("gzip"))).blob() : new Blob([text], {type:"application/json"});

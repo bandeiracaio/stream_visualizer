@@ -113,6 +113,6 @@ hs$("hsFind").onclick = () => { HS.tab = "income"; hsLoad("income", true); };
 hs$("hsRefresh").onclick = () => hsLoad(HS.tab, true);
 hs$("hsStop").onclick = () => { HS.stop = true; };
 hs$("hsCsv").onclick = hsCsv;
-{ const prev = setTab; setTab = function (t) { prev(t); if (t === "history") hsLoad(); }; }
-{ const prev = logout; logout = function () { prev(); HS.cache = {}; HS.found = []; HS.sym = null; hsRender(); }; }      // another account must never show this one's rows      // open the view: load only what is not loaded yet for this choice
+HOOKS.on("setTab", t => { if (t === "history") hsLoad(); });
+HOOKS.on("logout", () => { HS.cache = {}; HS.found = []; HS.sym = null; hsRender(); });      // another account must never show this one's rows      // open the view: load only what is not loaded yet for this choice
 hsRender();

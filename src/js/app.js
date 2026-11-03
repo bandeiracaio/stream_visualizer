@@ -203,6 +203,7 @@ async function bnSnapshot(gen){
   }catch{ $("bnBookAge").textContent = "snapshot failed (CORS/network)"; }
 }
 function bnDepth(d){
+  HOOKS.emit("bnDepth", d);      // collectors.js watches updates before the book applies them
   const b = bnBook; if (!b) return;
   if (!b.ready){ b.buffer.push(d); return; }
   if (d.u < b.lastU) return;
@@ -1132,6 +1133,7 @@ function setTab(t){
   $("views").innerHTML = g[2].length < 2 ? "" : g[2].map(v=>`<button data-t="${v}" class="${v===t?"act":""}">${TABS.find(x=>x[0]===v)[1]}</button>`).join("");
   document.querySelectorAll("main section").forEach(s=>s.classList.toggle("hide", s.dataset.tab!==t));
   dirty = true; renderSlow();
+  HOOKS.emit("setTab", t);
 }
 const visible = name => tab===name || (tab==="trading" && !!document.querySelector(`#tgrid section[data-home="${name}"]`));
 $("groups").innerHTML = GROUPS.map(([id,l])=>`<button data-g="${id}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${GICON[id]}"/></svg><span>${l}</span></button>`).join("");
@@ -1297,6 +1299,7 @@ async function cancelAll(){
 function logout(){
   Object.assign(ACC, {mode:null, key:null, secret:null, base:null, maxUsd:Infinity, status:"", data:null});
   SIM = null; renderAccount();
+  HOOKS.emit("logout");
 }
 function renderAccount(){
   const b = $("accBadge"); b.className = ACC.mode || ""; b.textContent = ACC.mode ? ACC.mode.toUpperCase() : "";
@@ -1522,13 +1525,14 @@ function renderReader(){
   const s=RD().state(),card=(k,v,cls)=>`<div class="rd-card ${cls||""}"><span>${k}</span><b>${v}</b></div>`;
   $("rdStatus").textContent=s.calibrated?"armed":`calibrating ${(s.calibratingPct*100).toFixed(0)}%`;
   renderEpisodes(s);
-  if (typeof rdToolsRender==="function") rdToolsRender(s);
+  rdToolsRender(s);
   $("rdStrip").innerHTML=[card("activity",`${s.regime} (x${s.ratio.toFixed(2)})`)].concat(["fast","mid","slow"].map(k=>{const h=s.horizons[k];return h?card(`${k} - window ${rdMs(h.ms)}`,`${h.side} (${(h.share*100).toFixed(0)}% buy)`,h.side==="buyers"?"buy":h.side==="sellers"?"sell":""):card(k,"-");})).concat([card("episodes active",String(s.episodesActive))]).join("");
   const rows=RD().events.slice().reverse().filter(e=>(!rdFilter.family.size||rdFilter.family.has(e.family))&&(!rdFilter.venue.size||rdFilter.venue.has(e.venue))&&e.strength>=rdFilter.min).slice(0,100);
   $("rdFeed").innerHTML=`<tr><th>time</th><th>type</th><th>venue</th><th>price</th><th>horizon</th><th>strength</th><th>evidence</th></tr>`+rows.map(e=>`<tr class="neutral"><td>${hhmmss(e.t)}</td><td>${e.type.replace(/_/g," ")}</td><td><span class="venue v-${e.venue}">${e.venue.toUpperCase()}</span></td><td>${fmt(e.px,1)}</td><td>${e.horizon}</td><td><i class="rd-str" style="width:${Math.round(e.strength*60)}px"></i> ${(e.strength*100).toFixed(0)}</td><td style="white-space:normal">${rdEsc(e.evidence)}</td></tr>`).join("");
   const hs=["bn.trade","bn.depth","bn.bookTicker","hl.trades","hl.l2Book","hl.bbo"].map(id=>[id.replace("."," "),S[id].on?(status(S[id])||"-"):"off"]);
   hs.push(["signals / min",s.eventsPerMin],["BN book age",s.bookAgeMs.bn==null?"-":s.bookAgeMs.bn+" ms"],["HL book age",s.bookAgeMs.hl==null?"-":s.bookAgeMs.hl+" ms"],["heartbeat",rdWorker?"on":"off"]);
   $("rdHealth").innerHTML=hs.map(([k,v])=>`<div class="metric"><span>${k}</span><b>${v}</b></div>`).join("");
+  HOOKS.emit("renderReader");
 }
 
 // ---------- loops ----------
