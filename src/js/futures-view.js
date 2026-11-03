@@ -10,6 +10,26 @@
   let watermark = 0, hovX = null, hits = [], bins = [], geo = null, heatImg = null, heatKey = "";
   const heatOff = document.createElement("canvas");
 
+  // ---- backfill: on every connect (and when the header coin changes) fetch the last 4 hours from Binance so the chart is not empty ----
+  let curCoin = null, wasConn = false, bfGen = 0, bfMsg = "", liveFrom = null;
+  async function backfill(coin) {
+    const gen = ++bfGen, sym = coin + "USDT"; bfMsg = "backfilling the last 4 hours from Binance…";
+    try {
+      const get = async u => { const r = await fetch(u); if (!r.ok) throw new Error(u.split("?")[0].split("/").pop() + " " + r.status); return r.json(); };
+      const [kl, oh] = await Promise.all([get(`${BN_REST}/fapi/v1/klines?symbol=${sym}&interval=1m&limit=241`), get(`${BN_REST}/futures/data/openInterestHist?symbol=${sym}&period=5m&limit=60`).catch(() => [])]);
+      if (gen !== bfGen) return; if (!Array.isArray(kl)) throw new Error("no klines for " + sym);
+      const now = nowEx(), r = FUTSTACK.backfill(st, kl.filter(x => +x[6] < now), Array.isArray(oh) ? oh : [], now);
+      bfMsg = r.minutes ? `backfilled ${r.minutes} min of price and delta${r.oiPoints ? " and open interest" : " (no open interest history)"} from Binance: 1-minute detail, no liquidations before you connected` : "nothing to backfill";
+    } catch (e) { if (gen === bfGen) bfMsg = "backfill failed: " + e.message; }
+    if (gen === bfGen && typeof futuresRender === "function") futuresRender();
+  }
+  function histManage(coin) {
+    const on = typeof connected !== "undefined" && connected;
+    if (!on) { wasConn = false; return; }
+    if (coin && coin !== curCoin) { if (curCoin != null) { FUTSTACK.reset(st); heats.bn.length = heats.hl.length = 0; fills.length = 0; watermark = 0; heatKey = ""; } curCoin = coin; wasConn = false; }
+    if (!wasConn && coin) { wasConn = true; liveFrom = nowEx(); backfill(coin); }
+  }
+
   // ---- Bybit and OKX liquidation sockets: open while the page is connected, for the coin in the header (own sockets; the collectors' worker is untouched) ----
   const LQ = { by:{ name:"Bybit", ws:null, coin:null, st:"off", gen:0, ping:null, retry:null, hold:0 }, ok:{ name:"OKX", ws:null, coin:null, st:"off", gen:0, ping:null, retry:null, hold:0 } };
   function lqClose(k) { const s = LQ[k]; s.gen++; clearInterval(s.ping); clearTimeout(s.retry); if (s.ws) { try { s.ws.close(); } catch (e) { /* already closed */ } } s.ws = null; s.st = "off"; s.coin = null; }
@@ -34,7 +54,7 @@
 
   // ---- history: runs once a second while connected, whether or not the view is open ----
   setInterval(() => {
-    lqManage(); if (typeof connected === "undefined" || !connected) return; const now = nowEx();
+    histManage((typeof accAsset === "function" ? accAsset() : "").replace(/[^A-Z0-9]/g, "")); lqManage(); if (typeof connected === "undefined" || !connected) return; const now = nowEx();
     for (let i = trades.length - 1; i >= 0; i--) {
       const t = trades[i]; if (t.t < watermark - 5000) break;
       if (seen.has(t) || t.bf) continue; seen.add(t); if (t.t > watermark) watermark = t.t;
@@ -88,7 +108,7 @@
     const Yp = p => top[0] + (hi - p) / (hi - lo) * hP;
     // panel frames and titles
     ctx.fillStyle = TH.dim; ctx.textAlign = "left";
-    const titles = ["", "Liquidations $ (" + (liqAll() ? "Binance + Bybit + OKX" : venue === "bn" ? "Binance" : venue === "hl" ? "Hyperliquid: no feed" : "Binance") + ")   ▲ shorts liquidated   ▼ longs liquidated", "Volume delta $  (taker buy − sell, liquidations not counted)", "Open interest (" + (venue === "all" ? "BN + HL" : venue.toUpperCase()) + ", coin)"];
+    const titles = ["", "Liquidations $ (" + (liqAll() ? "Binance + Bybit + OKX" : venue === "bn" ? "Binance" : venue === "hl" ? "Hyperliquid: no feed" : "Binance") + ")   ▲ shorts liquidated   ▼ longs liquidated", "Volume delta $  (taker buy − sell)", "Open interest (" + (venue === "all" ? "BN + HL" : venue.toUpperCase()) + ", coin)"];
     for (let k = 0; k < 4; k++) { ctx.strokeStyle = TH.line; ctx.strokeRect(L + .5, top[k] + .5, pw, [hP, hL, hD, hO][k]); if (titles[k]) ctx.fillText(titles[k], L + 4, top[k] + 11); }
     // heatmap
     if (g("fsHeat").checked && venue !== "all") {
@@ -142,6 +162,11 @@
       for (const [nm, okc] of lab) { const s = nm + (okc ? "✓" : "✗") + " "; ctx.fillStyle = TH.canvas; ctx.fillRect(lx - 1, ly - 10, ctx.measureText(s).width + 2, 13); ctx.fillStyle = okc ? MARK : TH.dim; ctx.fillText(s, lx, ly); lx += ctx.measureText(s).width; }
       ctx.font = "10.5px ui-monospace,Menlo,Consolas,monospace";
     }
+    // where the backfilled history ends and live data starts
+    if (st.bf && liveFrom != null && liveFrom > t0 && liveFrom < t0 + span) {
+      const x = X(liveFrom); ctx.setLineDash([2, 4]); ctx.strokeStyle = TH.a("hi", .5); ctx.beginPath(); ctx.moveTo(x, top[0]); ctx.lineTo(x, top[3] + hO); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = TH.dim; ctx.textAlign = "right"; ctx.fillText("backfilled ◂", x - 4, top[0] + hP - 6); ctx.textAlign = "left"; ctx.fillText("▸ live", x + 4, top[0] + hP - 6);
+    }
     // crosshair
     if (hovX != null && hovX >= L && hovX <= L + pw) {
       const j = Math.min(n - 1, Math.floor((hovX - L) / bw)), x = xc(j); ctx.strokeStyle = TH.a("hi", .6); ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(x, top[0]); ctx.lineTo(x, top[3] + hO); ctx.stroke(); ctx.setLineDash([]);
@@ -159,7 +184,7 @@
   // ---- the live reading beside the chart ----
   const setHtml = (el, html) => { if (el.dataset.h !== html) { el.dataset.h = html; el.innerHTML = html; } };
   function panels() {
-    setHtml(g("fsLiqSrc"), `Liquidation feeds: Binance ${connected ? "(app feed)" : "off"} · Bybit ${LQ.by.st} · OKX ${LQ.ok.st} · Hyperliquid: its feed does not flag liquidations`);
+    setHtml(g("fsLiqSrc"), `Liquidation feeds: Binance ${connected ? "(app feed)" : "off"} · Bybit ${LQ.by.st} · OKX ${LQ.ok.st} · Hyperliquid: its feed does not flag liquidations${bfMsg ? " · History: " + bfMsg : ""}`);
     if (!bins.length) { setHtml(g("fsCheck"), `<b>Reading</b><div class="note">Waiting for data.</div>`); setHtml(g("fsHits"), `<b>Boxed moments</b><div class="note">None yet.</div>`); return; }
     const n = Math.max(1, Math.ceil(300000 / (+g("fsBin").value))), s = FUTSTACK.summary(bins, n), cls = ok => ok ? "yes" : "no";
     const liqHit = s.bl + s.sl >= (cfg().minLiqUsd || 1), dHit = s.vol > 0 && Math.abs(s.delta) / s.vol > .1, oHit = s.oiPct != null && Math.abs(s.oiPct) >= .0002;

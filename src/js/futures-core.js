@@ -44,6 +44,30 @@ const FUTSTACK = (() => {
     return out;
   }
 
+  // History for the start of a session: Binance 1-minute klines (price, and taker buy quote volume = delta) and 5-minute open interest history, spread over the 5 s base bins.
+  // klines: rows of /fapi/v1/klines ([openTime, o, h, l, c, vol, closeTime, quoteVol, trades, takerBuyBase, takerBuyQuote]); oiHist: rows of /futures/data/openInterestHist ({timestamp, sumOpenInterest}); until: the time the open interest is held to.
+  // Live data wins: a base bin that already has live price keeps it, one that already has open interest keeps it. Detail inside a minute is invented (price walks open -> low/high -> close, volume is split evenly), so 1-minute and 5-minute bins are exact and 15-second bins are approximate.
+  // Liquidations cannot be backfilled (Binance keeps no public history), and the kline delta includes liquidation prints. Returns {t0, t1, minutes, oiPoints} of what was written.
+  function backfill(st, klines, oiHist, until) {
+    const per = 60000 / BASE_MS, res = { t0:null, t1:null, minutes:0, oiPoints:0 };
+    for (const r of klines || []) {
+      const t0 = +r[0], o = +r[1], h = +r[2], l = +r[3], c = +r[4], qv = +r[7], tb = +r[10]; if (!(o > 0) || !(h > 0) || !(l > 0) || !(c > 0)) continue;
+      const wp = c >= o ? [[0, o], [4, l], [8, h], [per - 1, c]] : [[0, o], [4, h], [8, l], [per - 1, c]], k0 = slot(t0), buy = (tb > 0 ? tb : 0) / per, sell = Math.max(0, qv - (tb > 0 ? tb : 0)) / per; let wrote = false;
+      for (let i = 0; i < per; i++) {
+        const x = cell(st, k0 + i, "bn"); if (x.o != null) continue;
+        let j = 0; while (j < wp.length - 2 && i > wp[j + 1][0]) j++;
+        const [i0, p0] = wp[j], [i1, p1] = wp[j + 1], px = p0 + (p1 - p0) * (i - i0) / (i1 - i0);
+        x.o = x.h = x.l = x.c = px; x.b = buy; x.s = sell; wrote = true;
+      }
+      if (wrote) { res.minutes++; res.t0 = res.t0 == null ? t0 : Math.min(res.t0, t0); res.t1 = Math.max(res.t1 || 0, t0 + 60000); }
+    }
+    const pts = (oiHist || []).map(r => ({ t:+r.timestamp, v:+r.sumOpenInterest })).filter(p => p.t > 0 && p.v > 0).sort((a, b) => a.t - b.t);
+    pts.forEach((p, j) => { const end = j + 1 < pts.length ? pts[j + 1].t : Math.max(p.t + 300000, until || 0); for (let k = slot(p.t); k < slot(end); k++) { const x = cell(st, k, "bn"); if (x.oi == null) x.oi = p.v; } res.oiPoints++; });
+    if (res.t0 != null) st.bf = { t0:res.t0, t1:res.t1 };
+    return res;
+  }
+  function reset(st) { st.bins.clear(); st.oi.bn = st.oi.hl = null; st.bf = null; }
+
   // One liquidation message from Bybit (v5 public linear, topic allLiquidation.<COIN>USDT) or OKX (public, channel liquidation-orders, instType SWAP) -> trades {t, v, side, px, ntl, liq:true}.
   // side is the side of the forced order: "sell" = a long was closed out. Bybit S "Buy" means a long was liquidated, size v in coin, p the bankruptcy price. OKX gives side directly, sz in contracts (x ctVal coin), bkPx.
   // Only the coin asked for (USDT-margined); everything else on the channel is ignored. o: {coin:"BTC", ctVal: OKX contract size in coin}.
@@ -135,8 +159,16 @@ const FUTSTACK = (() => {
     const st3 = newStore(); addTrade(st3, { t:T, v:"bn", side:"buy", px:100, ntl:1000 }); for (const t of by.concat(okx)) addTrade(st3, t);
     const own = aggregate(st3, { venue:"bn", t0:T, t1:T + 60000, binMs:60000 })[0], allL = aggregate(st3, { venue:"bn", t0:T, t1:T + 60000, binMs:60000, liqAll:true })[0];
     ok("liqAll adds Bybit and OKX liquidations without touching price or delta", own.liq === 0 && allL.sl === 30000 && allL.bl === 30000 && allL.c === 100 && allL.delta === 1000 && allL.h === 100, JSON.stringify(allL));
+    const sb = newStore(), TB = 6e9, kl = [[TB, "100", "103", "99", "102", "0", TB + 59999, "60000", 10, "0", "42000"], [TB + 60000, "102", "104", "101", "101", "0", TB + 119999, "30000", 5, "0", "10000"]];
+    addTrade(sb, { t:TB + 60000 + 2000, v:"bn", side:"buy", px:102.5, ntl:500 });                       // live data already in the second minute, first 5 s bin
+    const rb = backfill(sb, kl, [{ timestamp:TB - 120000, sumOpenInterest:"1000" }, { timestamp:TB + 60000, sumOpenInterest:"990" }], TB + 400000), ab = aggregate(sb, { venue:"bn", t0:TB, t1:TB + 120000, binMs:60000 });
+    ok("backfill: 1-minute bins keep the kline price", ab[0].o === 100 && ab[0].h === 103 && ab[0].l === 99 && ab[0].c === 102, JSON.stringify(ab[0]));
+    ok("backfill: delta is taker buy minus taker sell", Math.abs(ab[0].delta - (42000 - 18000)) < 1e-6 && Math.abs(ab[0].vol - 60000) < 1e-6, JSON.stringify(ab[0]));
+    ok("backfill: open interest carried forward from each point", ab[0].oi === 1000 && ab[1].oi === 990, JSON.stringify([ab[0].oi, ab[1].oi]));
+    ok("backfill: live data wins over backfill in the same bin", ab[1].b >= 500 && ab[1].o === 102.5 && rb.minutes === 2 && sb.bf.t0 === TB, JSON.stringify([ab[1], rb, sb.bf]));
+    ok("backfill: no liquidations invented, junk rows skipped", ab.every(b => b.liq === 0) && backfill(newStore(), [["x"], [TB, "0", "0", "0", "0"]], [{ timestamp:"a" }], 0).minutes === 0, "");
     const before = st.bins.size; prune(st, 60000, T + 600000); ok("prune drops old bins", st.bins.size < before && st.bins.size > 0, st.bins.size);
     return out;
   }
-  return { BASE_MS, DEFAULTS, newStore, addTrade, setOi, stamp, prune, aggregate, highlights, summary, reading, parseLiq, usd, selftest };
+  return { BASE_MS, DEFAULTS, newStore, addTrade, setOi, stamp, prune, aggregate, highlights, summary, reading, parseLiq, backfill, reset, usd, selftest };
 })();
