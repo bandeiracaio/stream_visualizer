@@ -124,6 +124,47 @@
     <div class="note">Taker buy vs sell $ volume. Imbalance = (buy − sell) / (buy + sell).</div>
   </section>
 
+  <section data-tab="futures" class="full">
+    <h2>Futures stack <span class="ctl">
+      <select id="fsVenue"><option value="bn">Binance</option><option value="hl">Hyperliquid</option><option value="all">Both</option></select>
+      <select id="fsWin"><option value="1800000">30m</option><option value="3600000" selected>1h</option><option value="7200000">2h</option><option value="14400000">4h</option></select>
+      <select id="fsBin"><option value="15000">15s</option><option value="60000" selected>1m</option><option value="300000">5m</option></select>
+      <label><input type="checkbox" id="fsHeat" checked> book heatmap</label>
+      <label><input type="checkbox" id="fsMark" checked> highlights</label>
+      <label title="Add Bybit and OKX liquidations to the liquidation panel (delta and open interest stay Binance / Hyperliquid)"><input type="checkbox" id="fsLiqAll" checked> liq: all venues</label>
+      min liq $ <input id="fsMin" type="number" value="100000" step="50000" min="0" style="width:90px"></span></h2>
+    <canvas id="cvFut" class="chart" style="height:580px;touch-action:pan-y"></canvas>
+    <div class="note" id="fsLiqSrc"></div>
+    <div class="note" id="fsHover">Move over the chart (or tap it) to read one candle.</div>
+    <div class="legend">
+      <span><i style="background:var(--buy)"></i>shorts liquidated / net buying</span>
+      <span><i style="background:var(--sell)"></i>longs liquidated / net selling</span>
+      <span><i style="height:2px;background:var(--accent)"></i>open interest</span>
+      <span><i style="border:1.5px solid var(--mark);width:8px;height:12px"></i>look here: liquidation spike confirmed by delta and open interest</span>
+    </div>
+    <div class="fs-grid">
+      <div class="fs-box" id="fsCheck" style="margin-top:0"></div>
+      <div class="fs-box" id="fsHits" style="margin-top:0"></div>
+    </div>
+    <div class="fs-box">
+      <b>Trade it</b> <span class="note" id="fsAcct" style="display:inline"></span>
+      <div class="fs-row"><input id="fsSize" type="number" value="100" min="0" step="any"> USD
+        <button id="fsBuy" class="buy">Buy now</button><button id="fsSell" class="sell">Sell now</button><button id="fsClose">Close position</button><button id="fsStart">Start paper account</button></div>
+      <div class="note" id="fsMsg"></div><div class="metrics" id="fsPos"></div>
+      <div class="note">Orders go to the account chosen on the Accounts tab (paper, demo or live) on the asset in the header, at the Binance bid / ask, whatever venue the chart shows. A live account still asks for confirmation.</div>
+    </div>
+    <details class="fs-box"><summary>The setup: what to build and what to look for</summary>
+      <ol><li><b>Stack three things on one time axis</b>: liquidations, volume delta (taker buy minus sell $), open interest. Price (here over the order-book heatmap) sits on top.</li>
+      <li><b>Liquidations</b> tell you who got forced out: a long liquidation is a forced sell, a short liquidation is a forced buy.</li>
+      <li><b>Volume delta</b> tells you who is aggressive: buyers lifting the ask or sellers hitting the bid.</li>
+      <li><b>Open interest</b> tells you whether positions are opening (rising) or closing (falling).</li>
+      <li><b>Look for rotations</b>: a liquidation spike on one side, a delta spike the same way, and open interest dropping at the same moment (the cyan boxes). That is positions being closed by force, often near where a move stalls or turns.</li>
+      <li>Delta up with open interest up is new longs opening; delta up with open interest down is shorts closing; delta down with open interest up is new shorts; delta down with open interest down is longs closing.</li>
+      <li><b>Use small size</b>, get screen time, catch rotations, build experience. The point is to learn to read it fast.</li></ol>
+      <div class="note">From a trader's post. This view only shows and marks; the boxes are a reading aid, not a signal, and nothing here is validated. History starts when you press Connect and is not kept after a reload. Liquidations come from Binance, Bybit and OKX (the original shows nine venues); Hyperliquid's feed does not flag liquidations, so it adds none. Delta and open interest are Binance and Hyperliquid only.</div>
+    </details>
+  </section>
+
   <section data-tab="micro" class="full">
     <h2>Liquidity heatmap <span class="ctl">
       <select id="hmVenue"><option value="bn">Binance book</option><option value="hl">HL book (20 lvls)</option></select>
@@ -608,6 +649,12 @@
 </script>
 <script>
 <!--@include js/arm-mode.js-->
+</script>
+<script>
+<!--@include js/futures-core.js-->
+</script>
+<script>
+<!--@include js/futures-view.js-->
 </script>
 <script>
 <!--@include js/label-queue-core.js-->

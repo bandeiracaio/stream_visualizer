@@ -952,6 +952,7 @@ const READER_SLOT = {slot:"reader", render:()=>renderReader(), minIntervalMs:250
 VIEWS.register({id:"overview", label:"Overview", area:"now", minIntervalMs:250, render:()=>{ try{ renderOverview(); }catch(e){ console.error("overview", e); } }});
 VIEWS.register({id:"armmode", label:"Arm mode", area:"now"});
 VIEWS.register({id:"charts", label:"Charts", area:"now", minIntervalMs:100, render:()=>{ drawBubbles(); drawCvd(); }});
+VIEWS.register({id:"futures", label:"Futures stack", area:"now", minIntervalMs:250, render:()=>{ if (typeof futuresRender === "function") futuresRender(); }});
 VIEWS.register({id:"micro", label:"Microstructure", area:"now", minIntervalMs:250, render:()=>renderMicro()});
 VIEWS.register({id:"viz", label:"Visuals", area:"now", minIntervalMs:400, render:()=>renderViz()});
 VIEWS.register({id:"tape", label:"Tape", area:"now"});
