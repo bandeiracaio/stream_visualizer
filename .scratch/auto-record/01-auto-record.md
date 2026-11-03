@@ -36,5 +36,5 @@ the fast sigma component helps) need a recording that contains a jump in activit
 ## Keep watching after a recording (v042)
 - Setting `rearm` (default on): after a recording stops and is saved, auto-record stays armed instead of disarming. The price stream and its history keep running, so there is no new 15 minutes to learn.
 - A cooldown (`cooldownMin`, default 10) blocks a new start straight after a recording, so a long volatile stretch cannot become a string of short files.
-- At most `maxRuns` (8) recordings per arming, then it disarms (storage bound). A recording stopped by hand still disarms.
+- At most `maxRuns` (100; 8 until v097) recordings per arming, then it disarms (storage bound). A recording stopped by hand still disarms.
 - Header chip: `armed · cooldown N min`, then `armed · waiting · N recorded`.
