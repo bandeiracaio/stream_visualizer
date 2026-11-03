@@ -37,9 +37,11 @@ function assemble() {
   }).join("\n");
 }
 
+const releaseDir = path.join(root, "releases");      // every stream-visualizer_vNNN.html lives here (until v098 they sat in the repo root)
 function nextRelease() {
-  const nums = fs.readdirSync(root).map(f => f.match(/^stream-visualizer_v(\d+)\.html$/)).filter(Boolean).map(m => +m[1]);
-  return path.join(root, `stream-visualizer_v${String((nums.length ? Math.max(...nums) : 0) + 1).padStart(3, "0")}.html`);
+  const names = d => fs.existsSync(d) ? fs.readdirSync(d) : [];      // the root is scanned too, so a stray old-style file in it still counts and a number is never reused
+  const nums = [...names(root), ...names(releaseDir)].map(f => f.match(/^stream-visualizer_v(\d+)\.html$/)).filter(Boolean).map(m => +m[1]);
+  return path.join(releaseDir, `stream-visualizer_v${String((nums.length ? Math.max(...nums) : 0) + 1).padStart(3, "0")}.html`);
 }
 
 const args = process.argv.slice(2);

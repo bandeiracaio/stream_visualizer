@@ -109,7 +109,7 @@ The rule that holds the whole design together: **the register, drift and proposa
 node fold.mjs --check      # preview what the next fold would change
 node fold.mjs              # rewrite the matching defaults, mark files "Folded: yes"
 node build.mjs             # self-test + dev build
-node build.mjs --release   # next stream-visualizer_vNNN.html in the repo root
+node build.mjs --release   # next releases/stream-visualizer_vNNN.html
 ```
 
 `fold.mjs` refuses a revision file that does not fit the current defaults. See [docs/revisions/README.md](docs/revisions/README.md) and [ADR 0003](docs/adr/0003-approved-thresholds-are-overrides-then-folded-by-script.md).
@@ -134,7 +134,7 @@ cd dist && python -m http.server 8765    # then open http://localhost:8765/strea
 
 ## Publishing
 
-The repository is public and serves GitHub Pages. `.github/workflows/pages.yml` runs on every push to `main` and publishes the **newest** `stream-visualizer_vNNN.html` in the repo root as the site, plus a `version.json` the page reads to offer updates. So the flow is: `node build.mjs --release`, commit, push. Unreleased work in `src/` never goes live. GitHub caches the page for about ten minutes, so a phone may need a reload.
+The repository is public and serves GitHub Pages. `.github/workflows/pages.yml` runs on every push to `main` and publishes the **newest** `releases/stream-visualizer_vNNN.html` as the site, plus a `version.json` the page reads to offer updates. So the flow is: `node build.mjs --release`, commit, push. Unreleased work in `src/` never goes live. GitHub caches the page for about ten minutes, so a phone may need a reload.
 
 ## Testing
 
