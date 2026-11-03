@@ -1009,6 +1009,22 @@ const READER_SELFTEST=(()=>{
     const ok=DISK.assess(50*G,r),warnRoom=DISK.assess(4*G,r),badRoom=DISK.assess(1.5*G,r),warnRate=DISK.assess(10*G,1e9),badRate=DISK.assess(10*G,3e9),unk=DISK.assess(undefined,r),noRate=DISK.assess(50*G,null);
     return{ok:Math.abs(r-2.4e6)<1&&none===null&&old===null&&Math.abs(fresh-3e6)<1&&ok.tone==="ok"&&warnRoom.tone==="warn"&&badRoom.tone==="bad"&&warnRate.tone==="warn"&&badRate.tone==="bad"&&unk.tone==="off"&&noRate.tone==="ok"&&noRate.hours===null&&/about 50\.0 GB left/.test(ok.text),detail:JSON.stringify({r,none,old,fresh,ok:ok.text,warnRoom:warnRoom.tone,badRoom:badRoom.tone,warnRate:warnRate.tone,badRate:badRate.tone,unk:unk.tone,noRate})};
   });
+  add("review: replay configs, label tally, freshness, import filter and the revision / revert files (ADR 0003)",E=>{
+    const R=READER_REVIEW,LK=READER_REGISTER.LINKS,epL=LK.find(l=>l.at==="ep"),cfgL=LK.find(l=>l.at==="cfg"),live={sens:1,detectors:{a:1},ep:Object.assign({},READER_EPISODES.DEFAULTS,{families:{x:1},horizons:[1,2]}),[cfgL.k]:7};
+    const c=R.replayCfg(live,{[epL.k]:99,[cfgL.k]:55}),untouched=live.ep[epL.k]===READER_EPISODES.DEFAULTS[epL.k]&&live[cfgL.k]===7&&c.ep.families!==live.ep.families;
+    const pend=[{id:"a",k:epL.k,to:5},{id:"b",k:cfgL.k,to:6}],pl=R.plan(pend),pl1=R.plan([pend[0]]);
+    const labels=[{verdict:"agree",t0:0,t1:10},{verdict:"disagree",t0:0,t1:10},{verdict:"missed",t0:0,t1:10},{verdict:"agree",t0:500,t1:600}],tl=R.tally(labels,[{id:1}],0,100,(l,ep)=>l.verdict!=="disagree");
+    const p={id:"a",rev:2},res={epoch:3,together:{ids:["a"],revs:[2]}};
+    const fresh=R.isFresh(p,{rev:2},res,3)&&!R.isFresh(p,{rev:1},res,3)&&!R.isFresh(p,{rev:2},res,4)&&!R.isFresh(p,null,res,3)&&R.togetherShown(res,3,[p])&&!R.togetherShown(res,3,[{id:"a",rev:0}])&&!R.togetherShown(res,4,[p]);
+    const imp=R.importCandidates({[epL.k]:{value:5},[cfgL.k]:{value:7},nope:{value:1},bad:null},k=>R.curValue(live,k)),none=R.importCandidates({[cfgL.k]:{value:7}},k=>R.curValue(live,k)),nul=R.importCandidates(undefined,()=>0);
+    const rv=R.revertFile({k:epL.k,at:"ep",of:"id1",from:5,to:4,reason:"",time:9},"2026-01-02"),json=JSON.parse(rv.text.split("```json")[1].split("```")[0]);
+    const pr={id:"p1",k:epL.k,at:"ep",label:"L",from:1,to:2,change:1,approvedAt:5,provisional:false,large:false,driftId:"d",driftKey:"bn|x",driftFrom:1,driftAt:2,per:[{key:"bn|x",p:.5}],families:["wall"]},r={v:{verdict:"unproven",conds:[{k:"c",ok:false,text:"t"}],labels:{base:{a:0,dn:0,m:0},prop:{a:0,dn:0,m:0}},rates:{}},base:[{name:"f",tag:"after",hours:1,eps:{wall:3}}],prop:[{hours:1,eps:{wall:2}}]};
+    const rf=R.revisionFile(pr,r,"g1",{at:1},[pr,{k:"other"}],k=>k,"2026-01-02"),rj=JSON.parse(rf.text.split("```json")[1].split("```")[0]);
+    const ok=untouched&&c.ep[epL.k]===99&&c[cfgL.k]===55&&c.ep.keepEpisodes===5000&&pl.length===4&&pl[3].name==="together"&&pl[3].changes[epL.k]===5&&pl1.length===2&&tl.a===1&&tl.aF===1&&tl.dn===1&&tl.dS===0&&tl.m===1&&tl.mD===1&&fresh
+      &&Object.keys(imp||{}).join()===epL.k&&none===null&&nul===null&&rv.name==="2026-01-02-"+epL.k+"-revert.md"&&/^Folded: no$/m.test(rv.text)&&json.kind==="revert"&&json.to===4
+      &&rf.name==="2026-01-02-"+epL.k+"-g1.md"&&/^Group: g1 \(approved together with other\)$/m.test(rf.text)&&rj.kind==="approval"&&rj.together.length===2&&rj.verdict==="unproven";
+    return{ok,detail:JSON.stringify({untouched,pl:pl.length,tl,fresh,imp:Object.keys(imp||{}),rvname:rv.name,rfname:rf.name})};
+  });
   function run(Eng){return scenarios.map(sc=>{try{const r=sc.run(Eng);return{name:sc.name,ok:!!r.ok,detail:r.detail};}catch(err){return{name:sc.name,ok:false,detail:String(err&&err.stack||err)};}});}
   return {T0,rng,poisson,levels,sim,scenarios,run};
 })();
