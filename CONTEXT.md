@@ -35,3 +35,9 @@
 **Sigma**: the scale of normal price movement, in bps per root second (the MAD of overlapping 15-second returns divided by the square root of 15). Price progress and distances are measured in multiples of it (see `docs/adr/0004`).
 
 **Expectation**: a shape a measured quantity must have if our assumption about it is right, written in advance and checked against everything seen so far (for example, price progress in sigmas should have a typical move of about 0.7 and tails near 1.6). It catches an assumption that was wrong from the start, which drift never does.
+
+**Recording**: the inputs the engine consumed over a stretch of time (plus the `ext` collector slice and `quality`), saved as one session file so it can be replayed. Made by hand (Record) or by auto-record. Saved recordings are the IndexedDB copies of those files. Not the same as a Session (one continuous live run of the app, which may hold several recordings).
+
+**Arming**: switching auto-record on (header Arm). While armed it watches the mark-price volatility and starts and stops recordings by itself; it ends when disarmed by hand, when a recording is stopped by hand, when it hits `maxRuns`, or when the page closes. Armed is the state; Recording is what it produces.
+
+**Run**: one auto-recording started within one arming, counted in `AR.runs`. An arming has 0 to `maxRuns` runs. A hand-made recording is not a run.
