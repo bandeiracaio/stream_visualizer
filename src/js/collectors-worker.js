@@ -7,7 +7,8 @@
 // Collector "wallets": the 10 Hyperliquid wallets that traded the most in this coin over 15 minutes, their positions (30 s), their liquidation fills,
 // and the predicted funding across venues (60 s).
 // Collector "options" (BTC and ETH only): Deribit's volatility index and index price (pushed, sampled every 10 s) and the whole option chain summarised every 120 s.
-// The page says which collectors are on in the start message: {t:"start", sym, want:{derivs, calendar, venues, wallets, options}, rec}, and tells when a recording starts or stops: {t:"rec", on}.
+// Collector "tradeVol" (fast, like venues): every venue's BTC trades in one-second buckets (record "tv", every 10 s). Collector "vol24" (slow): each venue's 24 h ticker volume once a minute (record "vol24").
+// The page says which collectors are on in the start message: {t:"start", sym, want:{derivs, calendar, venues, tradeVol, vol24, wallets, options}, rec}, and tells when a recording starts or stops: {t:"rec", on}.
 let on = false, gen = 0, sym = "btc", want = {}, ws = null, lastMsg = 0, timer = null, mk = null, prevRatios = null, lastCal = 0, recOn = false, vOn = false, vGen = 0, vSock = {}, vState = {}, lastVen = 0, lastPing = 0, wtr = null, wsk = null, wTracked = new Map(), wGen = 0, startAt = 0, dsk = null, dGen = 0, dState = {}, optOn = false;
 const last = {}, busy = {}, hold = {}, said = {};
 const BN = "https://fapi.binance.com", HLI = "https://api.hyperliquid.xyz/info";
@@ -176,6 +177,57 @@ function venuesTick(now) {
   for (const id in vSock) { const s = vSock[id]; if (now - s.last > 30000) try { s.w.close(); } catch {} }      // silent without closing: close it so onclose reopens it
   if (now - lastVen >= 1000) { lastVen = now; const p = COLLECT.venueRecord(vState, now); if (p) col("venues", now, p); }
 }
+// ---- venue trade volume (fast collector "tradeVol"): every venue's BTC trades into one-second buckets, a record ("tv") every 10 s. Open only while the page says so (like the extra venues).
+let tOn = false, tGen = 0, tSock = {}, tBook = null, tCt = null, tFlushAt = 0, tPing = 0;
+function tOpen(v) {
+  const g = tGen; let w;
+  try { w = new WebSocket(v.url); } catch (e) { say("trades " + v.id, e); return; }
+  tSock[v.id] = {w, last:Date.now()};
+  w.onopen = () => { if (v.sub) try { w.send(JSON.stringify(v.sub)); } catch {} };
+  w.onmessage = ev => {
+    const s = tSock[v.id]; if (!s || s.w !== w || !tBook) return;
+    const now = s.last = Date.now(); let j; try { j = JSON.parse(ev.data); } catch { return; }      // OKX answers a ping with the plain text "pong"
+    try { for (const tr of COLLECT.tradeParse(v.id, j, tCt)) tBook.add(tr, now); } catch {}
+  };
+  w.onclose = () => { if (!tOn || g !== tGen) return; say("trades " + v.id, "closed, reopening"); setTimeout(() => { if (tOn && g === tGen) tOpen(v); }, 5000); };
+}
+async function tradesStart() {
+  const g = ++tGen; tOn = true; tBook = COLLECT.tradeBook(); tFlushAt = Date.now(); tCt = null;
+  try { const j = await (await fetch(`https://www.okx.com/api/v5/public/instruments?instType=SWAP&instId=${sym.toUpperCase()}-USDT-SWAP`, {cache:"no-store"})).json(); tCt = COLLECT.okxCt(j); } catch (e) { say("trades okx", e); }
+  if (!tOn || g !== tGen) return;
+  if (!tCt) say("trades okx", "no contract size: OKX swap trades are skipped");
+  for (const v of COLLECT.tradeSubs(sym, {swap:!!tCt})) tOpen(v);
+}
+function tradesFlush(now, all) { if (!tBook) return; const p = tBook.flush(now, all); if (p) col("tv", now, p); }
+function tradesClose() { if (tOn) tradesFlush(Date.now(), true); tOn = false; tGen++; for (const id in tSock) try { tSock[id].w.close(); } catch {} tSock = {}; tBook = null; }
+function tradesSync() {
+  const wanted = !!(want.tradeVol && recOn && on);
+  if (wanted && !tOn) tradesStart(); else if (!wanted && tOn) tradesClose();
+}
+function tradesTick(now) {
+  if (!tOn) return;
+  if (now - tPing >= 20000) { tPing = now; for (const v of COLLECT.tradeSubs(sym, {swap:!!tCt})) { const s = tSock[v.id]; if (v.ping && s && s.w.readyState === 1) try { s.w.send(typeof v.ping === "string" ? v.ping : JSON.stringify(v.ping)); } catch {} } }
+  for (const id in tSock) { const s = tSock[id]; if (now - s.last > 60000) try { s.w.close(); } catch {} }      // silent without closing: close it so onclose reopens it
+  if (now - tFlushAt >= 10000) { tFlushAt = now; tradesFlush(now, false); }
+}
+
+// ---- venue 24 h volume (slow collector "vol24"): each venue's own ticker, once a minute, dollars per venue id
+const V24 = id => { const C = sym.toUpperCase(), c = C + "USDT", H = {cache:"no-store"}; return {
+  bnF: () => getJson("vol24", `${BN}/fapi/v1/ticker/24hr?symbol=${c}`), bnS: () => getJson("vol24", `https://api.binance.com/api/v3/ticker/24hr?symbol=${c}`),
+  byF: () => getJson("vol24", `https://api.bybit.com/v5/market/tickers?category=linear&symbol=${c}`), byS: () => getJson("vol24", `https://api.bybit.com/v5/market/tickers?category=spot&symbol=${c}`),
+  okF: () => getJson("vol24", `https://www.okx.com/api/v5/market/ticker?instId=${C}-USDT-SWAP`), okS: () => getJson("vol24", `https://www.okx.com/api/v5/market/ticker?instId=${C}-USDT`),
+  cbS: () => getJson("vol24", `https://api.exchange.coinbase.com/products/${C}-USD/stats`), hlF: () => getJson("vol24", HLI, {method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({type:"metaAndAssetCtxs"})}),
+}[id]; };
+async function pollVol24() {
+  const g = gen, t = Date.now(), ids = COLLECT.TRADE_ORDER;
+  const rs = await Promise.allSettled(ids.map(id => V24(id)()));
+  if (!on || g !== gen) return;
+  const p = {}; let n = 0;
+  ids.forEach((id, i) => { if (rs[i].status !== "fulfilled") return; const v = COLLECT.vol24Parse(id, rs[i].value, id === "hlF" ? sym : null); if (v != null) { p[id] = Math.round(v); n++; } });
+  if (!n) throw first(rs);
+  col("vol24", t, p);
+}
+
 function tick() {
   if (!on) return;
   const now = Date.now();
@@ -185,6 +237,8 @@ function tick() {
     lastCal = now;
   }
   venuesTick(now);
+  tradesTick(now);
+  if (want.vol24 && COLLECT.due(last.vol24, now, COLLECT.EVERY.vol24)) { last.vol24 = now; run("vol24", pollVol24); }
   if (want.wallets) {
     if (wsk && now - wsk.last > 30000) try { wsk.w.close(); } catch {}      // silent without closing (the coin's trades keep it busy): close it so onclose reopens it
     if (now - (last.wping || 0) >= 30000) { last.wping = now; if (wsk && wsk.w.readyState === 1) try { wsk.w.send(JSON.stringify({method:"ping"})); } catch {} }
@@ -201,7 +255,7 @@ function tick() {
 }
 self.onmessage = ev => {
   const m = ev.data;
-  if (m.t === "start") { on = true; gen++; venuesClose(); walletsStop(); optionsStop(); sym = String(m.sym || "btc"); want = m.want || {derivs:true}; recOn = !!m.rec; mk = null; prevRatios = null; lastCal = Date.now(); for (const k of [last, busy, hold, said]) for (const i in k) delete k[i]; startAt = Date.now(); if (want.derivs) open(); if (want.wallets) walletsStart(); if (want.options) optionsStart(); venuesSync(); clearInterval(timer); timer = setInterval(tick, 1000); tick(); }
-  else if (m.t === "rec") { recOn = !!m.on; venuesSync(); }
-  else if (m.t === "stop") { venuesClose(); walletsStop(); optionsStop(); on = false; gen++; clearInterval(timer); try { if (ws) ws.close(); } catch {} ws = null; }
+  if (m.t === "start") { on = true; gen++; venuesClose(); tradesClose(); walletsStop(); optionsStop(); sym = String(m.sym || "btc"); want = m.want || {derivs:true}; recOn = !!m.rec; mk = null; prevRatios = null; lastCal = Date.now(); for (const k of [last, busy, hold, said]) for (const i in k) delete k[i]; startAt = Date.now(); if (want.derivs) open(); if (want.wallets) walletsStart(); if (want.options) optionsStart(); venuesSync(); tradesSync(); clearInterval(timer); timer = setInterval(tick, 1000); tick(); }
+  else if (m.t === "rec") { recOn = !!m.on; venuesSync(); tradesSync(); }
+  else if (m.t === "stop") { venuesClose(); tradesClose(); walletsStop(); optionsStop(); on = false; gen++; clearInterval(timer); try { if (ws) ws.close(); } catch {} ws = null; }
 };

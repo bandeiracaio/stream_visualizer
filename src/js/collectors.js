@@ -55,8 +55,8 @@ setInterval(colSample, 10000);
 // ---- the always-on worker (collectors-worker.js): derivatives context and calendar tags. It runs whether or not auto-record is armed, in a worker so a hidden tab
 // does not slow it. Its records come here and go onto the tape; a record posted while the page is frozen is written when the page thaws.
 function colWorkerSync() {
-  const sym = cl$("sym").value.trim().toLowerCase(), wants = {derivs:colOn("derivs"), calendar:colOn("calendar"), venues:colOn("venues"), wallets:colOn("wallets"), options:colOn("options")}, key = sym + "|" + wants.derivs + "|" + wants.calendar + "|" + wants.venues + "|" + wants.wallets + "|" + wants.options;
-  const want = (wants.derivs || wants.calendar || wants.venues || wants.wallets || wants.options) && !!sym;
+  const sym = cl$("sym").value.trim().toLowerCase(), wants = {derivs:colOn("derivs"), calendar:colOn("calendar"), venues:colOn("venues"), tradeVol:colOn("tradeVol"), vol24:colOn("vol24"), wallets:colOn("wallets"), options:colOn("options")}, key = sym + "|" + wants.derivs + "|" + wants.calendar + "|" + wants.venues + "|" + wants.tradeVol + "|" + wants.vol24 + "|" + wants.wallets + "|" + wants.options;
+  const want = (wants.derivs || wants.calendar || wants.venues || wants.tradeVol || wants.vol24 || wants.wallets || wants.options) && !!sym;
   if (CL.worker && (!want || CL.workerKey !== key)) { try { CL.worker.postMessage({t:"stop"}); CL.worker.terminate(); } catch {} CL.worker = null; }
   if (!want || CL.worker) return;
   let w;
@@ -129,6 +129,7 @@ function colWhy(id) {
     case "telemetry": return connected || AR.on ? null : "waits for the app to be connected or armed";
     case "options": return !COLLECT.deribitCoin(cl$("sym").value.trim()) ? "Deribit lists BTC and ETH only" : CL.worker ? null : "worker not running";
     case "venues": return CL.worker ? (colWatching() ? null : "waits for a recording or auto-record armed") : "worker not running";
+    case "tradeVol": return CL.worker ? (colWatching() ? null : "waits for a recording or auto-record armed") : "worker not running";
     case "book": return colBookOn() ? null : "waits for the app connected and recording";
     default: return CL.worker ? null : "worker not running";
   }
@@ -149,6 +150,23 @@ function colRender() {
   colStatus();
 }
 setInterval(colStatus, 1000);
+// ---- venue volume readout (read-only): each venue's 24 h dollar volume and share from the newest "vol24" record, perp against spot, and, while a recording or armed
+// run is writing "tv", the share of what was actually traded over the last 5 minutes by the aggressor (buy / sell split). Redrawn only when its text changes.
+function colVolRender() {
+  const box = cl$("colVol"); if (!box) return;
+  const v24 = (CL.recent.vol24 || []).slice(-1)[0], d = v24 ? COLLECT.vol24Share(v24[3]) : null, now = Date.now(), tv = COLLECT.tradeShare(CL.recent.tv || [], now, 300000);
+  const U = COLLECT.usdText, pct = x => (x*100).toFixed(1) + "%", I = COLLECT.TRADE_IDS;
+  let html = "";
+  if (!d) html = `<div class="note">Venue volume: no 24 h reading yet (the vol24 collector asks each venue once a minute).</div>`;
+  else {
+    const rows = COLLECT.TRADE_ORDER.filter(id => d.by[id]).map(id => { const t = tv && tv.by[id], bs = t && t.usd > 0 ? Math.round(t.buy/t.usd*100) : null;
+      return `<tr><td>${I[id].label}</td><td style="text-align:right">${U(d.by[id].usd)}</td><td style="text-align:right">${pct(d.by[id].share)}</td><td style="text-align:right">${t ? pct(t.share) : "-"}</td><td style="text-align:right">${bs == null ? "-" : bs + " / " + (100 - bs)}</td></tr>`; }).join("");
+    html = `<div class="stat" style="margin-top:8px" title="24 h volume is each venue's own ticker, in dollars (USDT and USD treated as equal), read ${COLLECT.ageText(now - v24[2])} ago. 'Last 5 min' and buy / sell come from the trade buckets, only while a recording or armed run is writing them; buy / sell is by aggressor (the taker's side).">Venue volume, ${String(cl$("sym").value).toUpperCase()}: 24 h ${U(d.usd)} · perp ${pct(d.perp)} · spot ${pct(d.spot)}</div>
+      <table style="margin-top:4px"><thead><tr><th style="text-align:left">venue</th><th style="text-align:right">24 h</th><th style="text-align:right">share</th><th style="text-align:right">share 5 min</th><th style="text-align:right">buy / sell %</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
+  if (box.dataset.h !== html) { box.dataset.h = html; box.innerHTML = html; }
+}
+setInterval(colVolRender, 5000);
 cl$("colList").onchange = e => { const id = e.target.dataset && e.target.dataset.col; if (!id) return; CL.cfg[id] = e.target.checked; store.set("col.cfg", CL.cfg); colWorkerSync(); if (AR.on && AR.worker) AR.worker.postMessage({t:"cfg", cfg:Object.assign({}, AR.cfg, {collectors:colWorkerCfg()})}); };
 cl$("colSave").onclick = async () => {
   const text = JSON.stringify({kind:"sv-tape", v:1, version:APP_VERSION, at:Date.now(), records:await colAll()});
@@ -157,6 +175,7 @@ cl$("colSave").onclick = async () => {
 cl$("colClear").onclick = async () => { try { await colReq("readwrite", st => st.clear()); CL.count = 0; CL.stat = {}; } catch {} colStatus(); };
 colAll().then(a => { CL.count = a.length; colTally(a); colStatus(); colPrune(); const cut = Date.now() - COL_RECENT_MS; for (const r of a) if (r[2] >= cut) colRemember(r); }, () => colStatus());
 colRender();
+colVolRender();
 colWorkerSync();
 
 // ---- collector context on an episode card (v067): what the collectors read when the episode was detected, as the feature's deviation from its own recent mean
