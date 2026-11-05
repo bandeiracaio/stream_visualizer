@@ -7,7 +7,7 @@ const SD = await import("file:///C:/Users/Caio/stream_visualizer/sample-designs.
 const which = process.argv[2] || "dev", LB = Number(process.argv[3] || 5);
 const D = "C:/Users/Caio/stream_visualizer/.scratch/trade-system/";
 const all = H.loadSessionFacts("C:/Users/Caio/stream_visualizer/sessions"), cut = H.holdoutCutoff(all);
-const sessions = H.splitSessions(all, which, true, cut, undefined, which === "fresh" ? H.freshCutoff(all) : null), byFile = Object.fromEntries(sessions.map(s => [s.file, s]));
+const sessions = H.splitSessions(all, which, true, cut, undefined, which === "fresh" || which === "holdout" ? H.freshCutoff(all) : null), byFile = Object.fromEntries(sessions.map(s => [s.file, s]));
 const ids = new Set(JSON.parse(fs.readFileSync(D + "prereg-book-depth-ids.json", "utf8")));
 const n = 700, seed = 6; let designs = SD.generate({ pool: SD.loadPool(), n: n * 12, seed, implemented: H.implemented() }).designs;
 const cellOf = d => d.trig + " | " + d.thes, cells = new Set(designs.map(cellOf)), per = Math.ceil(n / cells.size), cnt = {}, keep = [];

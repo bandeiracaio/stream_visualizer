@@ -303,7 +303,7 @@ export function loadSessionFacts(dir, { limit = Infinity } = {}) {
 export function splitSessions(all, which, confirm = false, cutT = null, share = EXEC.holdoutShare, freshT = null) {
   // cutT (ms): fixed start-time cut; sessions starting before it are dev. Without it the latest `share` of the list is the hold-out (only for tests: it moves as sessions are added).
   const cut = cutT == null ? null : cutT, i = Math.floor(all.length * (1 - share));
-  const dev = cut == null ? all.slice(0, i) : all.filter(s => s.t0 < cut), hold = cut == null ? all.slice(i) : all.filter(s => s.t0 >= cut);
+  const dev = cut == null ? all.slice(0, i) : all.filter(s => s.t0 < cut), hold = cut == null ? all.slice(i) : all.filter(s => s.t0 >= cut && (freshT == null || s.t0 < freshT));      // the hold-out ends where the fresh data begins, so new sessions never leak into it
   if (which === "dev") return dev;
   if (which === "holdout") { if (!confirm) throw new Error("hold-out sessions are reserved: pass --confirm-holdout only for final candidates"); return hold; }
   if (which === "fresh") { if (!confirm) throw new Error("fresh sessions are reserved for pre-registered tests: pass --confirm-holdout"); if (freshT == null) throw new Error("no fresh cutoff"); return all.filter(x => x.t0 >= freshT); }
@@ -359,6 +359,7 @@ function selftest() {
   ok(splitSessions(fake, "holdout", true).length === 3 && splitSessions(fake, "holdout", true)[0].t0 === 7, "hold-out is the latest 30%");
   const grown = fake.concat([{ t0: 10 }, { t0: 11 }]); ok(splitSessions(grown, "dev", false, 7).length === 7 && splitSessions(grown, "holdout", true, 7).length === 5, "with a fixed cut, new sessions land in the hold-out and dev does not move");
   const fresh = [{ t0: 1, t1: 5 }, { t0: 6, t1: 9 }, { t0: 12, t1: 15 }]; ok(splitSessions(fresh, "fresh", true, null, undefined, 10).length === 1, "fresh split keeps only sessions starting at or after the fresh cutoff");
+  { const g = [{ t0: 1 }, { t0: 8 }, { t0: 11 }, { t0: 14 }]; ok(splitSessions(g, "holdout", true, 7, undefined, 12).length === 2 && splitSessions(g, "fresh", true, 7, undefined, 12).length === 1, "hold-out ends at the fresh cutoff: the newest session is fresh, not hold-out"); }
   let thr2 = false; try { splitSessions(fresh, "fresh", false, null, undefined, 10); } catch { thr2 = true; } ok(thr2, "fresh data is refused without --confirm-holdout");
   const NEEDS = ["level-or-range-break", "level-rejection-bounce", "sweep-or-failed-break-reclaim"];
   // sampler integration
@@ -437,20 +438,26 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const dir = path.resolve(HERE, arg("sessions", "sessions")), seed = Number(arg("seed", 1)), n = Number(arg("n", 100)), nullReps = Number(arg("null", 20));
     const costs = arg("costs", "0,2,4,8").split(",").map(Number), split = arg("split", "dev");
     const ex = { ...EXEC, latencyMs: Number(arg("latency", EXEC.latencyMs)) };      // entry (and flow-exit) delay after a signal, ms
-    const t0 = Date.now(), all = loadSessionFacts(dir), sessions = splitSessions(all, split, args.includes("--confirm-holdout"), holdoutCutoff(all), undefined, split === "fresh" ? freshCutoff(all) : null);
+    const t0 = Date.now(), all = loadSessionFacts(dir), sessions = splitSessions(all, split, args.includes("--confirm-holdout"), holdoutCutoff(all), undefined, split === "fresh" || split === "holdout" ? freshCutoff(all) : null);
     if (!sessions.length) { console.error(`no sessions in the '${split}' split yet`); process.exit(3); }
     console.error(`sessions: ${all.length} BTC total, ${sessions.length} in '${split}' split (${((Date.now() - t0) / 1000).toFixed(0)} s)`);
     // --balance: the same number of designs in every cell of trigger x thesis x exit, drawn from a larger sample
-    let designs = generate({ pool: loadPool(), n: args.includes("--balance") ? n * 12 : n, seed, implemented: implemented() }).designs;
-    if (args.includes("--balance")) {
-      const by = arg("balance-by", "trig,thes,exit").split(","), cellOf = d => by.map(k => d[k]).join(" | "), cells = new Set(designs.map(cellOf)), per = Math.ceil(n / cells.size), cnt = {}, keep = [];
-      for (const d of designs) { const c = cellOf(d); cnt[c] = (cnt[c] || 0) + 1; if (cnt[c] <= per) keep.push(d); }
-      designs = keep.slice(0, n);
+    // --designs-file frozen.json: replay exactly these designs (id, trig, thes, exit, hor, p) instead of drawing them; used by pre-registrations, which must not depend on the sampler's current categories
+    let designs;
+    if (arg("designs-file", null)) designs = JSON.parse(fs.readFileSync(arg("designs-file"), "utf8")).map(d => ({ sampler: "frozen", ...d }));
+    else {
+      let designs = generate({ pool: loadPool(), n: args.includes("--balance") ? n * 12 : n, seed, implemented: implemented() }).designs;
+      if (args.includes("--balance")) {
+        const by = arg("balance-by", "trig,thes,exit").split(","), cellOf = d => by.map(k => d[k]).join(" | "), cells = new Set(designs.map(cellOf)), per = Math.ceil(n / cells.size), cnt = {}, keep = [];
+        for (const d of designs) { const c = cellOf(d); cnt[c] = (cnt[c] || 0) + 1; if (cnt[c] <= per) keep.push(d); }
+        designs = keep.slice(0, n);
+      }
+      // --only key=value,...: keep designs with those categories (keys trig, thes, exit, stop, hor). The list is built exactly as without the filter, so a design keeps its id and parameters.
+      if (arg("only", null)) { const f = Object.fromEntries(arg("only").split(",").map(x => x.split("="))); designs = designs.filter(d => Object.entries(f).every(([k, v]) => d[k] === v)); }
+      if (arg("ids", null)) { const ids = new Set(JSON.parse(fs.readFileSync(arg("ids"), "utf8"))); designs = designs.filter(d => ids.has(d.id)); }      // --ids file.json: a JSON array of design ids (pre-registered lists)
+
     }
-    // --only key=value,...: keep designs with those categories (keys trig, thes, exit, stop, hor). The list is built exactly as without the filter, so a design keeps its id and parameters.
-    if (arg("only", null)) { const f = Object.fromEntries(arg("only").split(",").map(x => x.split("="))); designs = designs.filter(d => Object.entries(f).every(([k, v]) => d[k] === v)); }
-    if (arg("ids", null)) { const ids = new Set(JSON.parse(fs.readFileSync(arg("ids"), "utf8"))); designs = designs.filter(d => ids.has(d.id)); }      // --ids file.json: a JSON array of design ids (pre-registered lists)
-    designs = designs.map(x => instantiate(x, seed));
+    if (!arg("designs-file", null)) designs = designs.map(x => instantiate(x, seed));
     { const tf = Date.now(); let k = 0; for (const x of sessions) { flowOf(x); k++; } console.error(`flow facts ready for ${k} sessions (${((Date.now() - tf) / 1000).toFixed(0)} s)`); }
     const rows = [];
     for (const d of designs) {
