@@ -8,7 +8,7 @@
 // and the predicted funding across venues (60 s).
 // Collector "options" (BTC and ETH only): Deribit's volatility index and index price (pushed, sampled every 10 s) and the whole option chain summarised every 120 s.
 // Collector "tradeVol" (fast, like venues): every venue's BTC trades in one-second buckets (record "tv", every 10 s). Collector "vol24" (slow): each venue's 24 h ticker volume once a minute (record "vol24").
-// The page says which collectors are on in the start message: {t:"start", sym, want:{derivs, calendar, venues, tradeVol, vol24, wallets, options}, rec}, and tells when a recording starts or stops: {t:"rec", on}.
+// The page says which collectors are on in the start message: {t:"start", sym, want:{derivs, calendar, venues, tradeVol, bookPerp, vol24, wallets, options}, rec}, and tells when a recording starts or stops: {t:"rec", on}.
 let on = false, gen = 0, sym = "btc", want = {}, ws = null, lastMsg = 0, timer = null, mk = null, prevRatios = null, lastCal = 0, recOn = false, vOn = false, vGen = 0, vSock = {}, vState = {}, lastVen = 0, lastPing = 0, wtr = null, wsk = null, wTracked = new Map(), wGen = 0, startAt = 0, dsk = null, dGen = 0, dState = {}, optOn = false;
 const last = {}, busy = {}, hold = {}, said = {};
 const BN = "https://fapi.binance.com", HLI = "https://api.hyperliquid.xyz/info";
@@ -202,13 +202,50 @@ function tradesFlush(now, all) { if (!tBook) return; const p = tBook.flush(now, 
 function tradesClose() { if (tOn) tradesFlush(Date.now(), true); tOn = false; tGen++; for (const id in tSock) try { tSock[id].w.close(); } catch {} tSock = {}; tBook = null; }
 function tradesSync() {
   const wanted = !!(want.tradeVol && recOn && on);
-  if (wanted && !tOn) tradesStart(); else if (!wanted && tOn) tradesClose();
+  if (wanted && !tOn) tradesStart(); else if (!wanted && tOn) tradesClose(); bookClose();
 }
 function tradesTick(now) {
   if (!tOn) return;
   if (now - tPing >= 20000) { tPing = now; for (const v of COLLECT.tradeSubs(sym, {swap:!!tCt})) { const s = tSock[v.id]; if (v.ping && s && s.w.readyState === 1) try { s.w.send(typeof v.ping === "string" ? v.ping : JSON.stringify(v.ping)); } catch {} } }
   for (const id in tSock) { const s = tSock[id]; if (now - s.last > 60000) try { s.w.close(); } catch {} }      // silent without closing: close it so onclose reopens it
   if (now - tFlushAt >= 10000) { tFlushAt = now; tradesFlush(now, false); }
+}
+
+// ---- perp book depth, Bybit and OKX (fast collector "bookPerp"): one socket each, the book kept by price level (COLLECT.perpBook), a summary record ("bookBy" / "bookOk") every 10 s. Open only while
+// the page says so (like the extra venues). A gap, a crossed book or a bad checksum drops the book and resubscribes (a new snapshot); a socket silent for 30 s is closed and reopened.
+let bOn = false, bGen = 0, bSock = {}, bBook = {}, bAt = 0, bPing = 0, bCt = null;
+const BREC = {by:"bookBy", ok:"bookOk"};
+function bResub(v, w) { try { w.send(JSON.stringify(v.unsub)); w.send(JSON.stringify(v.sub)); } catch {} }
+function bOpen(v) {
+  const g = bGen; let w;
+  try { w = new WebSocket(v.url); } catch (e) { say("book " + v.id, e); return; }
+  bSock[v.id] = {w, last:Date.now()};
+  bBook[v.id] = COLLECT.perpBook(v.id, {ct:bCt});
+  w.onopen = () => { try { w.send(JSON.stringify(v.sub)); } catch {} };
+  w.onmessage = ev => {
+    const s = bSock[v.id]; if (!s || s.w !== w) return;
+    const now = s.last = Date.now(); let j; try { j = JSON.parse(ev.data); } catch { return; }      // OKX answers a ping with the plain text "pong"
+    try { const m = COLLECT.bookParse(v.id, j); if (m && bBook[v.id].apply(m) === "resync") { say("book " + v.id, "book out of step (" + JSON.stringify(bBook[v.id].stats()) + "), resubscribing"); bResub(v, w); } } catch {}
+  };
+  w.onclose = () => { if (!bOn || g !== bGen) return; say("book " + v.id, "closed, reopening"); bBook[v.id] = COLLECT.perpBook(v.id, {ct:bCt}); setTimeout(() => { if (bOn && g === bGen) bOpen(v); }, 5000); };
+}
+async function bookStart() {
+  const g = ++bGen; bOn = true; bAt = Date.now(); bCt = null; bBook = {};
+  try { const j = await (await fetch(`https://www.okx.com/api/v5/public/instruments?instType=SWAP&instId=${sym.toUpperCase()}-USDT-SWAP`, {cache:"no-store"})).json(); bCt = COLLECT.okxCt(j); } catch (e) { say("book okx", e); }
+  if (!bOn || g !== bGen) return;
+  if (!bCt) say("book okx", "no contract size: the OKX book is skipped");
+  for (const v of COLLECT.bookSubs(sym)) if (v.id !== "ok" || bCt) bOpen(v);
+}
+function bookClose() { bOn = false; bGen++; for (const id in bSock) try { bSock[id].w.close(); } catch {} bSock = {}; bBook = {}; }
+function bookSync() {
+  const wanted = !!(want.bookPerp && recOn && on);
+  if (wanted && !bOn) bookStart(); else if (!wanted && bOn) bookClose();
+}
+function bookTick(now) {
+  if (!bOn) return;
+  if (now - bPing >= 20000) { bPing = now; for (const v of COLLECT.bookSubs(sym)) { const s = bSock[v.id]; if (v.ping && s && s.w.readyState === 1) try { s.w.send(typeof v.ping === "string" ? v.ping : JSON.stringify(v.ping)); } catch {} } }
+  for (const id in bSock) { const s = bSock[id]; if (now - s.last > 30000) try { s.w.close(); } catch {} }      // silent without closing: close it so onclose reopens it
+  if (now - bAt >= 10000) { bAt = now; for (const id in bBook) { const p = bBook[id].summary(); if (p) col(BREC[id], now, p); } }
 }
 
 // ---- venue 24 h volume (slow collector "vol24"): each venue's own ticker, once a minute, dollars per venue id
@@ -238,6 +275,7 @@ function tick() {
   }
   venuesTick(now);
   tradesTick(now);
+  bookTick(now);
   if (want.vol24 && COLLECT.due(last.vol24, now, COLLECT.EVERY.vol24)) { last.vol24 = now; run("vol24", pollVol24); }
   if (want.wallets) {
     if (wsk && now - wsk.last > 30000) try { wsk.w.close(); } catch {}      // silent without closing (the coin's trades keep it busy): close it so onclose reopens it
@@ -255,7 +293,7 @@ function tick() {
 }
 self.onmessage = ev => {
   const m = ev.data;
-  if (m.t === "start") { on = true; gen++; venuesClose(); tradesClose(); walletsStop(); optionsStop(); sym = String(m.sym || "btc"); want = m.want || {derivs:true}; recOn = !!m.rec; mk = null; prevRatios = null; lastCal = Date.now(); for (const k of [last, busy, hold, said]) for (const i in k) delete k[i]; startAt = Date.now(); if (want.derivs) open(); if (want.wallets) walletsStart(); if (want.options) optionsStart(); venuesSync(); tradesSync(); clearInterval(timer); timer = setInterval(tick, 1000); tick(); }
-  else if (m.t === "rec") { recOn = !!m.on; venuesSync(); tradesSync(); }
-  else if (m.t === "stop") { venuesClose(); tradesClose(); walletsStop(); optionsStop(); on = false; gen++; clearInterval(timer); try { if (ws) ws.close(); } catch {} ws = null; }
+  if (m.t === "start") { on = true; gen++; venuesClose(); tradesClose(); bookClose(); walletsStop(); optionsStop(); sym = String(m.sym || "btc"); want = m.want || {derivs:true}; recOn = !!m.rec; mk = null; prevRatios = null; lastCal = Date.now(); for (const k of [last, busy, hold, said]) for (const i in k) delete k[i]; startAt = Date.now(); if (want.derivs) open(); if (want.wallets) walletsStart(); if (want.options) optionsStart(); venuesSync(); tradesSync(); clearInterval(timer); timer = setInterval(tick, 1000); tick(); }
+  else if (m.t === "rec") { recOn = !!m.on; venuesSync(); tradesSync(); bookSync(); }
+  else if (m.t === "stop") { venuesClose(); tradesClose(); bookClose(); walletsStop(); optionsStop(); on = false; gen++; clearInterval(timer); try { if (ws) ws.close(); } catch {} ws = null; }
 };

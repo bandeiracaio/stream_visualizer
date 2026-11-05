@@ -201,6 +201,39 @@ const READER_SELFTEST=(()=>{
       &&recTv&&recTv.speed==="fast"&&recTv.records[0]==="tv"&&rec24&&rec24.speed==="slow"&&COLLECT.ownerOf("tv")==="tradeVol"&&COLLECT.ownerOf("vol24")==="vol24",
       detail:J({bnF,okF:okF[0],cb:cb[0],f1,f2,sh,v24,s24})};
   });
+  add("collectors: perp books (Bybit, OKX): snapshot then deltas by level, removal, edges, crossed book, sequence gap and checksum resync, contract conversion, comparison rows",E=>{
+    const J=JSON.stringify,P=COLLECT.bookParse,T0=1792800000000;
+    const bySnap=(u,t)=>({topic:"orderbook.1000.BTCUSDT",type:t||"snapshot",ts:T0,data:{s:"BTCUSDT",b:[["100000","2"],["99990","3"],["99900","5"]],a:[["100001","1"],["100010","4"],["100100","6"]],u,seq:7},cts:T0});
+    const byDelta=(u,b,a)=>({topic:"orderbook.1000.BTCUSDT",type:"delta",ts:T0,data:{s:"BTCUSDT",b,a,u,seq:9},cts:T0});
+    const b=COLLECT.perpBook("by"),r0=b.apply(P("by",byDelta(5,[["100000","1"]],[]))),r1=b.apply(P("by",bySnap(10))),s1=b.summary();
+    const r2=b.apply(P("by",byDelta(11,[["99990","0"],["100000","2.5"],["99995","1"]],[["100001","0"],["100020","2"]]))),s2=b.summary();
+    const r3=b.apply(P("by",byDelta(13,[["100000","3"]],[]))),afterGap=b.ready(),r4=b.apply(P("by",byDelta(14,[],[]))),r5=b.apply(P("by",bySnap(20))),r6=b.apply(P("by",byDelta(21,[["100005","1"]],[]))),afterCross=b.ready();
+    const r7=b.apply(P("by",bySnap(30))),r8=b.apply(P("by",bySnap(1,"delta"))),st=b.stats();
+    const nul=[P("by",{success:true,op:"subscribe"}),P("ok",{event:"subscribe"}),P("by",null),P("by",{topic:"tickers.BTCUSDT",data:{}}),P("ok",{arg:{channel:"tickers"},data:[{}]}),P("zz",{})];
+    const cp=COLLECT.perpBook("by",{maxLevels:2});cp.apply(P("by",bySnap(10)));const cps=cp.summary();      // the summary keeps the nearest levels only: reach shrinks, deeper edges become null
+    // OKX: contracts x ct, prevSeqId chain, checksum
+    const ct=0.01,okMsg=(act,bids,asks,seqId,prevSeqId,cs)=>({arg:{channel:"books",instId:"BTC-USDT-SWAP"},action:act,data:[{bids,asks,ts:String(T0),checksum:cs==null?0:cs,seqId,prevSeqId}]});
+    const lv=(px,sz)=>[px,sz,"0","1"],ob=COLLECT.perpBook("ok",{ct}),okNo=COLLECT.perpBook("ok").apply(P("ok",okMsg("snapshot",[lv("100000","100")],[lv("100001","100")],5,-1)));
+    const bids=[lv("100000","200"),lv("99990","300")],asks=[lv("100001","100"),lv("100010","400")];
+    const cs=COLLECT.crc32("100000:200:100001:100:99990:300:100010:400");
+    const o1=ob.apply(P("ok",okMsg("snapshot",bids,asks,100,-1,cs))),os1=ob.summary();
+    const o2=ob.apply(P("ok",okMsg("update",[lv("100000","0")],[lv("100001","150")],110,100))),os2=ob.summary();
+    const o3=ob.apply(P("ok",okMsg("update",[],[],110,110))),o4=ob.apply(P("ok",okMsg("update",[lv("99999","1")],[],130,115))),oReady=ob.ready();
+    const ob2=COLLECT.perpBook("ok",{ct}),c1=ob2.apply(P("ok",okMsg("snapshot",bids,asks,100,-1,cs+1))),c2=ob2.apply(P("ok",okMsg("snapshot",bids,asks,100,-1,cs)));
+    const c3=ob2.apply(P("ok",okMsg("update",[lv("100000","1")],[],101,100,12345)));
+    // bookCompare: newest record per venue, depth in coin and dollars, bid share, too-shallow book -> null depth
+    const recs=[COLLECT.rec("bookBy",T0,s1),COLLECT.rec("bookBy",T0+10000,s2),COLLECT.rec("bookOk",T0+10000,os1),COLLECT.rec("bookHl",T0+9000,{mid:100000,spr:1,d:{5:[null,3]}}),COLLECT.rec("x",1,{})];
+    const cmp=COLLECT.bookCompare(recs,T0+20000,5),reg=COLLECT.REGISTRY.find(c=>c.id==="bookPerp"),subs=COLLECT.bookSubs("btc");
+    return{ok:J(r0)==='"ignored"'&&r1==="snapshot"&&s1&&s1.mid===100000.5&&s1.spr===0.1&&s1.tb===2&&s1.ta===1&&J(s1.d[1])==='[2,5]'&&J(s1.d[5])==='[5,5]'&&J(s1.d[10])==='[5,null]'&&J(s1.d[20])==='[null,null]'&&s1.reach[0]===10&&s1.reach[1]===9.9
+      &&r2==="ok"&&s2.tb===2.5&&s2.ta===4&&J(s2.d[1])==='[3.5,4]'&&J(s2.d[5])==='[3.5,6]'&&Math.abs(s2.fl.b.add-1.5)<1e-9&&Math.abs(s2.fl.b.rem-3)<1e-9&&s2.fl.a.add===2&&s2.fl.a.rem===1&&s2.fl.b.nDel===1&&s2.fl.b.nAdd===1&&s2.fl.b.nUp===1
+      &&r3==="resync"&&!afterGap&&r4==="ignored"&&r5==="snapshot"&&r6==="resync"&&!afterCross&&r7==="snapshot"&&r8==="snapshot"&&b.ready()&&st.gap===1&&st.cross===1&&st.resync===2&&st.snap===4&&st.upd===2&&st.ign===2
+      &&cps&&cps.d[10][0]===null&&cps.d[10][1]===null&&cps.tb===2&&cps.reach[0]<2&&s1.d[10][0]===5&&nul.every(x=>x===null)&&P("by",bySnap(1,"delta")).type==="snapshot"&&P("by",byDelta(2,[],[])).type==="delta"&&P("ok",okMsg("update",[],[],2,1)).prev===1&&P("ok",okMsg("update",[],[],2,1)).cs===null&&P("ok",okMsg("update",[],[],2,1,-5)).cs===-5
+      &&okNo==="ignored"&&COLLECT.crc32("123456789")===-873187034&&o1==="snapshot"&&os1.tb===2&&os1.ta===1&&J(os1.d[1])==='[2,null]'&&J(os1.d[5])==='[null,null]'&&os1.reach[0]===1
+      &&o2==="ok"&&os2.tb===3&&os2.ta===1.5&&Math.abs(os2.fl.a.add-0.5)<1e-9&&o3==="ok"&&o4==="resync"&&!oReady&&c1==="resync"&&c2==="snapshot"&&c3==="resync"&&ob2.stats().csum===2
+      &&cmp.length===4&&cmp[0].id==="bnF"&&cmp[0].depthBtc===null&&cmp[0].ageMs===null&&cmp[1].id==="byF"&&cmp[1].depthBtc===9.5&&cmp[1].ageMs===10000&&Math.abs(cmp[1].depthUsd-9.5*s2.mid)<1e-6&&Math.abs(cmp[1].imb-3.5/9.5)<1e-9&&cmp[2].id==="okF"&&cmp[2].depthBtc===null&&cmp[2].ageMs===10000&&cmp[3].id==="hlF"&&cmp[3].depthBtc===null
+      &&reg&&reg.speed==="fast"&&reg.owner==="worker"&&COLLECT.ownerOf("bookBy")==="bookPerp"&&COLLECT.ownerOf("bookOk")==="bookPerp"&&subs.length===2&&subs[0].sub.args[0]==="orderbook.1000.BTCUSDT"&&subs[1].sub.args[0].instId==="BTC-USDT-SWAP"&&subs[1].unsub.op==="unsubscribe",
+      detail:J({r0,r1,s1,r2,s2,r3,r5,r6,r7,r8,st,o1,os1,o2,os2,o3,o4,c1,c2,c3,cmp})};
+  });
   add("collectors: wallets: ranking over a window, position read from clearinghouseState, change rule, liquidation fills, predicted funding",E=>{
     const J=JSON.stringify,tr=COLLECT.walletTracker(1000);
     tr.note(100,["A","B"],500,100);tr.note(200,["A","C"],300,200);tr.note(300,["D","B"],100,300);tr.note(0,["Z"],-5,300);tr.note(0,"x",5,300);tr.note(NaN,["Q"],5,300);
@@ -272,7 +305,7 @@ const READER_SELFTEST=(()=>{
       &&by("hlCtx.fund")&&by("hlCtx.fund").unusual&&by("hlCtx.fund").z===99&&by("hlCtx.fund").text==="+1 bps"
       &&by("bookBn.depth5")&&!by("bookBn.depth5").unusual&&by("bookBn.depth5").z===0&&!by("optChain.atmVol")&&by("dvol.vol").x===60
       &&c.liq.bn===2&&c.liq.hl===1&&early.items.length>=2&&!early.items.find(x=>x.f==="dvol.vol").unusual&&none.items.length===0&&none.liq.bn===0
-      &&c.items.every((x,i,a)=>!i||Math.abs(a[i-1].z)>=Math.abs(x.z))&&COLLECT.REGISTRY.length===9&&Object.keys(COLLECT.FEATURES).length===21,
+      &&c.items.every((x,i,a)=>!i||Math.abs(a[i-1].z)>=Math.abs(x.z))&&COLLECT.REGISTRY.length===10&&Object.keys(COLLECT.FEATURES).length===21,
       detail:J({n:c.items.length,top:c.items.slice(0,4).map(x=>[x.f,x.z,x.text,x.unusual]),liq:c.liq,early:early.items.length})};
   });
   add("collectors: who moved first: a venue that covered half of the move earlier led, one within 2 s is with it, a flat or silent one is named, and no clear or only a gradual move says so",E=>{

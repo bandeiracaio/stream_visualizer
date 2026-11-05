@@ -17,6 +17,7 @@ const COLLECT = (() => {
     {id:"book", label:"Book depth (while recording): depth within 1 / 5 / 10 / 25 bps, spread, touch size, size added and removed per side (Binance, Hyperliquid)", speed:"fast", on:true, owner:"page", expectMs:10000, records:["bookBn", "bookHl"]},
     {id:"venues", label:"Extra venues (while recording or armed): Coinbase, Bybit and OKX quotes, Binance spot, perp marks and indexes, and the ETH / SOL / BNB / XRP / DOGE marks", speed:"fast", on:true, owner:"worker", expectMs:10000, records:["venues"]},
     {id:"tradeVol", label:"Venue trade volume (while recording or armed): coins traded per second on Binance, Bybit, OKX, Coinbase and Hyperliquid, perp and spot, buy and sell by aggressor", speed:"fast", on:true, owner:"worker", expectMs:10000, records:["tv"]},
+    {id:"bookPerp", label:"Perp book depth, Bybit and OKX (while recording or armed): depth within 1 / 5 / 10 / 20 bps, spread, touch size, size added and removed per side, every 10 s, to compare with Binance and Hyperliquid", speed:"fast", on:true, owner:"worker", expectMs:10000, records:["bookBy", "bookOk"]},
     {id:"vol24", label:"Venue 24 h volume: each venue's own ticker volume in dollars, for market share and the perp / spot split", speed:"slow", on:true, owner:"worker", expectMs:60000, records:["vol24"]},
     {id:"wallets", label:"Hyperliquid wallets: position and liquidation price of the 10 biggest traders, their liquidation fills, predicted funding across venues", speed:"slow", on:true, owner:"worker", expectMs:180000, records:["walletsTop", "hlLiq", "fundPred"]},
     {id:"options", label:"Options and volatility (Deribit, BTC and ETH): volatility index, at-the-money implied vol, skew, open interest and busiest strikes by expiry", speed:"slow", on:true, owner:"worker", expectMs:60000, records:["dvol", "optChain"]},
@@ -312,7 +313,7 @@ const COLLECT = (() => {
   // ---- status of each collector, for the list in the Reader tab (view: collectors.js)
   // derived from REGISTRY: which collector writes which record name; how often (ms) a collector writes while it is working (three times that late is "slow")
   const OWNER = {}; for (const c of REGISTRY) for (const n of c.records) OWNER[n] = c.id;
-  const EXPECT_ORDER = ["telemetry", "derivs", "calendar", "wallets", "options", "venues", "tradeVol", "vol24", "book"];      // the order the analysis reports list collectors in (it is not the registry order); kept as it was
+  const EXPECT_ORDER = ["telemetry", "derivs", "calendar", "wallets", "options", "venues", "tradeVol", "vol24", "book", "bookPerp"];      // the order the analysis reports list collectors in (it is not the registry order); kept as it was
   const EXPECT_MS = {}; for (const id of EXPECT_ORDER) EXPECT_MS[id] = REGISTRY.find(c => c.id === id).expectMs;
   const ownerOf = name => OWNER[name] || null;
   // records -> {collectorId: {n, last}} (last = the newest record time)
@@ -822,6 +823,103 @@ const COLLECT = (() => {
     return {usd:tot, by, perp:perp/tot, spot:spot/tot};
   }
 
+  // ---- perp book depth on Bybit and OKX (v107; collector "bookPerp", fast, run by collectors-worker.js while a recording is on or auto-record is armed): the same summaries the page writes
+  // for Binance (bookBn) and Hyperliquid (bookHl), so the four perp venues can be compared. Public sockets, no keys. Records "bookBy" / "bookOk" have bookBn's shape
+  // ({mid, spr, tb, ta, reach, d:{edge:[bidQty, askQty]}, fl:{b,a}}) plus rs = resyncs so far; quantities are in the coin (BTC), dollars = quantity x mid.
+  //   Bybit linear   orderbook.1000.BTCUSDT: snapshot (1000 levels a side, about 25 to 30 bps for BTC; 500 levels is only about 11), then deltas by price level (size "0" removes); u rises by 1 per message, any other u is a gap
+  //                  (u = 1 is a service restart that comes as a snapshot). 200 levels would reach only about 2.5 bps, so 1000.
+  //   OKX swap       books: snapshot (400 levels a side, about 7 bps for BTC), then updates by price level (size "0" removes); prevSeqId must equal the last seqId; checksum (crc32 of the top 25 levels,
+  //                  original strings) is verified when the message carries one (0 = not sent). books5 is 5 levels (under 1 bp): useless for depth; the deeper channels need a login.
+  //                  Sizes are contracts: coin = sz x ctVal x ctMult (okxCt).
+  // perpBook keeps the book by price level and tells when it must be rebuilt: apply() answers "snapshot", "ok", "ignored" (a delta before any snapshot) or "resync" (gap, crossed book, bad
+  // checksum; the book is dropped until the next snapshot, so the caller resubscribes).
+  const BOOK_PERP = {by:{label:"Bybit perp", rec:"bookBy"}, ok:{label:"OKX swap", rec:"bookOk"}};
+  const BOOK_PERP_ORDER = ["bnF", "byF", "okF", "hlF"], BOOK_PERP_REC = {bnF:"bookBn", byF:"bookBy", okF:"bookOk", hlF:"bookHl"};
+  function bookSubs(coin) {
+    const C = String(coin || "BTC").toUpperCase(), topic = "orderbook.1000." + C + "USDT", arg = {channel:"books", instId:C + "-USDT-SWAP"};
+    return [
+      {id:"by", url:"wss://stream.bybit.com/v5/public/linear", sub:{op:"subscribe", args:[topic]}, unsub:{op:"unsubscribe", args:[topic]}, ping:{op:"ping"}},
+      {id:"ok", url:"wss://ws.okx.com/ws/v5/public", sub:{op:"subscribe", args:[arg]}, unsub:{op:"unsubscribe", args:[arg]}, ping:"ping"},
+    ];
+  }
+  // one socket message -> {venue, type "snapshot" | "delta", bids, asks (lists of [price, size] strings), seq, prev (OKX), cs (OKX checksum or null)} or null for anything that is not a book message
+  function bookParse(id, j) {
+    if (!j || typeof j !== "object") return null;
+    if (id === "by") {
+      const d = j.data; if (typeof j.topic !== "string" || j.topic.indexOf("orderbook.") !== 0 || !d || !Array.isArray(d.b) || !Array.isArray(d.a) || num(d.u) == null) return null;
+      return {venue:"by", type:j.type === "snapshot" || num(d.u) === 1 ? "snapshot" : "delta", bids:d.b, asks:d.a, seq:num(d.u), prev:null, cs:null};
+    }
+    if (id === "ok") {
+      const d = Array.isArray(j.data) && j.data[0]; if (!j.arg || j.arg.channel !== "books" || !d || !Array.isArray(d.bids) || !Array.isArray(d.asks) || (j.action !== "snapshot" && j.action !== "update")) return null;
+      return {venue:"ok", type:j.action === "snapshot" ? "snapshot" : "delta", bids:d.bids, asks:d.asks, seq:num(d.seqId), prev:num(d.prevSeqId), cs:num(d.checksum) ? num(d.checksum) : null};
+    }
+    return null;
+  }
+  const CRC_T = (() => { const t = []; for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t.push(c >>> 0); } return t; })();
+  const crc32 = s => { let c = 0xFFFFFFFF; for (let i = 0; i < s.length; i++) c = CRC_T[(c ^ s.charCodeAt(i)) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) | 0; };
+  // venue "by" | "ok"; opt.ct = coin per contract (OKX), opt.edges, opt.flowBps (flow window, default 20 bps), opt.maxLevels (levels a side the summary uses: the venue's window, 1000 Bybit / 400 OKX)
+  function perpBook(venue, opt) {
+    opt = opt || {}; const ct = venue === "ok" ? (opt.ct > 0 ? opt.ct : null) : 1, edges = opt.edges || BOOK_EDGES, flow = flowStat(opt.flowBps || 20), cap = opt.maxLevels || (venue === "ok" ? 400 : 1000), bids = new Map(), asks = new Map();
+    let ready = false, lastSeq = null, bb = -Infinity, ba = Infinity; const st = {snap:0, upd:0, gap:0, cross:0, csum:0, ign:0, bad:0, resync:0};
+    const qty = e => num(e[1])*ct;
+    const rescan = () => { bb = -Infinity; ba = Infinity; for (const p of bids.keys()) if (p > bb) bb = p; for (const p of asks.keys()) if (p < ba) ba = p; };
+    function setLevel(isBid, e, track) {
+      if (!Array.isArray(e)) { st.bad++; return; }
+      const px = num(e[0]), sz = num(e[1]); if (!(px > 0) || sz == null || sz < 0) { st.bad++; return; }
+      const m = isBid ? bids : asks, old = m.get(px), oq = old ? qty(old) : 0;
+      if (sz === 0) { if (!old) return; m.delete(px); if (isBid ? px === bb : px === ba) rescan(); }
+      else { m.set(px, [e[0], e[1]]); if (isBid ? px > bb : px < ba) { if (isBid) bb = px; else ba = px; } }
+      if (track && bb > 0 && ba < Infinity) { const mid = (bb + ba)/2; flow.note(isBid ? "b" : "a", oq, sz === 0 ? 0 : qty(m.get(px)), (isBid ? mid - px : px - mid)*1e4/mid); }
+    }
+    const fail = kind => { st[kind]++; st.resync++; ready = false; lastSeq = null; bids.clear(); asks.clear(); bb = -Infinity; ba = Infinity; return "resync"; };
+    const crossed = () => bb > 0 && ba < Infinity && ba <= bb;
+    function checksum() {      // OKX: crc32 of "bid:size:ask:size:..." for the 25 best levels each side, strings as sent
+      const b = [...bids].sort((x, y) => y[0] - x[0]).slice(0, 25), a = [...asks].sort((x, y) => x[0] - y[0]).slice(0, 25), parts = [];
+      for (let i = 0; i < Math.max(b.length, a.length); i++) { if (b[i]) parts.push(b[i][1][0], b[i][1][1]); if (a[i]) parts.push(a[i][1][0], a[i][1][1]); }
+      return crc32(parts.join(":"));
+    }
+    return {
+      apply(m) {
+        if (!m) return "ignored";
+        if (venue === "ok" && !ct) return "ignored";      // no contract size: the sizes could not be read, never guessed
+        if (m.type === "snapshot") {
+          bids.clear(); asks.clear(); bb = -Infinity; ba = Infinity; flow.take();
+          for (const e of m.bids) setLevel(true, e, false); for (const e of m.asks) setLevel(false, e, false);
+          if (!bids.size || !asks.size || crossed()) return fail("cross");
+          if (m.cs != null && checksum() !== m.cs) return fail("csum");
+          ready = true; lastSeq = m.seq; st.snap++; return "snapshot";
+        }
+        if (!ready) { st.ign++; return "ignored"; }
+        if (venue === "by" ? m.seq !== lastSeq + 1 : m.prev !== lastSeq) return fail("gap");
+        for (const e of m.bids) setLevel(true, e, true); for (const e of m.asks) setLevel(false, e, true);
+        lastSeq = m.seq; st.upd++;
+        if (!bids.size || !asks.size || crossed()) return fail("cross");
+        if (m.cs != null && checksum() !== m.cs) return fail("csum");
+        return "ok";
+      },
+      ready: () => ready,
+      stats: () => Object.assign({}, st),
+      // the summary record payload (bookBn's shape) or null when there is no good book; also empties the flow counters
+      summary() {
+        const fl = flow.take(); if (!ready) return null;
+        // keep the nearest `cap` levels a side: the venue's window is that deep, and a local book keeps stray levels beyond it that are incomplete (their reach would be claimed as depth)
+        const arr = (m, isBid) => { const a = []; for (const [, e] of m) a.push([+e[0], qty(e)]); if (a.length > cap) { a.sort((x, y) => isBid ? y[0] - x[0] : x[0] - y[0]); a.length = cap; } return a; };
+        const s = book(arr(bids, true), arr(asks, false), edges); return s ? Object.assign(s, {fl, rs:st.resync}) : null;
+      },
+      best: () => ready ? [bb, ba] : null,
+    };
+  }
+  // the newest bookBy / bookOk / bookBn / bookHl records -> rows {id, label, mid, spr, depthBtc (both sides within `edge` bps, null where the book does not reach), depthUsd, imb (bid share), ageMs}
+  function bookCompare(recs, nowMs, edge) {
+    edge = edge || 5; const out = [];
+    for (const id of BOOK_PERP_ORDER) {
+      let r = null; for (let i = (recs || []).length - 1; i >= 0; i--) { const x = recs[i]; if (isRec(x) && x[1] === BOOK_PERP_REC[id]) { r = x; break; } }
+      const p = r && r[3], d = p && p.d && p.d[edge], ok = d && num(d[0]) != null && num(d[1]) != null, tot = ok ? d[0] + d[1] : null;
+      out.push({id, rec:BOOK_PERP_REC[id], mid:p ? num(p.mid) : null, spr:p ? num(p.spr) : null, depthBtc:tot, depthUsd:tot != null && num(p.mid) ? tot*p.mid : null, imb:ok && tot > 0 ? d[0]/tot : null, ageMs:r ? nowMs - r[2] : null});
+    }
+    return out;
+  }
+
   // tape helpers on arrays of records
   const prune = (recs, nowMs, keepMs) => recs.filter(r => r[2] >= nowMs - (keepMs == null ? TAPE_MS : keepMs));
   const slice = (recs, t0, t1) => recs.filter(r => r[2] >= t0 && r[2] <= t1);
@@ -831,5 +929,5 @@ const COLLECT = (() => {
     for (let i = recs.length - 1; i >= 0; i--) { const b = JSON.stringify(recs[i]).length + 1; if (size + b > lim) break; size += b; out.push(recs[i]); }
     return out.reverse();
   }
-  return {REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, due, calendar, OWNER, EXPECT_MS, ownerOf, tally, ageText, health, FEATURES, FEATURE_INFO, featureSeries, featureMaxAge, context, venueLead, leadText, liqDriven, usdText, wallQuality, marketState, marketStateSeries, STATE_VERSION, EVENT_LABEL, evSpan, eventsNear, eventClock, volLens, lensSeries, gridReturns, LENS_TEXT, walletSeries, takerNet, crowdIndex, crowdNetAt, whaleFlow, whaleSeries, WHALE_FLOOR_USD, deribitCoin, optName, optionsChain, walletTracker, walletPosition, walletChanged, liqFills, predictedFunding, WALLET_TOP, WALLET_REFRESH_MS, MAJORS, TRADE_IDS, TRADE_ORDER, tradeSubs, okxCt, tradeParse, tradeBook, tradeRows, tradeShare, vol24Parse, vol24Share, venueSubs, venueParse, venueApply, venueRecord, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
+  return {REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, due, calendar, OWNER, EXPECT_MS, ownerOf, tally, ageText, health, FEATURES, FEATURE_INFO, featureSeries, featureMaxAge, context, venueLead, leadText, liqDriven, usdText, wallQuality, marketState, marketStateSeries, STATE_VERSION, EVENT_LABEL, evSpan, eventsNear, eventClock, volLens, lensSeries, gridReturns, LENS_TEXT, walletSeries, takerNet, crowdIndex, crowdNetAt, whaleFlow, whaleSeries, WHALE_FLOOR_USD, deribitCoin, optName, optionsChain, walletTracker, walletPosition, walletChanged, liqFills, predictedFunding, WALLET_TOP, WALLET_REFRESH_MS, MAJORS, TRADE_IDS, TRADE_ORDER, tradeSubs, okxCt, tradeParse, tradeBook, tradeRows, tradeShare, vol24Parse, vol24Share, bookSubs, bookParse, perpBook, crc32, bookCompare, BOOK_PERP, BOOK_PERP_ORDER, BOOK_PERP_REC, venueSubs, venueParse, venueApply, venueRecord, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
 })();

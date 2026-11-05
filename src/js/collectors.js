@@ -55,8 +55,8 @@ setInterval(colSample, 10000);
 // ---- the always-on worker (collectors-worker.js): derivatives context and calendar tags. It runs whether or not auto-record is armed, in a worker so a hidden tab
 // does not slow it. Its records come here and go onto the tape; a record posted while the page is frozen is written when the page thaws.
 function colWorkerSync() {
-  const sym = cl$("sym").value.trim().toLowerCase(), wants = {derivs:colOn("derivs"), calendar:colOn("calendar"), venues:colOn("venues"), tradeVol:colOn("tradeVol"), vol24:colOn("vol24"), wallets:colOn("wallets"), options:colOn("options")}, key = sym + "|" + wants.derivs + "|" + wants.calendar + "|" + wants.venues + "|" + wants.tradeVol + "|" + wants.vol24 + "|" + wants.wallets + "|" + wants.options;
-  const want = (wants.derivs || wants.calendar || wants.venues || wants.tradeVol || wants.vol24 || wants.wallets || wants.options) && !!sym;
+  const sym = cl$("sym").value.trim().toLowerCase(), wants = {derivs:colOn("derivs"), calendar:colOn("calendar"), venues:colOn("venues"), tradeVol:colOn("tradeVol"), bookPerp:colOn("bookPerp"), vol24:colOn("vol24"), wallets:colOn("wallets"), options:colOn("options")}, key = sym + "|" + wants.derivs + "|" + wants.calendar + "|" + wants.venues + "|" + wants.tradeVol + "|" + wants.bookPerp + "|" + wants.vol24 + "|" + wants.wallets + "|" + wants.options;
+  const want = (wants.derivs || wants.calendar || wants.venues || wants.tradeVol || wants.bookPerp || wants.vol24 || wants.wallets || wants.options) && !!sym;
   if (CL.worker && (!want || CL.workerKey !== key)) { try { CL.worker.postMessage({t:"stop"}); CL.worker.terminate(); } catch {} CL.worker = null; }
   if (!want || CL.worker) return;
   let w;
@@ -130,6 +130,7 @@ function colWhy(id) {
     case "options": return !COLLECT.deribitCoin(cl$("sym").value.trim()) ? "Deribit lists BTC and ETH only" : CL.worker ? null : "worker not running";
     case "venues": return CL.worker ? (colWatching() ? null : "waits for a recording or auto-record armed") : "worker not running";
     case "tradeVol": return CL.worker ? (colWatching() ? null : "waits for a recording or auto-record armed") : "worker not running";
+    case "bookPerp": return CL.worker ? (colWatching() ? null : "waits for a recording or auto-record armed") : "worker not running";
     case "book": return colBookOn() ? null : "waits for the app connected and recording";
     default: return CL.worker ? null : "worker not running";
   }
@@ -167,6 +168,23 @@ function colVolRender() {
   if (box.dataset.h !== html) { box.dataset.h = html; box.innerHTML = html; }
 }
 setInterval(colVolRender, 5000);
+// ---- perp book comparison (read-only): depth within 5 bps (coin and dollars), spread and bid share of the four perp books from their newest summary records (bookBn, bookHl from the page,
+// bookBy, bookOk from the worker; they write only while a recording or armed run is on). A venue whose book does not reach 5 bps, or that has no recent record, shows "-".
+function colBookRender() {
+  const box = cl$("colBook"); if (!box) return;
+  const now = Date.now(), recs = [].concat(CL.recent.bookBn || [], CL.recent.bookHl || [], CL.recent.bookBy || [], CL.recent.bookOk || []), rows = COLLECT.bookCompare(recs, now, 5), U = COLLECT.usdText;
+  let html = "";
+  if (!rows.some(r => r.ageMs != null && r.ageMs < 120000)) html = `<div class="note">Perp books: nothing recent (they are written only while a recording or an armed run is on).</div>`;
+  else {
+    const L = {bnF:"Binance perp", byF:"Bybit perp", okF:"OKX swap", hlF:"Hyperliquid perp"};
+    const body = rows.map(r => { const live = r.ageMs != null && r.ageMs < 120000;
+      return `<tr><td>${L[r.id]}</td><td style="text-align:right">${live && r.depthBtc != null ? r.depthBtc.toFixed(1) + " BTC" : "-"}</td><td style="text-align:right">${live && r.depthUsd != null ? U(r.depthUsd) : "-"}</td><td style="text-align:right">${live && r.spr != null ? r.spr.toFixed(2) + " bps" : "-"}</td><td style="text-align:right">${live && r.imb != null ? Math.round(r.imb*100) + " / " + (100 - Math.round(r.imb*100)) : "-"}</td><td style="text-align:right">${r.ageMs == null ? "-" : COLLECT.ageText(r.ageMs)}</td></tr>`; }).join("");
+    html = `<div class="stat" style="margin-top:8px" title="Resting size within 5 bps of the mid, both sides, from each venue's own order book (OKX sizes converted from contracts). Bid / ask % is the bid share of that depth. The books reach different distances (Bybit about 25, OKX about 7, Binance about 15, Hyperliquid about 24), so a reading beyond a venue's reach shows as '-'.">Perp books, depth within 5 bps</div>
+      <table style="margin-top:4px"><thead><tr><th style="text-align:left">venue</th><th style="text-align:right">depth</th><th style="text-align:right">dollars</th><th style="text-align:right">spread</th><th style="text-align:right">bid / ask %</th><th style="text-align:right">read</th></tr></thead><tbody>${body}</tbody></table>`;
+  }
+  if (box.dataset.h !== html) { box.dataset.h = html; box.innerHTML = html; }
+}
+setInterval(colBookRender, 5000);
 cl$("colList").onchange = e => { const id = e.target.dataset && e.target.dataset.col; if (!id) return; CL.cfg[id] = e.target.checked; store.set("col.cfg", CL.cfg); colWorkerSync(); if (AR.on && AR.worker) AR.worker.postMessage({t:"cfg", cfg:Object.assign({}, AR.cfg, {collectors:colWorkerCfg()})}); };
 cl$("colSave").onclick = async () => {
   const text = JSON.stringify({kind:"sv-tape", v:1, version:APP_VERSION, at:Date.now(), records:await colAll()});
@@ -176,6 +194,7 @@ cl$("colClear").onclick = async () => { try { await colReq("readwrite", st => st
 colAll().then(a => { CL.count = a.length; colTally(a); colStatus(); colPrune(); const cut = Date.now() - COL_RECENT_MS; for (const r of a) if (r[2] >= cut) colRemember(r); }, () => colStatus());
 colRender();
 colVolRender();
+colBookRender();
 colWorkerSync();
 
 // ---- collector context on an episode card (v067): what the collectors read when the episode was detected, as the feature's deviation from its own recent mean
