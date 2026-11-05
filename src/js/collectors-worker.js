@@ -202,7 +202,7 @@ function tradesFlush(now, all) { if (!tBook) return; const p = tBook.flush(now, 
 function tradesClose() { if (tOn) tradesFlush(Date.now(), true); tOn = false; tGen++; for (const id in tSock) try { tSock[id].w.close(); } catch {} tSock = {}; tBook = null; }
 function tradesSync() {
   const wanted = !!(want.tradeVol && recOn && on);
-  if (wanted && !tOn) tradesStart(); else if (!wanted && tOn) tradesClose(); bookClose();
+  if (wanted && !tOn) tradesStart(); else if (!wanted && tOn) tradesClose();
 }
 function tradesTick(now) {
   if (!tOn) return;
@@ -359,7 +359,7 @@ function tick() {
 }
 self.onmessage = ev => {
   const m = ev.data;
-  if (m.t === "start") { on = true; gen++; venuesClose(); tradesClose(); bookClose(); depthClose(); walletsStop(); optionsStop(); sym = String(m.sym || "btc"); want = m.want || {derivs:true}; recOn = !!m.rec; recording = !!m.recording; mk = null; prevRatios = null; lastCal = Date.now(); for (const k of [last, busy, hold, said]) for (const i in k) delete k[i]; startAt = Date.now(); if (want.derivs) open(); if (want.wallets) walletsStart(); if (want.options) optionsStart(); venuesSync(); tradesSync(); depthSync(); clearInterval(timer); timer = setInterval(tick, 1000); tick(); }
+  if (m.t === "start") { on = true; gen++; venuesClose(); tradesClose(); bookClose(); depthClose(); walletsStop(); optionsStop(); sym = String(m.sym || "btc"); want = m.want || {derivs:true}; recOn = !!m.rec; recording = !!m.recording; mk = null; prevRatios = null; lastCal = Date.now(); for (const k of [last, busy, hold, said]) for (const i in k) delete k[i]; startAt = Date.now(); if (want.derivs) open(); if (want.wallets) walletsStart(); if (want.options) optionsStart(); venuesSync(); tradesSync(); bookSync(); depthSync(); clearInterval(timer); timer = setInterval(tick, 1000); tick(); }
   else if (m.t === "rec") { recOn = !!m.on; recording = !!m.recording; venuesSync(); tradesSync(); bookSync(); depthSync(); }
   else if (m.t === "stop") { venuesClose(); tradesClose(); bookClose(); depthClose(); walletsStop(); optionsStop(); on = false; gen++; clearInterval(timer); try { if (ws) ws.close(); } catch {} ws = null; }
 };
