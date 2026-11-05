@@ -1003,6 +1003,14 @@ const READER_SELFTEST=(()=>{
     const t=l=>l.map(c=>c.text).join(" | ");
     return{ok:t(learn)==="armed · learning 4/15 min | 2 saved"&&t(wait)==="armed · waiting | screen may sleep | 2 saved"&&t(rec)==="auto REC 3:12 | 2 saved"&&/^REC 1:05 · 12[.,  ]?345 inputs/.test(t(man)),detail:[t(learn),t(wait),t(rec),t(man)].join(" // ")};
   });
+  add("status: a lost, failing or missing save folder is shown while armed or recording, and only then",E=>{
+    const base={connected:false,paused:false,online:true,venues:{},rec:{on:false},kept:0},arm={on:true,ready:true,mode:"waiting",wake:true};
+    const t=l=>l.map(c=>c.text).join(" | "),f=(st,extra)=>Object.assign({},base,{ar:arm,folder:Object.assign({state:st},extra)});
+    const den=STATUS.chips(f("denied")),fail=STATUS.chips(f("failed",{err:"disk full"})),none=STATUS.chips(f("none")),ok=STATUS.chips(f("ok"));
+    const idle=STATUS.chips(Object.assign({},base,{folder:{state:"denied"}})),man=STATUS.chips(Object.assign({},base,{rec:{on:true,ms:1000,n:1},folder:{state:"denied"}})),absent=STATUS.chips(Object.assign({},base,{ar:arm}));
+    return{ok:t(den)==="armed · waiting | save folder needs OK"&&den[1].tone==="bad"&&/Allow/.test(den[1].title)&&t(fail)==="armed · waiting | last save failed"&&/disk full/.test(fail[1].title)&&t(none)==="armed · waiting | no save folder"&&none[1].tone==="info"
+      &&t(ok)==="armed · waiting"&&idle.length===0&&/save folder needs OK/.test(t(man))&&t(absent)==="armed · waiting",detail:[t(den),t(fail),t(none),t(ok),t(idle),t(man),t(absent)].join(" // ")};
+  });
   add("status: only a higher release number counts as a newer version; a dev build never asks to update",E=>{
     const n=STATUS.newer;
     return{ok:n("v040","v041")&&!n("v040","v040")&&!n("v041","v040")&&n("v099","v100")&&!n("dev","v041")&&!n("v040","")&&!n("v040",null)&&!n("v040","latest"),detail:"version comparison"};

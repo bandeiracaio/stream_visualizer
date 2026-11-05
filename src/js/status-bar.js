@@ -14,7 +14,9 @@ function sbSnapshot() {
   }
   const ar = AR.on ? {on:true, ready:!!(AR.v && AR.v.ready), learnMin:AR.v ? Math.round(AR.v.nSlow / 60) : 0, mode:AR.st && AR.st.mode, wake:!!AR.lock, runs:AR.runs, cooldownMin:AR.st && AR.st.until > now ? Math.ceil((AR.st.until - now) / 60000) : 0} : {on:false};
   const rec = RT.rec ? {on:true, ms:now - RT.rec.t0, n:READER.recording().n} : {on:false};
-  return {connected, paused, online:navigator.onLine, venues, ar, rec, kept:typeof RC !== "undefined" ? RC.rows.length : 0};
+  let folder = null;      // folder-save.js is loaded before this file; without it (or in a browser that cannot save into a folder) there is no folder chip
+  if (typeof FS !== "undefined" && FS.supported) { const last = FS.log[0]; folder = !FS.dir ? {state:"none"} : FS.perm !== "granted" ? {state:"denied"} : last && !last.ok ? {state:"failed", err:last.err} : {state:"ok"}; }
+  return {connected, paused, online:navigator.onLine, venues, ar, rec, kept:typeof RC !== "undefined" ? RC.rows.length : 0, folder};
 }
 // phone header: a venue pill shows a coloured dot instead of its long text (styles.css); the state is classified here, the full text stays in the title
 function sbPills() {
@@ -54,4 +56,6 @@ if (APP_VERSION !== "dev") {
   setTimeout(sbCheckVersion, 3000); setInterval(sbCheckVersion, 600000);
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") sbCheckVersion(); });
 }
+// the browser can take back the folder permission without telling the page: while something is armed or recording, ask it again every 30 s so the chip shows it before a save fails
+setInterval(() => { if (typeof fsQuery === "function" && typeof FS !== "undefined" && FS.dir && (AR.on || RT.rec)) fsQuery().catch(() => {}); }, 30000);
 setInterval(sbRender, 1000); sbRender();
