@@ -16,6 +16,8 @@ const COLLECT = (() => {
     {id:"calendar", label:"Calendar tags: funding times, 15m / 1h / 4h / daily / weekly / monthly closes, US open and close, options expiry (rules, no network)", speed:"slow", on:true, owner:"worker", expectMs:900000, records:["cal"]},
     {id:"book", label:"Book depth (while recording): depth within 1 / 5 / 10 / 25 bps, spread, touch size, size added and removed per side (Binance, Hyperliquid)", speed:"fast", on:true, owner:"page", expectMs:10000, records:["bookBn", "bookHl"]},
     {id:"venues", label:"Extra venues (while recording or armed): Coinbase, Bybit and OKX quotes, Binance spot, perp marks and indexes, and the ETH / SOL / BNB / XRP / DOGE marks", speed:"fast", on:true, owner:"worker", expectMs:10000, records:["venues"]},
+    {id:"tradeVol", label:"Venue trade volume (while recording or armed): coins traded per second on Binance, Bybit, OKX, Coinbase and Hyperliquid, perp and spot, buy and sell by aggressor", speed:"fast", on:true, owner:"worker", expectMs:10000, records:["tv"]},
+    {id:"vol24", label:"Venue 24 h volume: each venue's own ticker volume in dollars, for market share and the perp / spot split", speed:"slow", on:true, owner:"worker", expectMs:60000, records:["vol24"]},
     {id:"wallets", label:"Hyperliquid wallets: position and liquidation price of the 10 biggest traders, their liquidation fills, predicted funding across venues", speed:"slow", on:true, owner:"worker", expectMs:180000, records:["walletsTop", "hlLiq", "fundPred"]},
     {id:"options", label:"Options and volatility (Deribit, BTC and ETH): volatility index, at-the-money implied vol, skew, open interest and busiest strikes by expiry", speed:"slow", on:true, owner:"worker", expectMs:60000, records:["dvol", "optChain"]},
   ];
@@ -49,7 +51,7 @@ const COLLECT = (() => {
 
   // ---- derivatives context (collector "derivs", run by collectors-worker.js). Readers of the public endpoints; each returns null for an answer that is not usable.
   // Verified live 2026-10-23, see .scratch/collectors/01-collectors.md.
-  const EVERY = {prem:15000, hl:15000, ratios:60000, basis:10000, wallets:30000, funding:60000, options:120000, dvol:10000}, BACKOFF_MS = 300000;      // polling spacing per source; a rate-limited source rests this long
+  const EVERY = {prem:15000, hl:15000, ratios:60000, basis:10000, wallets:30000, funding:60000, options:120000, dvol:10000, vol24:60000}, BACKOFF_MS = 300000;      // polling spacing per source; a rate-limited source rests this long
   const num = x => { const n = +x; return x != null && x !== "" && Number.isFinite(n) ? n : null; };
   const due = (last, now, every) => !last || now - last >= every;
   function premium(j) {
@@ -310,7 +312,7 @@ const COLLECT = (() => {
   // ---- status of each collector, for the list in the Reader tab (view: collectors.js)
   // derived from REGISTRY: which collector writes which record name; how often (ms) a collector writes while it is working (three times that late is "slow")
   const OWNER = {}; for (const c of REGISTRY) for (const n of c.records) OWNER[n] = c.id;
-  const EXPECT_ORDER = ["telemetry", "derivs", "calendar", "wallets", "options", "venues", "book"];      // the order the analysis reports list collectors in (it is not the registry order); kept as it was
+  const EXPECT_ORDER = ["telemetry", "derivs", "calendar", "wallets", "options", "venues", "tradeVol", "vol24", "book"];      // the order the analysis reports list collectors in (it is not the registry order); kept as it was
   const EXPECT_MS = {}; for (const id of EXPECT_ORDER) EXPECT_MS[id] = REGISTRY.find(c => c.id === id).expectMs;
   const ownerOf = name => OWNER[name] || null;
   // records -> {collectorId: {n, last}} (last = the newest record time)
@@ -690,6 +692,136 @@ const COLLECT = (() => {
   }
   const WHALE_FLOOR_USD = 1000000;      // a net move under this is "flat": about the 35th percentile of the whales' 10-minute change and the 20th of the crowd's flow in the first 13 recordings (104 windows)
 
+  // ---- venue trade volume (v106; collectors "tradeVol" fast and "vol24" slow): how much each venue trades, to measure market share. Public sockets and tickers, no keys.
+  // Ids: venue letters + F (perpetual / futures) or S (spot). Quantities are in the coin (BTC), dollars are price x quantity (USDT and USD are treated as the same dollar).
+  // AGGRESSOR SIDE ("b" buy = the taker bought, lifting the ask; "s" sell = the taker sold, hitting the bid), per venue:
+  //   Binance perp / spot aggTrade: field m = "buyer is the maker"; m true -> the taker sold ("s"), m false -> the taker bought ("b").
+  //   Bybit publicTrade: field S is the taker's side ("Buy" / "Sell").   OKX trades: field side is the taker's side ("buy" / "sell").
+  //   Coinbase matches: field side is the MAKER order's side, so it is inverted: side "sell" (resting ask hit) -> the taker bought ("b").
+  //   Hyperliquid trades: field side "B" / "A" is the taker's side (B = bought). Swap sizes on OKX are contracts: base quantity = sz x ctVal x ctMult.
+  const TRADE_IDS = {bnF:{venue:"bn", kind:"perp", label:"Binance perp"}, bnS:{venue:"bn", kind:"spot", label:"Binance spot"}, byF:{venue:"by", kind:"perp", label:"Bybit perp"}, byS:{venue:"by", kind:"spot", label:"Bybit spot"},
+    okF:{venue:"ok", kind:"perp", label:"OKX swap"}, okS:{venue:"ok", kind:"spot", label:"OKX spot"}, cbS:{venue:"cb", kind:"spot", label:"Coinbase spot"}, hlF:{venue:"hl", kind:"perp", label:"Hyperliquid perp"}};
+  const TRADE_ORDER = ["bnF", "bnS", "byF", "byS", "okF", "okS", "cbS", "hlF"];
+  // the sockets to open for a coin: {id, url, sub, ping}; OKX is one socket for swap and spot (parsed by instId; the swap needs its contract size, see okxCt)
+  function tradeSubs(coin, opt) {
+    const C = String(coin || "BTC").toUpperCase(), c = C.toLowerCase(), swap = !opt || opt.swap !== false;
+    return [
+      {id:"bnF", url:"wss://fstream.binance.com/market/stream?streams=" + c + "usdt@aggTrade"},
+      {id:"bnS", url:"wss://stream.binance.com:9443/stream?streams=" + c + "usdt@aggTrade"},
+      {id:"byF", url:"wss://stream.bybit.com/v5/public/linear", sub:{op:"subscribe", args:["publicTrade." + C + "USDT"]}, ping:{op:"ping"}},
+      {id:"byS", url:"wss://stream.bybit.com/v5/public/spot", sub:{op:"subscribe", args:["publicTrade." + C + "USDT"]}, ping:{op:"ping"}},
+      {id:"ok", url:"wss://ws.okx.com:8443/ws/v5/public", ping:"ping", sub:{op:"subscribe", args:(swap ? [{channel:"trades", instId:C + "-USDT-SWAP"}] : []).concat([{channel:"trades", instId:C + "-USDT"}])}},
+      {id:"cbS", url:"wss://ws-feed.exchange.coinbase.com", sub:{type:"subscribe", product_ids:[C + "-USD"], channels:["matches"]}},
+      {id:"hlF", url:"wss://api.hyperliquid.xyz/ws", sub:{method:"subscribe", subscription:{type:"trades", coin:C}}, ping:{method:"ping"}},
+    ];
+  }
+  // OKX /api/v5/public/instruments?instType=SWAP answer -> the coin per contract (ctVal x ctMult), or null
+  function okxCt(j) { const d = j && Array.isArray(j.data) && j.data[0], v = d && num(d.ctVal), m = d && num(d.ctMult); return v > 0 ? v*(m > 0 ? m : 1) : null; }
+  // One socket message -> a list of {id, venue, kind, t (exchange ms or null), side "b" | "s", qty (coin), usd, tid (for duplicates, or null)}; [] for anything that is not a trade or lacks a field.
+  // sockId is the socket's id from tradeSubs; ct is the OKX swap contract size (okxCt).
+  function tradeParse(sockId, j, ct) {
+    const out = [];
+    if (!j || typeof j !== "object") return out;
+    const push = (id, t, side, qty, px, tid) => {
+      qty = num(qty); px = num(px); const T = num(t), I = TRADE_IDS[id];
+      if (!I || !(qty > 0) || !(px > 0) || (side !== "b" && side !== "s")) return;
+      out.push({id, venue:I.venue, kind:I.kind, t:T > 0 ? T : null, side, qty, usd:qty*px, tid:tid == null || tid === "" ? null : String(tid)});
+    };
+    if (sockId === "bnF" || sockId === "bnS") {
+      const d = j.data; if (!d || d.e !== "aggTrade" || typeof d.m !== "boolean") return out;
+      push(sockId, d.T, d.m ? "s" : "b", d.q, d.p, d.a);
+    } else if (sockId === "byF" || sockId === "byS") {
+      if (typeof j.topic !== "string" || j.topic.indexOf("publicTrade.") !== 0 || !Array.isArray(j.data)) return out;
+      for (const d of j.data) if (d) push(sockId, d.T != null ? d.T : j.ts, d.S === "Buy" ? "b" : d.S === "Sell" ? "s" : null, d.v, d.p, d.i);
+    } else if (sockId === "ok") {
+      if (!j.arg || j.arg.channel !== "trades" || !Array.isArray(j.data)) return out;
+      for (const d of j.data) {
+        if (!d || typeof d.instId !== "string") continue;
+        const swap = /-SWAP$/.test(d.instId), side = d.side === "buy" ? "b" : d.side === "sell" ? "s" : null;
+        if (swap) { if (ct > 0) push("okF", d.ts, side, num(d.sz) != null ? d.sz*ct : null, d.px, d.tradeId); }
+        else push("okS", d.ts, side, d.sz, d.px, d.tradeId);
+      }
+    } else if (sockId === "cbS") {
+      if (j.type !== "match") return out;      // "last_match" is the snapshot sent on subscribe: an old trade, not counted
+      push("cbS", Date.parse(j.time), j.side === "sell" ? "b" : j.side === "buy" ? "s" : null, j.size, j.price, j.trade_id);      // inverted: Coinbase's side is the maker's
+    } else if (sockId === "hlF") {
+      if (j.channel !== "trades" || !Array.isArray(j.data)) return out;
+      for (const d of j.data) if (d) push("hlF", d.time, d.side === "B" ? "b" : d.side === "A" ? "s" : null, d.sz, d.px, d.tid != null ? d.tid : d.hash);
+    }
+    return out;
+  }
+  // One-second buckets per id. add() puts a trade into its second (the exchange's time; the local clock when the trade has none or is more than 5 minutes off), drops repeats (same id and trade id),
+  // and takes trades in any order; a trade for a second already flushed goes into the oldest second still open (counted in late). flush() hands out the closed seconds as a compact record payload:
+  //   {t0: epoch second of the first row, v: {id: [[second - t0, buyUsd, sellUsd, buyQty, sellQty, n], ...]}}   (non-empty seconds only; dollars whole, quantities 5 decimals)
+  function tradeBook(opt) {
+    const holdMs = opt && opt.holdMs != null ? opt.holdMs : 2000, seenCap = opt && opt.seenCap || 20000, b = new Map(), seen = new Map(); let flushed = -Infinity, dup = 0, late = 0, bad = 0;
+    return {
+      add(tr, nowMs) {
+        if (!tr || !TRADE_IDS[tr.id] || !(tr.qty > 0) || !(tr.usd > 0) || (tr.side !== "b" && tr.side !== "s")) { bad++; return false; }
+        if (tr.tid != null) { const k = tr.id + ":" + tr.tid; if (seen.has(k)) { dup++; return false; } seen.set(k, 1); if (seen.size > seenCap) seen.delete(seen.keys().next().value); }
+        let sec = Math.floor((tr.t != null && Math.abs(tr.t - nowMs) <= 300000 ? tr.t : nowMs)/1000);
+        if (sec <= flushed) { sec = flushed + 1; late++; }
+        const m = b.get(tr.id) || (b.set(tr.id, new Map()), b.get(tr.id)), r = m.get(sec) || (m.set(sec, [0, 0, 0, 0, 0]), m.get(sec));
+        if (tr.side === "b") { r[0] += tr.usd; r[2] += tr.qty; } else { r[1] += tr.usd; r[3] += tr.qty; }
+        r[4]++; return true;
+      },
+      flush(nowMs, all) {
+        const cut = all ? Infinity : Math.floor((nowMs - holdMs)/1000); let t0 = Infinity; const take = {};
+        for (const [id, m] of b) for (const [sec, r] of m) if (sec < cut) { (take[id] || (take[id] = [])).push([sec, r]); m.delete(sec); if (sec < t0) t0 = sec; }
+        if (t0 === Infinity) return null;
+        const v = {}; let top = -Infinity;
+        for (const id in take) { v[id] = take[id].sort((x, y) => x[0] - y[0]).map(([s, r]) => { if (s > top) top = s; return [s - t0, Math.round(r[0]), Math.round(r[1]), round(r[2], 5), round(r[3], 5), r[4]]; }); }
+        if (top > flushed) flushed = top;
+        return {t0, v};
+      },
+      stats() { return {dup, late, bad}; },
+    };
+  }
+  // a "tv" record payload -> rows {id, sec, bu, su, bq, sq, n} (absolute seconds)
+  function tradeRows(p) {
+    const out = []; if (!p || !p.v || !Number.isFinite(p.t0)) return out;
+    for (const id in p.v) { if (!TRADE_IDS[id] || !Array.isArray(p.v[id])) continue; for (const r of p.v[id]) if (Array.isArray(r) && r.length >= 6) out.push({id, sec:p.t0 + r[0], bu:r[1], su:r[2], bq:r[3], sq:r[4], n:r[5]}); }
+    return out;
+  }
+  // share of the dollar volume per id over the window ending at nowMs, from "tv" records: {usd, by:{id:{usd, share, buy, sell, qty, n}}, perp, spot (shares of the total)}; null when nothing traded
+  function tradeShare(recs, nowMs, windowMs) {
+    const by = {}; let tot = 0;
+    for (const r of recs || []) {
+      if (!isRec(r) || r[1] !== "tv" || r[2] < nowMs - windowMs - 60000 || r[2] > nowMs + 60000) continue;
+      for (const x of tradeRows(r[3])) {
+        const ms = x.sec*1000; if (ms < nowMs - windowMs || ms > nowMs) continue;
+        const o = by[x.id] || (by[x.id] = {usd:0, share:0, buy:0, sell:0, qty:0, n:0}); o.usd += x.bu + x.su; o.buy += x.bu; o.sell += x.su; o.qty += x.bq + x.sq; o.n += x.n; tot += x.bu + x.su;
+      }
+    }
+    if (!(tot > 0)) return null;
+    let perp = 0, spot = 0; for (const id in by) { by[id].share = by[id].usd/tot; if (TRADE_IDS[id].kind === "perp") perp += by[id].usd; else spot += by[id].usd; }
+    return {usd:tot, by, perp:perp/tot, spot:spot/tot};
+  }
+  // 24 h ticker answers -> dollars of volume (or null). `last` is a fallback price where the venue reports coin units (for hlF it is the coin name)
+  function vol24Parse(id, j, last) {
+    if (j == null) return null;
+    const pos = x => { x = num(x); return x > 0 ? x : null; };
+    if (id === "bnF" || id === "bnS") return pos(j.quoteVolume);
+    if (id === "byF" || id === "byS") { const d = j.result && Array.isArray(j.result.list) && j.result.list[0]; return d ? pos(d.turnover24h) : null; }
+    if (id === "okF") { const d = Array.isArray(j.data) && j.data[0]; const q = d && pos(d.volCcy24h), px = d && (pos(d.last) || pos(last)); return q && px ? q*px : null; }      // swap: volCcy24h is in coins
+    if (id === "okS") { const d = Array.isArray(j.data) && j.data[0]; return d ? pos(d.volCcy24h) : null; }      // spot: volCcy24h is in the quote currency (USDT)
+    if (id === "cbS") { const q = pos(j.volume), px = pos(j.last) || pos(last); return q && px ? q*px : null; }      // /products/BTC-USD/stats: volume in coins
+    if (id === "hlF") {      // metaAndAssetCtxs: [{universe:[{name}]}, [ctx]]; dayNtlVlm in dollars
+      const u = Array.isArray(j) && j[0] && j[0].universe, c = Array.isArray(j) && j[1]; if (!Array.isArray(u) || !Array.isArray(c)) return null;
+      const i = u.findIndex(x => x && String(x.name).toUpperCase() === String(last).toUpperCase()); return i >= 0 && c[i] ? pos(c[i].dayNtlVlm) : null;
+    }
+    return null;
+  }
+  // the "vol24" record payload ({id: dollars}) -> {usd, by:{id:{usd, share}}, perp, spot}, null when empty
+  function vol24Share(p) {
+    if (!p || typeof p !== "object") return null;
+    const by = {}; let tot = 0, perp = 0, spot = 0;
+    for (const id of TRADE_ORDER) { const v = num(p[id]); if (v > 0) { by[id] = {usd:v, share:0}; tot += v; if (TRADE_IDS[id].kind === "perp") perp += v; else spot += v; } }
+    if (!(tot > 0)) return null;
+    for (const id in by) by[id].share = by[id].usd/tot;
+    return {usd:tot, by, perp:perp/tot, spot:spot/tot};
+  }
+
   // tape helpers on arrays of records
   const prune = (recs, nowMs, keepMs) => recs.filter(r => r[2] >= nowMs - (keepMs == null ? TAPE_MS : keepMs));
   const slice = (recs, t0, t1) => recs.filter(r => r[2] >= t0 && r[2] <= t1);
@@ -699,5 +831,5 @@ const COLLECT = (() => {
     for (let i = recs.length - 1; i >= 0; i--) { const b = JSON.stringify(recs[i]).length + 1; if (size + b > lim) break; size += b; out.push(recs[i]); }
     return out.reverse();
   }
-  return {REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, due, calendar, OWNER, EXPECT_MS, ownerOf, tally, ageText, health, FEATURES, FEATURE_INFO, featureSeries, featureMaxAge, context, venueLead, leadText, liqDriven, usdText, wallQuality, marketState, marketStateSeries, STATE_VERSION, EVENT_LABEL, evSpan, eventsNear, eventClock, volLens, lensSeries, gridReturns, LENS_TEXT, walletSeries, takerNet, crowdIndex, crowdNetAt, whaleFlow, whaleSeries, WHALE_FLOOR_USD, deribitCoin, optName, optionsChain, walletTracker, walletPosition, walletChanged, liqFills, predictedFunding, WALLET_TOP, WALLET_REFRESH_MS, MAJORS, venueSubs, venueParse, venueApply, venueRecord, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
+  return {REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, due, calendar, OWNER, EXPECT_MS, ownerOf, tally, ageText, health, FEATURES, FEATURE_INFO, featureSeries, featureMaxAge, context, venueLead, leadText, liqDriven, usdText, wallQuality, marketState, marketStateSeries, STATE_VERSION, EVENT_LABEL, evSpan, eventsNear, eventClock, volLens, lensSeries, gridReturns, LENS_TEXT, walletSeries, takerNet, crowdIndex, crowdNetAt, whaleFlow, whaleSeries, WHALE_FLOOR_USD, deribitCoin, optName, optionsChain, walletTracker, walletPosition, walletChanged, liqFills, predictedFunding, WALLET_TOP, WALLET_REFRESH_MS, MAJORS, TRADE_IDS, TRADE_ORDER, tradeSubs, okxCt, tradeParse, tradeBook, tradeRows, tradeShare, vol24Parse, vol24Share, venueSubs, venueParse, venueApply, venueRecord, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
 })();

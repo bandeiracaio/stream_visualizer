@@ -159,6 +159,48 @@ const READER_SELFTEST=(()=>{
       &&bn.src==="bnS"&&bn.set.b===81105.85&&bn.e===null&&mj.src==="maj"&&mj.set.eth===3100.5&&junk.every(x=>x===null)
       &&r.byL.b===81054.7&&r.byL.m===81059.93&&r.byL.age===800&&r.byL.lag===9100&&r.maj.eth===3100.5&&r.maj.sol===150.5&&r.maj.age===600&&r.maj.lag===undefined&&none===null&&COLLECT.REGISTRY.some(c=>c.id==="venues"&&c.speed==="fast"),detail:J({cb,by1,by2,okT,bn,mj,r,eth5:eth[5].url})};
   });
+  add("collectors: venue trade volume: real message shapes parsed per venue, aggressor side, OKX contract size, duplicates, out-of-order, buckets, shares, 24 h tickers",E=>{
+    const J=JSON.stringify,P=COLLECT.tradeParse,T0=1792800000000,subs=COLLECT.tradeSubs("btc");
+    const bnF=P("bnF",{stream:"btcusdt@aggTrade",data:{e:"aggTrade",E:T0,a:11,s:"BTCUSDT",p:"80000.10",q:"0.500",f:1,l:1,T:T0,m:true}});
+    const bnB=P("bnS",{stream:"btcusdt@aggTrade",data:{e:"aggTrade",E:T0,a:12,s:"BTCUSDT",p:"80000",q:"0.25",f:1,l:1,T:T0+5,m:false}});
+    const by=P("byF",{topic:"publicTrade.BTCUSDT",type:"snapshot",ts:T0,data:[{T:T0+1,s:"BTCUSDT",S:"Buy",v:"0.002",p:"80001",L:"PlusTick",i:"a1",BT:false},{T:T0+2,s:"BTCUSDT",S:"Sell",v:"0.1",p:"80000",i:"a2"},{T:T0+3,S:"Sell",v:"x",p:"1",i:"a3"}]});
+    const ct=COLLECT.okxCt({data:[{instId:"BTC-USDT-SWAP",ctVal:"0.01",ctMult:"1"}]}),ct2=COLLECT.okxCt({data:[{ctVal:"0.001",ctMult:"10"}]});
+    const okF=P("ok",{arg:{channel:"trades",instId:"BTC-USDT-SWAP"},data:[{instId:"BTC-USDT-SWAP",tradeId:"1",px:"80000",sz:"150",side:"sell",ts:String(T0),count:"3"}]},ct);
+    const okNoCt=P("ok",{arg:{channel:"trades",instId:"BTC-USDT-SWAP"},data:[{instId:"BTC-USDT-SWAP",tradeId:"1",px:"80000",sz:"150",side:"sell",ts:String(T0)}]},null);
+    const okS=P("ok",{arg:{channel:"trades",instId:"BTC-USDT"},data:[{instId:"BTC-USDT",tradeId:"2",px:"80000",sz:"0.3",side:"buy",ts:String(T0)}]},ct);
+    const cb=P("cbS",{type:"match",trade_id:7,maker_order_id:"a",taker_order_id:"b",side:"sell",size:"0.04",price:"80000.00",product_id:"BTC-USD",time:"2026-10-23T23:48:10.644540Z"});
+    const cb2=P("cbS",{type:"match",trade_id:8,side:"buy",size:"0.04",price:"80000.00",time:"2026-10-23T23:48:10.7Z"});
+    const cbLast=P("cbS",{type:"last_match",trade_id:6,side:"buy",size:"1",price:"1",time:"2026-10-23T23:48:10Z"});
+    const hl=P("hlF",{channel:"trades",data:[{coin:"BTC",side:"B",px:"80000.0",sz:"0.01",time:T0,hash:"0x1",tid:5,users:["0xa","0xb"]},{coin:"BTC",side:"A",px:"80000.0",sz:"0.02",time:T0,tid:6}]});
+    const junk=[P("bnF",{result:null}),P("byF",{success:true,op:"subscribe"}),P("ok",{event:"subscribe"}),P("cbS",{type:"subscriptions"}),P("hlF",{channel:"subscriptionResponse"}),P("bnF",{data:{e:"aggTrade",p:"1",q:"1"}}),P("cbS",null),P("zzz",{}),P("hlF",{channel:"trades",data:[{side:"B",px:"x",sz:"1"}]})];
+    // bucketing: out of order, duplicate, a late one after a flush, a trade without time, a far-off clock
+    const bk=COLLECT.tradeBook({holdMs:2000}),ad=(id,t,side,qty,usd,tid)=>bk.add({id,venue:"x",kind:"perp",t,side,qty,usd,tid},T0+10000);
+    const a1=ad("bnF",T0+3500,"b",1,80000,"1"),a2=ad("bnF",T0+3100,"s",0.5,40000,"2"),a3=ad("bnF",T0+3100,"s",0.5,40000,"2"),a4=ad("bnF",T0+1200,"b",0.1,8000,"3"),a5=ad("hlF",null,"b",0.2,16000,null),a6=ad("bnF",T0+3900,"b",0,0,"9"),a7=ad("bnF",T0+9e8,"s",0.3,24000,"4");
+    const f1=bk.flush(T0+10000,false),none=bk.flush(T0+10000,false),a8=ad("bnF",T0+500,"s",0.01,800,"5"),f2=bk.flush(T0+30000,false);
+    const row1=f1&&f1.v.bnF,tv1=f1&&COLLECT.tradeRows(f1);
+    // shares over a window
+    const recs=[COLLECT.rec("tv",T0+10000,{t0:T0/1000+1,v:{bnF:[[0,900,100,0.0125,0.00125,4]],cbS:[[1,0,100,0,0.00125,1]],okS:[[2,300,0,0.00375,0,1]]}}),COLLECT.rec("x",1,{})];
+    const sh=COLLECT.tradeShare(recs,T0+10000,60000),shOut=COLLECT.tradeShare(recs,T0+500000,60000),shNone=COLLECT.tradeShare([],1,1);
+    // 24 h tickers
+    const V=COLLECT.vol24Parse;
+    const v24={bnF:V("bnF",{symbol:"BTCUSDT",volume:"1",quoteVolume:"9000000000.5"}),byF:V("byF",{result:{list:[{symbol:"BTCUSDT",turnover24h:"3000000000"}]}}),okF:V("okF",{data:[{last:"80000",volCcy24h:"100000"}]}),okS:V("okS",{data:[{last:"80000",vol24h:"1",volCcy24h:"500000000"}]}),cbS:V("cbS",{volume:"20000.5",last:"80000"}),hlF:V("hlF",[{universe:[{name:"ETH"},{name:"BTC"}]},[{dayNtlVlm:"1"},{dayNtlVlm:"4000000000"}]],"btc"),bad:[V("bnF",{}),V("byF",{result:{list:[]}}),V("okF",{data:[]}),V("hlF",[{universe:[]},[]],"btc"),V("cbS",null)]};
+    const s24=COLLECT.vol24Share({bnF:6e9,bnS:2e9,okF:1e9,cbS:1e9,hlF:0,zzz:5}),s24n=COLLECT.vol24Share({});
+    const rec24=COLLECT.REGISTRY.find(c=>c.id==="vol24"),recTv=COLLECT.REGISTRY.find(c=>c.id==="tradeVol");
+    return{ok:subs.length===7&&subs[0].url.endsWith("btcusdt@aggTrade")&&subs[4].sub.args.length===2&&COLLECT.tradeSubs("eth",{swap:false})[4].sub.args.length===1&&subs[5].sub.channels[0]==="matches"&&subs[6].sub.subscription.coin==="BTC"
+      &&bnF.length===1&&bnF[0].side==="s"&&bnF[0].qty===0.5&&Math.abs(bnF[0].usd-40000.05)<1e-6&&bnF[0].t===T0&&bnF[0].tid==="11"&&bnF[0].kind==="perp"&&bnB[0].side==="b"&&bnB[0].kind==="spot"&&bnB[0].venue==="bn"
+      &&by.length===2&&by[0].side==="b"&&by[1].side==="s"&&by[0].qty===0.002&&by[0].tid==="a1"
+      &&ct===0.01&&Math.abs(ct2-0.01)<1e-12&&okF.length===1&&okF[0].id==="okF"&&Math.abs(okF[0].qty-1.5)<1e-9&&Math.abs(okF[0].usd-120000)<1e-6&&okF[0].side==="s"&&okNoCt.length===0&&okS[0].id==="okS"&&okS[0].qty===0.3&&okS[0].side==="b"
+      &&cb[0].side==="b"&&cb2[0].side==="s"&&cb[0].t===Date.parse("2026-10-23T23:48:10.644Z")&&cbLast.length===0
+      &&hl.length===2&&hl[0].side==="b"&&hl[1].side==="s"&&hl[0].tid==="5"&&hl[0].qty===0.01&&junk.every(x=>x.length===0)
+      &&a1&&a2&&!a3&&a4&&a5&&!a6&&a7&&bk.stats().dup===1&&bk.stats().bad===1
+      &&f1&&row1.length===2&&row1[0][0]===0&&row1[0][5]===1&&row1[0][1]===8000&&row1[1][0]===2&&row1[1][1]===80000&&row1[1][2]===40000&&row1[1][3]===1&&row1[1][4]===0.5&&f1.t0===T0/1000+1
+      &&f1.v.hlF===undefined&&tv1.length===2&&J(f2.v.hlF)===J([[6,16000,0,0.2,0,1]])&&none===null&&a8&&bk.stats().late===1&&f2.v.bnF.length===2&&f2.v.bnF.reduce((s,r)=>s+r[5],0)===2
+      &&sh&&sh.usd===1400&&Math.abs(sh.by.bnF.share-1000/1400)<1e-9&&sh.by.cbS.sell===100&&Math.abs(sh.perp-1000/1400)<1e-9&&Math.abs(sh.spot-400/1400)<1e-9&&shOut===null&&shNone===null
+      &&v24.bnF===9000000000.5&&v24.byF===3e9&&v24.okF===8e9&&v24.okS===5e8&&Math.abs(v24.cbS-1600040000)<1&&v24.hlF===4e9&&v24.bad.every(x=>x===null)
+      &&s24&&s24.usd===1e10&&s24.by.bnF.share===0.6&&s24.by.hlF===undefined&&Math.abs(s24.perp-0.7)<1e-9&&Math.abs(s24.spot-0.3)<1e-9&&s24n===null
+      &&recTv&&recTv.speed==="fast"&&recTv.records[0]==="tv"&&rec24&&rec24.speed==="slow"&&COLLECT.ownerOf("tv")==="tradeVol"&&COLLECT.ownerOf("vol24")==="vol24",
+      detail:J({bnF,okF:okF[0],cb:cb[0],f1,f2,sh,v24,s24})};
+  });
   add("collectors: wallets: ranking over a window, position read from clearinghouseState, change rule, liquidation fills, predicted funding",E=>{
     const J=JSON.stringify,tr=COLLECT.walletTracker(1000);
     tr.note(100,["A","B"],500,100);tr.note(200,["A","C"],300,200);tr.note(300,["D","B"],100,300);tr.note(0,["Z"],-5,300);tr.note(0,"x",5,300);tr.note(NaN,["Q"],5,300);
@@ -230,7 +272,7 @@ const READER_SELFTEST=(()=>{
       &&by("hlCtx.fund")&&by("hlCtx.fund").unusual&&by("hlCtx.fund").z===99&&by("hlCtx.fund").text==="+1 bps"
       &&by("bookBn.depth5")&&!by("bookBn.depth5").unusual&&by("bookBn.depth5").z===0&&!by("optChain.atmVol")&&by("dvol.vol").x===60
       &&c.liq.bn===2&&c.liq.hl===1&&early.items.length>=2&&!early.items.find(x=>x.f==="dvol.vol").unusual&&none.items.length===0&&none.liq.bn===0
-      &&c.items.every((x,i,a)=>!i||Math.abs(a[i-1].z)>=Math.abs(x.z))&&COLLECT.REGISTRY.length===7&&Object.keys(COLLECT.FEATURES).length===21,
+      &&c.items.every((x,i,a)=>!i||Math.abs(a[i-1].z)>=Math.abs(x.z))&&COLLECT.REGISTRY.length===9&&Object.keys(COLLECT.FEATURES).length===21,
       detail:J({n:c.items.length,top:c.items.slice(0,4).map(x=>[x.f,x.z,x.text,x.unusual]),liq:c.liq,early:early.items.length})};
   });
   add("collectors: who moved first: a venue that covered half of the move earlier led, one within 2 s is with it, a flat or silent one is named, and no clear or only a gradual move says so",E=>{
