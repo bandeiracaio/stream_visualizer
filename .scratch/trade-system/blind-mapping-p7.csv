@@ -1,0 +1,41 @@
+id,p7,p7_secondary,note
+S003,label-or-scoreboard-precision,random-or-placebo-baseline,
+S010,passive-benchmark-comparison,,
+S015,descriptive-or-no-comparison,,
+S026,cost-and-execution-stress,,
+S030,variant-or-component-comparison,,
+S040,cost-and-execution-stress,,
+S052,variant-or-component-comparison,,
+S058,cost-and-execution-stress,,
+S098,cost-and-execution-stress,,fee-bound floor control
+S108,random-or-placebo-baseline,,same clock on non-event days
+S111,cost-and-execution-stress,,
+S135,variant-or-component-comparison,,
+S140,tail-or-failure-profile,out-of-time-or-asset-validation,
+S142,variant-or-component-comparison,,fixed trail variant
+S144,variant-or-component-comparison,,
+S145,variant-or-component-comparison,,
+S160,variant-or-component-comparison,,control built from natural events
+S166,descriptive-or-no-comparison,,
+S168,random-or-placebo-baseline,,
+S179,random-or-placebo-baseline,,
+S182,dose-response-or-calibration,,
+S184,out-of-time-or-asset-validation,,
+S203,random-or-placebo-baseline,,
+S204,cost-and-execution-stress,,
+S211,variant-or-component-comparison,,non-climax natural bars
+S239,variant-or-component-comparison,tail-or-failure-profile,
+S241,variant-or-component-comparison,cost-and-execution-stress,
+S252,variant-or-component-comparison,,
+S255,dose-response-or-calibration,,
+S257,cost-and-execution-stress,,
+S259,descriptive-or-no-comparison,,
+S269,dose-response-or-calibration,,
+S271,regime-or-subgroup-split,,
+S280,regime-or-subgroup-split,,
+S304,descriptive-or-no-comparison,,
+S321,descriptive-or-no-comparison,,hedge ratio check fits no category; closest descriptive
+S325,cost-and-execution-stress,,
+S326,descriptive-or-no-comparison,,
+S340,descriptive-or-no-comparison,,
+S349,descriptive-or-no-comparison,,

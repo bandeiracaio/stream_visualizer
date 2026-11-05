@@ -1,0 +1,24 @@
+sessions: 142 BTC total, 99 in 'dev' split (247 s)
+designs 200; trades total 141012; split dev; null reps 20
+
+continuation-momentum: 100 designs
+  gross bps per trade: mean 0.07, range -2.38..1.28, positive in 63
+  gross minus random-entry null: mean -0.20, positive in 35; designs with null p <= 0.05: 3 (chance alone gives about 5.0)
+  designs whose gross CI excludes 0: 20; positive CI: 16
+  best gross bps vs the cost needed to break even: 1.28 bps (costs tried: 0, 2, 4, 8)
+
+mean-reversion-overreaction: 100 designs
+  gross bps per trade: mean 0.41, range -2.65..1.79, positive in 89
+  gross minus random-entry null: mean 0.20, positive in 82; designs with null p <= 0.05: 14 (chance alone gives about 5.0)
+  designs whose gross CI excludes 0: 46; positive CI: 46
+  best gross bps vs the cost needed to break even: 1.79 bps (costs tried: 0, 2, 4, 8)
+
+top 8 designs by gross bps:
+M00302 mean- burst+exhaustion           hl  hold 415s k 0.58 | n  297 gross 1.79 ci 0.32..3.47 | null 0.74 p 0.10
+M00249 mean- exhaustion                 hl  hold 406s k 1.47 | n  214 gross 1.59 ci 0.13..3.17 | null -0.11 p 0.05
+M00315 mean- burst+exhaustion           any hold 527s k 0.51 | n  322 gross 1.45 ci 0.07..3.16 | null 0.72 p 0.24
+M00102 conti absorption+wall            any hold 401s k 0.81 | n  381 gross 1.28 ci 0.07..2.64 | null 0.41 p 0.14
+M00109 mean- burst+exhaustion+wall      hl  hold 259s k 0.63 | n  436 gross 1.27 ci 0.44..2.22 | null 0.70 p 0.10
+M00112 mean- absorption+burst+exhaustion bn  hold 337s k 2.19 | n  335 gross 1.16 ci -0.13..2.57 | null -0.24 p 0.05
+M00307 mean- burst+exhaustion+wall      any hold 494s k 1.4 | n  278 gross 1.15 ci -1.13..3.92 | null -0.07 p 0.24
+M00164 mean- absorption                 bn  hold 194s k 0.52 | n  431 gross 1.13 ci 0.42..2.23 | null 0.52 p 0.10

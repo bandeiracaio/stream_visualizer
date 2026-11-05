@@ -1,0 +1,38 @@
+sessions: 143 BTC total, 44 in 'holdout' split (0 s)
+flow facts ready for 44 sessions (20 s)
+designs 50; trades total 37056; split holdout; null reps 40; latency 1000 ms
+
+by trigger:  designs | mean gross bps | gross minus null | null p<=0.05 (chance) | CI above 0 | CI below 0 | best gross
+  book-depth-and-wall-event                                        50 |  0.48 |  0.44 |  31 (2.5) |  31 |   0 |  3.26
+
+by thesis:  designs | mean gross bps | gross minus null | null p<=0.05 (chance) | CI above 0 | CI below 0 | best gross
+  continuation-momentum                                            50 |  0.48 |  0.44 |  31 (2.5) |  31 |   0 |  3.26
+
+by exit:  designs | mean gross bps | gross minus null | null p<=0.05 (chance) | CI above 0 | CI below 0 | best gross
+  elapsed-time-stop                                                13 |  0.63 |  0.52 |   8 (0.7) |   9 |   0 |  3.26
+  fixed-distance-target                                             3 |  0.39 |  0.50 |   3 (0.2) |   2 |   0 |  0.84
+  flow-episode-or-book-state-exit                                  22 |  0.36 |  0.31 |  11 (1.1) |  12 |   0 |  1.02
+  indicator-normalization-exit                                      5 |  0.60 |  0.60 |   5 (0.3) |   5 |   0 |  1.16
+  named-level-target                                                2 |  0.91 |  1.24 |   1 (0.1) |   0 |   0 |  1.69
+  trailing-or-ratchet-stop                                          5 |  0.42 |  0.25 |   3 (0.3) |   3 |   0 |  0.97
+
+by trigger x thesis:  designs | mean gross bps | gross minus null | null p<=0.05 (chance) | CI above 0 | CI below 0 | best gross
+  book-depth-and-wall-event | continuation-momentum                50 |  0.48 |  0.44 |  31 (2.5) |  31 |   0 |  3.26
+
+by trigger x thesis x exit:  designs | mean gross bps | gross minus null | null p<=0.05 (chance) | CI above 0 | CI below 0 | best gross
+  book-depth-and-wall-event | continuation-momentum | elapsed-time-stop   13 |  0.63 |  0.52 |   8 (0.7) |   9 |   0 |  3.26
+  book-depth-and-wall-event | continuation-momentum | fixed-distance-target    3 |  0.39 |  0.50 |   3 (0.2) |   2 |   0 |  0.84
+  book-depth-and-wall-event | continuation-momentum | flow-episode-or-book-state-exit   22 |  0.36 |  0.31 |  11 (1.1) |  12 |   0 |  1.02
+  book-depth-and-wall-event | continuation-momentum | indicator-normalization-exit    5 |  0.60 |  0.60 |   5 (0.3) |   5 |   0 |  1.16
+  book-depth-and-wall-event | continuation-momentum | named-level-target    2 |  0.91 |  1.24 |   1 (0.1) |   0 |   0 |  1.69
+  book-depth-and-wall-event | continuation-momentum | trailing-or-ratchet-stop    5 |  0.42 |  0.25 |   3 (0.3) |   3 |   0 |  0.97
+
+top 8 designs by gross bps:
+M00063 conti book- {"edge":20,"thr":0.72,"sustainSec":9,"coolSec":13,"venue":"hl"} exit elap {"holdSec":161} k 0.52 | n 54 gross 3.26 ci 1.55..4.90 | null 0.70 p 0.02
+M00117 conti book- {"edge":20,"thr":0.77,"sustainSec":1,"coolSec":19,"venue":"hl"} exit name {"holdSec":245,"frac":0.5} k 0.59 | n 85 gross 1.69 ci -0.54..3.88 | null -0.65 p 0.02
+M00263 conti book- {"edge":20,"thr":0.68,"sustainSec":1,"coolSec":23,"venue":"hl"} exit indi {"holdSec":24} k 1.69 | n 733 gross 1.16 ci 0.76..1.53 | null 0.01 p 0.02
+M00247 conti book- {"edge":5,"thr":0.61,"sustainSec":2,"coolSec":65,"venue":"hl"} exit flow {"holdSec":52,"families":["burst"]} k 0.75 | n 700 gross 1.02 ci 0.51..1.43 | null 0.20 p 0.02
+M00001 conti book- {"edge":5,"thr":0.61,"sustainSec":2,"coolSec":19,"venue":"bn"} exit flow {"holdSec":210,"families":["burst"]} k 1.19 | n 473 gross 1.01 ci 0.17..1.80 | null -0.01 p 0.05
+M00258 conti book- {"edge":5,"thr":0.35,"sustainSec":1,"coolSec":14,"venue":"hl"} exit trai {"holdSec":73,"trailK":0.51} k 0.53 | n 1583 gross 0.97 ci 0.75..1.16 | null 0.38 p 0.02
+M00558 conti book- {"edge":5,"thr":0.61,"sustainSec":8,"coolSec":67,"venue":"hl"} exit fixe {"holdSec":27,"tpK":2.66} k 0.76 | n 225 gross 0.84 ci 0.38..1.25 | null 0.23 p 0.05
+M00091 conti book- {"edge":20,"thr":0.55,"sustainSec":3,"coolSec":19,"venue":"hl"} exit elap {"holdSec":54} k 0.54 | n 1017 gross 0.77 ci 0.40..1.16 | null 0.30 p 0.02

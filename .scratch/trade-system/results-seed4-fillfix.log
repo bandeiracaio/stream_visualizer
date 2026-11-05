@@ -1,0 +1,40 @@
+sessions: 143 BTC total, 99 in 'dev' split (0 s)
+designs 320; trades total 227488; split dev; null reps 20; latency 1000 ms
+
+by trigger:  designs | mean gross bps | gross minus null | null p<=0.05 (chance) | CI above 0 | CI below 0 | best gross
+  price-move-or-distance-threshold                                160 | -0.09 | -0.19 |  23 (8.0) |  27 |  14 |  4.10
+  reader-episode-event                                            160 |  0.08 |  0.04 |  25 (8.0) |  28 |  11 |  2.67
+
+by thesis:  designs | mean gross bps | gross minus null | null p<=0.05 (chance) | CI above 0 | CI below 0 | best gross
+  continuation-momentum                                           160 | -0.16 | -0.23 |  26 (8.0) |  27 |  11 |  1.23
+  mean-reversion-overreaction                                     160 |  0.15 |  0.09 |  22 (8.0) |  28 |  14 |  4.10
+
+by exit:  designs | mean gross bps | gross minus null | null p<=0.05 (chance) | CI above 0 | CI below 0 | best gross
+  elapsed-time-stop                                               160 |  0.02 | -0.07 |  22 (8.0) |  27 |  13 |  4.10
+  flow-episode-or-book-state-exit                                 160 | -0.03 | -0.07 |  26 (8.0) |  28 |  12 |  2.21
+
+by trigger x thesis:  designs | mean gross bps | gross minus null | null p<=0.05 (chance) | CI above 0 | CI below 0 | best gross
+  price-move-or-distance-threshold | continuation-momentum         80 | -0.19 | -0.28 |  21 (4.0) |  26 |   1 |  0.95
+  price-move-or-distance-threshold | mean-reversion-overreaction   80 |  0.01 | -0.09 |   2 (4.0) |   1 |  13 |  4.10
+  reader-episode-event | continuation-momentum                     80 | -0.13 | -0.18 |   5 (4.0) |   1 |  10 |  1.23
+  reader-episode-event | mean-reversion-overreaction               80 |  0.29 |  0.27 |  20 (4.0) |  27 |   1 |  2.67
+
+by trigger x thesis x exit:  designs | mean gross bps | gross minus null | null p<=0.05 (chance) | CI above 0 | CI below 0 | best gross
+  price-move-or-distance-threshold | continuation-momentum | elapsed-time-stop   40 | -0.17 | -0.32 |   9 (2.0) |  11 |   1 |  0.95
+  price-move-or-distance-threshold | continuation-momentum | flow-episode-or-book-state-exit   40 | -0.21 | -0.24 |  12 (2.0) |  15 |   0 |  0.77
+  price-move-or-distance-threshold | mean-reversion-overreaction | elapsed-time-stop   40 |  0.17 |  0.02 |   2 (2.0) |   1 |   6 |  4.10
+  price-move-or-distance-threshold | mean-reversion-overreaction | flow-episode-or-book-state-exit   40 | -0.15 | -0.21 |   0 (2.0) |   0 |   7 |  0.84
+  reader-episode-event | continuation-momentum | elapsed-time-stop   40 | -0.20 | -0.26 |   2 (2.0) |   1 |   6 |  0.92
+  reader-episode-event | continuation-momentum | flow-episode-or-book-state-exit   40 | -0.05 | -0.11 |   3 (2.0) |   0 |   4 |  1.23
+  reader-episode-event | mean-reversion-overreaction | elapsed-time-stop   40 |  0.30 |  0.26 |   9 (2.0) |  14 |   0 |  2.67
+  reader-episode-event | mean-reversion-overreaction | flow-episode-or-book-state-exit   40 |  0.29 |  0.28 |  11 (2.0) |  13 |   1 |  2.21
+
+top 8 designs by gross bps:
+M00211 mean- price {"lookSec":52,"m":3.69,"venue":"hl"} exit elap {"holdSec":203} k 0.73 | n 80 gross 4.10 ci 0.86..7.87 | null 0.24 p 0.05
+M00097 mean- price {"lookSec":75,"m":3.59,"venue":"bn"} exit elap {"holdSec":385} k 2.27 | n 40 gross 3.41 ci -0.94..7.80 | null 0.12 p 0.19
+M00438 mean- reade {"families":["burst","wall"],"venue":"any"} exit elap {"holdSec":554} k 2.44 | n 207 gross 2.67 ci 0.09..5.96 | null -0.52 p 0.05
+M00205 mean- price {"lookSec":205,"m":3.95,"venue":"bn"} exit elap {"holdSec":310} k 1.32 | n 9 gross 2.22 ci -7.41..15.30 | null 2.83 p 0.43
+M00113 mean- reade {"families":["burst"],"venue":"hl"} exit flow {"holdSec":523,"families":["absorption","burst","exhaustion"]} k 1.74 | n 167 gross 2.21 ci 0.33..4.66 | null 0.20 p 0.05
+M00221 mean- reade {"families":["burst","wall"],"venue":"hl"} exit elap {"holdSec":549} k 2.15 | n 121 gross 1.82 ci -2.05..6.67 | null -0.49 p 0.14
+M00423 mean- reade {"families":["burst","exhaustion"],"venue":"bn"} exit elap {"holdSec":587} k 2.83 | n 157 gross 1.55 ci -2.30..5.29 | null 0.13 p 0.24
+M00246 mean- reade {"families":["burst"],"venue":"hl"} exit flow {"holdSec":589,"families":["burst","wall"]} k 2.19 | n 119 gross 1.49 ci -1.83..6.08 | null -0.02 p 0.19

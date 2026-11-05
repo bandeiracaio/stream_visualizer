@@ -1,0 +1,1503 @@
+[
+ {
+  "id": "M00001",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "minutes",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 5,
+    "thr": 0.61,
+    "sustainSec": 2,
+    "coolSec": 19,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 210,
+    "families": [
+     "burst"
+    ]
+   },
+   "stop": {
+    "k": 1.19
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00005",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 20,
+    "thr": 0.73,
+    "sustainSec": 3,
+    "coolSec": 18,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 58,
+    "families": [
+     "absorption"
+    ]
+   },
+   "stop": {
+    "k": 0.86
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00012",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "minutes",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 5,
+    "thr": 0.37,
+    "sustainSec": 1,
+    "coolSec": 23,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 205,
+    "families": [
+     "absorption",
+     "burst",
+     "wall"
+    ]
+   },
+   "stop": {
+    "k": 2.68
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00046",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "indicator-normalization-exit",
+  "hor": "minutes",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 5,
+    "thr": 0.63,
+    "sustainSec": 10,
+    "coolSec": 14,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 188
+   },
+   "stop": {
+    "k": 2.85
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00050",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "indicator-normalization-exit",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 20,
+    "thr": 0.69,
+    "sustainSec": 7,
+    "coolSec": 50,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 11
+   },
+   "stop": {
+    "k": 1.05
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00060",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "minutes",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 5,
+    "thr": 0.4,
+    "sustainSec": 1,
+    "coolSec": 10,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 115,
+    "families": [
+     "absorption",
+     "exhaustion"
+    ]
+   },
+   "stop": {
+    "k": 0.88
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00062",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "minutes",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 20,
+    "thr": 0.62,
+    "sustainSec": 3,
+    "coolSec": 20,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 300,
+    "families": [
+     "burst"
+    ]
+   },
+   "stop": {
+    "k": 0.59
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00063",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "elapsed-time-stop",
+  "hor": "minutes",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 20,
+    "thr": 0.72,
+    "sustainSec": 9,
+    "coolSec": 13,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 161
+   },
+   "stop": {
+    "k": 0.52
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00070",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "elapsed-time-stop",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 20,
+    "thr": 0.41,
+    "sustainSec": 3,
+    "coolSec": 90,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 43
+   },
+   "stop": {
+    "k": 1.16
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00091",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "elapsed-time-stop",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 20,
+    "thr": 0.55,
+    "sustainSec": 3,
+    "coolSec": 19,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 54
+   },
+   "stop": {
+    "k": 0.54
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00098",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 20,
+    "thr": 0.41,
+    "sustainSec": 3,
+    "coolSec": 57,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 40,
+    "families": [
+     "absorption",
+     "wall"
+    ]
+   },
+   "stop": {
+    "k": 1.56
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00112",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "elapsed-time-stop",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 5,
+    "thr": 0.51,
+    "sustainSec": 3,
+    "coolSec": 10,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 15
+   },
+   "stop": {
+    "k": 1.43
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00117",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "named-level-target",
+  "hor": "minutes",
+  "p": {
+   "ctx": {},
+   "reg": {
+    "windowSec": 1171
+   },
+   "trig": {
+    "edge": 20,
+    "thr": 0.77,
+    "sustainSec": 1,
+    "coolSec": 19,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 245,
+    "frac": 0.5
+   },
+   "stop": {
+    "k": 0.59
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00137",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "elapsed-time-stop",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 5,
+    "thr": 0.34,
+    "sustainSec": 7,
+    "coolSec": 17,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 18
+   },
+   "stop": {
+    "k": 1.94
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00159",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 20,
+    "thr": 0.63,
+    "sustainSec": 3,
+    "coolSec": 48,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 47,
+    "families": [
+     "exhaustion",
+     "wall"
+    ]
+   },
+   "stop": {
+    "k": 0.89
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00180",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "elapsed-time-stop",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 20,
+    "thr": 0.44,
+    "sustainSec": 6,
+    "coolSec": 92,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 10
+   },
+   "stop": {
+    "k": 2.14
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00184",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "elapsed-time-stop",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 5,
+    "thr": 0.32,
+    "sustainSec": 2,
+    "coolSec": 116,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 39
+   },
+   "stop": {
+    "k": 1.38
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00207",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "elapsed-time-stop",
+  "hor": "minutes",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 5,
+    "thr": 0.39,
+    "sustainSec": 1,
+    "coolSec": 72,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 369
+   },
+   "stop": {
+    "k": 1.21
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00210",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "minutes",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 5,
+    "thr": 0.51,
+    "sustainSec": 2,
+    "coolSec": 57,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 70,
+    "families": [
+     "wall"
+    ]
+   },
+   "stop": {
+    "k": 2.69
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00235",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "minutes",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 20,
+    "thr": 0.42,
+    "sustainSec": 3,
+    "coolSec": 39,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 135,
+    "families": [
+     "burst",
+     "exhaustion",
+     "wall"
+    ]
+   },
+   "stop": {
+    "k": 2.34
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00244",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "minutes",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 20,
+    "thr": 0.39,
+    "sustainSec": 7,
+    "coolSec": 45,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 238,
+    "families": [
+     "absorption",
+     "burst",
+     "exhaustion"
+    ]
+   },
+   "stop": {
+    "k": 0.58
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00247",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 5,
+    "thr": 0.61,
+    "sustainSec": 2,
+    "coolSec": 65,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 52,
+    "families": [
+     "burst"
+    ]
+   },
+   "stop": {
+    "k": 0.75
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00252",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 5,
+    "thr": 0.36,
+    "sustainSec": 3,
+    "coolSec": 15,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 35,
+    "families": [
+     "absorption",
+     "burst",
+     "exhaustion"
+    ]
+   },
+   "stop": {
+    "k": 1.95
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00258",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "trailing-or-ratchet-stop",
+  "hor": "minutes",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 5,
+    "thr": 0.35,
+    "sustainSec": 1,
+    "coolSec": 14,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 73,
+    "trailK": 0.51
+   },
+   "stop": {
+    "k": 0.53
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00263",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "indicator-normalization-exit",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 20,
+    "thr": 0.68,
+    "sustainSec": 1,
+    "coolSec": 23,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 24
+   },
+   "stop": {
+    "k": 1.69
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00278",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "minutes",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 20,
+    "thr": 0.41,
+    "sustainSec": 8,
+    "coolSec": 65,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 532,
+    "families": [
+     "burst",
+     "wall"
+    ]
+   },
+   "stop": {
+    "k": 2.05
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00282",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "elapsed-time-stop",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 5,
+    "thr": 0.71,
+    "sustainSec": 2,
+    "coolSec": 79,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 34
+   },
+   "stop": {
+    "k": 2.3
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00286",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "fixed-distance-target",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 5,
+    "thr": 0.58,
+    "sustainSec": 2,
+    "coolSec": 97,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 25,
+    "tpK": 0.91
+   },
+   "stop": {
+    "k": 2.4
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00309",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "indicator-normalization-exit",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 20,
+    "thr": 0.72,
+    "sustainSec": 3,
+    "coolSec": 91,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 17
+   },
+   "stop": {
+    "k": 1.87
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00315",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "elapsed-time-stop",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 5,
+    "thr": 0.67,
+    "sustainSec": 10,
+    "coolSec": 40,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 11
+   },
+   "stop": {
+    "k": 1.31
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00360",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "elapsed-time-stop",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 20,
+    "thr": 0.35,
+    "sustainSec": 2,
+    "coolSec": 26,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 47
+   },
+   "stop": {
+    "k": 2.1
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00364",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "trailing-or-ratchet-stop",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 5,
+    "thr": 0.64,
+    "sustainSec": 4,
+    "coolSec": 30,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 47,
+    "trailK": 1.27
+   },
+   "stop": {
+    "k": 2.85
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00387",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 20,
+    "thr": 0.46,
+    "sustainSec": 2,
+    "coolSec": 107,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 47,
+    "families": [
+     "absorption",
+     "burst"
+    ]
+   },
+   "stop": {
+    "k": 2.35
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00402",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 5,
+    "thr": 0.52,
+    "sustainSec": 8,
+    "coolSec": 36,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 44,
+    "families": [
+     "burst",
+     "exhaustion",
+     "wall"
+    ]
+   },
+   "stop": {
+    "k": 2.49
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00441",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "elapsed-time-stop",
+  "hor": "minutes",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 20,
+    "thr": 0.7,
+    "sustainSec": 7,
+    "coolSec": 108,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 126
+   },
+   "stop": {
+    "k": 1.37
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00453",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 5,
+    "thr": 0.71,
+    "sustainSec": 5,
+    "coolSec": 13,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 28,
+    "families": [
+     "absorption",
+     "wall"
+    ]
+   },
+   "stop": {
+    "k": 0.64
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00475",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "trailing-or-ratchet-stop",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 5,
+    "thr": 0.67,
+    "sustainSec": 3,
+    "coolSec": 71,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 14,
+    "trailK": 1.35
+   },
+   "stop": {
+    "k": 0.83
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00498",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "named-level-target",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {
+    "windowSec": 641
+   },
+   "trig": {
+    "edge": 5,
+    "thr": 0.7,
+    "sustainSec": 2,
+    "coolSec": 18,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 28,
+    "frac": 1
+   },
+   "stop": {
+    "k": 0.65
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00511",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "elapsed-time-stop",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 20,
+    "thr": 0.66,
+    "sustainSec": 6,
+    "coolSec": 84,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 37
+   },
+   "stop": {
+    "k": 2.69
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00517",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "fixed-distance-target",
+  "hor": "minutes",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 5,
+    "thr": 0.51,
+    "sustainSec": 2,
+    "coolSec": 79,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 61,
+    "tpK": 0.71
+   },
+   "stop": {
+    "k": 0.62
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00519",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "minutes",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 20,
+    "thr": 0.31,
+    "sustainSec": 7,
+    "coolSec": 12,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 81,
+    "families": [
+     "burst",
+     "wall"
+    ]
+   },
+   "stop": {
+    "k": 1.66
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00524",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "trailing-or-ratchet-stop",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 20,
+    "thr": 0.37,
+    "sustainSec": 3,
+    "coolSec": 19,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 23,
+    "trailK": 1.02
+   },
+   "stop": {
+    "k": 2.98
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00531",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "trailing-or-ratchet-stop",
+  "hor": "minutes",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 5,
+    "thr": 0.49,
+    "sustainSec": 4,
+    "coolSec": 46,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 557,
+    "trailK": 0.61
+   },
+   "stop": {
+    "k": 2.63
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00532",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "minutes",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 20,
+    "thr": 0.36,
+    "sustainSec": 2,
+    "coolSec": 95,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 477,
+    "families": [
+     "burst",
+     "wall"
+    ]
+   },
+   "stop": {
+    "k": 0.91
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00534",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "indicator-normalization-exit",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 20,
+    "thr": 0.66,
+    "sustainSec": 9,
+    "coolSec": 11,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 35
+   },
+   "stop": {
+    "k": 2.08
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00537",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 20,
+    "thr": 0.78,
+    "sustainSec": 7,
+    "coolSec": 49,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 20,
+    "families": [
+     "absorption"
+    ]
+   },
+   "stop": {
+    "k": 1.1
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00550",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "minutes",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 20,
+    "thr": 0.46,
+    "sustainSec": 9,
+    "coolSec": 23,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 139,
+    "families": [
+     "absorption",
+     "exhaustion",
+     "wall"
+    ]
+   },
+   "stop": {
+    "k": 2.06
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00553",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 20,
+    "thr": 0.53,
+    "sustainSec": 8,
+    "coolSec": 108,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 14,
+    "families": [
+     "wall"
+    ]
+   },
+   "stop": {
+    "k": 0.63
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00558",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "fixed-distance-target",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 5,
+    "thr": 0.61,
+    "sustainSec": 8,
+    "coolSec": 67,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 27,
+    "tpK": 2.66
+   },
+   "stop": {
+    "k": 0.76
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00571",
+  "trig": "book-depth-and-wall-event",
+  "thes": "continuation-momentum",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 5,
+    "thr": 0.38,
+    "sustainSec": 3,
+    "coolSec": 87,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 14,
+    "families": [
+     "absorption",
+     "exhaustion"
+    ]
+   },
+   "stop": {
+    "k": 2.3
+   },
+   "sz": {}
+  }
+ }
+]

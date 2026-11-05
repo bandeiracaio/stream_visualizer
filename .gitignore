@@ -5,3 +5,6 @@ reader_register_*.json
 tape_*.json
 health_*.json
 .venue-volume-cache/
+.scratch/trade-system/cache/
+.scratch/trade-system/cache-flow/
+.scratch/trade-system/cache-quotes/

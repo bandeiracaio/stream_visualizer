@@ -1,0 +1,1042 @@
+[
+ {
+  "id": "M00010",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "elapsed-time-stop",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 64,
+    "minBps": 1.09,
+    "coolSec": 53,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 20
+   },
+   "stop": {
+    "k": 2.12
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00016",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "elapsed-time-stop",
+  "hor": "minutes",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 354,
+    "minBps": 2.69,
+    "coolSec": 63,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 198
+   },
+   "stop": {
+    "k": 0.81
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00017",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "elapsed-time-stop",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 291,
+    "minBps": 1.96,
+    "coolSec": 13,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 14
+   },
+   "stop": {
+    "k": 2.39
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00027",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "minutes",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 261,
+    "minBps": 0.42,
+    "coolSec": 32,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 383,
+    "families": [
+     "absorption",
+     "burst",
+     "exhaustion"
+    ]
+   },
+   "stop": {
+    "k": 0.6
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00037",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "elapsed-time-stop",
+  "hor": "minutes",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 409,
+    "minBps": 0.4,
+    "coolSec": 80,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 343
+   },
+   "stop": {
+    "k": 2.63
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00049",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "elapsed-time-stop",
+  "hor": "minutes",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 97,
+    "minBps": 0.32,
+    "coolSec": 36,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 135
+   },
+   "stop": {
+    "k": 1.22
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00077",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "elapsed-time-stop",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 450,
+    "minBps": 0.89,
+    "coolSec": 24,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 13
+   },
+   "stop": {
+    "k": 0.91
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00081",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "elapsed-time-stop",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 442,
+    "minBps": 0.81,
+    "coolSec": 20,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 17
+   },
+   "stop": {
+    "k": 0.54
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00092",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "elapsed-time-stop",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 227,
+    "minBps": 1.42,
+    "coolSec": 33,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 29
+   },
+   "stop": {
+    "k": 2.22
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00095",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "elapsed-time-stop",
+  "hor": "minutes",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 197,
+    "minBps": 1.85,
+    "coolSec": 46,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 395
+   },
+   "stop": {
+    "k": 0.95
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00108",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "elapsed-time-stop",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 320,
+    "minBps": 2.58,
+    "coolSec": 12,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 23
+   },
+   "stop": {
+    "k": 2.79
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00117",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "elapsed-time-stop",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 394,
+    "minBps": 0.88,
+    "coolSec": 33,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 46
+   },
+   "stop": {
+    "k": 0.75
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00126",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "elapsed-time-stop",
+  "hor": "minutes",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 119,
+    "minBps": 0.55,
+    "coolSec": 11,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 75
+   },
+   "stop": {
+    "k": 2.9
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00140",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "elapsed-time-stop",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 242,
+    "minBps": 1.18,
+    "coolSec": 42,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 40
+   },
+   "stop": {
+    "k": 2.96
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00143",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "elapsed-time-stop",
+  "hor": "minutes",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 414,
+    "minBps": 1.76,
+    "coolSec": 12,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 118
+   },
+   "stop": {
+    "k": 0.81
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00166",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "elapsed-time-stop",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 163,
+    "minBps": 0.92,
+    "coolSec": 17,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 18
+   },
+   "stop": {
+    "k": 0.93
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00167",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "elapsed-time-stop",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 332,
+    "minBps": 0.8,
+    "coolSec": 96,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 44
+   },
+   "stop": {
+    "k": 1.55
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00194",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "minutes",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 186,
+    "minBps": 1.81,
+    "coolSec": 11,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 187,
+    "families": [
+     "absorption",
+     "exhaustion"
+    ]
+   },
+   "stop": {
+    "k": 0.55
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00213",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "elapsed-time-stop",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 213,
+    "minBps": 2.66,
+    "coolSec": 56,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 15
+   },
+   "stop": {
+    "k": 0.88
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00214",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "elapsed-time-stop",
+  "hor": "minutes",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 581,
+    "minBps": 1.82,
+    "coolSec": 54,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 68
+   },
+   "stop": {
+    "k": 2.85
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00316",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 551,
+    "minBps": 1.22,
+    "coolSec": 85,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 17,
+    "families": [
+     "burst"
+    ]
+   },
+   "stop": {
+    "k": 0.71
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00339",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 69,
+    "minBps": 2.24,
+    "coolSec": 32,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 21,
+    "families": [
+     "wall"
+    ]
+   },
+   "stop": {
+    "k": 2.94
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00478",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 515,
+    "minBps": 0.57,
+    "coolSec": 88,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 44,
+    "families": [
+     "exhaustion"
+    ]
+   },
+   "stop": {
+    "k": 1.1
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00482",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 198,
+    "minBps": 2.31,
+    "coolSec": 11,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 34,
+    "families": [
+     "exhaustion"
+    ]
+   },
+   "stop": {
+    "k": 0.64
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00645",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 360,
+    "minBps": 0.32,
+    "coolSec": 36,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 19,
+    "families": [
+     "absorption"
+    ]
+   },
+   "stop": {
+    "k": 2.52
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00756",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 90,
+    "minBps": 0.98,
+    "coolSec": 15,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 19,
+    "families": [
+     "absorption"
+    ]
+   },
+   "stop": {
+    "k": 0.59
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00782",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 119,
+    "minBps": 0.93,
+    "coolSec": 13,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 42,
+    "families": [
+     "absorption",
+     "exhaustion",
+     "wall"
+    ]
+   },
+   "stop": {
+    "k": 1.2
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00802",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 385,
+    "minBps": 0.83,
+    "coolSec": 56,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 16,
+    "families": [
+     "burst",
+     "exhaustion",
+     "wall"
+    ]
+   },
+   "stop": {
+    "k": 1.1
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00818",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "minutes",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 183,
+    "minBps": 1.73,
+    "coolSec": 22,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 217,
+    "families": [
+     "burst",
+     "wall"
+    ]
+   },
+   "stop": {
+    "k": 1.67
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00860",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 147,
+    "minBps": 1.86,
+    "coolSec": 59,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 23,
+    "families": [
+     "absorption",
+     "exhaustion"
+    ]
+   },
+   "stop": {
+    "k": 1.73
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00908",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "minutes",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 78,
+    "minBps": 1.56,
+    "coolSec": 23,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 474,
+    "families": [
+     "absorption",
+     "burst",
+     "wall"
+    ]
+   },
+   "stop": {
+    "k": 0.55
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00916",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 470,
+    "minBps": 2.69,
+    "coolSec": 17,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 12,
+    "families": [
+     "absorption"
+    ]
+   },
+   "stop": {
+    "k": 1.17
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M01019",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 85,
+    "minBps": 2.26,
+    "coolSec": 69,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 42,
+    "families": [
+     "exhaustion",
+     "wall"
+    ]
+   },
+   "stop": {
+    "k": 1.02
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M01139",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "minutes",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 502,
+    "minBps": 0.37,
+    "coolSec": 28,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 303,
+    "families": [
+     "burst",
+     "exhaustion",
+     "wall"
+    ]
+   },
+   "stop": {
+    "k": 0.69
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M01269",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 564,
+    "minBps": 2.44,
+    "coolSec": 49,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 17,
+    "families": [
+     "absorption"
+    ]
+   },
+   "stop": {
+    "k": 2.66
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M01271",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "exit": "flow-episode-or-book-state-exit",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 70,
+    "minBps": 1.79,
+    "coolSec": 98,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 31,
+    "families": [
+     "absorption"
+    ]
+   },
+   "stop": {
+    "k": 1.09
+   },
+   "sz": {}
+  }
+ }
+]

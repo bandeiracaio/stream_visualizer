@@ -1,0 +1,47 @@
+sessions: 143 BTC total, 99 in 'dev' split (0 s)
+designs 360; trades total 367010; split dev; null reps 20; latency 1000 ms
+
+by trigger:  designs | mean gross bps | gross minus null | null p<=0.05 (chance) | CI above 0 | CI below 0 | best gross
+  cross-venue-or-asset-divergence                                 120 |  0.12 |  0.06 |  38 (6.0) |  37 |  27 |  1.42
+  price-move-or-distance-threshold                                120 | -0.06 | -0.17 |  19 (6.0) |  22 |   9 |  3.11
+  reader-episode-event                                            120 |  0.06 |  0.02 |  14 (6.0) |  17 |   5 |  1.97
+
+by thesis:  designs | mean gross bps | gross minus null | null p<=0.05 (chance) | CI above 0 | CI below 0 | best gross
+  continuation-momentum                                           180 | -0.12 | -0.19 |  26 (9.0) |  30 |  30 |  1.56
+  mean-reversion-overreaction                                     180 |  0.20 |  0.13 |  45 (9.0) |  46 |  11 |  3.11
+
+by exit:  designs | mean gross bps | gross minus null | null p<=0.05 (chance) | CI above 0 | CI below 0 | best gross
+  elapsed-time-stop                                               180 |  0.03 | -0.07 |  35 (9.0) |  36 |  20 |  3.11
+  flow-episode-or-book-state-exit                                 180 |  0.05 |  0.01 |  36 (9.0) |  40 |  21 |  1.97
+
+by trigger x thesis:  designs | mean gross bps | gross minus null | null p<=0.05 (chance) | CI above 0 | CI below 0 | best gross
+  cross-venue-or-asset-divergence | continuation-momentum          60 | -0.26 | -0.32 |   6 (3.0) |   7 |  24 |  0.99
+  cross-venue-or-asset-divergence | mean-reversion-overreaction    60 |  0.49 |  0.43 |  32 (3.0) |  30 |   3 |  1.42
+  price-move-or-distance-threshold | continuation-momentum         60 | -0.02 | -0.13 |  18 (3.0) |  20 |   1 |  1.29
+  price-move-or-distance-threshold | mean-reversion-overreaction   60 | -0.09 | -0.20 |   1 (3.0) |   2 |   8 |  3.11
+  reader-episode-event | continuation-momentum                     60 | -0.08 | -0.12 |   2 (3.0) |   3 |   5 |  1.56
+  reader-episode-event | mean-reversion-overreaction               60 |  0.20 |  0.15 |  12 (3.0) |  14 |   0 |  1.97
+
+by trigger x thesis x exit:  designs | mean gross bps | gross minus null | null p<=0.05 (chance) | CI above 0 | CI below 0 | best gross
+  cross-venue-or-asset-divergence | continuation-momentum | elapsed-time-stop   30 | -0.24 | -0.31 |   3 (1.5) |   2 |  13 |  0.99
+  cross-venue-or-asset-divergence | continuation-momentum | flow-episode-or-book-state-exit   30 | -0.28 | -0.33 |   3 (1.5) |   5 |  11 |  0.78
+  cross-venue-or-asset-divergence | mean-reversion-overreaction | elapsed-time-stop   30 |  0.48 |  0.41 |  15 (1.5) |  15 |   1 |  1.42
+  cross-venue-or-asset-divergence | mean-reversion-overreaction | flow-episode-or-book-state-exit   30 |  0.51 |  0.45 |  17 (1.5) |  15 |   2 |  1.29
+  price-move-or-distance-threshold | continuation-momentum | elapsed-time-stop   30 | -0.08 | -0.24 |   9 (1.5) |   9 |   1 |  1.29
+  price-move-or-distance-threshold | continuation-momentum | flow-episode-or-book-state-exit   30 |  0.03 | -0.02 |   9 (1.5) |  11 |   0 |  0.90
+  price-move-or-distance-threshold | mean-reversion-overreaction | elapsed-time-stop   30 |  0.02 | -0.14 |   1 (1.5) |   2 |   3 |  3.11
+  price-move-or-distance-threshold | mean-reversion-overreaction | flow-episode-or-book-state-exit   30 | -0.21 | -0.26 |   0 (1.5) |   0 |   5 |  0.74
+  reader-episode-event | continuation-momentum | elapsed-time-stop   30 | -0.09 | -0.20 |   1 (1.5) |   1 |   2 |  1.05
+  reader-episode-event | continuation-momentum | flow-episode-or-book-state-exit   30 | -0.06 | -0.04 |   1 (1.5) |   2 |   3 |  1.56
+  reader-episode-event | mean-reversion-overreaction | elapsed-time-stop   30 |  0.10 |  0.05 |   6 (1.5) |   7 |   0 |  0.78
+  reader-episode-event | mean-reversion-overreaction | flow-episode-or-book-state-exit   30 |  0.29 |  0.25 |   6 (1.5) |   7 |   0 |  1.97
+
+top 8 designs by gross bps:
+M00136 mean- price {"lookSec":46,"m":3.56,"venue":"hl"} exit elap {"holdSec":220} k 0.54 | n 100 gross 3.11 ci 0.94..6.64 | null 0.98 p 0.05
+M00220 mean- reade {"families":["burst","wall"],"venue":"hl"} exit flow {"holdSec":490,"families":["wall"]} k 2.7 | n 137 gross 1.97 ci -0.90..5.23 | null 0.34 p 0.19
+M00070 mean- price {"lookSec":156,"m":3.01,"venue":"hl"} exit elap {"holdSec":276} k 0.88 | n 66 gross 1.72 ci -1.93..4.82 | null 0.48 p 0.24
+M00075 conti reade {"families":["absorption","wall"],"venue":"any"} exit flow {"holdSec":416,"families":["absorption"]} k 2.7 | n 428 gross 1.56 ci 0.17..2.93 | null -0.27 p 0.05
+M00035 mean- price {"lookSec":21,"m":3.36,"venue":"bn"} exit elap {"holdSec":544} k 0.57 | n 135 gross 1.52 ci -0.64..3.65 | null 1.12 p 0.38
+M00127 mean- price {"lookSec":41,"m":3.93,"venue":"hl"} exit elap {"holdSec":58} k 0.57 | n 87 gross 1.51 ci 0.12..2.96 | null 0.58 p 0.14
+M00143 mean- cross {"baseSec":414,"minBps":1.76,"coolSec":12,"venue":"hl"} exit elap {"holdSec":118} k 0.81 | n 997 gross 1.42 ci 0.89..1.84 | null 0.36 p 0.05
+M00213 mean- cross {"baseSec":213,"minBps":2.66,"coolSec":56,"venue":"hl"} exit elap {"holdSec":15} k 0.88 | n 717 gross 1.30 ci 1.06..1.54 | null 0.17 p 0.05

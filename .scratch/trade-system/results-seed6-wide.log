@@ -1,0 +1,126 @@
+sessions: 143 BTC total, 99 in 'dev' split (0 s)
+flow facts ready for 99 sessions (0 s)
+designs 700; trades total 604101; split dev; null reps 20; latency 1000 ms
+
+by trigger:  designs | mean gross bps | gross minus null | null p<=0.05 (chance) | CI above 0 | CI below 0 | best gross
+  book-depth-and-wall-event                                       100 | -0.01 | -0.04 |  36 (5.0) |  37 |  36 |  1.11
+  cross-venue-or-asset-divergence                                 100 |  0.01 | -0.05 |  26 (5.0) |  33 |  28 |  1.71
+  level-or-range-break                                            100 |  0.03 |  0.10 |  10 (5.0) |   8 |   7 |  4.45
+  level-rejection-bounce                                          100 | -0.07 | -0.00 |   9 (5.0) |   7 |   9 |  3.39
+  price-move-or-distance-threshold                                100 | -0.10 | -0.08 |  14 (5.0) |  10 |   9 |  5.94
+  reader-episode-event                                            100 |  0.06 |  0.07 |  10 (5.0) |  12 |   8 |  1.92
+  trade-flow-signal                                               100 | -0.02 | -0.04 |  12 (5.0) |  12 |  14 |  1.43
+
+by thesis:  designs | mean gross bps | gross minus null | null p<=0.05 (chance) | CI above 0 | CI below 0 | best gross
+  continuation-momentum                                           350 | -0.09 | -0.10 |  74 (17.5) |  82 |  44 |  4.45
+  mean-reversion-overreaction                                     350 |  0.07 |  0.09 |  43 (17.5) |  37 |  67 |  5.94
+
+by exit:  designs | mean gross bps | gross minus null | null p<=0.05 (chance) | CI above 0 | CI below 0 | best gross
+  elapsed-time-stop                                               188 | -0.12 | -0.19 |  26 (9.4) |  35 |  33 |  1.92
+  fixed-distance-target                                           104 | -0.16 |  0.01 |  13 (5.2) |   8 |  21 |  2.07
+  flow-episode-or-book-state-exit                                 148 |  0.08 |  0.05 |  25 (7.4) |  29 |  16 |  1.19
+  indicator-normalization-exit                                     58 | -0.01 | -0.03 |  19 (2.9) |  21 |  21 |  1.15
+  named-level-target                                              101 |  0.09 |  0.35 |  16 (5.1) |   6 |  13 |  5.94
+  trailing-or-ratchet-stop                                        101 |  0.07 | -0.10 |  18 (5.1) |  20 |   7 |  2.94
+
+by trigger x thesis:  designs | mean gross bps | gross minus null | null p<=0.05 (chance) | CI above 0 | CI below 0 | best gross
+  book-depth-and-wall-event | continuation-momentum                50 |  0.43 |  0.37 |  36 (2.5) |  37 |   0 |  1.11
+  book-depth-and-wall-event | mean-reversion-overreaction          50 | -0.44 | -0.45 |   0 (2.5) |   0 |  36 |  0.01
+  cross-venue-or-asset-divergence | continuation-momentum          50 | -0.33 | -0.41 |   6 (2.5) |  13 |  23 |  0.32
+  cross-venue-or-asset-divergence | mean-reversion-overreaction    50 |  0.36 |  0.32 |  20 (2.5) |  20 |   5 |  1.71
+  level-or-range-break | continuation-momentum                     50 |  0.15 |  0.25 |   8 (2.5) |   8 |   1 |  4.45
+  level-or-range-break | mean-reversion-overreaction               50 | -0.10 | -0.05 |   2 (2.5) |   0 |   6 |  2.56
+  level-rejection-bounce | continuation-momentum                   50 | -0.71 | -0.67 |   1 (2.5) |   1 |   9 |  0.63
+  level-rejection-bounce | mean-reversion-overreaction             50 |  0.56 |  0.67 |   8 (2.5) |   6 |   0 |  3.39
+  price-move-or-distance-threshold | continuation-momentum         50 | -0.16 | -0.17 |  11 (2.5) |  10 |   3 |  1.82
+  price-move-or-distance-threshold | mean-reversion-overreaction   50 | -0.03 |  0.01 |   3 (2.5) |   0 |   6 |  5.94
+  reader-episode-event | continuation-momentum                     50 | -0.14 | -0.17 |   0 (2.5) |   1 |   6 |  0.60
+  reader-episode-event | mean-reversion-overreaction               50 |  0.26 |  0.30 |  10 (2.5) |  11 |   2 |  1.92
+  trade-flow-signal | continuation-momentum                        50 |  0.10 |  0.10 |  12 (2.5) |  12 |   2 |  1.19
+  trade-flow-signal | mean-reversion-overreaction                  50 | -0.15 | -0.18 |   0 (2.5) |   0 |  12 |  1.43
+
+by trigger x thesis x exit:  designs | mean gross bps | gross minus null | null p<=0.05 (chance) | CI above 0 | CI below 0 | best gross
+  book-depth-and-wall-event | continuation-momentum | elapsed-time-stop   13 |  0.34 |  0.24 |   9 (0.7) |  11 |   0 |  0.59
+  book-depth-and-wall-event | continuation-momentum | fixed-distance-target    3 |  0.27 |  0.37 |   3 (0.2) |   2 |   0 |  0.58
+  book-depth-and-wall-event | continuation-momentum | flow-episode-or-book-state-exit   22 |  0.44 |  0.40 |  13 (1.1) |  14 |   0 |  1.11
+  book-depth-and-wall-event | continuation-momentum | indicator-normalization-exit    5 |  0.52 |  0.51 |   5 (0.3) |   5 |   0 |  0.79
+  book-depth-and-wall-event | continuation-momentum | named-level-target    2 |  0.64 |  0.69 |   2 (0.1) |   1 |   0 |  1.01
+  book-depth-and-wall-event | continuation-momentum | trailing-or-ratchet-stop    5 |  0.51 |  0.30 |   4 (0.3) |   4 |   0 |  0.95
+  book-depth-and-wall-event | mean-reversion-overreaction | elapsed-time-stop   13 | -0.44 | -0.50 |   0 (0.7) |   0 |   8 |  0.01
+  book-depth-and-wall-event | mean-reversion-overreaction | fixed-distance-target    5 | -0.73 | -0.47 |   0 (0.3) |   0 |   4 | -0.54
+  book-depth-and-wall-event | mean-reversion-overreaction | flow-episode-or-book-state-exit   20 | -0.36 | -0.44 |   0 (1.0) |   0 |  13 | -0.11
+  book-depth-and-wall-event | mean-reversion-overreaction | indicator-normalization-exit    6 | -0.49 | -0.51 |   0 (0.3) |   0 |   6 | -0.31
+  book-depth-and-wall-event | mean-reversion-overreaction | named-level-target    3 | -0.52 | -0.25 |   0 (0.2) |   0 |   3 | -0.20
+  book-depth-and-wall-event | mean-reversion-overreaction | trailing-or-ratchet-stop    3 | -0.29 | -0.39 |   0 (0.2) |   0 |   2 | -0.24
+  cross-venue-or-asset-divergence | continuation-momentum | elapsed-time-stop   28 | -0.33 | -0.46 |   2 (1.4) |   7 |  14 |  0.25
+  cross-venue-or-asset-divergence | continuation-momentum | fixed-distance-target    2 | -0.98 | -0.97 |   0 (0.1) |   0 |   2 | -0.73
+  cross-venue-or-asset-divergence | continuation-momentum | indicator-normalization-exit   14 | -0.32 | -0.34 |   3 (0.7) |   5 |   7 |  0.17
+  cross-venue-or-asset-divergence | continuation-momentum | named-level-target    2 |  0.01 |  0.15 |   0 (0.1) |   0 |   0 |  0.02
+  cross-venue-or-asset-divergence | continuation-momentum | trailing-or-ratchet-stop    4 | -0.21 | -0.35 |   1 (0.2) |   1 |   0 |  0.32
+  cross-venue-or-asset-divergence | mean-reversion-overreaction | elapsed-time-stop   14 |  0.39 |  0.32 |   5 (0.7) |   5 |   1 |  1.71
+  cross-venue-or-asset-divergence | mean-reversion-overreaction | fixed-distance-target    4 | -0.15 | -0.04 |   2 (0.2) |   2 |   1 |  0.72
+  cross-venue-or-asset-divergence | mean-reversion-overreaction | flow-episode-or-book-state-exit    8 |  0.19 |  0.26 |   1 (0.4) |   1 |   0 |  1.03
+  cross-venue-or-asset-divergence | mean-reversion-overreaction | indicator-normalization-exit   15 |  0.52 |  0.51 |   9 (0.8) |   9 |   2 |  1.15
+  cross-venue-or-asset-divergence | mean-reversion-overreaction | named-level-target    2 | -0.23 | -0.15 |   0 (0.1) |   0 |   1 | -0.06
+  cross-venue-or-asset-divergence | mean-reversion-overreaction | trailing-or-ratchet-stop    7 |  0.58 |  0.33 |   3 (0.4) |   3 |   0 |  1.17
+  level-or-range-break | continuation-momentum | elapsed-time-stop    4 |  0.59 |  0.49 |   0 (0.2) |   2 |   0 |  1.52
+  level-or-range-break | continuation-momentum | fixed-distance-target   15 |  0.10 |  0.29 |   1 (0.8) |   0 |   1 |  2.07
+  level-or-range-break | continuation-momentum | flow-episode-or-book-state-exit    2 |  0.37 |  0.33 |   0 (0.1) |   1 |   0 |  0.64
+  level-or-range-break | continuation-momentum | named-level-target   11 | -0.46 |  0.18 |   2 (0.6) |   0 |   0 |  4.45
+  level-or-range-break | continuation-momentum | trailing-or-ratchet-stop   18 |  0.44 |  0.19 |   5 (0.9) |   5 |   0 |  2.94
+  level-or-range-break | mean-reversion-overreaction | elapsed-time-stop   10 | -0.08 | -0.23 |   0 (0.5) |   0 |   2 |  0.71
+  level-or-range-break | mean-reversion-overreaction | fixed-distance-target   13 | -0.24 | -0.03 |   1 (0.7) |   0 |   2 |  1.34
+  level-or-range-break | mean-reversion-overreaction | flow-episode-or-book-state-exit    5 | -0.42 | -0.51 |   0 (0.3) |   0 |   0 |  0.02
+  level-or-range-break | mean-reversion-overreaction | named-level-target    8 |  0.04 |  0.52 |   1 (0.4) |   0 |   1 |  1.76
+  level-or-range-break | mean-reversion-overreaction | trailing-or-ratchet-stop   14 |  0.07 | -0.09 |   0 (0.7) |   0 |   1 |  2.56
+  level-rejection-bounce | continuation-momentum | elapsed-time-stop    5 | -0.41 | -0.55 |   0 (0.3) |   0 |   0 |  0.08
+  level-rejection-bounce | continuation-momentum | fixed-distance-target    7 | -0.71 | -0.63 |   1 (0.4) |   0 |   0 |  0.43
+  level-rejection-bounce | continuation-momentum | flow-episode-or-book-state-exit    4 | -0.08 | -0.13 |   0 (0.2) |   0 |   0 |  0.20
+  level-rejection-bounce | continuation-momentum | named-level-target   18 | -0.67 | -0.46 |   0 (0.9) |   1 |   6 |  0.63
+  level-rejection-bounce | continuation-momentum | trailing-or-ratchet-stop   16 | -1.00 | -1.11 |   0 (0.8) |   0 |   3 |  0.27
+  level-rejection-bounce | mean-reversion-overreaction | elapsed-time-stop    2 |  0.46 |  0.41 |   0 (0.1) |   0 |   0 |  0.87
+  level-rejection-bounce | mean-reversion-overreaction | fixed-distance-target    7 |  0.27 |  0.25 |   0 (0.4) |   1 |   0 |  1.02
+  level-rejection-bounce | mean-reversion-overreaction | flow-episode-or-book-state-exit    4 |  0.14 |  0.16 |   1 (0.2) |   1 |   0 |  0.99
+  level-rejection-bounce | mean-reversion-overreaction | named-level-target   29 |  0.71 |  0.93 |   6 (1.5) |   4 |   0 |  3.39
+  level-rejection-bounce | mean-reversion-overreaction | trailing-or-ratchet-stop    8 |  0.51 |  0.42 |   1 (0.4) |   0 |   0 |  1.44
+  price-move-or-distance-threshold | continuation-momentum | elapsed-time-stop   28 | -0.29 | -0.42 |   5 (1.4) |   6 |   3 |  1.18
+  price-move-or-distance-threshold | continuation-momentum | fixed-distance-target    9 | -0.13 |  0.27 |   2 (0.5) |   1 |   0 |  1.82
+  price-move-or-distance-threshold | continuation-momentum | flow-episode-or-book-state-exit    6 |  0.55 |  0.48 |   2 (0.3) |   2 |   0 |  0.89
+  price-move-or-distance-threshold | continuation-momentum | named-level-target    5 | -0.46 | -0.36 |   1 (0.3) |   0 |   0 |  0.24
+  price-move-or-distance-threshold | continuation-momentum | trailing-or-ratchet-stop    2 |  0.10 | -0.07 |   1 (0.1) |   1 |   0 |  0.49
+  price-move-or-distance-threshold | mean-reversion-overreaction | elapsed-time-stop   31 | -0.27 | -0.27 |   1 (1.6) |   0 |   2 |  1.89
+  price-move-or-distance-threshold | mean-reversion-overreaction | fixed-distance-target    6 | -0.24 |  0.04 |   0 (0.3) |   0 |   2 |  1.02
+  price-move-or-distance-threshold | mean-reversion-overreaction | flow-episode-or-book-state-exit    5 | -0.01 |  0.06 |   1 (0.3) |   0 |   2 |  0.74
+  price-move-or-distance-threshold | mean-reversion-overreaction | named-level-target    6 |  1.33 |  1.41 |   1 (0.3) |   0 |   0 |  5.94
+  price-move-or-distance-threshold | mean-reversion-overreaction | trailing-or-ratchet-stop    2 |  0.09 |  0.02 |   0 (0.1) |   0 |   0 |  0.18
+  reader-episode-event | continuation-momentum | elapsed-time-stop    6 | -0.31 | -0.38 |   0 (0.3) |   0 |   0 |  0.25
+  reader-episode-event | continuation-momentum | fixed-distance-target    5 | -0.59 | -0.45 |   0 (0.3) |   0 |   3 | -0.18
+  reader-episode-event | continuation-momentum | flow-episode-or-book-state-exit   26 | -0.06 | -0.10 |   0 (1.3) |   0 |   1 |  0.40
+  reader-episode-event | continuation-momentum | named-level-target    5 | -0.25 | -0.14 |   0 (0.3) |   0 |   2 | -0.11
+  reader-episode-event | continuation-momentum | trailing-or-ratchet-stop    8 |  0.09 | -0.09 |   0 (0.4) |   1 |   0 |  0.60
+  reader-episode-event | mean-reversion-overreaction | elapsed-time-stop    7 |  0.44 |  0.52 |   2 (0.4) |   2 |   0 |  1.92
+  reader-episode-event | mean-reversion-overreaction | fixed-distance-target   14 | -0.05 |  0.10 |   1 (0.7) |   1 |   2 |  0.44
+  reader-episode-event | mean-reversion-overreaction | flow-episode-or-book-state-exit   12 |  0.29 |  0.28 |   1 (0.6) |   3 |   0 |  1.07
+  reader-episode-event | mean-reversion-overreaction | named-level-target    7 |  0.34 |  0.66 |   3 (0.4) |   0 |   0 |  1.20
+  reader-episode-event | mean-reversion-overreaction | trailing-or-ratchet-stop   10 |  0.50 |  0.22 |   3 (0.5) |   5 |   0 |  1.47
+  trade-flow-signal | continuation-momentum | elapsed-time-stop    13 | -0.13 | -0.13 |   2 (0.7) |   2 |   0 |  0.52
+  trade-flow-signal | continuation-momentum | fixed-distance-target    8 |  0.08 |  0.24 |   2 (0.4) |   1 |   1 |  0.51
+  trade-flow-signal | continuation-momentum | flow-episode-or-book-state-exit   24 |  0.27 |  0.21 |   6 (1.2) |   7 |   0 |  1.19
+  trade-flow-signal | continuation-momentum | indicator-normalization-exit    4 |  0.11 |  0.08 |   2 (0.2) |   2 |   0 |  0.37
+  trade-flow-signal | continuation-momentum | trailing-or-ratchet-stop    1 | -0.77 | -0.71 |   0 (0.1) |   0 |   1 | -0.77
+  trade-flow-signal | mean-reversion-overreaction | elapsed-time-stop   14 | -0.01 | -0.11 |   0 (0.7) |   0 |   3 |  1.43
+  trade-flow-signal | mean-reversion-overreaction | fixed-distance-target    6 | -0.14 | -0.03 |   0 (0.3) |   0 |   3 |  0.41
+  trade-flow-signal | mean-reversion-overreaction | flow-episode-or-book-state-exit   10 | -0.20 | -0.25 |   0 (0.5) |   0 |   0 |  0.08
+  trade-flow-signal | mean-reversion-overreaction | indicator-normalization-exit   14 | -0.28 | -0.31 |   0 (0.7) |   0 |   6 |  0.04
+  trade-flow-signal | mean-reversion-overreaction | named-level-target    3 | -0.13 | -0.12 |   0 (0.2) |   0 |   0 | -0.02
+  trade-flow-signal | mean-reversion-overreaction | trailing-or-ratchet-stop    3 |  0.03 | -0.04 |   0 (0.2) |   0 |   0 |  0.82
+
+top 8 designs by gross bps:
+M00318 mean- price {"lookSec":130,"m":3.87,"venue":"bn"} exit name {"holdSec":461,"frac":0.5} k 0.56 | n 18 gross 5.94 ci -0.84..12.97 | null 1.02 p 0.10
+M00103 conti level {"brkBps":1.99,"coolSec":36,"venue":"bn"} exit name {"holdSec":84,"frac":1} k 0.85 | n 1 gross 4.45 ci - | null 0.01 p 0.05
+M00588 mean- level {"tolBps":1.12,"rejBps":1.82,"lookSec":32,"coolSec":41,"venue":"bn"} exit name {"holdSec":447,"frac":1} k 0.95 | n 35 gross 3.39 ci 0.88..6.26 | null -0.61 p 0.05
+M00147 conti level {"brkBps":1.28,"coolSec":45,"venue":"hl"} exit trai {"holdSec":242,"trailK":0.97} k 0.55 | n 33 gross 2.94 ci -0.29..6.37 | null 0.52 p 0.05
+M00135 mean- level {"brkBps":1.68,"coolSec":26,"venue":"bn"} exit trai {"holdSec":284,"trailK":1.03} k 1.1 | n 127 gross 2.56 ci -0.18..6.11 | null 0.33 p 0.10
+M00459 mean- level {"tolBps":0.25,"rejBps":4.4,"lookSec":5,"coolSec":15,"venue":"bn"} exit name {"holdSec":112,"frac":0.5} k 1.96 | n 29 gross 2.35 ci -1.48..5.88 | null -0.50 p 0.24
+M00644 mean- level {"tolBps":0.5,"rejBps":2.69,"lookSec":5,"coolSec":11,"venue":"bn"} exit name {"holdSec":111,"frac":1} k 0.64 | n 41 gross 2.13 ci 0.09..4.73 | null 0.12 p 0.10
+M00068 conti level {"brkBps":1.48,"coolSec":29,"venue":"bn"} exit fixe {"holdSec":381,"tpK":2.01} k 1.09 | n 17 gross 2.07 ci -3.65..7.91 | null 0.57 p 0.19
