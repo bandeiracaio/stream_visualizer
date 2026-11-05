@@ -7,9 +7,9 @@
 // Collector "wallets": the 10 Hyperliquid wallets that traded the most in this coin over 15 minutes, their positions (30 s), their liquidation fills,
 // and the predicted funding across venues (60 s).
 // Collector "options" (BTC and ETH only): Deribit's volatility index and index price (pushed, sampled every 10 s) and the whole option chain summarised every 120 s.
-// Collector "tradeVol" (fast, like venues): every venue's BTC trades in one-second buckets (record "tv", every 10 s). Collector "vol24" (slow): each venue's 24 h ticker volume once a minute (record "vol24").
-// The page says which collectors are on in the start message: {t:"start", sym, want:{derivs, calendar, venues, tradeVol, bookPerp, vol24, wallets, options}, rec}, and tells when a recording starts or stops: {t:"rec", on}.
-let on = false, gen = 0, sym = "btc", want = {}, ws = null, lastMsg = 0, timer = null, mk = null, prevRatios = null, lastCal = 0, recOn = false, vOn = false, vGen = 0, vSock = {}, vState = {}, lastVen = 0, lastPing = 0, wtr = null, wsk = null, wTracked = new Map(), wGen = 0, startAt = 0, dsk = null, dGen = 0, dState = {}, optOn = false;
+// Collector "book" (fast): Binance and Hyperliquid book depth summaries, one record a second each, only while a recording is on (the page says so with `recording`). Collector "tradeVol" (fast, like venues): every venue's BTC trades in one-second buckets (record "tv", every 10 s). Collector "vol24" (slow): each venue's 24 h ticker volume once a minute (record "vol24").
+// The page says which collectors are on in the start message: {t:"start", sym, want:{derivs, calendar, venues, tradeVol, book, bookPerp, vol24, wallets, options}, rec, recording}, and tells when a recording starts or stops: {t:"rec", on, recording} (on = recording or armed).
+let recording = false, on = false, gen = 0, sym = "btc", want = {}, ws = null, lastMsg = 0, timer = null, mk = null, prevRatios = null, lastCal = 0, recOn = false, vOn = false, vGen = 0, vSock = {}, vState = {}, lastVen = 0, lastPing = 0, wtr = null, wsk = null, wTracked = new Map(), wGen = 0, startAt = 0, dsk = null, dGen = 0, dState = {}, optOn = false;
 const last = {}, busy = {}, hold = {}, said = {};
 const BN = "https://fapi.binance.com", HLI = "https://api.hyperliquid.xyz/info";
 const post = m => self.postMessage(m);
@@ -248,6 +248,71 @@ function bookTick(now) {
   if (now - bAt >= 10000) { bAt = now; for (const id in bBook) { const p = bBook[id].summary(); if (p) col(BREC[id], now, p); } }
 }
 
+// ---- book depth, Binance and Hyperliquid (fast collector "book"): while a recording is on, the worker keeps its own books so a hidden tab cannot starve them. Binance: the diff stream plus the REST
+// snapshot (COLLECT.perpBook("bn")); Hyperliquid: the exact 20 levels from its socket, topped up with the bucketed book asked for every 2 s. One record a second each ("bookBn", "bookHl").
+let kOn = false, kGen = 0, kSock = {}, kBn = null, kBuf = [], kSnapAt = 0, kSnapBusy = false, kHl = null, kCo = null, kCoAt = 0, kAt = 0, kCoLast = 0, kPing = 0;
+async function kSnap(g) {
+  if (kSnapBusy || !kBn || (hold.bookBn && hold.bookBn > Date.now())) return;
+  kSnapBusy = true; kSnapAt = Date.now();
+  try {
+    const j = await getJson("bookBn", COLLECT.bnBookSub(sym).snap);
+    if (!kOn || g !== kGen) return;
+    kBn.apply(COLLECT.bookParse("bn", j));
+    const buf = kBuf; kBuf = []; for (const m of buf) kApply(m);
+  } catch (e) { say("book bn", e); }
+  finally { kSnapBusy = false; }
+}
+function kApply(m) { if (kBn.apply(m) === "resync") { say("book bn", "book out of step (" + JSON.stringify(kBn.stats()) + "), taking a new snapshot"); kBuf = []; } }
+function kOpenBn() {
+  const g = kGen; let w;
+  try { w = new WebSocket(COLLECT.bnBookSub(sym).url); } catch (e) { say("book bn", e); return; }
+  kSock.bn = {w, last:Date.now()};
+  kBn = COLLECT.perpBook("bn"); kBuf = [];
+  w.onopen = () => kSnap(g);
+  w.onmessage = ev => {
+    const s = kSock.bn; if (!s || s.w !== w) return;
+    s.last = Date.now(); let j; try { j = JSON.parse(ev.data); } catch { return; }
+    const m = COLLECT.bookParse("bn", j); if (!m) return;
+    if (!kBn.ready()) { kBuf.push(m); if (kBuf.length > 5000) kBuf.shift(); } else kApply(m);      // no good book yet: keep the diffs for when the snapshot arrives
+  };
+  w.onclose = () => { if (!kOn || g !== kGen) return; say("book bn", "closed, reopening"); kBn = COLLECT.perpBook("bn"); kBuf = []; setTimeout(() => { if (kOn && g === kGen) kOpenBn(); }, 5000); };
+}
+function kOpenHl() {
+  const g = kGen; let w;
+  try { w = new WebSocket("wss://api.hyperliquid.xyz/ws"); } catch (e) { say("book hl", e); return; }
+  kSock.hl = {w, last:Date.now()};
+  w.onopen = () => { try { w.send(JSON.stringify({method:"subscribe", subscription:{type:"l2Book", coin:sym.toUpperCase()}})); } catch {} };
+  w.onmessage = ev => {
+    const s = kSock.hl; if (!s || s.w !== w) return;
+    const now = s.last = Date.now(); let j; try { j = JSON.parse(ev.data); } catch { return; }
+    const b = COLLECT.hlBookParse(j, sym); if (b) kHl = {bids:b.bids, asks:b.asks, at:now};
+  };
+  w.onclose = () => { if (!kOn || g !== kGen) return; say("book hl", "closed, reopening"); kHl = null; setTimeout(() => { if (kOn && g === kGen) kOpenHl(); }, 5000); };
+}
+function depthClose() { kOn = false; kGen++; for (const id in kSock) try { kSock[id].w.close(); } catch {} kSock = {}; kBn = null; kBuf = []; kHl = null; kCo = null; kCoAt = 0; kSnapBusy = false; }
+function depthSync() {
+  const wanted = !!(want.book && recording && on);
+  if (wanted && !kOn) { kOn = true; kGen++; kHl = null; kCo = null; kCoAt = 0; kAt = Date.now(); kCoLast = 0; kOpenBn(); kOpenHl(); }
+  else if (!wanted && kOn) depthClose();
+}
+async function pollCoarse(g) {
+  const j = await getJson("bookCoarse", HLI, {method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({type:"l2Book", coin:sym.toUpperCase(), nSigFigs:4})});
+  if (!kOn || g !== kGen) return;
+  const c = COLLECT.hlCoarse(j); if (c) { kCo = c; kCoAt = Date.now(); }
+}
+function depthTick(now) {
+  if (!kOn) return;
+  if (now - kPing >= 30000) { kPing = now; const s = kSock.hl; if (s && s.w.readyState === 1) try { s.w.send(JSON.stringify({method:"ping"})); } catch {} }
+  for (const id in kSock) { const s = kSock[id]; if (now - s.last > 30000) try { s.w.close(); } catch {} }      // silent without closing: close it so onclose reopens it
+  if (kBn && !kBn.ready() && !kSnapBusy && kSock.bn && kSock.bn.w.readyState === 1 && now - kSnapAt >= 3000) kSnap(kGen);      // a book that was dropped (gap, crossed) gets a new snapshot
+  if (now - kCoLast >= 2000) { kCoLast = now; const g = kGen; run("bookCoarse", () => pollCoarse(g)); }
+  if (now - kAt >= 1000) {
+    kAt = now;
+    if (kBn) { const s = kBn.summary(); if (s) col("bookBn", now, s); }
+    const h = COLLECT.hlBookSummary(kHl, kCo, now, kCoAt); if (h) col("bookHl", now, h);
+  }
+}
+
 // ---- venue 24 h volume (slow collector "vol24"): each venue's own ticker, once a minute, dollars per venue id
 const V24 = id => { const C = sym.toUpperCase(), c = C + "USDT", H = {cache:"no-store"}; return {
   bnF: () => getJson("vol24", `${BN}/fapi/v1/ticker/24hr?symbol=${c}`), bnS: () => getJson("vol24", `https://api.binance.com/api/v3/ticker/24hr?symbol=${c}`),
@@ -276,6 +341,7 @@ function tick() {
   venuesTick(now);
   tradesTick(now);
   bookTick(now);
+  depthTick(now);
   if (want.vol24 && COLLECT.due(last.vol24, now, COLLECT.EVERY.vol24)) { last.vol24 = now; run("vol24", pollVol24); }
   if (want.wallets) {
     if (wsk && now - wsk.last > 30000) try { wsk.w.close(); } catch {}      // silent without closing (the coin's trades keep it busy): close it so onclose reopens it
@@ -293,7 +359,7 @@ function tick() {
 }
 self.onmessage = ev => {
   const m = ev.data;
-  if (m.t === "start") { on = true; gen++; venuesClose(); tradesClose(); bookClose(); walletsStop(); optionsStop(); sym = String(m.sym || "btc"); want = m.want || {derivs:true}; recOn = !!m.rec; mk = null; prevRatios = null; lastCal = Date.now(); for (const k of [last, busy, hold, said]) for (const i in k) delete k[i]; startAt = Date.now(); if (want.derivs) open(); if (want.wallets) walletsStart(); if (want.options) optionsStart(); venuesSync(); tradesSync(); clearInterval(timer); timer = setInterval(tick, 1000); tick(); }
-  else if (m.t === "rec") { recOn = !!m.on; venuesSync(); tradesSync(); bookSync(); }
-  else if (m.t === "stop") { venuesClose(); tradesClose(); bookClose(); walletsStop(); optionsStop(); on = false; gen++; clearInterval(timer); try { if (ws) ws.close(); } catch {} ws = null; }
+  if (m.t === "start") { on = true; gen++; venuesClose(); tradesClose(); bookClose(); depthClose(); walletsStop(); optionsStop(); sym = String(m.sym || "btc"); want = m.want || {derivs:true}; recOn = !!m.rec; recording = !!m.recording; mk = null; prevRatios = null; lastCal = Date.now(); for (const k of [last, busy, hold, said]) for (const i in k) delete k[i]; startAt = Date.now(); if (want.derivs) open(); if (want.wallets) walletsStart(); if (want.options) optionsStart(); venuesSync(); tradesSync(); depthSync(); clearInterval(timer); timer = setInterval(tick, 1000); tick(); }
+  else if (m.t === "rec") { recOn = !!m.on; recording = !!m.recording; venuesSync(); tradesSync(); bookSync(); depthSync(); }
+  else if (m.t === "stop") { venuesClose(); tradesClose(); bookClose(); depthClose(); walletsStop(); optionsStop(); on = false; gen++; clearInterval(timer); try { if (ws) ws.close(); } catch {} ws = null; }
 };

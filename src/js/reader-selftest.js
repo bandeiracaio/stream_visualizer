@@ -234,6 +234,30 @@ const READER_SELFTEST=(()=>{
       &&reg&&reg.speed==="fast"&&reg.owner==="worker"&&COLLECT.ownerOf("bookBy")==="bookPerp"&&COLLECT.ownerOf("bookOk")==="bookPerp"&&subs.length===2&&subs[0].sub.args[0]==="orderbook.1000.BTCUSDT"&&subs[1].sub.args[0].instId==="BTC-USDT-SWAP"&&subs[1].unsub.op==="unsubscribe",
       detail:J({r0,r1,s1,r2,s2,r3,r5,r6,r7,r8,st,o1,os1,o2,os2,o3,o4,c1,c2,c3,cmp})};
   });
+  add("collectors: Binance and Hyperliquid books in the worker: snapshot window as reach, stale and straddling first diff, pu chain, gap resync, flow, Hyperliquid parse, bucketed top-up and stale book",E=>{
+    const J=JSON.stringify,P=COLLECT.bookParse,T0=1792800000000;
+    const snap=id=>({lastUpdateId:id,E:T0,T:T0,bids:[["100000","2"],["99990","3"],["99900","5"]],asks:[["100001","1"],["100010","4"],["100100","6"]]});
+    const ev=(U,u,pu,b,a)=>({stream:"btcusdt@depth@100ms",data:{e:"depthUpdate",E:T0,T:T0,s:"BTCUSDT",U,u,pu,b,a}});
+    const b=COLLECT.perpBook("bn"),r0=b.apply(P("bn",ev(5,6,4,[["100000","1"]],[]))),r1=b.apply(P("bn",snap(100))),s1=b.summary();
+    const r2=b.apply(P("bn",ev(90,100,89,[["100000","9"]],[]))),r3=b.apply(P("bn",ev(95,105,99,[["99990","0"],["100000","2.5"],["99995","1"]],[["100001","0"],["100020","2"]]))),s3=b.summary();
+    const r4=b.apply(P("bn",ev(106,110,105,[],[]))),r5=b.apply(P("bn",ev(112,115,111,[],[]))),afterGap=b.ready();
+    const r6=b.apply(P("bn",snap(200))),r7=b.apply(P("bn",ev(250,260,249,[],[]))),afterFirst=b.ready();
+    const r8=b.apply(P("bn",snap(300))),r9=b.apply(P("bn",ev(300,301,299,[],[]))),r10=b.apply(P("bn",ev(302,303,301,[["99995","1"]],[]))),st=b.stats();
+    const raw=ev(1,2,0,[],[]).data,sub=COLLECT.bnBookSub("btc");
+    const lv=(px,sz,n)=>({px,sz,n:n||1}),hl={channel:"l2Book",data:{coin:"BTC",time:T0,levels:[[lv("100000","2"),lv("99999","1")],[lv("100001","1.5")]]}};
+    const h=COLLECT.hlBookParse(hl,"btc"),cur={bids:h.bids,asks:h.asks,at:T0},co=COLLECT.hlCoarse({coin:"BTC",levels:[[lv("99920","3"),lv("99500","4")],[lv("100080","3.5"),lv("100500","5")]]});
+    const h1=COLLECT.hlBookSummary(cur,null,T0+1000,0),h2=COLLECT.hlBookSummary(cur,co,T0+1000,T0+500),h3=COLLECT.hlBookSummary(cur,co,T0+1000,T0-20000),h4=COLLECT.hlBookSummary(cur,co,T0+6000,T0+5900),h5=COLLECT.hlBookSummary(null,co,T0,0);
+    const reg=COLLECT.REGISTRY.find(c=>c.id==="book");
+    return{ok:J(r0)==='"ignored"'&&r1==="snapshot"&&s1.mid===100000.5&&J(s1.d[1])==='[2,5]'&&J(s1.d[5])==='[5,5]'&&J(s1.d[10])==='[5,null]'&&J(s1.d[20])==='[null,null]'&&s1.reach[0]>=10&&s1.reach[1]<10
+      &&r2==="ignored"&&r3==="ok"&&s3.tb===2.5&&s3.ta===4&&Math.abs(s3.fl.b.add-1.5)<1e-9&&Math.abs(s3.fl.b.rem-3)<1e-9&&s3.fl.a.add===2&&s3.fl.a.rem===1&&s3.reach[0]>=10&&s3.reach[1]<10
+      &&r4==="ok"&&r5==="resync"&&!afterGap&&r6==="snapshot"&&r7==="resync"&&!afterFirst&&r8==="snapshot"&&r9==="ok"&&r10==="ok"&&b.ready()&&st.gap===2&&st.resync===2&&st.snap===3&&st.ign===2
+      &&P("bn",ev(1,2,0,[],[])).type==="delta"&&P("bn",raw).type==="delta"&&P("bn",raw).first===1&&P("bn",snap(1)).type==="snapshot"&&P("bn",{e:"aggTrade"})===null&&P("bn",{result:null,id:1})===null
+      &&sub.url.indexOf("/public/stream?streams=btcusdt@depth@100ms")>0&&sub.snap.indexOf("symbol=BTCUSDT&limit=1000")>0
+      &&J(h)==='{"bids":[[100000,2],[99999,1]],"asks":[[100001,1.5]]}'&&COLLECT.hlBookParse(hl,"eth")===null&&COLLECT.hlBookParse({channel:"subscriptionResponse"},"btc")===null&&COLLECT.hlBookParse(null,"btc")===null
+      &&co&&co.mid===100000&&h1&&h1.mid===100000.5&&h1.cAge===null&&h2.cAge===500&&h2.coarse.length>0&&h2.d[10][0]!==null&&h3.cAge===21000&&h3.coarse.length===0&&h4===null&&h5===null
+      &&reg&&reg.owner==="worker"&&reg.speed==="fast"&&COLLECT.ownerOf("bookBn")==="book"&&COLLECT.ownerOf("bookHl")==="book",
+      detail:J({r0,r1,s1,r2,r3,s3,r4,r5,r6,r7,r8,r9,r10,st,h,co,h1,h2,h3})};
+  });
   add("collectors: wallets: ranking over a window, position read from clearinghouseState, change rule, liquidation fills, predicted funding",E=>{
     const J=JSON.stringify,tr=COLLECT.walletTracker(1000);
     tr.note(100,["A","B"],500,100);tr.note(200,["A","C"],300,200);tr.note(300,["D","B"],100,300);tr.note(0,["Z"],-5,300);tr.note(0,"x",5,300);tr.note(NaN,["Q"],5,300);

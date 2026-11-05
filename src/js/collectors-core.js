@@ -14,7 +14,7 @@ const COLLECT = (() => {
     {id:"telemetry", label:"Self-telemetry: feed latency, message rates, gaps, clock offset", speed:"slow", on:true, owner:"worker", expectMs:30000, records:["feeds", "markPrice"]},
     {id:"derivs", label:"Derivatives context: funding, open interest, basis, liquidations, long/short and taker ratios (Binance, Hyperliquid)", speed:"slow", on:true, owner:"worker", expectMs:60000, records:["bnDerivs", "hlCtx", "ratios", "basis", "liq"]},
     {id:"calendar", label:"Calendar tags: funding times, 15m / 1h / 4h / daily / weekly / monthly closes, US open and close, options expiry (rules, no network)", speed:"slow", on:true, owner:"worker", expectMs:900000, records:["cal"]},
-    {id:"book", label:"Book depth (while recording): depth within 1 / 5 / 10 / 25 bps, spread, touch size, size added and removed per side (Binance, Hyperliquid)", speed:"fast", on:true, owner:"page", expectMs:10000, records:["bookBn", "bookHl"]},
+    {id:"book", label:"Book depth (while recording): depth within 1 / 5 / 10 / 20 bps, spread, touch size, size added and removed per side (Binance, Hyperliquid; the worker keeps its own books)", speed:"fast", on:true, owner:"worker", expectMs:10000, records:["bookBn", "bookHl"]},
     {id:"venues", label:"Extra venues (while recording or armed): Coinbase, Bybit and OKX quotes, Binance spot, perp marks and indexes, and the ETH / SOL / BNB / XRP / DOGE marks", speed:"fast", on:true, owner:"worker", expectMs:10000, records:["venues"]},
     {id:"tradeVol", label:"Venue trade volume (while recording or armed): coins traded per second on Binance, Bybit, OKX, Coinbase and Hyperliquid, perp and spot, buy and sell by aggressor", speed:"fast", on:true, owner:"worker", expectMs:10000, records:["tv"]},
     {id:"bookPerp", label:"Perp book depth, Bybit and OKX (while recording or armed): depth within 1 / 5 / 10 / 20 bps, spread, touch size, size added and removed per side, every 10 s, to compare with Binance and Hyperliquid", speed:"fast", on:true, owner:"worker", expectMs:10000, records:["bookBy", "bookOk"]},
@@ -853,14 +853,43 @@ const COLLECT = (() => {
       const d = Array.isArray(j.data) && j.data[0]; if (!j.arg || j.arg.channel !== "books" || !d || !Array.isArray(d.bids) || !Array.isArray(d.asks) || (j.action !== "snapshot" && j.action !== "update")) return null;
       return {venue:"ok", type:j.action === "snapshot" ? "snapshot" : "delta", bids:d.bids, asks:d.asks, seq:num(d.seqId), prev:num(d.prevSeqId), cs:num(d.checksum) ? num(d.checksum) : null};
     }
+    if (id === "bn") {      // Binance USD-M futures: a depthUpdate event (alone or inside the combined-stream wrapper {stream, data}) or the REST depth snapshot {lastUpdateId, bids, asks}
+      const d = j.data && typeof j.data === "object" && j.data.e ? j.data : j;
+      if (d.e === "depthUpdate" && Array.isArray(d.b) && Array.isArray(d.a) && num(d.u) != null) return {venue:"bn", type:"delta", bids:d.b, asks:d.a, seq:num(d.u), first:num(d.U), prev:num(d.pu), cs:null};
+      if (!d.e && num(d.lastUpdateId) != null && Array.isArray(d.bids) && Array.isArray(d.asks)) return {venue:"bn", type:"snapshot", bids:d.bids, asks:d.asks, seq:num(d.lastUpdateId), first:null, prev:null, cs:null};
+      return null;
+    }
     return null;
+  }
+  // Binance book for the worker (collector "book"): the diff stream (the public route, like the page's) and the REST snapshot it is applied on top of (1000 levels, about 17 bps for BTC)
+  function bnBookSub(coin) {
+    const C = String(coin || "BTC").toUpperCase(), c = C.toLowerCase();
+    return {id:"bn", url:"wss://fstream.binance.com/public/stream?streams=" + c + "usdt@depth@100ms", snap:"https://fapi.binance.com/fapi/v1/depth?symbol=" + C + "USDT&limit=1000"};
+  }
+  // Hyperliquid l2Book push for the coin -> {bids, asks} as [price, size] numbers, best first, or null for anything else (the default 20 exact levels; the bucketed book is asked for separately, hlCoarse)
+  function hlBookParse(j, coin) {
+    const d = j && j.channel === "l2Book" && j.data; if (!d || !Array.isArray(d.levels) || !Array.isArray(d.levels[0]) || !Array.isArray(d.levels[1])) return null;
+    if (coin && String(d.coin).toUpperCase() !== String(coin).toUpperCase()) return null;
+    const side = a => a.map(l => [num(l.px), num(l.sz)]).filter(l => l[0] > 0 && l[1] != null);
+    return {bids:side(d.levels[0]), asks:side(d.levels[1])};
+  }
+  // the l2Book answer aggregated to 4 significant figures (20 levels that reach about 24 bps for BTC) -> a book summary at the standard edges, or null
+  function hlCoarse(j) {
+    const L = j && j.levels; if (!Array.isArray(L) || !Array.isArray(L[0]) || !Array.isArray(L[1])) return null;
+    return book(L[0].map(l => [+l.px, +l.sz]), L[1].map(l => [+l.px, +l.sz]), BOOK_EDGES);
+  }
+  // the "bookHl" record payload: the exact book (cur = {bids, asks, at}) topped up with the bucketed one where it reaches deeper; null when the exact book is missing or older than 5 s
+  function hlBookSummary(cur, coarse, nowMs, coarseAt) {
+    if (!cur || !(nowMs - cur.at < 5000)) return null;
+    const fine = book(cur.bids, cur.asks), m = mergeBook(fine, coarse && nowMs - coarseAt < 10000 ? coarse : null);
+    return m ? Object.assign(m, {cAge:coarseAt ? nowMs - coarseAt : null}) : null;
   }
   const CRC_T = (() => { const t = []; for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t.push(c >>> 0); } return t; })();
   const crc32 = s => { let c = 0xFFFFFFFF; for (let i = 0; i < s.length; i++) c = CRC_T[(c ^ s.charCodeAt(i)) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) | 0; };
-  // venue "by" | "ok"; opt.ct = coin per contract (OKX), opt.edges, opt.flowBps (flow window, default 20 bps), opt.maxLevels (levels a side the summary uses: the venue's window, 1000 Bybit / 400 OKX)
+  // venue "by" | "ok" | "bn" (Binance: REST snapshot, then diffs; the first diff must straddle the snapshot id, later ones chain on pu; the summary claims only the snapshot window as reach); opt.ct = coin per contract (OKX), opt.edges, opt.flowBps (flow window, default 20 bps), opt.maxLevels (levels a side the summary uses: the venue's window, 1000 Bybit / 400 OKX)
   function perpBook(venue, opt) {
-    opt = opt || {}; const ct = venue === "ok" ? (opt.ct > 0 ? opt.ct : null) : 1, edges = opt.edges || BOOK_EDGES, flow = flowStat(opt.flowBps || 20), cap = opt.maxLevels || (venue === "ok" ? 400 : 1000), bids = new Map(), asks = new Map();
-    let ready = false, lastSeq = null, bb = -Infinity, ba = Infinity; const st = {snap:0, upd:0, gap:0, cross:0, csum:0, ign:0, bad:0, resync:0};
+    opt = opt || {}; const ct = venue === "ok" ? (opt.ct > 0 ? opt.ct : null) : 1, edges = opt.edges || BOOK_EDGES, flow = flowStat(opt.flowBps || 20), cap = opt.maxLevels || (venue === "ok" ? 400 : venue === "bn" ? Infinity : 1000), bids = new Map(), asks = new Map();
+    let ready = false, lastSeq = null, bb = -Infinity, ba = Infinity, firstDelta = false, snapLo = 0, snapHi = 0; const st = {snap:0, upd:0, gap:0, cross:0, csum:0, ign:0, bad:0, resync:0};
     const qty = e => num(e[1])*ct;
     const rescan = () => { bb = -Infinity; ba = Infinity; for (const p of bids.keys()) if (p > bb) bb = p; for (const p of asks.keys()) if (p < ba) ba = p; };
     function setLevel(isBid, e, track) {
@@ -887,10 +916,16 @@ const COLLECT = (() => {
           for (const e of m.bids) setLevel(true, e, false); for (const e of m.asks) setLevel(false, e, false);
           if (!bids.size || !asks.size || crossed()) return fail("cross");
           if (m.cs != null && checksum() !== m.cs) return fail("csum");
-          ready = true; lastSeq = m.seq; st.snap++; return "snapshot";
+          ready = true; lastSeq = m.seq; st.snap++; firstDelta = venue === "bn";
+          if (venue === "bn") { snapLo = Infinity; snapHi = 0; for (const p of bids.keys()) if (p < snapLo) snapLo = p; for (const p of asks.keys()) if (p > snapHi) snapHi = p; }      // how far the snapshot reaches: past it the local book is incomplete
+          return "snapshot";
         }
         if (!ready) { st.ign++; return "ignored"; }
-        if (venue === "by" ? m.seq !== lastSeq + 1 : m.prev !== lastSeq) return fail("gap");
+        if (venue === "bn" && firstDelta) {      // the first event after a snapshot: drop what the snapshot already holds, then it must straddle the snapshot id
+          if (m.seq <= lastSeq) { st.ign++; return "ignored"; }
+          if (m.first > lastSeq + 1) return fail("gap");
+          firstDelta = false;
+        } else if (venue === "by" ? m.seq !== lastSeq + 1 : m.prev !== lastSeq) return fail("gap");
         for (const e of m.bids) setLevel(true, e, true); for (const e of m.asks) setLevel(false, e, true);
         lastSeq = m.seq; st.upd++;
         if (!bids.size || !asks.size || crossed()) return fail("cross");
@@ -904,7 +939,9 @@ const COLLECT = (() => {
         const fl = flow.take(); if (!ready) return null;
         // keep the nearest `cap` levels a side: the venue's window is that deep, and a local book keeps stray levels beyond it that are incomplete (their reach would be claimed as depth)
         const arr = (m, isBid) => { const a = []; for (const [, e] of m) a.push([+e[0], qty(e)]); if (a.length > cap) { a.sort((x, y) => isBid ? y[0] - x[0] : x[0] - y[0]); a.length = cap; } return a; };
-        const s = book(arr(bids, true), arr(asks, false), edges); return s ? Object.assign(s, {fl, rs:st.resync}) : null;
+        let reach = null;
+        if (venue === "bn") { const mid = (bb + ba)/2; reach = mid > 0 ? [Math.max(0, (mid - snapLo)*1e4/mid), Math.max(0, (snapHi - mid)*1e4/mid)] : [0, 0]; }      // Binance: the snapshot window, not the farthest stray level
+        const s = book(arr(bids, true), arr(asks, false), edges, reach); return s ? Object.assign(s, {fl, rs:st.resync}) : null;
       },
       best: () => ready ? [bb, ba] : null,
     };
@@ -929,5 +966,5 @@ const COLLECT = (() => {
     for (let i = recs.length - 1; i >= 0; i--) { const b = JSON.stringify(recs[i]).length + 1; if (size + b > lim) break; size += b; out.push(recs[i]); }
     return out.reverse();
   }
-  return {REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, due, calendar, OWNER, EXPECT_MS, ownerOf, tally, ageText, health, FEATURES, FEATURE_INFO, featureSeries, featureMaxAge, context, venueLead, leadText, liqDriven, usdText, wallQuality, marketState, marketStateSeries, STATE_VERSION, EVENT_LABEL, evSpan, eventsNear, eventClock, volLens, lensSeries, gridReturns, LENS_TEXT, walletSeries, takerNet, crowdIndex, crowdNetAt, whaleFlow, whaleSeries, WHALE_FLOOR_USD, deribitCoin, optName, optionsChain, walletTracker, walletPosition, walletChanged, liqFills, predictedFunding, WALLET_TOP, WALLET_REFRESH_MS, MAJORS, TRADE_IDS, TRADE_ORDER, tradeSubs, okxCt, tradeParse, tradeBook, tradeRows, tradeShare, vol24Parse, vol24Share, bookSubs, bookParse, perpBook, crc32, bookCompare, BOOK_PERP, BOOK_PERP_ORDER, BOOK_PERP_REC, venueSubs, venueParse, venueApply, venueRecord, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
+  return {REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, due, calendar, OWNER, EXPECT_MS, ownerOf, tally, ageText, health, FEATURES, FEATURE_INFO, featureSeries, featureMaxAge, context, venueLead, leadText, liqDriven, usdText, wallQuality, marketState, marketStateSeries, STATE_VERSION, EVENT_LABEL, evSpan, eventsNear, eventClock, volLens, lensSeries, gridReturns, LENS_TEXT, walletSeries, takerNet, crowdIndex, crowdNetAt, whaleFlow, whaleSeries, WHALE_FLOOR_USD, deribitCoin, optName, optionsChain, walletTracker, walletPosition, walletChanged, liqFills, predictedFunding, WALLET_TOP, WALLET_REFRESH_MS, MAJORS, TRADE_IDS, TRADE_ORDER, tradeSubs, okxCt, tradeParse, tradeBook, tradeRows, tradeShare, vol24Parse, vol24Share, bookSubs, bookParse, bnBookSub, hlBookParse, hlCoarse, hlBookSummary, perpBook, crc32, bookCompare, BOOK_PERP, BOOK_PERP_ORDER, BOOK_PERP_REC, venueSubs, venueParse, venueApply, venueRecord, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
 })();
