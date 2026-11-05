@@ -100,6 +100,8 @@ function colStatus() {
     el.textContent = h.text; el.className = "stat" + (h.tone === "ok" || h.tone === "warn" || h.tone === "info" ? " sb-" + h.tone : "");
   }
 }
+// the collectors that should have been writing during a recording (switched on; options only exist for BTC and ETH): what the quality summary in a session file judges (SQ.collectors)
+const colExpected = () => { const sym = cl$("sym").value.trim(); return COLLECT.REGISTRY.filter(c => colOn(c.id) && (c.id !== "options" || COLLECT.deribitCoin(sym))); };
 function colRender() {
   const box = cl$("colList"); if (!box) return;
   box.innerHTML = COLLECT.REGISTRY.map(c => `<div style="margin:3px 0"><label class="stat" style="display:block"><input type="checkbox" data-col="${c.id}"${colOn(c.id) ? " checked" : ""}> ${c.label}</label><span id="colSt-${c.id}" class="stat" style="margin-left:22px"></span></div>`).join("");

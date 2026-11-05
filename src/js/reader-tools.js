@@ -68,13 +68,14 @@ rt$("rtSave").onclick = async () => {
   const quality = SQ.of(s.inputs), health = typeof HL !== "undefined" ? HL.ev.filter(e => e.t >= (s.startedAt || 0) - 60000).slice(-60) : null;      // how complete it is, and what the page noted meanwhile
   const pre = typeof AR !== "undefined" && AR.pre && AR.pre.at >= (s.startedAt || 0) - 120000 && AR.pre.at <= (s.startedAt || 0) + 120000 ? AR.pre : null;      // auto-record's 30 minutes of mark price before the trigger
   const ext = await colSlice(s.startedAt, pre ? 1800000 : 60000);      // collector records (collectors.js); the engine never sees them. An auto-recording takes 30 minutes before the trigger, like its `pre` prices
+  if (typeof colExpected === "function") { const c = SQ.collectors(ext, s.startedAt || 0, quality.t1, colExpected()); if (c) quality.collectors = c; }      // which collectors wrote during the recording and how long each was silent
   const text = JSON.stringify({kind:"sv-session", v:1, sym:s.sym, startedAt:s.startedAt, baseline:s.baseline || null, quality, health, pre, ext, inputs:s.inputs});
   const gz = typeof CompressionStream !== "undefined", name = base + (gz ? ".json.gz" : ".json");
   const blob = gz ? await new Response(new Blob([text]).stream().pipeThrough(new CompressionStream("gzip"))).blob() : new Blob([text], {type:"application/json"});
   const inFolder = typeof fsSave === "function" ? await fsSave(name, blob) : false;      // the chosen save folder (folder-save.js); if there is none, or it failed, download as before
   if (!inFolder) rtDownload(blob, name);
   const kept = typeof rcKeep === "function" ? await rcKeep(name, blob, {sym:s.sym, startedAt:s.startedAt, quality}) : false;      // a copy stays on the device (recordings.js)
-  rtMsg("Saved" + (quality.verdict === "complete" ? "" : ` (${SQ.line(quality)})`) + (inFolder ? ` into the folder "${FS.name}".` : ".") + (kept ? " A copy is kept on this device (Recordings, Saved)." : "") + " Load it later (or on another device) with Load session.");
+  rtMsg("Saved" + (SQ.clean(quality) ? "" : ` (${SQ.line(quality)})`) + (inFolder ? ` into the folder "${FS.name}".` : ".") + (kept ? " A copy is kept on this device (Recordings, Saved)." : "") + " Load it later (or on another device) with Load session.");
 };
 rt$("rtLoadBtn").onclick = () => rt$("rtLoad").click();
 async function rtReadSessionFile(f){

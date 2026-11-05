@@ -103,7 +103,7 @@ function amRecordings(now) {
   h += amRow("Kept on this device", `${all} file${all === 1 ? "" : "s"} in total`);
   if (typeof FS !== "undefined" && FS.supported) h += amRow("Save folder", !FS.dir ? "none (downloads)" : FS.perm !== "granted" ? `"${amEsc(FS.name)}" needs OK` : `"${amEsc(FS.name)}" · ${FS.log.filter(r => r.ok).length} written`, FS.dir && FS.perm === "granted" ? "ok" : "warn");
   const inFolder = n => typeof FS !== "undefined" && FS.log.some(r => r.ok && r.name === n);
-  h += rows.length ? rows.slice(0, 8).map(r => `<div class="am-ep"><b>${amClock(r.at)}</b> ${amEsc(r.name)} · ${amSize(r.size)}${inFolder(r.name) ? " · in folder" : ""}${r.quality ? ` · <span class="${r.quality.verdict === "complete" ? "" : "am-t-warn"}">${amEsc(amTry(() => SQ.line(r.quality), ""))}</span>` : ""}</div>`).join("") : `<div class="note">Nothing saved since this page opened.</div>`;
+  h += rows.length ? rows.slice(0, 8).map(r => `<div class="am-ep"><b>${amClock(r.at)}</b> ${amEsc(r.name)} · ${amSize(r.size)}${inFolder(r.name) ? " · in folder" : ""}${r.quality ? ` · <span class="${SQ.clean(r.quality) ? "" : "am-t-warn"}">${amEsc(amTry(() => SQ.line(r.quality), ""))}</span>` : ""}</div>`).join("") : `<div class="note">Nothing saved since this page opened.</div>`;
   return h;
 }
 function amHealth(now) {

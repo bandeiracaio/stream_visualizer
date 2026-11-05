@@ -1003,6 +1003,24 @@ const READER_SELFTEST=(()=>{
     const t=l=>l.map(c=>c.text).join(" | ");
     return{ok:t(learn)==="armed · learning 4/15 min | 2 saved"&&t(wait)==="armed · waiting | screen may sleep | 2 saved"&&t(rec)==="auto REC 3:12 | 2 saved"&&/^REC 1:05 · 12[.,  ]?345 inputs/.test(t(man)),detail:[t(learn),t(wait),t(rec),t(man)].join(" // ")};
   });
+  add("session quality: each collector's records, minutes and longest silence over the recording; none / holes / ok; slow writers and the lead-in are not judged; the list line names the problem",E=>{
+    const J=JSON.stringify,T0=1792800000000,MIN=60000,to=T0+10*MIN;
+    const reg=[{id:"venues",records:["venues"],expectMs:10000},{id:"book",records:["bookBn","bookHl"],expectMs:10000},{id:"derivs",records:["bnDerivs"],expectMs:60000},{id:"calendar",records:["cal"],expectMs:900000},{id:"options",records:["dvol"],expectMs:60000}];
+    const ext=[];
+    for(let t=T0-5*MIN;t<=to;t+=10000)ext.push(["c","venues",t,{}]);                 // before the start too: the lead-in is not counted
+    for(let t=T0+1000;t<=to;t+=1000){ if(t>T0+3*MIN&&t<T0+8*MIN)continue; ext.push(["c","bookBn",t,{}]); }      // book: silent 5 minutes in the middle
+    for(let t=T0;t<=to;t+=60000)ext.push(["c","bnDerivs",t,{}]);
+    ext.push(["x"],["c","zzz",T0+5,{}],["c","venues","bad",{}]);
+    const c=SQ.collectors(ext,T0,to,reg),q={verdict:"complete",dataMinutes:10,minutes:10,longestGapSec:1,clock:100,collectors:c};
+    const none=SQ.collectors(ext,T0,to,[{id:"derivs",records:["wallets"],expectMs:60000}]);
+    const short=SQ.collectors(ext,T0,T0+60000,reg),old={verdict:"complete",dataMinutes:10,minutes:10,longestGapSec:1,clock:100};
+    const withIn=SQ.of([["q","bn",T0,1,2],["q","bn",T0+MIN,1,2]]);
+    return{ok:c.venues.state==="ok"&&c.venues.min===10&&c.venues.of===10&&c.book.state==="holes"&&c.book.gapSec===300&&c.book.min<=6&&c.book.n>0&&c.derivs.state==="ok"&&c.calendar===undefined&&c.options.state==="none"&&c.options.n===0&&c.options.gapSec===600
+      &&none.derivs.state==="none"&&short===null&&SQ.collectors(ext,T0,to,null)===null&&SQ.collectors([],T0,to,reg).venues.state==="none"
+      &&J(SQ.colProblems(q).map(p=>p.id))==='["book","options"]'&&!SQ.clean(q)&&SQ.clean(old)&&SQ.colProblems(old).length===0&&SQ.line(old)==="10 of 10 min with data"
+      &&SQ.line(q)==="10 of 10 min with data; collectors: book silent 5 min, options no data"&&SQ.line(Object.assign({},old,{collectors:{a:{state:"holes",gapSec:90},b:{state:"ok"}}}))==="10 of 10 min with data; collectors: a silent 90 s"
+      &&withIn.t0===T0&&withIn.t1===T0+MIN,detail:J({c,none,short,line:SQ.line(q)})};
+  });
   add("status: a lost, failing or missing save folder is shown while armed or recording, and only then",E=>{
     const base={connected:false,paused:false,online:true,venues:{},rec:{on:false},kept:0},arm={on:true,ready:true,mode:"waiting",wake:true};
     const t=l=>l.map(c=>c.text).join(" | "),f=(st,extra)=>Object.assign({},base,{ar:arm,folder:Object.assign({state:st},extra)});
