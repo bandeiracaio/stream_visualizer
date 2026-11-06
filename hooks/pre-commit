@@ -1,0 +1,41 @@
+#!/bin/sh
+# Pre-commit: (1) fail if a staged text file changed line-ending style, (2) fail if `node build.mjs` fails.
+# Bypass once with: git commit --no-verify
+
+cd "$(git rev-parse --show-toplevel)" || exit 1
+tmp=$(mktemp -d) || exit 1
+trap 'rm -rf "$tmp"' EXIT
+
+# lf | crlf | mixed | empty  (mixed = some lines CRLF, some LF, e.g. reader-selftest.js)
+style() {
+  total=$(grep -c '' "$1")
+  crlf=$(tr -cd '\r' < "$1" | wc -c)
+  if   [ "$total" -eq 0 ];      then echo empty
+  elif [ "$crlf"  -eq 0 ];      then echo lf
+  elif [ "$crlf"  -eq "$total" ]; then echo crlf
+  else echo mixed; fi
+}
+
+bad=0
+git diff --cached --name-only --diff-filter=M | while IFS= read -r f; do
+  # binary files show "-" in numstat; skip them
+  git diff --cached --numstat -- "$f" | grep -q '^-' && continue
+  git show "HEAD:$f" > "$tmp/a" 2>/dev/null || continue
+  git show ":$f"     > "$tmp/b" || continue
+  a=$(style "$tmp/a"); b=$(style "$tmp/b")
+  if [ "$a" != "$b" ] && [ "$a" != empty ]; then
+    echo "pre-commit: line endings changed in $f ($a -> $b)" >&2
+    echo x >> "$tmp/bad"
+  fi
+done
+if [ -s "$tmp/bad" ]; then
+  echo "pre-commit: edit without converting (see CLAUDE.md > Build), then re-stage. Bypass: git commit --no-verify" >&2
+  exit 1
+fi
+
+if ! node build.mjs > "$tmp/build.log" 2>&1; then
+  tail -n 25 "$tmp/build.log" >&2
+  echo "pre-commit: node build.mjs failed; commit aborted." >&2
+  exit 1
+fi
+exit 0
