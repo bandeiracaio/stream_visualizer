@@ -1,5 +1,5 @@
 "use strict";
-// Account info (view, Trade area): every balance, the open positions with leverage and margin type, position and asset mode, fee rates and
+// Account info (header panel): every balance, the open positions with leverage and margin type, position and asset mode, fee rates and
 // whether the key may trade. Read-only: it only sends GET requests (aiGet below), loads when the view opens and on Refresh, never on a timer.
 // Rows come from history-core.js (HIST.account / HIST.simAccount). Spec: .scratch/order-history/spec.md.
 const AI = {busy:false, data:null, errs:[], at:0, mode:null};
@@ -34,7 +34,7 @@ function aiTable(head, rows) {
 }
 function aiRender() {
   const head = ai$("aiHead"), err = ai$("aiErr"), body = ai$("aiBody"); if (!head) return;
-  if (!ACC.mode) { head.textContent = "No account connected. Log in on the Accounts tab."; err.innerHTML = ""; body.innerHTML = ""; return; }
+  if (!ACC.mode) { head.textContent = "No account connected. Log in with the account button in the header."; err.innerHTML = ""; body.innerHTML = ""; return; }
   const name = ACC.mode === "sim" ? "Simulated paper" : ACC.mode === "demo" ? "Binance demo (paper)" : "Binance LIVE (real money)";
   head.innerHTML = aiEsc(name) + (AI.busy ? " · loading…" : AI.at && AI.mode === ACC.mode ? " · updated " + hhmmss(AI.at).slice(0, 8) : "");
   err.innerHTML = AI.errs.map(e => `<div class="acc-msg err">${aiEsc(e)}</div>`).join("");
@@ -59,6 +59,5 @@ function aiRender() {
 }
 
 ai$("aiRefresh").onclick = aiLoad;
-VIEWS.onOpen("accinfo", () => { if (Date.now() - AI.at > 5000) aiLoad(); });   // open the view: load (not more than once in 5 s)
 HOOKS.on("logout", () => { AI.data = null; AI.errs = []; AI.mode = null; AI.at = 0; aiRender(); });      // another account must never show this one's balances
 aiRender();

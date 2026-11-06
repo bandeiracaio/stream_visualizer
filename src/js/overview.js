@@ -145,6 +145,6 @@ function renderOverview(){
 ov$("ovWin").onchange = () => { if (typeof visible==="function" && visible("overview")) renderOverview(); };
 ov$("ovOpenReader").onclick = () => setTab("reader");
 ov$("ovOpenState").onclick = () => setTab("reader");
-ov$("ovOpenAcc").onclick = () => setTab("accounts");
+ov$("ovOpenAcc").onclick = () => accPanelOpen("switch");
 ov$("ovOpenRec").onclick = () => setTab("record");
 ov$("ovOpenCharts").onclick = () => setTab("market");

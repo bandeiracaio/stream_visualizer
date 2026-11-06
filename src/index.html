@@ -19,9 +19,51 @@
   <span class="stat pill">BN <b id="bnState">off</b></span>
   <span class="stat pill">HL <b id="hlState">off</b></span>
   <button id="catLock" aria-pressed="false">🐱</button>
-  <span id="accBadge"></span>
+  <span id="accSplit" class="split"><button id="accMain" title="Account info (or connect an account)"><span class="dot"></span><b id="accLbl">Account</b><span id="accPnl"></span></button><button id="accCaret" title="Switch or connect an account" aria-label="Switch or connect an account" aria-expanded="false">▾</button></span>
   <button id="cog" title="Settings" aria-expanded="false">⚙ <span id="symLbl">BTC</span></button>
   <div id="alerts"></div>
+  <section id="accSwitchPanel" class="accpanel" hidden>
+    <h2>Accounts <span class="ctl"><button id="accClose1" aria-label="Close">✕</button></span></h2>
+    <div class="headline" id="accActive">No account connected.</div>
+    <div class="acc-grid">
+      <div class="acc-card">
+        <h3>Simulated paper</h3>
+        <p>Paper trading inside this page, filled against live Binance prices (market at bid/ask, limits when the tape trades through). No keys, nothing sent anywhere.</p>
+        <label class="row">Start balance (USDT) <input id="simStart" type="number" value="10000" style="width:110px"></label>
+        <button id="simGo" class="primary">Start simulated account</button>
+        <div class="acc-msg" id="simMsg"></div>
+      </div>
+      <div class="acc-card">
+        <h3>Binance demo</h3>
+        <p>Binance's own paper-trading futures account (demo-fapi.binance.com). Use keys created in Binance Demo Trading.</p>
+        <input id="demoKey" type="text" placeholder="API key" autocomplete="off" spellcheck="false">
+        <input id="demoSecret" type="password" placeholder="Secret key" autocomplete="new-password">
+        <button id="demoGo" class="primary">Connect demo</button>
+        <div class="acc-msg" id="demoMsg"></div>
+      </div>
+      <div class="acc-card live">
+        <h3>Binance live — real money</h3>
+        <p>Orders are real and can lose money. Every order asks for confirmation and is capped at the max order value below.</p>
+        <input id="liveKey" type="text" placeholder="API key" autocomplete="off" spellcheck="false">
+        <input id="liveSecret" type="password" placeholder="Secret key" autocomplete="new-password">
+        <label class="row">Max order value (USD) <input id="liveMax" type="number" value="500" style="width:100px"></label>
+        <label class="row" style="align-items:flex-start"><input id="liveAck" type="checkbox" style="width:auto;margin-top:3px"> I understand orders placed here are real and I am responsible for them.</label>
+        <button id="liveGo" style="border-color:var(--sell);color:var(--sell);font-weight:600">Connect live</button>
+        <div class="acc-msg" id="liveMsg"></div>
+      </div>
+    </div>
+    <div class="row" style="margin-top:10px"><button id="logout">Log out</button></div>
+    <div class="note">Keys stay only in this page's memory: never saved, only ever sent to Binance, and gone when you refresh or log out. Use keys with USD-M futures trading enabled and <b>withdrawals disabled</b>. Orders are one-way mode (not hedge mode), on the asset selected in the header (e.g. BTC → BTCUSDT). If Binance or the browser refuses signed requests from a local file, the error is shown here.</div>
+  </section>
+
+  <section id="accInfoPanel" class="accpanel" hidden>
+    <h2>Account info <span class="ctl"><button id="aiRefresh">Refresh</button><button id="accClose2" aria-label="Close">✕</button></span></h2>
+    <div class="headline" id="aiHead">No account connected.</div>
+    <div id="aiErr"></div>
+    <div id="aiBody"></div>
+    <div class="note">Read-only: this view only asks Binance for information and never places or cancels anything. It loads when you open it and when you press Refresh (not on a timer, to stay inside Binance's request limits). The simulated account shows its own balance, fees and positions.</div>
+  </section>
+
   <nav id="groups"></nav>
   <nav id="views" hidden></nav>
   <div id="sheet" hidden>
@@ -124,7 +166,7 @@
       <div class="fs-row"><input id="fsSize" type="number" value="100" min="0" step="any"> USD
         <button id="fsBuy" class="buy">Buy now</button><button id="fsSell" class="sell">Sell now</button><button id="fsClose">Close position</button><button id="fsStart">Start paper account</button></div>
       <div class="note" id="fsMsg"></div><div class="metrics" id="fsPos"></div>
-      <div class="note">Orders go to the account chosen on the Accounts tab (paper, demo or live) on the asset in the header, at the Binance bid / ask, whatever venue the chart shows. A live account still asks for confirmation.</div>
+      <div class="note">Orders go to the account chosen with the account button in the header (paper, demo or live) on the asset in the header, at the Binance bid / ask, whatever venue the chart shows. A live account still asks for confirmation.</div>
     </div>
     <details class="fs-box"><summary>The setup: what to build and what to look for</summary>
       <ol><li><b>Stack three things on one time axis</b>: liquidations, volume delta (taker buy minus sell $), open interest. Price (here over the order-book heatmap) sits on top.</li>
@@ -365,40 +407,6 @@
     <div id="tgrid"></div>
   </section>
 
-  <section data-tab="accounts" class="full">
-    <h2>Accounts</h2>
-    <div class="headline" id="accActive">No account connected.</div>
-    <div class="acc-grid">
-      <div class="acc-card">
-        <h3>Simulated paper</h3>
-        <p>Paper trading inside this page, filled against live Binance prices (market at bid/ask, limits when the tape trades through). No keys, nothing sent anywhere.</p>
-        <label class="row">Start balance (USDT) <input id="simStart" type="number" value="10000" style="width:110px"></label>
-        <button id="simGo" class="primary">Start simulated account</button>
-        <div class="acc-msg" id="simMsg"></div>
-      </div>
-      <div class="acc-card">
-        <h3>Binance demo</h3>
-        <p>Binance's own paper-trading futures account (demo-fapi.binance.com). Use keys created in Binance Demo Trading.</p>
-        <input id="demoKey" type="text" placeholder="API key" autocomplete="off" spellcheck="false">
-        <input id="demoSecret" type="password" placeholder="Secret key" autocomplete="new-password">
-        <button id="demoGo" class="primary">Connect demo</button>
-        <div class="acc-msg" id="demoMsg"></div>
-      </div>
-      <div class="acc-card live">
-        <h3>Binance live — real money</h3>
-        <p>Orders are real and can lose money. Every order asks for confirmation and is capped at the max order value below.</p>
-        <input id="liveKey" type="text" placeholder="API key" autocomplete="off" spellcheck="false">
-        <input id="liveSecret" type="password" placeholder="Secret key" autocomplete="new-password">
-        <label class="row">Max order value (USD) <input id="liveMax" type="number" value="500" style="width:100px"></label>
-        <label class="row" style="align-items:flex-start"><input id="liveAck" type="checkbox" style="width:auto;margin-top:3px"> I understand orders placed here are real and I am responsible for them.</label>
-        <button id="liveGo" style="border-color:var(--sell);color:var(--sell);font-weight:600">Connect live</button>
-        <div class="acc-msg" id="liveMsg"></div>
-      </div>
-    </div>
-    <div class="row" style="margin-top:10px"><button id="logout">Log out</button></div>
-    <div class="note">Keys stay only in this page's memory: never saved, only ever sent to Binance, and gone when you refresh or log out. Use keys with USD-M futures trading enabled and <b>withdrawals disabled</b>. Orders are one-way mode (not hedge mode), on the asset selected in the header (e.g. BTC → BTCUSDT). If Binance or the browser refuses signed requests from a local file, the error is shown here.</div>
-  </section>
-
   <section data-tab="history" class="full">
     <h2>History <span class="ctl"><button id="hsStop" style="display:none">Stop</button><button id="hsRefresh">Refresh</button><button id="hsCsv" disabled>Download CSV</button></span></h2>
     <div class="headline" id="hsHead">No account connected.</div>
@@ -414,14 +422,6 @@
     <div id="hsTotals" class="metrics"></div>
     <div id="hsTable"></div>
     <div class="note" id="hsNote"></div>
-  </section>
-
-  <section data-tab="accinfo" class="full">
-    <h2>Account info <span class="ctl"><button id="aiRefresh">Refresh</button></span></h2>
-    <div class="headline" id="aiHead">No account connected.</div>
-    <div id="aiErr"></div>
-    <div id="aiBody"></div>
-    <div class="note">Read-only: this view only asks Binance for information and never places or cancels anything. It loads when you open it and when you press Refresh (not on a timer, to stay inside Binance's request limits). The simulated account shows its own balance, fees and positions.</div>
   </section>
 
   <section data-tab="market">
@@ -523,6 +523,9 @@
 </script>
 <script>
 <!--@include js/account-info.js-->
+</script>
+<script>
+<!--@include js/account-button.js-->
 </script>
 <script>
 <!--@include js/order-history.js-->

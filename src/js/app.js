@@ -535,9 +535,7 @@ VIEWS.register({id:"saved", label:"Saved", area:"rec", slot:"reader"});
 VIEWS.register({id:"healthlog", label:"Health log", area:"rec", slot:"reader"});
 VIEWS.register({id:"collectors", label:"Collectors", area:"rec", slot:"reader"});
 VIEWS.register({id:"trading", label:"Trading", area:"trade", minIntervalMs:400, render:()=>renderTrading()});
-VIEWS.register({id:"accounts", label:"Accounts", area:"trade"});
 VIEWS.register({id:"history", label:"History", area:"trade"});
-VIEWS.register({id:"accinfo", label:"Account info", area:"trade"});
 VIEWS.register({id:"streams", label:"Streams", area:"system"});
 VIEWS.register({id:"health", label:"Feed health", area:"system"});
 VIEWS.register({id:"raw", label:"Raw", area:"system"});
@@ -687,7 +685,7 @@ setInterval(()=>{ if (ACC.mode && ACC.mode!=="sim") accRefresh(); }, 3000);
 const refreshSoon = () => setTimeout(accRefresh, 400);
 
 async function placeOrder(o){
-  if (!ACC.mode) throw new Error("no account; log in on the Accounts tab");
+  if (!ACC.mode) throw new Error("no account; log in with the account button in the header");
   const f = await loadFilters();
   const q = +roundStep(o.qty, f.step);
   if (!(q > 0) || q < f.minQty) throw new Error(`size below the minimum of ${f.minQty} ${accAsset()}`);
@@ -723,11 +721,11 @@ function logout(){
   HOOKS.emit("logout");
 }
 function renderAccount(){
-  const b = $("accBadge"); b.className = ACC.mode || ""; b.textContent = ACC.mode ? ACC.mode.toUpperCase() : "";
   $("accActive").innerHTML = !ACC.mode ? "No account connected." :
     ACC.mode==="sim" ? `Connected: <b>simulated paper</b> · started with $${fmtK(SIM.start)}` :
     ACC.mode==="demo" ? `Connected: <b>Binance demo</b> (paper)` :
     `Connected: <b style="color:var(--sell)">Binance LIVE — real money</b> · max order $${ACC.maxUsd}`;
+  HOOKS.emit("renderAccount");
 }
 function accMsg(which, txt, ok){ const el = $(which+"Msg"); el.className = "acc-msg " + (ok ? "ok" : "err"); el.textContent = txt; }
 $("simGo").onclick = () => {
@@ -775,7 +773,7 @@ function buildModCatalog(){
 function tagViewSections(){
   let i = 0;
   document.querySelectorAll("main > section").forEach(sec=>{
-    const t = sec.dataset.tab; if (!t || t==="trading" || t==="accounts" || t==="history" || t==="accinfo" || sec.classList.contains("ph")) return;
+    const t = sec.dataset.tab; if (!t || t==="trading" || t==="history" || sec.classList.contains("ph")) return;
     const h2 = sec.querySelector("h2"); if (!h2) return;
     sec.dataset.mid = "v-"+(i++); sec.dataset.title = (h2.childNodes[0].textContent || "").trim() || "panel";
   });
@@ -845,11 +843,11 @@ function renderTicket(){
   const unit = $("tkUnit"); unit.options[1].textContent = accAsset();
   const type = $("tkType").value, raw = +$("tkQty").value, ref = type==="LIMIT" ? +$("tkPx").value : (tkSide==="BUY" ? M.bnAsk : M.bnBid);
   const qty = ref ? (unit.value==="usd" ? raw/ref : raw) : 0;
-  $("tkInfo").innerHTML = `bid ${fmt(M.bnBid,1)} · ask ${fmt(M.bnAsk,1)}<br>${raw && ref ? `≈ ${qty.toFixed(5)} ${accAsset()} · $${fmt(qty*ref,2)}` : ""}<br>account: ${ACC.mode ? ACC.mode.toUpperCase() : "none (Accounts tab)"}`;
+  $("tkInfo").innerHTML = `bid ${fmt(M.bnBid,1)} · ask ${fmt(M.bnAsk,1)}<br>${raw && ref ? `≈ ${qty.toFixed(5)} ${accAsset()} · $${fmt(qty*ref,2)}` : ""}<br>account: ${ACC.mode ? ACC.mode.toUpperCase() : "none (account button)"}`;
   const btn = $("tkSubmit"); btn.textContent = `${tkSide==="BUY"?"Buy":"Sell"} ${type==="LIMIT"?"limit":"market"}${ACC.mode==="live"?" · REAL":""}`;
   btn.style.background = tkSide==="BUY" ? "var(--buy)" : "var(--sell)"; btn.style.borderColor = btn.style.background;
 }
-function noAcc(el){ el.innerHTML = `<div class="note">No account connected. Log in on the Accounts tab.</div>`; }
+function noAcc(el){ el.innerHTML = `<div class="note">No account connected. Log in with the account button in the header.</div>`; }
 function renderTrading(){
   if (ACC.mode==="sim") ACC.data = simSnapshot();
   const d = ACC.data, stMsg = ACC.status ? `<div class="note err">${ACC.status}</div>` : "";

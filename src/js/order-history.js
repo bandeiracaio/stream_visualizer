@@ -65,7 +65,7 @@ function hsRender() {
   document.querySelectorAll(".hs-tabs button").forEach(b => b.classList.toggle("act", b.dataset.hs === HS.tab));
   hs$("hsSymBox").style.display = HS.tab === "income" ? "none" : ""; hs$("hsStop").style.display = HS.busy ? "" : "none";
   if (document.activeElement !== hs$("hsSym")) hs$("hsSym").value = hsSym();
-  if (!ACC.mode) { head.textContent = "No account connected. Log in on the Accounts tab."; for (const id of ["hsPicks", "hsErr", "hsTotals", "hsTable", "hsNote"]) set(id, ""); hs$("hsCsv").disabled = true; return; }
+  if (!ACC.mode) { head.textContent = "No account connected. Log in with the account button in the header."; for (const id of ["hsPicks", "hsErr", "hsTotals", "hsTable", "hsNote"]) set(id, ""); hs$("hsCsv").disabled = true; return; }
   const name = ACC.mode === "sim" ? "Simulated paper" : ACC.mode === "demo" ? "Binance demo (paper)" : "Binance LIVE (real money)", res = HS.cache[hsKey()];
   head.innerHTML = hsEsc(name) + (HS.busy ? " · loading…" : res ? " · loaded " + hsTime(res.at).slice(11) : "");
   const picks = [...new Set([hsSym()].concat(HS.found, SIM && ACC.mode === "sim" ? HIST.symbols(SIM.log.orders) : []))];

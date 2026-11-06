@@ -1,5 +1,5 @@
 // Futures stack (view): Now > Futures stack. Price over the order-book heatmap, then liquidations, volume delta and open interest on one time axis, with the moments the setup is about boxed in cyan
-// (FUTSTACK.highlights, futures-core.js), a live reading of the last few minutes, and Buy now / Sell now buttons that use the account chosen on the Accounts tab.
+// (FUTSTACK.highlights, futures-core.js), a live reading of the last few minutes, and Buy now / Sell now buttons that use the account chosen with the account button in the header.
 // Display and its own history only: it reads the page's `trades`, `M` and `heatBn` / `heatHl` by name, keeps its own 4-hour bins, and places orders through the existing placeOrder. The Reader engine is untouched.
 // Registered in app.js (VIEWS.register, id "futures"); loaded after app.js, before label-queue.
 (function futuresSetup() {
