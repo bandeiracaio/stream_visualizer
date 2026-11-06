@@ -114,7 +114,7 @@ setInterval(()=>{ if (connected) cvdHist.push({t:nowEx(), bn:cvd.bn, hl:cvd.hl})
 function prune(){
   const cut = nowEx() - KEEP;
   const drop = (a) => { let i=0; while (i<a.length && a[i].t<cut) i++; return i ? a.slice(i) : a; };
-  trades.sort((a,b)=>a.t-b.t); trades = drop(trades); midHist = drop(midHist); cvdHist = drop(cvdHist); microHist = drop(microHist); heatBn = drop(heatBn); heatHl = drop(heatHl);
+  trades.sort((a,b)=>a.t-b.t); trades = drop(trades); midHist = drop(midHist); cvdHist = drop(cvdHist); MI.hist = drop(MI.hist); MI.heatBn = drop(MI.heatBn); MI.heatHl = drop(MI.heatHl);
 }
 
 // ---------- canvas helpers ----------
@@ -282,70 +282,12 @@ function renderAlerts(){
 
 
 // ---------- microstructure ----------
-let microHist = [], heatBn = [], heatHl = [], sweeps = [], bnGroup = null;
-function resetMicro(){ microHist=[]; heatBn=[]; heatHl=[]; sweeps=[]; bnGroup=null; }
-function topN(map, n, desc){
-  const out = [];
-  for (const [p, q] of map){
-    const px = +p; let i = out.length;
-    while (i > 0 && (desc ? out[i-1][0] < px : out[i-1][0] > px)) i--;
-    if (i < n){ out.splice(i, 0, [px, q]); if (out.length > n) out.pop(); }
-  }
-  return out;
-}
-function bnTopN(n){ return bnBook && bnBook.ready && bnBook.bids.size && bnBook.asks.size ? {bids:topN(bnBook.bids,n,true), asks:topN(bnBook.asks,n,false)} : null; }
-function bnTop(){
-  if (!bnBook || !bnBook.ready || !bnBook.bids.size || !bnBook.asks.size) return null;
-  return { bids:[...bnBook.bids].map(([p,q])=>[+p,q]).sort((a,b)=>b[0]-a[0]),
-           asks:[...bnBook.asks].map(([p,q])=>[+p,q]).sort((a,b)=>a[0]-b[0]) };
-}
-function hlTop(){
-  if (!hlBook || !hlBook[0].length || !hlBook[1].length) return null;
-  return { bids:hlBook[0].map(l=>[+l.px,+l.sz]), asks:hlBook[1].map(l=>[+l.px,+l.sz]) };
-}
-function imbalance(b, N){
-  let bs=0, as=0; for (let i=0;i<N && i<b.bids.length;i++) bs+=b.bids[i][1]; for (let i=0;i<N && i<b.asks.length;i++) as+=b.asks[i][1];
-  return bs+as ? (bs-as)/(bs+as) : null;
-}
-// bucket the visible book into a fine fixed grid so the heatmap can re-bin at any zoom
-function heatSnap(b, t){
-  const mid = (b.bids[0][0]+b.asks[0][0])/2, base = niceStep(mid*5e-6), half = mid*0.0018;
-  const lo = Math.floor((mid-half)/base)*base, nb = Math.ceil(2*half/base)+1, arr = new Float32Array(nb);
-  for (const side of [b.bids, b.asks]) for (const [p,q] of side){ const i = Math.floor((p-lo)/base+1e-9); if (i>=0 && i<nb) arr[i]+=q; }
-  return {t, mid, lo, base, arr};
-}
-const microprice = (b,a,bs,as) => bs+as ? (b*as + a*bs)/(bs+as) : null;
-setInterval(()=>{
-  if (!connected) return;
-  const t = nowEx(), r = {t};
-  const bn = bnTop();
-  if (bn){ for (const N of [5,10,20]) r["bnImb"+N] = imbalance(bn,N); heatBn.push(heatSnap(bn,t)); }
-  const hl = hlTop();
-  if (hl){ for (const N of [5,10,20]) r["hlImb"+N] = imbalance(hl,N); heatHl.push(heatSnap(hl,t)); }
-  let bnMid=null, hlMid=null;
-  if (M.bnBid && M.bnAsk){ bnMid=(M.bnBid+M.bnAsk)/2; r.bnSpread=M.bnAsk-M.bnBid; const mp=microprice(M.bnBid,M.bnAsk,M.bnBidSz,M.bnAskSz); if (mp!=null) r.bnMicro=mp-bnMid; }
-  if (M.hlBid && M.hlAsk){ hlMid=(M.hlBid+M.hlAsk)/2; r.hlSpread=M.hlAsk-M.hlBid; const mp=microprice(M.hlBid,M.hlAsk,M.hlBidSz,M.hlAskSz); if (mp!=null) r.hlMicro=mp-hlMid; }
-  if (bnMid && hlMid) r.basis = hlMid - bnMid;
-  microHist.push(r);
-}, 250);
-
-// sweeps: an aggressive order filling at 2+ prices
-function addSweep(v, t, side, fills){
-  const pxs = new Set(fills.map(f=>f.px)); if (pxs.size < 2) return;
-  const lo = Math.min(...pxs), hi = Math.max(...pxs);
-  sweeps.push({t, v, side, levels:pxs.size, fills:fills.length, from: side==="buy"?lo:hi, to: side==="buy"?hi:lo,
-               ntl: fills.reduce((a,f)=>a+f.ntl,0)});
-  if (sweeps.length > 300) sweeps.shift();
-  rdSafe(() => READER.onSweep(v, t, side, fills.reduce((a, f) => a + f.ntl, 0), pxs.size));
-  dirty = true;
-}
-function bnSweepFeed(tr){   // Binance gives no taker-order id on @trade: same ms + same side ≈ one order
-  if (bnGroup && (bnGroup.t!==tr.t || bnGroup.side!==tr.side)) flushBnGroup();
-  if (!bnGroup) bnGroup = {t:tr.t, side:tr.side, fills:[]};
-  bnGroup.fills.push(tr);
-}
-function flushBnGroup(){ if (bnGroup){ addSweep("bn", bnGroup.t, bnGroup.side, bnGroup.fills); bnGroup=null; } }
-setInterval(()=>{ if (bnGroup && nowEx()-bnGroup.t > 500) flushBnGroup(); }, 250);
+const MI = MICRO.create({onSweep:(v, t, side, ntl, levels) => { rdSafe(() => READER.onSweep(v, t, side, ntl, levels)); dirty = true; }});   // data logic: micro-core.js
+const resetMicro = () => MI.reset();
+const bnTopN = n => MICRO.bnTopN(bnBook, n), hlTop = () => MICRO.hlTop(hlBook);
+const addSweep = (v, t, side, fills) => MI.addSweep(v, t, side, fills), bnSweepFeed = tr => MI.bnSweepFeed(tr);
+setInterval(()=>{ if (!connected) return; MI.sample(nowEx(), bnBook, hlBook, M); }, 250);
+setInterval(()=>MI.flushStale(nowEx()), 250);
 
 // generic time-series line chart
 function drawLines(cv, rows, series, opt={}){
@@ -387,7 +329,7 @@ const hmOff = document.createElement("canvas");
 function drawHeat(){
   const {ctx,w,h} = prep($("cvHeat"));
   const v = $("hmVenue").value, win = +$("mwin").value, t1 = nowEx(), t0 = t1-win;
-  const ss = (v==="bn"?heatBn:heatHl).filter(s=>s.t>=t0);
+  const ss = (v==="bn"?MI.heatBn:MI.heatHl).filter(s=>s.t>=t0);
   if (!ss.length) return emptyMsg(ctx,w,h, connected ? "waiting for the "+(v==="bn"?"Binance":"HL")+" book…" : "press Connect");
   const mid = ss[ss.length-1].mid, range = mid * +$("hmRange").value, lo = mid-range, hi = mid+range;
   const L=6, R=64, T=6, B=18, pw=w-L-R, ph=h-T-B;
@@ -425,7 +367,7 @@ function drawHeat(){
     ctx.fillStyle = t.side==="buy" ? TH.a("buy",.8) : TH.a("sell",.8);
     ctx.beginPath(); ctx.arc(X(t.t), Y(t.px), r, 0, Math.PI*2); ctx.fill();
   }
-  for (const s of sweeps){
+  for (const s of MI.sweeps){
     if (s.v!==v || s.t<t0) continue;
     const x=X(s.t), y=Y(s.to), d = s.side==="buy" ? -1 : 1;
     ctx.fillStyle = s.side==="buy" ? COL.buy : COL.sell; ctx.strokeStyle=TH.hi; ctx.lineWidth=1;
@@ -478,13 +420,13 @@ function renderAnatomy(){
 
 function renderSweeps(){
   const min = +$("swMin").value || 0, t0 = nowEx() - +$("mwin").value;
-  const recent = sweeps.filter(s=>s.t>=t0 && s.ntl>=min);
+  const recent = MI.sweeps.filter(s=>s.t>=t0 && s.ntl>=min);
   const stat = v => { const a = recent.filter(s=>s.v===v); return `${a.length} · $${fmtK(a.reduce((x,s)=>x+s.ntl,0))}`; };
   $("swSum").innerHTML = [["BN sweeps (window)", stat("bn")], ["HL sweeps (window)", stat("hl")],
     ["Most levels", recent.length ? Math.max(...recent.map(s=>s.levels)) : "–"]]
     .map(([k,v])=>`<div class="metric"><span>${k}</span><b>${v}</b></div>`).join("");
   $("swTable").innerHTML = `<tr><th>time</th><th>venue</th><th>side</th><th>lvls</th><th>fills</th><th>from → to</th><th>Δ</th><th>bps</th><th>$</th></tr>` +
-    sweeps.filter(s=>s.ntl>=min).slice(-80).reverse().map(s=>{
+    MI.sweeps.filter(s=>s.ntl>=min).slice(-80).reverse().map(s=>{
       const c = s.side==="buy"?"var(--buy)":"var(--sell)", d = Math.abs(s.to-s.from);
       return `<tr><td>${hhmmss(s.t)}</td><td><span class="venue v-${s.v}">${s.v.toUpperCase()}</span></td><td style="color:${c}">${s.side}</td>
         <td>${s.levels}</td><td>${s.fills}</td><td>${fmt(s.from,1)} → ${fmt(s.to,1)}</td><td>${fmt(d,1)}</td><td>${(d/s.from*1e4).toFixed(1)}</td><td style="color:${c}">${fmtK(s.ntl)}</td></tr>`;
@@ -494,11 +436,11 @@ function renderSweeps(){
 function renderMicro(){
   drawHeat();
   const N = $("imbN").value;
-  drawLines($("cvImb"), microHist, [{key:"bnImb"+N, color:COL.bn},{key:"hlImb"+N, color:COL.hl}], {lo:-1.05, hi:1.05, fmt:v=>(v*100).toFixed(0)+"%"});
-  drawLines($("cvMicro"), microHist, [{key:"bnMicro", color:COL.bn},{key:"hlMicro", color:COL.hl}], {zero:true});
-  drawLines($("cvSpread"), microHist, [{key:"bnSpread", color:COL.bn},{key:"hlSpread", color:COL.hl}], {zero:true});
-  drawLines($("cvBasis"), microHist, [{key:"basis", color:TH.accent}], {zero:true});
-  const t0 = nowEx() - +$("mwin").value, b = microHist.filter(r=>r.t>=t0 && r.basis!=null).map(r=>r.basis);
+  drawLines($("cvImb"), MI.hist, [{key:"bnImb"+N, color:COL.bn},{key:"hlImb"+N, color:COL.hl}], {lo:-1.05, hi:1.05, fmt:v=>(v*100).toFixed(0)+"%"});
+  drawLines($("cvMicro"), MI.hist, [{key:"bnMicro", color:COL.bn},{key:"hlMicro", color:COL.hl}], {zero:true});
+  drawLines($("cvSpread"), MI.hist, [{key:"bnSpread", color:COL.bn},{key:"hlSpread", color:COL.hl}], {zero:true});
+  drawLines($("cvBasis"), MI.hist, [{key:"basis", color:TH.accent}], {zero:true});
+  const t0 = nowEx() - +$("mwin").value, b = MI.hist.filter(r=>r.t>=t0 && r.basis!=null).map(r=>r.basis);
   const mean = b.length ? b.reduce((a,x)=>a+x,0)/b.length : null, sd = b.length>1 ? Math.sqrt(b.reduce((a,x)=>a+(x-mean)**2,0)/(b.length-1)) : null;
   $("basisStats").innerHTML = [["now", b.length?fmt(b[b.length-1],2):"–"], ["mean", fmt(mean,2)], ["std", fmt(sd,2)],
     ["min / max", b.length?`${fmt(Math.min(...b),1)} / ${fmt(Math.max(...b),1)}`:"–"],
