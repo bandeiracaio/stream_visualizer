@@ -14,14 +14,17 @@
   <div id="updBar" hidden><span id="updText"></span><button id="updBtn" class="primary">Reload</button><button id="updClose" title="Hide until the next check">✕</button></div>
   <h1>Live Stream Visualizer <small id="ver"></small></h1>
   <button id="go" class="primary">Connect</button>
-  <button id="recHdr" title="Record the raw inputs now (same as Record in the Recordings tab)">Record</button>
-  <button id="arHdr" title="Auto-record: watch the price and record when the market gets volatile (settings: Recordings tab)">Arm</button><span id="arHdrMsg" class="stat"></span>
-  <span class="stat pill">BN <b id="bnState">off</b></span>
-  <span class="stat pill">HL <b id="hlState">off</b></span>
-  <button id="catLock" aria-pressed="false">🐱</button>
+  <span class="seg"><button id="recHdr" title="Record the raw inputs now (same as Record in the Recordings tab)">Record</button><button id="arHdr" title="Auto-record: watch the price and record when the market gets volatile (settings: Recordings tab)">Arm</button></span><span id="arHdrMsg" class="stat"></span>
+  <button id="stBtn" title="Feeds status (Binance, Hyperliquid) and cat mode" aria-expanded="false"><span class="sd" id="stBn" data-st="off">BN</span><span class="sd" id="stHl" data-st="off">HL</span></button>
   <span id="accSplit" class="split"><button id="accMain" title="Account info (or connect an account)"><span class="dot"></span><b id="accLbl">Account</b><span id="accPnl"></span></button><button id="accCaret" title="Switch or connect an account" aria-label="Switch or connect an account" aria-expanded="false">▾</button></span>
   <button id="cog" title="Settings" aria-expanded="false">⚙ <span id="symLbl">BTC</span></button>
   <div id="alerts"></div>
+  <section id="stPanel" class="accpanel" hidden>
+    <h2>Status <span class="ctl"><button id="stClose" aria-label="Close">✕</button></span></h2>
+    <div class="stat pill">BN <b id="bnState">off</b></div>
+    <div class="stat pill">HL <b id="hlState">off</b></div>
+    <div class="row" style="margin-top:8px"><button id="catLock" aria-pressed="false">🐱 Cat mode</button><span class="stat">locks the keyboard so cats cannot type</span></div>
+  </section>
   <section id="accSwitchPanel" class="accpanel" hidden>
     <h2>Accounts <span class="ctl"><button id="accClose1" aria-label="Close">✕</button></span></h2>
     <div class="headline" id="accActive">No account connected.</div>
@@ -586,6 +589,9 @@
 </script>
 <script>
 <!--@include js/keyboard-lock.js-->
+</script>
+<script>
+<!--@include js/status-button.js-->
 </script>
 </body>
 </html>
