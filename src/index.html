@@ -300,6 +300,12 @@
     <div class="row" style="margin-top:8px"><button id="rvReport">Export review report</button></div>
   </section>
 
+  <section data-tab="scoreboard" class="full">
+    <h2>Scoreboard <span class="ctl"><button id="sbGo" class="primary">Compute</button></span></h2>
+    <div id="sbStatus" class="stat"></div>
+    <div id="sbOut"></div>
+  </section>
+
   <section data-tab="assumptions" class="full">
     <h2>What the Reader assumes</h2>
     <div class="note" style="margin-top:0">Measured from the live feed and kept on this device. For now it only watches: nothing here changes what the Reader detects.</div>
@@ -574,6 +580,9 @@
 <!--@include js/futures-core.js-->
 </script>
 <script>
+<!--@include js/scoreboard-core.js-->
+</script>
+<script>
 <!--@include js/futures-view.js-->
 </script>
 <script>
@@ -581,6 +590,9 @@
 </script>
 <script>
 <!--@include js/label-queue.js-->
+</script>
+<script>
+<!--@include js/scoreboard-view.js-->
 </script>
 <script>
 <!--@include js/disk-core.js-->

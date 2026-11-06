@@ -11,85 +11,17 @@
 // Usage:  node reader-scoreboard.mjs SESSION... [--labels reader_labels.json] [--cfg cfg.json] [--json]      |      --selftest
 //   SESSION is a session_*.json.gz (or .json) from the app; --labels is the file from "Export labels" in the Reader tab.
 import fs from "node:fs";
+import vm from "node:vm";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readInput } from "./analyze-collectors.mjs";
 import { labelMatches, labelFor } from "./analyze-episodes.mjs";
 import { loadEngine } from "./compare-detections.mjs";
 
-export const PLAN = { horizonsSec:[60, 300, 900], minN:8, sigmaLagSec:15, sigmaFloor:0.05, randomStepSec:10, z:1.96 };
-const rtSide = g => g.aggressor || (g.wall && g.wall.side) || "";
-export const sideDir = side => side === "buy" || side === "bid" ? 1 : side === "sell" || side === "ask" ? -1 : 0;      // aggressors are buy / sell; a wall's side is bid / ask (a bid wall protects upward)
-const median = a => { if (!a.length) return null; const s = a.slice().sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m])/2; };
-const r2 = x => x == null ? null : +x.toFixed(2);
-
-// ---------- price helpers: hist is the engine's [[t_ms, price]] one point a second
-function priceAt(h, t) {      // newest point at or before t, within 2 s of it (the engine's own rule)
-  let lo = 0, hi = h.length - 1, r = -1; while (lo <= hi) { const m = (lo + hi) >> 1; if (h[m][0] <= t) { r = m; lo = m + 1; } else hi = m - 1; }
-  return r >= 0 && t - h[r][0] <= 2000 ? h[r][1] : null;
-}
-export function sigmaOf(h, plan = PLAN) {      // bps per root second over the whole history
-  const rets = [];
-  for (let i = 0; i < h.length; i++) { const p0 = h[i][1], p1 = priceAt(h, h[i][0] + plan.sigmaLagSec*1000); if (p0 > 0 && p1 > 0 && h[i][0] + plan.sigmaLagSec*1000 <= h[h.length - 1][0]) rets.push((p1/p0 - 1)*1e4); }
-  if (rets.length < 60) return plan.sigmaFloor;
-  const med = median(rets), dev = rets.map(x => Math.abs(x - med)).sort((a, b) => a - b), q75 = dev[Math.floor(0.75*(dev.length - 1))];
-  return Math.max(q75/1.1503/Math.sqrt(plan.sigmaLagSec), plan.sigmaFloor);
-}
-export function forwardMove(h, t, horizonSec, dir, sigma) {      // signed move in sigmas after horizonSec; null when the history does not reach that far or the start has no price
-  const end = t + horizonSec*1000; if (!h.length || end > h[h.length - 1][0]) return null;
-  const p0 = priceAt(h, t), p1 = priceAt(h, end); if (!(p0 > 0) || !(p1 > 0)) return null;
-  return dir*((p1/p0 - 1)*1e4)/(sigma*Math.sqrt(horizonSec));
-}
-export function typicalAbs(h, horizonSec, sigma, step = PLAN.randomStepSec) {      // median |move| in sigmas at moments spread over the history
-  const v = []; if (h.length < 2) return null;
-  for (let t = h[0][0]; t + horizonSec*1000 <= h[h.length - 1][0]; t += step*1000) { const m = forwardMove(h, t, horizonSec, 1, sigma); if (m != null) v.push(Math.abs(m)); }
-  return v.length ? median(v) : null;
-}
-export function wilson(k, n, z = PLAN.z) {      // 95% interval for a share k of n
-  if (!n) return null;
-  const p = k/n, d = 1 + z*z/n, c = p + z*z/(2*n), w = z*Math.sqrt(p*(1 - p)/n + z*z/(4*n*n));
-  return [Math.max(0, (c - w)/d), Math.min(1, (c + w)/d)];
-}
-
-// ---------- the scoreboard
-export function scoreboard(sessions, labels, E, cfg, plan = PLAN) {
-  const rows = [], typ = {};      // typ[h] = list of per-session typical |move|
-  const ranges = sessions.map(s => [s.t0, s.t1]);
-  sessions.forEach(s => {
-    const e = E.replayEngine(s.inputs, cfg || undefined), sig = {}, hist = {};
-    for (const vn of ["bn", "hl"]) { hist[vn] = e.priceHistory(vn) || []; sig[vn] = sigmaOf(hist[vn], plan); }
-    for (const H of plan.horizonsSec) for (const vn of ["bn", "hl"]) { const x = typicalAbs(hist[vn], H, sig[vn], plan.randomStepSec); if (x != null) (typ[H] ||= []).push(x); }
-    for (const g of e.episodeGroups()) {
-      const vn = g.venues && g.venues.length > 1 ? (g.venues.includes("bn") ? "bn" : g.venues[0]) : g.venue, side = rtSide(g), dir = sideDir(side), fwd = {};
-      for (const H of plan.horizonsSec) fwd[H] = dir && hist[vn] ? forwardMove(hist[vn], g.tDetected, H, dir, sig[vn]) : null;
-      rows.push({ session:s.file, family:g.family, side:side || "-", venue:vn, tDetected:g.tDetected, day:new Date(g.tDetected).toISOString().slice(0, 10), label:labelFor(labels, g), fwd, g });
-    }
-  });
-  const out = { plan, sessions:sessions.length, groups:rows.length, families:{}, typicalAbs:{}, missed:null };
-  for (const H of plan.horizonsSec) out.typicalAbs[H] = r2(median(typ[H] || []));
-  const fams = [...new Set(rows.map(r => r.family))].sort();
-  for (const fam of fams) {
-    const g = rows.filter(r => r.family === fam), o = { n:g.length, labelled:{ agree:0, disagree:0, none:0 }, forward:{}, precision:null, byDay:[] };
-    for (const r of g) o.labelled[r.label || "none"]++;
-    for (const H of plan.horizonsSec) {
-      const cell = sel => { const v = sel.map(r => r.fwd[H]).filter(x => x != null); return { n:v.length, median:r2(median(v)), withShare:v.length ? +(v.filter(x => x > 0).length/v.length).toFixed(2) : null }; };
-      o.forward[H] = { all:cell(g), agree:cell(g.filter(r => r.label === "agree")), disagree:cell(g.filter(r => r.label === "disagree")), none:cell(g.filter(r => !r.label)) };
-    }
-    const prec = (a, d) => ({ agree:a, disagree:d, n:a + d, share:a + d ? +(a/(a + d)).toFixed(3) : null, ci:a + d ? wilson(a, a + d).map(x => +x.toFixed(3)) : null, enough:a + d >= plan.minN });
-    o.precision = prec(o.labelled.agree, o.labelled.disagree);
-    for (const day of [...new Set(g.map(r => r.day))].sort()) { const d = g.filter(r => r.day === day); o.byDay.push(Object.assign({ day, groups:d.length }, prec(d.filter(r => r.label === "agree").length, d.filter(r => r.label === "disagree").length))); }
-    out.families[fam] = o;
-  }
-  // recall among what was called real: missed labels inside the sessions' time range, found when a group now matches one
-  const inRange = l => ranges.some(([a, b]) => a != null && b != null && l.t0 <= b && l.t1 >= a), missed = labels.filter(l => l.verdict === "missed" && inRange(l)), agreeRows = rows.filter(r => r.label === "agree");
-  out.missed = { total:missed.length, perFamily:{} };
-  for (const fam of new Set(missed.map(l => l.family).concat(fams))) {
-    const m = missed.filter(l => l.family === fam), ag = agreeRows.filter(r => r.family === fam), caught = m.filter(l => rows.some(r => r.label !== "agree" && r.family === fam && labelMatches(l, r.g))).length, real = ag.length + m.length;
-    if (!m.length && !ag.length) continue;
-    out.missed.perFamily[fam] = { agree:ag.length, missed:m.length, caughtNow:caught, stillMissed:m.length - caught, real, recall:real ? +((ag.length + caught)/real).toFixed(3) : null, ci:real ? wilson(ag.length + caught, real).map(x => +x.toFixed(3)) : null, enough:real >= plan.minN };
-  }
-  return out;
-}
+// The maths lives in src/js/scoreboard-core.js (shared with the in-app Scoreboard view); it is loaded here from the same file.
+const SB = vm.runInNewContext(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "src/js/scoreboard-core.js"), "utf8") + ";SCOREBOARD", {});
+export const { PLAN, sideDir, sigmaOf, forwardMove, typicalAbs, wilson } = SB;
+export const scoreboard = (sessions, labels, E, cfg, plan = PLAN) => SB.scoreboard(sessions, labels, E, cfg, plan, { labelFor, labelMatches });
 
 const pct = x => x == null ? "  -  " : String(Math.round(100*x)).padStart(3) + "%";
 function print(r) {

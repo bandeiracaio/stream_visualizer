@@ -530,6 +530,7 @@ VIEWS.register({id:"signals", label:"Signals", area:"reader", slot:"reader"});
 VIEWS.register({id:"replay", label:"Replay and labels", area:"review", slot:"reader"});
 VIEWS.register({id:"drift", label:"Drift", area:"review", slot:"reader"});
 VIEWS.register({id:"assumptions", label:"Assumptions", area:"review", slot:"reader"});
+VIEWS.register({id:"scoreboard", label:"Scoreboard", area:"review"});
 VIEWS.register({id:"record", label:"Record", area:"rec", slot:"reader"});
 VIEWS.register({id:"saved", label:"Saved", area:"rec", slot:"reader"});
 VIEWS.register({id:"healthlog", label:"Health log", area:"rec", slot:"reader"});

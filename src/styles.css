@@ -287,3 +287,5 @@ td.up{color:var(--buy)}td.dn{color:var(--sell)}
 .fs-hit{border-left:3px solid var(--mark);padding:2px 8px;margin:4px 0;color:var(--text)}
 .fs-ck b{color:var(--mark)}.fs-ck .yes{color:var(--buy)}.fs-ck .no{color:var(--dim)}
 #stChips{display:flex;flex-wrap:wrap;gap:5px}
+.sbfam{margin-top:12px;padding-top:8px;border-top:1px solid var(--line)}.sbfam h3{margin:0 0 6px;font-size:13px;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+.sbfam .tt{width:auto}.sbfam .tt th,.sbfam .tt td{text-align:left;padding-right:20px;white-space:nowrap}
