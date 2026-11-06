@@ -37,10 +37,24 @@ function rcShareable(r) {
   }
   return null;
 }
+// Hours recorded: one row per day, one cell per hour (local clock), brighter = more of that hour recorded (OVERNIGHT.coverage).
+function rcCoverage() {
+  const box = rc$("cvBox"); if (!box) return;
+  const days = +rc$("cvDays").value || 7, now = Date.now(), c = OVERNIGHT.coverage(RC.rows, now, days, -new Date(now).getTimezoneOffset() * 60000);
+  const h = x => (Math.round(x * 10) / 10).toFixed(1), rowsHtml = [];
+  for (let d = 0; d < days; d++) {
+    const cells = c.slots.slice(d * 24, d * 24 + 24), day = new Date(cells[0].start + 1);
+    rowsHtml.push(`<div style="display:flex;align-items:center;gap:6px"><span class="stat" style="width:84px;flex:none;white-space:nowrap">${day.toLocaleDateString([], {weekday:"short", day:"numeric", month:"numeric"})}</span><div style="display:grid;grid-template-columns:repeat(24,1fr);gap:2px;flex:1">`
+      + cells.map(x => `<span title="${new Date(x.start).toLocaleString([], {weekday:"short", hour:"2-digit", minute:"2-digit"})}: ${Math.round(x.frac * 60)} min recorded" style="height:16px;border:1px solid ${x.frac ? "var(--buy)" : "var(--edge)"};background:${x.frac ? `color-mix(in srgb, var(--buy) ${Math.max(15, Math.round(x.frac * 100))}%, transparent)` : "transparent"}"></span>`).join("") + `</div></div>`);
+  }
+  box.innerHTML = `<div class="stat" style="margin-bottom:6px"><b>${h(c.last24)} h</b> in the last 24 h${days > 1 ? ` · <b>${h(c.hours)} h</b> in the last ${days} days` : ""}. Each cell is one hour, brighter = more of it recorded.</div>`
+    + rowsHtml.join("") + `<div class="stat" style="margin-left:90px;display:flex;justify-content:space-between"><span>0h</span><span>6h</span><span>12h</span><span>18h</span><span>24h</span></div>`;
+}
+rc$("cvDays").onchange = rcCoverage;
 async function rcRender() {
   const box = rc$("rcList"); if (!box) return;
   let rows;
-  try { rows = RC.rows = await rcAll(); } catch { RC.rows = []; box.innerHTML = `<div class="note">This browser would not give the app storage, so recordings are only downloaded (private window?).</div>`; return; }
+  try { rows = RC.rows = await rcAll(); rcCoverage(); } catch { RC.rows = []; box.innerHTML = `<div class="note">This browser would not give the app storage, so recordings are only downloaded (private window?).</div>`; return; }
   if (!rows.length) { box.innerHTML = `<div class="note">Nothing kept yet. A recording is kept here when you press Save session or when auto-record finishes.</div>`; return; }
   box.innerHTML = rows.map(r => {
     const when = new Date(r.at).toLocaleString(), can = !!rcShareable(r);

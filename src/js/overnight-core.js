@@ -3,7 +3,7 @@
 // preflight turns a plain description of the environment into checklist items; morning turns the saved recordings and Health log notes of a time window into a summary.
 // Display only: nothing here changes a feed, a recording or a detection. Spec: .scratch/overnight/spec.md.
 const OVERNIGHT = (() => {
-  const HOUR = 3600000, PROBLEM_NOTE = /^(gap|silent|page frozen|wake lock lost|learning started over|auto-record not ready|price-stream drop|tab hidden|page error|promise error)/;
+  const HOUR = 3600000, DAY = 24 * HOUR, PROBLEM_NOTE = /^(gap|silent|page frozen|wake lock lost|learning started over|auto-record not ready|price-stream drop|tab hidden|page error|promise error)/;
   // env: {online, newer (latest version string or null), connected, armed, hidden, wakeLockApi,
   //       folder:{supported, state:"ok"|"none"|"denied"|"failed", name}|null, disk:{tone,text}|null, persisted:true|false|null,
   //       battery:{charging, level 0..1}|null, collectors:{expected, active, slow:[label]}|null}
@@ -58,8 +58,37 @@ const OVERNIGHT = (() => {
       notes:Object.keys(counts).sort((a, b) => counts[b] - counts[a]).map(k => ({k, n:counts[k]}))};
   }
 
+  // Hours recorded: one cell per hour (local clock; offMs = local offset from UTC), one row of 24 per day, the last row is today (cells still to come stay empty).
+  // A recording covers [t0, t1] of its quality (files from before v111: [kept time - span, kept time]); overlaps count once. frac = share of the hour covered.
+  // last24 = hours recorded in the 24 hours before `now`.
+  function coverage(rows, now, days, offMs) {
+    const iv = [];
+    for (const r of rows) {
+      const q = r.quality; if (!q) continue;
+      const a = q.t0 && q.t1 ? q.t0 : q.spanMin ? r.at - q.spanMin * 60000 : 0, b = q.t0 && q.t1 ? q.t1 : r.at;
+      if (a && b > a) iv.push([a, b]);
+    }
+    iv.sort((x, y) => x[0] - y[0]);
+    const un = []; for (const [a, b] of iv) { const l = un[un.length - 1]; if (l && a <= l[1]) l[1] = Math.max(l[1], b); else un.push([a, b]); }
+    const within = (s, e) => { let cov = 0; for (const [a, b] of un) { if (b <= s) continue; if (a >= e) break; cov += Math.min(b, e) - Math.max(a, s); } return cov; };
+    const first = Math.floor((now + offMs) / DAY) * DAY - offMs - (days - 1) * DAY, slots = [];
+    let total = 0;
+    for (let i = 0; i < days * 24; i++) { const s = first + i * HOUR, cov = within(s, s + HOUR); total += cov; slots.push({start:s, frac:Math.min(1, cov / HOUR)}); }
+    return {slots, hours:total / HOUR, last24:within(now - DAY, now) / HOUR, days};
+  }
+
   function selftest() {
     const out = [], ok = (name, pass) => out.push({name:"overnight: " + name, ok:!!pass, detail:""});
+    { const H = HOUR, now = 100 * H + 30 * 60000, rows = [      // 100 h = day 4 at 04:00 UTC, so today's cells run from 96 h
+        {at:90 * H, quality:{t0:88 * H, t1:90 * H}}, {at:90 * H, quality:{t0:89 * H, t1:91 * H}},
+        {at:99 * H, quality:{spanMin:60}}, {at:50 * H, quality:null}, {at:100 * H, quality:{t0:100 * H, t1:100 * H + 30 * 60000}}];
+      const c = coverage(rows, now, 2, 0), at = h => c.slots.find(x => x.start === h * H);
+      ok("coverage: rows of 24 hourly cells, the last day starts at local midnight", c.slots.length === 48 && c.slots[24].start === 96 * H && c.slots[0].start === 72 * H);
+      ok("coverage: overlapping recordings count once", [88, 89, 90].every(h => at(h).frac === 1) && at(87).frac === 0 && at(91).frac === 0);
+      ok("coverage: older files use kept time minus span; no quality is skipped", at(98).frac === 1 && at(99).frac === 0 && c.hours === 3 + 1 + .5);
+      ok("coverage: the current hour counts only what has happened; later cells are empty", at(100).frac === .5 && at(101).frac === 0);
+      ok("coverage: last 24 h counts the window before now", c.last24 === 4.5 && coverage(rows, 125 * H, 2, 0).last24 === 0);
+      ok("coverage: a local offset moves midnight", coverage(rows, now, 1, 2 * H).slots[0].start === 94 * H); }
     const good = {online:true, newer:null, connected:false, armed:false, hidden:false, wakeLockApi:true, folder:{supported:true, state:"ok", name:"sessions"}, disk:{tone:"ok", text:"40 GB free"}, persisted:true, battery:{charging:true, level:.8}, collectors:{expected:6, active:6, slow:[]}};
     const p = preflight(good), tone = (env, id) => preflight(Object.assign({}, good, env)).items.find(x => x.id === id);
     ok("everything fine: ready, only 'not armed yet' is informational", p.ready && p.text === "Ready" && p.items.find(x => x.id === "armed").tone === "info" && p.bad === 0 && p.warn === 0);
@@ -88,5 +117,5 @@ const OVERNIGHT = (() => {
     ok("morning: a missing quality says so, a longer window takes in more", m.recs.find(r => r.name === "e").line === "no quality information" && morning(rows, notes, now, {hours:48}, sq).n === 6);
     return out;
   }
-  return {preflight, morning, selftest, PROBLEM_NOTE};
+  return {preflight, morning, coverage, selftest, PROBLEM_NOTE};
 })();
