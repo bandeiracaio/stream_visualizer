@@ -273,7 +273,7 @@ All 38 skills of the `mattpocock-skills` plugin (version 1.3.1), each read from 
 
 1. > "/writing-beats Raw material is `.scratch/reader-research/`. Audience: other builders of order-flow tools. Take me through the beats of an article on what the research found."
 2. > "/writing-beats Write 'Why one HTML file' as a beat-by-beat article for developers new to local-first apps."
-3. > "/writing-beats Article: 'What 37 recordings taught us', built from the analysis output in the scratchpad."
+3. > "/writing-beats Article: 'What the saved recordings taught us', built from the analysis output in the scratchpad."
 
 ## writing-fragments
 **Slash command only.** The explore half of writing: a grilling session that mines raw fragments (sharp sentences, claims, vignettes, half-thoughts, leading words) into one Markdown file, with no structure imposed yet.
