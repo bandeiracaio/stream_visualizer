@@ -7,9 +7,9 @@ All 38 skills of the `mattpocock-skills` plugin (version 1.3.1), each read from 
 - **Invocable now** means the skill is in the list Claude Code offers this session and it can be called by name. **Slash command only** means the skill sets `disable-model-invocation`: you start it by typing `/<name>`, and Claude does not pick it up on its own. **Invocable by name** (the miscellaneous group) means it has no such flag but is not in this session's list, so ask for it by name or with `/<name>`.
 - **Repo facts the skills need to know**
   - The domain language lives in `CONTEXT.md` and decisions in `docs/adr/`. The skills look for `GLOSSARY.md`, so prompts that touch the language say "`CONTEXT.md`".
-  - The issue tracker is local markdown (`docs/agents/issue-tracker.md`): specs are `.scratch/<feature>/spec.md`, tickets are `.scratch/<feature>/issues/NN-<slug>.md` with a `Status:` line.
+  - The issue tracker is local markdown: see `docs/agents/issue-tracker.md`.
   - There is no `package.json`, no TypeScript and no CI test job. The check is `node build.mjs`, which runs the Reader self-test and compiles every page file.
-  - Each piece of work is one step and one release (`node build.mjs --release`, then commit and push).
+  - Build, release and scope rules: `CLAUDE.md`.
   - Detection cut-offs are checked with `compare-detections.mjs` before and after a change.
 - **How the skills fit together** (from `ask-matt`):
   - Main flow: idea, `grill-with-docs`, (`prototype`), `to-spec`, `to-tickets`, `implement` or `implement-spec`, with `tdd` and `code-review` inside, then `pr`.
@@ -67,9 +67,9 @@ All 38 skills of the `mattpocock-skills` plugin (version 1.3.1), each read from 
 ## diagnosing-bugs
 **Invocable now.** A six-phase loop for hard bugs. It builds a tight, red-capable feedback loop first (one command that goes red on this exact bug), then reproduces and minimises, writes 3 to 5 ranked hypotheses, instruments with tagged logs, fixes with a regression test at a correct seam, and cleans up. It refuses to theorise before the loop exists, and it redacts secrets.
 
-1. > "Diagnose why the Hyperliquid wallets socket closes and reopens every 30 to 60 minutes. Build a loop that reproduces it from a saved tape or session, and say whether wallet records are lost in the gap."
+1. > "Diagnose why worker sockets (the Hyperliquid wallets socket first) close and reopen. Use the 'socket closed' notes in the Health log from an armed night (code, upMs, silentMs, ours) as the loop, separate our own silence-watchdog closes (`ours: silent`) from server closes, and say whether wallet records are lost in the gap. Background: `.scratch/socket-reconnects/research.md`."
 2. > "Diagnose the quick-ending wall cards (about 25% end within seconds). Use `compare-detections.mjs` as the loop and show me the ranked hypotheses before testing any."
-3. > "Diagnose why `analyze-episodes.mjs` takes 6.5 minutes on 37 sessions. Measure first with a timing harness, find the hot spot, and propose a fix that leaves every detection unchanged."
+3. > "Diagnose why `analyze-episodes.mjs` takes minutes on the full set of saved sessions. Measure first with a timing harness, find the hot spot, and propose a fix that leaves every detection unchanged."
 
 ## domain-modeling
 **Invocable now.** Builds and sharpens the domain model as you design: challenges terms against the glossary, sharpens fuzzy words, stress-tests with scenarios, checks the code agrees, updates the glossary immediately, and offers an ADR only when the decision is hard to reverse, surprising and a real trade-off.
@@ -124,8 +124,8 @@ All 38 skills of the `mattpocock-skills` plugin (version 1.3.1), each read from 
 **Invocable now.** Starts a background agent that investigates a question against primary sources only (official docs, source, specs), writes one Markdown file citing each claim's source, and saves it where the repo keeps such notes (here `.scratch/reader-research/` or `.scratch/`).
 
 1. > "Research whether any browser API can report the real free space of the folder chosen with the File System Access API, or of its drive. Official Chrome and WHATWG docs only."
-2. > "Research what Chrome does to a hidden tab that holds a Web Lock, a Worker WebSocket and a wake lock, and which documented behaviour explains the per-minute gap notes in our Health log."
-3. > "Research the Hyperliquid and Deribit WebSocket docs for connection lifetime, ping/pong rules and reconnect guidance, to explain our periodic 'closed, reopening' collector errors."
+2. > "Research whether Chrome throttles or freezes a dedicated Web Worker created by a hidden page, and whether an open WebSocket, a held Web Lock or a wake lock stops Chrome freezing the tab. These are the two points `.scratch/socket-reconnects/research.md` left UNVERIFIED. Official Chrome and HTML Standard docs only."
+3. > "Research whether Deribit closes an idle WebSocket when no `public/set_heartbeat` is set, and whether Bybit's 10-minute idle statement applies to public streams. Both are UNVERIFIED in `.scratch/socket-reconnects/research.md`. Official docs only."
 
 ## retro
 **Slash command only.** A retrospective on a coding session that improves the agent's environment, not the code. It reads the session logs and looks at navigation, automated checks, coding standards, a bloated global instructions file, tool economy, no-ops and information access, and reports candidates by severity.
