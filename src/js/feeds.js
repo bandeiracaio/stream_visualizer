@@ -103,7 +103,7 @@ async function bnSnapshot(gen){
   }catch{ $("bnBookAge").textContent = "snapshot failed (CORS/network)"; }
 }
 function bnDepth(d){
-  HOOKS.emit("bnDepth", d);      // collectors.js watches updates before the book applies them
+  HOOKS.emit("bnDepth", d);      // before the book applies it; no subscriber now (the book collector runs in the worker)
   const b = bnBook; if (!b) return;
   if (!b.ready){ b.buffer.push(d); return; }
   if (d.u < b.lastU) return;
