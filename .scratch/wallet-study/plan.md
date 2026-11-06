@@ -75,7 +75,9 @@ Order slicing / TWAP detection (a wallet repeating similar sizes at regular inte
 
 ## 10. Amendments
 
-None yet. Format: date, what changed, why, and whether any real-data result had been seen.
+- 2026-11-05: the registered run was made (result in `result-20261105.md`: no feature passed). Afterwards an EXPLORATORY follow-up, `analyze-wallets-persistence.mjs`, checked whether the hot wallets stay good (`persistence-20261105.md`). The registered plan and `analyze-wallets.mjs` are unchanged; the follow-up was written after the main result was seen and its numbers are exploratory.
+
+Format for later entries: date, what changed, why, and whether any real-data result had been seen.
 
 ## 11. How to run
 

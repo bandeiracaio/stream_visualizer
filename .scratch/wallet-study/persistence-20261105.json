@@ -1,0 +1,738 @@
+{
+ "sessions": {
+  "A": 81,
+  "later": 84,
+  "A1": 40,
+  "A2": 41
+ },
+ "runs": [
+  {
+   "name": "A -> later (B + C)",
+   "min2": 10,
+   "score": "notional-weighted mean",
+   "eligible1": 2573,
+   "nHot": 257,
+   "withPeriod2": 1686,
+   "hotWithPeriod2": 159,
+   "rho": 0.078,
+   "p": 0.003,
+   "hotLater": {
+    "n": 159,
+    "pooledBps": 1.22,
+    "restPooledBps": 0.49,
+    "share_positive": 0.566,
+    "restShare_positive": 0.529,
+    "pRandomCohort": 0.033
+   },
+   "deciles": [
+    {
+     "decile": 1,
+     "n": 169,
+     "meanScore1": 4.13,
+     "pooledPeriod2Bps": 1.21,
+     "sharePositive2": 0.568
+    },
+    {
+     "decile": 2,
+     "n": 169,
+     "meanScore1": 1.73,
+     "pooledPeriod2Bps": 0.91,
+     "sharePositive2": 0.686
+    },
+    {
+     "decile": 3,
+     "n": 169,
+     "meanScore1": 1.08,
+     "pooledPeriod2Bps": 0.8,
+     "sharePositive2": 0.533
+    },
+    {
+     "decile": 4,
+     "n": 169,
+     "meanScore1": 0.59,
+     "pooledPeriod2Bps": -0.26,
+     "sharePositive2": 0.462
+    },
+    {
+     "decile": 5,
+     "n": 169,
+     "meanScore1": 0.27,
+     "pooledPeriod2Bps": -0.01,
+     "sharePositive2": 0.533
+    },
+    {
+     "decile": 6,
+     "n": 169,
+     "meanScore1": -0.01,
+     "pooledPeriod2Bps": 0.52,
+     "sharePositive2": 0.568
+    },
+    {
+     "decile": 7,
+     "n": 169,
+     "meanScore1": -0.25,
+     "pooledPeriod2Bps": 0.19,
+     "sharePositive2": 0.515
+    },
+    {
+     "decile": 8,
+     "n": 169,
+     "meanScore1": -0.64,
+     "pooledPeriod2Bps": -0.22,
+     "sharePositive2": 0.503
+    },
+    {
+     "decile": 9,
+     "n": 169,
+     "meanScore1": -1.28,
+     "pooledPeriod2Bps": 0.46,
+     "sharePositive2": 0.456
+    },
+    {
+     "decile": 10,
+     "n": 165,
+     "meanScore1": -3.96,
+     "pooledPeriod2Bps": 0.41,
+     "sharePositive2": 0.503
+    }
+   ]
+  },
+  {
+   "name": "A -> later (B + C)",
+   "min2": 10,
+   "score": "median per trade",
+   "eligible1": 2573,
+   "nHot": 257,
+   "withPeriod2": 1686,
+   "hotWithPeriod2": 132,
+   "rho": -0.004,
+   "p": 0.8836,
+   "hotLater": {
+    "n": 132,
+    "pooledBps": 1.24,
+    "restPooledBps": 0.55,
+    "share_positive": 0.477,
+    "restShare_positive": 0.389,
+    "pRandomCohort": 0.041
+   },
+   "deciles": [
+    {
+     "decile": 1,
+     "n": 169,
+     "meanScore1": 4.38,
+     "pooledPeriod2Bps": 1.12,
+     "sharePositive2": 0.444
+    },
+    {
+     "decile": 2,
+     "n": 169,
+     "meanScore1": 1.15,
+     "pooledPeriod2Bps": 1.07,
+     "sharePositive2": 0.491
+    },
+    {
+     "decile": 3,
+     "n": 169,
+     "meanScore1": 0.63,
+     "pooledPeriod2Bps": 0.59,
+     "sharePositive2": 0.473
+    },
+    {
+     "decile": 4,
+     "n": 169,
+     "meanScore1": 0.24,
+     "pooledPeriod2Bps": 0.08,
+     "sharePositive2": 0.396
+    },
+    {
+     "decile": 5,
+     "n": 169,
+     "meanScore1": 0.01,
+     "pooledPeriod2Bps": 0.04,
+     "sharePositive2": 0.29
+    },
+    {
+     "decile": 6,
+     "n": 169,
+     "meanScore1": 0,
+     "pooledPeriod2Bps": -0.9,
+     "sharePositive2": 0.26
+    },
+    {
+     "decile": 7,
+     "n": 169,
+     "meanScore1": 0,
+     "pooledPeriod2Bps": 0.26,
+     "sharePositive2": 0.296
+    },
+    {
+     "decile": 8,
+     "n": 169,
+     "meanScore1": -0.17,
+     "pooledPeriod2Bps": 0.2,
+     "sharePositive2": 0.391
+    },
+    {
+     "decile": 9,
+     "n": 169,
+     "meanScore1": -0.86,
+     "pooledPeriod2Bps": 0.25,
+     "sharePositive2": 0.438
+    },
+    {
+     "decile": 10,
+     "n": 165,
+     "meanScore1": -4.08,
+     "pooledPeriod2Bps": 0.47,
+     "sharePositive2": 0.479
+    }
+   ]
+  },
+  {
+   "name": "A -> later (B + C)",
+   "min2": 30,
+   "score": "notional-weighted mean",
+   "eligible1": 2573,
+   "nHot": 257,
+   "withPeriod2": 1348,
+   "hotWithPeriod2": 123,
+   "rho": 0.134,
+   "p": 0.0005,
+   "hotLater": {
+    "n": 123,
+    "pooledBps": 1.23,
+    "restPooledBps": 0.5,
+    "share_positive": 0.585,
+    "restShare_positive": 0.532,
+    "pRandomCohort": 0.0509
+   },
+   "deciles": [
+    {
+     "decile": 1,
+     "n": 135,
+     "meanScore1": 4.15,
+     "pooledPeriod2Bps": 1.22,
+     "sharePositive2": 0.593
+    },
+    {
+     "decile": 2,
+     "n": 135,
+     "meanScore1": 1.74,
+     "pooledPeriod2Bps": 0.91,
+     "sharePositive2": 0.763
+    },
+    {
+     "decile": 3,
+     "n": 135,
+     "meanScore1": 1.1,
+     "pooledPeriod2Bps": 0.8,
+     "sharePositive2": 0.526
+    },
+    {
+     "decile": 4,
+     "n": 135,
+     "meanScore1": 0.61,
+     "pooledPeriod2Bps": -0.2,
+     "sharePositive2": 0.474
+    },
+    {
+     "decile": 5,
+     "n": 135,
+     "meanScore1": 0.31,
+     "pooledPeriod2Bps": -0.04,
+     "sharePositive2": 0.533
+    },
+    {
+     "decile": 6,
+     "n": 135,
+     "meanScore1": 0.03,
+     "pooledPeriod2Bps": 0.43,
+     "sharePositive2": 0.578
+    },
+    {
+     "decile": 7,
+     "n": 135,
+     "meanScore1": -0.21,
+     "pooledPeriod2Bps": 0.26,
+     "sharePositive2": 0.519
+    },
+    {
+     "decile": 8,
+     "n": 135,
+     "meanScore1": -0.6,
+     "pooledPeriod2Bps": -0.13,
+     "sharePositive2": 0.474
+    },
+    {
+     "decile": 9,
+     "n": 135,
+     "meanScore1": -1.25,
+     "pooledPeriod2Bps": 0.21,
+     "sharePositive2": 0.437
+    },
+    {
+     "decile": 10,
+     "n": 133,
+     "meanScore1": -3.89,
+     "pooledPeriod2Bps": 0.4,
+     "sharePositive2": 0.474
+    }
+   ]
+  },
+  {
+   "name": "A -> later (B + C)",
+   "min2": 30,
+   "score": "median per trade",
+   "eligible1": 2573,
+   "nHot": 257,
+   "withPeriod2": 1348,
+   "hotWithPeriod2": 94,
+   "rho": 0.044,
+   "p": 0.1044,
+   "hotLater": {
+    "n": 94,
+    "pooledBps": 1.24,
+    "restPooledBps": 0.55,
+    "share_positive": 0.511,
+    "restShare_positive": 0.385,
+    "pRandomCohort": 0.049
+   },
+   "deciles": [
+    {
+     "decile": 1,
+     "n": 135,
+     "meanScore1": 4.09,
+     "pooledPeriod2Bps": 1.11,
+     "sharePositive2": 0.496
+    },
+    {
+     "decile": 2,
+     "n": 135,
+     "meanScore1": 1.08,
+     "pooledPeriod2Bps": 1.07,
+     "sharePositive2": 0.519
+    },
+    {
+     "decile": 3,
+     "n": 135,
+     "meanScore1": 0.61,
+     "pooledPeriod2Bps": 0.62,
+     "sharePositive2": 0.511
+    },
+    {
+     "decile": 4,
+     "n": 135,
+     "meanScore1": 0.23,
+     "pooledPeriod2Bps": -0.01,
+     "sharePositive2": 0.37
+    },
+    {
+     "decile": 5,
+     "n": 135,
+     "meanScore1": 0.01,
+     "pooledPeriod2Bps": 0.08,
+     "sharePositive2": 0.274
+    },
+    {
+     "decile": 6,
+     "n": 135,
+     "meanScore1": 0,
+     "pooledPeriod2Bps": -0.9,
+     "sharePositive2": 0.244
+    },
+    {
+     "decile": 7,
+     "n": 135,
+     "meanScore1": 0,
+     "pooledPeriod2Bps": 0.27,
+     "sharePositive2": 0.267
+    },
+    {
+     "decile": 8,
+     "n": 135,
+     "meanScore1": -0.14,
+     "pooledPeriod2Bps": 0.21,
+     "sharePositive2": 0.363
+    },
+    {
+     "decile": 9,
+     "n": 135,
+     "meanScore1": -0.79,
+     "pooledPeriod2Bps": 0.23,
+     "sharePositive2": 0.437
+    },
+    {
+     "decile": 10,
+     "n": 133,
+     "meanScore1": -4.01,
+     "pooledPeriod2Bps": 0.45,
+     "sharePositive2": 0.459
+    }
+   ]
+  },
+  {
+   "name": "A first half -> A second half",
+   "min2": 10,
+   "score": "notional-weighted mean",
+   "eligible1": 1072,
+   "nHot": 107,
+   "withPeriod2": 705,
+   "hotWithPeriod2": 67,
+   "rho": 0.138,
+   "p": 0.0005,
+   "hotLater": {
+    "n": 67,
+    "pooledBps": 0.16,
+    "restPooledBps": 0.8,
+    "share_positive": 0.597,
+    "restShare_positive": 0.578,
+    "pRandomCohort": 0.8132
+   },
+   "deciles": [
+    {
+     "decile": 1,
+     "n": 71,
+     "meanScore1": 4.56,
+     "pooledPeriod2Bps": 0.08,
+     "sharePositive2": 0.592
+    },
+    {
+     "decile": 2,
+     "n": 71,
+     "meanScore1": 1.54,
+     "pooledPeriod2Bps": 0.98,
+     "sharePositive2": 0.676
+    },
+    {
+     "decile": 3,
+     "n": 71,
+     "meanScore1": 1.05,
+     "pooledPeriod2Bps": 1.36,
+     "sharePositive2": 0.732
+    },
+    {
+     "decile": 4,
+     "n": 71,
+     "meanScore1": 0.72,
+     "pooledPeriod2Bps": 1.57,
+     "sharePositive2": 0.718
+    },
+    {
+     "decile": 5,
+     "n": 71,
+     "meanScore1": 0.37,
+     "pooledPeriod2Bps": 0.56,
+     "sharePositive2": 0.521
+    },
+    {
+     "decile": 6,
+     "n": 71,
+     "meanScore1": 0.11,
+     "pooledPeriod2Bps": -0.01,
+     "sharePositive2": 0.479
+    },
+    {
+     "decile": 7,
+     "n": 71,
+     "meanScore1": -0.18,
+     "pooledPeriod2Bps": 0.79,
+     "sharePositive2": 0.521
+    },
+    {
+     "decile": 8,
+     "n": 71,
+     "meanScore1": -0.59,
+     "pooledPeriod2Bps": -2.06,
+     "sharePositive2": 0.479
+    },
+    {
+     "decile": 9,
+     "n": 71,
+     "meanScore1": -1.18,
+     "pooledPeriod2Bps": 0.71,
+     "sharePositive2": 0.535
+    },
+    {
+     "decile": 10,
+     "n": 66,
+     "meanScore1": -3.61,
+     "pooledPeriod2Bps": 0.63,
+     "sharePositive2": 0.545
+    }
+   ]
+  },
+  {
+   "name": "A first half -> A second half",
+   "min2": 10,
+   "score": "median per trade",
+   "eligible1": 1072,
+   "nHot": 107,
+   "withPeriod2": 705,
+   "hotWithPeriod2": 61,
+   "rho": 0.076,
+   "p": 0.0505,
+   "hotLater": {
+    "n": 61,
+    "pooledBps": 0.38,
+    "restPooledBps": 0.78,
+    "share_positive": 0.492,
+    "restShare_positive": 0.483,
+    "pRandomCohort": 0.6973
+   },
+   "deciles": [
+    {
+     "decile": 1,
+     "n": 71,
+     "meanScore1": 5.11,
+     "pooledPeriod2Bps": 0.39,
+     "sharePositive2": 0.507
+    },
+    {
+     "decile": 2,
+     "n": 71,
+     "meanScore1": 1.21,
+     "pooledPeriod2Bps": 1.33,
+     "sharePositive2": 0.577
+    },
+    {
+     "decile": 3,
+     "n": 71,
+     "meanScore1": 0.71,
+     "pooledPeriod2Bps": 1.17,
+     "sharePositive2": 0.606
+    },
+    {
+     "decile": 4,
+     "n": 71,
+     "meanScore1": 0.32,
+     "pooledPeriod2Bps": 1.33,
+     "sharePositive2": 0.662
+    },
+    {
+     "decile": 5,
+     "n": 71,
+     "meanScore1": 0.03,
+     "pooledPeriod2Bps": 1.27,
+     "sharePositive2": 0.423
+    },
+    {
+     "decile": 6,
+     "n": 71,
+     "meanScore1": 0,
+     "pooledPeriod2Bps": 0.14,
+     "sharePositive2": 0.394
+    },
+    {
+     "decile": 7,
+     "n": 71,
+     "meanScore1": 0,
+     "pooledPeriod2Bps": 0.15,
+     "sharePositive2": 0.366
+    },
+    {
+     "decile": 8,
+     "n": 71,
+     "meanScore1": -0.07,
+     "pooledPeriod2Bps": 0.57,
+     "sharePositive2": 0.352
+    },
+    {
+     "decile": 9,
+     "n": 71,
+     "meanScore1": -0.78,
+     "pooledPeriod2Bps": -0.48,
+     "sharePositive2": 0.479
+    },
+    {
+     "decile": 10,
+     "n": 66,
+     "meanScore1": -3.77,
+     "pooledPeriod2Bps": 0.47,
+     "sharePositive2": 0.47
+    }
+   ]
+  },
+  {
+   "name": "A first half -> A second half",
+   "min2": 30,
+   "score": "notional-weighted mean",
+   "eligible1": 1072,
+   "nHot": 107,
+   "withPeriod2": 540,
+   "hotWithPeriod2": 53,
+   "rho": 0.167,
+   "p": 0.0005,
+   "hotLater": {
+    "n": 53,
+    "pooledBps": 0.17,
+    "restPooledBps": 0.81,
+    "share_positive": 0.585,
+    "restShare_positive": 0.612,
+    "pRandomCohort": 0.8162
+   },
+   "deciles": [
+    {
+     "decile": 1,
+     "n": 54,
+     "meanScore1": 4.81,
+     "pooledPeriod2Bps": 0.08,
+     "sharePositive2": 0.574
+    },
+    {
+     "decile": 2,
+     "n": 54,
+     "meanScore1": 1.62,
+     "pooledPeriod2Bps": 1,
+     "sharePositive2": 0.704
+    },
+    {
+     "decile": 3,
+     "n": 54,
+     "meanScore1": 1.08,
+     "pooledPeriod2Bps": 1.56,
+     "sharePositive2": 0.815
+    },
+    {
+     "decile": 4,
+     "n": 54,
+     "meanScore1": 0.78,
+     "pooledPeriod2Bps": 1.72,
+     "sharePositive2": 0.778
+    },
+    {
+     "decile": 5,
+     "n": 54,
+     "meanScore1": 0.45,
+     "pooledPeriod2Bps": 0.27,
+     "sharePositive2": 0.593
+    },
+    {
+     "decile": 6,
+     "n": 54,
+     "meanScore1": 0.19,
+     "pooledPeriod2Bps": 0.94,
+     "sharePositive2": 0.444
+    },
+    {
+     "decile": 7,
+     "n": 54,
+     "meanScore1": -0.09,
+     "pooledPeriod2Bps": 0.66,
+     "sharePositive2": 0.537
+    },
+    {
+     "decile": 8,
+     "n": 54,
+     "meanScore1": -0.49,
+     "pooledPeriod2Bps": -1.79,
+     "sharePositive2": 0.593
+    },
+    {
+     "decile": 9,
+     "n": 54,
+     "meanScore1": -1.03,
+     "pooledPeriod2Bps": 0.56,
+     "sharePositive2": 0.537
+    },
+    {
+     "decile": 10,
+     "n": 54,
+     "meanScore1": -3.15,
+     "pooledPeriod2Bps": 0.54,
+     "sharePositive2": 0.519
+    }
+   ]
+  },
+  {
+   "name": "A first half -> A second half",
+   "min2": 30,
+   "score": "median per trade",
+   "eligible1": 1072,
+   "nHot": 107,
+   "withPeriod2": 540,
+   "hotWithPeriod2": 45,
+   "rho": 0.081,
+   "p": 0.0635,
+   "hotLater": {
+    "n": 45,
+    "pooledBps": 0.57,
+    "restPooledBps": 0.78,
+    "share_positive": 0.533,
+    "restShare_positive": 0.487,
+    "pRandomCohort": 0.5974
+   },
+   "deciles": [
+    {
+     "decile": 1,
+     "n": 54,
+     "meanScore1": 5.39,
+     "pooledPeriod2Bps": 0.43,
+     "sharePositive2": 0.5
+    },
+    {
+     "decile": 2,
+     "n": 54,
+     "meanScore1": 1.16,
+     "pooledPeriod2Bps": 1.27,
+     "sharePositive2": 0.593
+    },
+    {
+     "decile": 3,
+     "n": 54,
+     "meanScore1": 0.72,
+     "pooledPeriod2Bps": 1.09,
+     "sharePositive2": 0.63
+    },
+    {
+     "decile": 4,
+     "n": 54,
+     "meanScore1": 0.39,
+     "pooledPeriod2Bps": 1.53,
+     "sharePositive2": 0.667
+    },
+    {
+     "decile": 5,
+     "n": 54,
+     "meanScore1": 0.1,
+     "pooledPeriod2Bps": 1.53,
+     "sharePositive2": 0.481
+    },
+    {
+     "decile": 6,
+     "n": 54,
+     "meanScore1": 0,
+     "pooledPeriod2Bps": 0.33,
+     "sharePositive2": 0.407
+    },
+    {
+     "decile": 7,
+     "n": 54,
+     "meanScore1": 0,
+     "pooledPeriod2Bps": 0.08,
+     "sharePositive2": 0.37
+    },
+    {
+     "decile": 8,
+     "n": 54,
+     "meanScore1": -0.04,
+     "pooledPeriod2Bps": 0.58,
+     "sharePositive2": 0.296
+    },
+    {
+     "decile": 9,
+     "n": 54,
+     "meanScore1": -0.63,
+     "pooledPeriod2Bps": -0.6,
+     "sharePositive2": 0.481
+    },
+    {
+     "decile": 10,
+     "n": 54,
+     "meanScore1": -3.27,
+     "pooledPeriod2Bps": 0.53,
+     "sharePositive2": 0.481
+    }
+   ]
+  }
+ ]
+}
