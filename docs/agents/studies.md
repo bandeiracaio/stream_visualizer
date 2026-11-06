@@ -1,6 +1,6 @@
 # Offline studies and analysis scripts
 
-Scripts at the repo root, not part of the app and never needing a release. Every one takes `--selftest`. `--plan` prints the plan fixed in advance (`analyze-collectors`, `analyze-wallets`, `analyze-liquidations`); `--status` (`analyze-liquidations`) prints counts only. The rules for pre-registered studies are in `CLAUDE.md`.
+Scripts at the repo root, not part of the app and never needing a release. Every one takes `--selftest`. `--plan` prints the plan fixed in advance (`analyze-collectors`, `analyze-wallets`, `analyze-liquidations`). The rules for pre-registered studies are in `CLAUDE.md`.
 
 **Descriptive** below means: it says where to look, never keep or drop, and its numbers are small-sample.
 

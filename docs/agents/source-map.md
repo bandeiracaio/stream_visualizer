@@ -11,8 +11,6 @@ Pure files (checked: no DOM, storage or socket use): every `*-core.js`, `hooks.j
 
 ## Reader
 
-Direction (agreed): detect *episodes* (forming -> active -> fading -> ended, resumable) instead of one-off events; report detected time and back-dated start; a multi-variable evidence checklist per episode; neutral participant language (aggressor / passive side); first families absorption, exhaustion, aggression burst, wall; validate with session record / replay, a span timeline, and agree / disagree labels.
-
 - `src/js/reader-engine.js`: order-flow engine and the legacy one-off event detectors; drives the episode layer once a second. Recording is `startRecording({quoteMs})`; replay is `READER_ENGINE.replayEngine(inputs, cfg)`.
 - `src/js/reader-episodes.js`: episode state machines and evidence checklists for absorption / exhaustion / burst / wall. Tunables in `READER_EPISODES.DEFAULTS` (also `READER.cfg.ep` at runtime). Fast and mid readings of one event are separate episodes on purpose; the groups layer (`groupGapMs`) presents them as one.
 - Self-revising Reader (specs `.scratch/self-revising-reader/`; sigma (`sigmaBps`) in `docs/adr/0004` and `.scratch/self-revising-reader/04-sigma-scale.md`): the Reader measures its own assumptions, flags drift, proposes threshold changes, and the user approves them.
@@ -42,7 +40,7 @@ Direction (agreed): detect *episodes* (forming -> active -> fading -> ended, res
 
 ### Look
 
-Spec `.scratch/restyle/spec.md` (the "Terminal" direction: flat, monospace, amber headings). The token and contrast rules are in `CLAUDE.md`; a control's border is `--edge` and text on a fill is dark `--ink`. The chart canvases read the tokens through `TH` at the top of `app.js`: `TH.dim` axis text, `TH.text` / `TH.hi` lines and labels, `TH.line` grid, `TH.edge` axes, `TH.ink` text on a fill, `TH.canvas` background, `TH.a(name, alpha)` for rgba, and buy / sell / bn / hl / warn / accent. The category palettes (episode families `RT_COLORS`, raw-log stream colours `LOG_COLOR`, the heat, fan and waterfall scales) are literals on purpose; each is at least 3:1 (4.5:1 for text) against the chart background. The phone header is two rows (controls and status, then the views), about 95 px; its button padding is in `docs/agents/testing-ui.md`.
+Spec `.scratch/restyle/spec.md` (the "Terminal" direction: flat, monospace, amber headings). The token and contrast rules are in `CLAUDE.md`; a control's border is `--edge` and text on a fill is dark `--ink`. The chart canvases read the tokens through `TH` at the top of `app.js`: `TH.dim` axis text, `TH.text` / `TH.hi` lines and labels, `TH.line` grid, `TH.edge` axes, `TH.ink` text on a fill, `TH.canvas` background, `TH.a(name, alpha)` for rgba, and buy / sell / bn / hl / warn / accent. The category palettes (episode families `RT_COLORS`, raw-log stream colours `LOG_COLOR`, the heat, fan and waterfall scales) are literals on purpose; each is at least 3:1 (4.5:1 for text) against the chart background. Phone header size and button padding: `CLAUDE.md` and `docs/agents/testing-ui.md`.
 
 ## Arm mode
 

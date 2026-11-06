@@ -14,16 +14,16 @@ Drive the built page with the Chrome tools. Each step is done when its check pas
 A native file dialog cannot be driven, so load the file from the page itself. This needs the repo-root server.
 
 1. In the page, `fetch('/sessions/<file>.json.gz')`, wrap the blob in a `File`, put it in a `DataTransfer`, assign it to `#rtLoad`'s `files`, and dispatch a `change` event.
-2. Click `#rtReplay`. A replay of an 18.9 MB session took about 40 s and blocks the page the whole time, so a JS tool call made meanwhile times out; start the click with `setTimeout(..., 50)` and wait with separate calls.
+2. Click `#rtReplay`. A replay of a large session takes tens of seconds and blocks the page the whole time, so a JS tool call made meanwhile times out; start the click with `setTimeout(..., 50)` and wait with separate calls.
 3. Done when `RD().episodeGroups().length` is above 0.
 
-A page reload loses the replay (and the next load takes the same ~40 s), so avoid navigating away once it is loaded.
+A page reload loses the replay (and the next load takes as long), so avoid navigating away once it is loaded.
 
 ## Phone width
 
 - The window does not resize the viewport. Test phone width through an iframe: 390 px for a generic phone.
 - For a specific width, make the iframe 15 px wider than the target; its own scrollbar takes about 15 px and a real phone has none.
-- Phone header buttons use 5 px side padding so one row of controls fits a 360 px phone. The user's Galaxy M52 5G reports 360 or 412 (not confirmed). The header is two rows, about 95 px.
+- Phone header buttons use 5 px side padding so one row of controls fits a 360 px phone.
 
 ## Why the page can look stale
 

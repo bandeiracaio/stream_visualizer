@@ -50,12 +50,6 @@ After each finished step, so the user always has an up-to-date single file. Anot
 - Before touching the episode layer's evidence cut-offs, run `node compare-detections.mjs --rev-a HEAD`: exit 0 means detections are byte-identical on the saved sessions, exit 1 lists every difference.
 - Participants are the aggressor / passive side (neutral language).
 
-## Extension seams
-
-- A late-loaded module extends an owner's function with `HOOKS.on(name, fn)` (`src/js/hooks.js`).
-- A new view is one `VIEWS.register({...})` in `app.js` (`src/js/views.js`).
-- A new collector is one `COLLECT.REGISTRY` entry plus one `CONTRIB` entry in `collectors-core.js`; its features also go in `FEATURE_ORDER` (a self-test fails otherwise).
-
 ## UI rules
 
 - Every colour is a token in `:root` of `styles.css`; the chart canvases read the same tokens through `TH` at the top of `app.js`.
@@ -66,7 +60,7 @@ After each finished step, so the user always has an up-to-date single file. Anot
 ## Pre-registered studies
 
 - A registered plan lives in `.scratch/<study>/plan.md`; a change to it is an amendment in that file.
-- `analyze-wallets.mjs` runs once on real sessions. `analyze-liquidations.mjs` runs its test once, when the three-venue variant has 60 clusters and 30 pairs (`--status` prints counts only).
+- `analyze-wallets.mjs` runs once on real sessions. `analyze-liquidations.mjs` runs its test once, at 60 clusters and 30 pairs. Details: `docs/agents/studies.md`.
 
 ## Where to look
 
