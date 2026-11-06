@@ -171,8 +171,8 @@ section.collapsed > .pbody{height:0;overflow:hidden;visibility:hidden}
   h1{display:none}
   /* the header is two rows on a phone: controls and status, then the views; it was three (about 160 px) */
   header{padding:5px 8px;gap:4px}
-  header input,header select,header button{min-height:44px;padding:4px 7px;font-size:12.5px}
-  #cog{padding:4px 6px}
+  header input,header select,header button{min-height:44px;padding:4px 5px;font-size:12.5px}      /* tight on purpose: one row of controls down to a 360 px phone */
+  #cog{padding:4px 5px}
   #accSplit button{padding:4px 3px;gap:0;font-size:12px}#accMain .dot{display:none}
   #accLbl{font-size:0}#accLbl::before{content:attr(data-s);font-size:12.5px}      /* one letter (S / D / L, + when not connected): the word stays for screen readers */
   #stBtn{gap:6px;padding:4px 6px}#stBtn .sd{font-size:0}      /* phone: two dots (BN, HL in that order), the words are in the panel */
