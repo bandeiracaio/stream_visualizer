@@ -18,6 +18,7 @@ const COLLECT = (() => {
     {id:"venues", label:"Extra venues (while recording or armed): Coinbase, Bybit and OKX quotes, Binance spot, perp marks and indexes, and the ETH / SOL / BNB / XRP / DOGE marks", speed:"fast", on:true, owner:"worker", expectMs:10000, records:["venues"]},
     {id:"tradeVol", label:"Venue trade volume (while recording or armed): coins traded per second on Binance, Bybit, OKX, Coinbase and Hyperliquid, perp and spot, buy and sell by aggressor", speed:"fast", on:true, owner:"worker", expectMs:10000, records:["tv"]},
     {id:"bookPerp", label:"Perp book depth, Bybit and OKX (while recording or armed): depth within 1 / 5 / 10 / 20 bps, spread, touch size, size added and removed per side, every 10 s, to compare with Binance and Hyperliquid", speed:"fast", on:true, owner:"worker", expectMs:10000, records:["bookBy", "bookOk"]},
+    {id:"perpFlow", label:"Perp liquidations and open interest, Bybit and OKX (while recording or armed): every liquidation (side, price, size) and each venue's open interest every 10 s", speed:"fast", on:true, owner:"worker", expectMs:10000, records:["liqPerp", "oiPerp"]},
     {id:"vol24", label:"Venue 24 h volume: each venue's own ticker volume in dollars, for market share and the perp / spot split", speed:"slow", on:true, owner:"worker", expectMs:60000, records:["vol24"]},
     {id:"wallets", label:"Hyperliquid wallets: position and liquidation price of the 10 biggest traders, their liquidation fills, predicted funding across venues", speed:"slow", on:true, owner:"worker", expectMs:180000, records:["walletsTop", "hlLiq", "fundPred"]},
     {id:"options", label:"Options and volatility (Deribit, BTC and ETH): volatility index, at-the-money implied vol, skew, open interest and busiest strikes by expiry", speed:"slow", on:true, owner:"worker", expectMs:60000, records:["dvol", "optChain"]},
@@ -313,7 +314,7 @@ const COLLECT = (() => {
   // ---- status of each collector, for the list in the Reader tab (view: collectors.js)
   // derived from REGISTRY: which collector writes which record name; how often (ms) a collector writes while it is working (three times that late is "slow")
   const OWNER = {}; for (const c of REGISTRY) for (const n of c.records) OWNER[n] = c.id;
-  const EXPECT_ORDER = ["telemetry", "derivs", "calendar", "wallets", "options", "venues", "tradeVol", "vol24", "book", "bookPerp"];      // the order the analysis reports list collectors in (it is not the registry order); kept as it was
+  const EXPECT_ORDER = ["telemetry", "derivs", "calendar", "wallets", "options", "venues", "tradeVol", "vol24", "book", "bookPerp", "perpFlow"];      // the order the analysis reports list collectors in (it is not the registry order); kept as it was
   const EXPECT_MS = {}; for (const id of EXPECT_ORDER) EXPECT_MS[id] = REGISTRY.find(c => c.id === id).expectMs;
   const ownerOf = name => OWNER[name] || null;
   // records -> {collectorId: {n, last}} (last = the newest record time)
@@ -957,6 +958,63 @@ const COLLECT = (() => {
     return out;
   }
 
+  // ---- perp liquidations and open interest on Bybit and OKX (fast collector "perpFlow", run by collectors-worker.js while a recording is on or auto-record is armed). Public sockets, no keys.
+  // Until v122 the Futures stack view saw these two feeds live and nothing recorded them; Binance's own liquidation stream keeps only the latest liquidation per symbol per second, so these two
+  // are the complete ones for the other venues. Verified live 2026-11-05 (messages captured from both sockets):
+  //   Bybit linear   tickers.BTCUSDT: a snapshot with openInterest (coin) and openInterestValue (USD), then deltas; a delta carries openInterest only when it changed.
+  //                  allLiquidation.BTCUSDT: {topic, type:"snapshot", ts, data:[{T, s, S, v, p}]} (every liquidation, pushed every 500 ms); S "Buy" = a long was liquidated (a forced sell), v coin, p bankruptcy price.
+  //   OKX swap       open-interest (instId BTC-USDT-SWAP): data:[{oi (contracts), oiCcy (coin), oiUsd, ts}], about every 3 s while it changes.
+  //                  liquidation-orders (instType SWAP): every coin on the channel; data:[{instId, details:[{side, posSide, sz (contracts), bkPx, ts}]}]; side is the side of the forced order ("sell" = a long
+  //                  was closed out). Coin = sz x ctVal x ctMult (okxCt). OKX moved its public socket to port 443 (a notice on port 8443 says it will be retired), so this one uses the plain URL.
+  // Records: "liqPerp" {v:"by"|"ok", rows:[{t, side, px, q}]} for every message that carries liquidations (t = exchange ms, side = forced order's side, px = bankruptcy price, q = coin),
+  // and "oiPerp" {by:{oi, usd}, ok:{oi, usd}} every 10 s (the latest reading of each venue; a venue with no reading yet is left out). Nothing here is a detector input.
+  function perpFlowSubs(coin) {
+    const C = String(coin || "BTC").toUpperCase();
+    return [
+      {id:"by", url:"wss://stream.bybit.com/v5/public/linear", sub:{op:"subscribe", args:["tickers." + C + "USDT", "allLiquidation." + C + "USDT"]}, ping:{op:"ping"}},
+      {id:"ok", url:"wss://ws.okx.com/ws/v5/public", sub:{op:"subscribe", args:[{channel:"open-interest", instId:C + "-USDT-SWAP"}, {channel:"liquidation-orders", instType:"SWAP"}]}, ping:"ping"},
+    ];
+  }
+  // One venue's state: the newest open interest and the liquidations of a message. ct = the OKX swap contract size (okxCt), needed for its liquidations.
+  function perpFlow(coin, ct) {
+    const C = String(coin || "BTC").toUpperCase(), oi = {by:null, ok:null}; let bad = 0;
+    const side = s => s === "Buy" || s === "buy" ? "buy" : s === "Sell" || s === "sell" ? "sell" : null;
+    return {
+      // one parsed socket message of venue id ("by" | "ok") -> the liquidation rows it carries ([] for none); open interest is kept for sample()
+      add(id, j, nowMs) {
+        const rows = [];
+        if (!j || typeof j !== "object") return rows;
+        try {
+          if (id === "by") {
+            if (typeof j.topic !== "string" || !j.data) return rows;
+            if (j.topic.startsWith("tickers.")) {
+              const o = num(j.data.openInterest), u = num(j.data.openInterestValue);
+              if (o != null || u != null) { const p = oi.by || (oi.by = {oi:null, usd:null}); if (o != null) p.oi = o; if (u != null) p.usd = u; }
+            } else if (j.topic.startsWith("allLiquidation.") && Array.isArray(j.data)) {
+              for (const d of j.data) { const px = num(d.p), q = num(d.v), s = d.S === "Buy" ? "sell" : d.S === "Sell" ? "buy" : null; if (d.s !== C + "USDT" || !(px > 0) || !(q > 0) || !s) continue; rows.push({t:num(d.T) || num(j.ts) || nowMs, side:s, px, q:round(q, 6)}); }
+            }
+          } else if (id === "ok") {
+            const ch = j.arg && j.arg.channel; if (!ch || !Array.isArray(j.data)) return rows;
+            if (ch === "open-interest") {
+              const d = j.data.find(x => x.instId === C + "-USDT-SWAP"), o = d && num(d.oiCcy), u = d && num(d.oiUsd);
+              if (o != null || u != null) { const p = oi.ok || (oi.ok = {oi:null, usd:null}); if (o != null) p.oi = o; if (u != null) p.usd = u; }
+            } else if (ch === "liquidation-orders" && ct > 0) {
+              for (const d of j.data) { if (d.instId !== C + "-USDT-SWAP") continue; for (const x of d.details || []) { const px = num(x.bkPx), q = num(x.sz) * ct, s = side(x.side); if (!(px > 0) || !(q > 0) || !s) continue; rows.push({t:num(x.ts) || nowMs, side:s, px, q:round(q, 6)}); } }
+            }
+          }
+        } catch { bad++; }
+        return rows;
+      },
+      // the latest open interest of each venue that has one, or null when neither has a reading yet; oi in coin, usd in dollars
+      sample() {
+        const out = {}; let n = 0;
+        for (const id of ["by", "ok"]) { const p = oi[id]; if (p && (p.oi != null || p.usd != null)) { out[id] = {oi:p.oi == null ? null : round(p.oi, 4), usd:p.usd == null ? null : Math.round(p.usd)}; n++; } }
+        return n ? out : null;
+      },
+      stats: () => ({bad}),
+    };
+  }
+
   // tape helpers on arrays of records
   const prune = (recs, nowMs, keepMs) => recs.filter(r => r[2] >= nowMs - (keepMs == null ? TAPE_MS : keepMs));
   const slice = (recs, t0, t1) => recs.filter(r => r[2] >= t0 && r[2] <= t1);
@@ -966,5 +1024,5 @@ const COLLECT = (() => {
     for (let i = recs.length - 1; i >= 0; i--) { const b = JSON.stringify(recs[i]).length + 1; if (size + b > lim) break; size += b; out.push(recs[i]); }
     return out.reverse();
   }
-  return {REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, due, calendar, OWNER, EXPECT_MS, ownerOf, tally, ageText, health, FEATURES, FEATURE_INFO, featureSeries, featureMaxAge, context, venueLead, leadText, liqDriven, usdText, wallQuality, marketState, marketStateSeries, STATE_VERSION, EVENT_LABEL, evSpan, eventsNear, eventClock, volLens, lensSeries, gridReturns, LENS_TEXT, walletSeries, takerNet, crowdIndex, crowdNetAt, whaleFlow, whaleSeries, WHALE_FLOOR_USD, deribitCoin, optName, optionsChain, walletTracker, walletPosition, walletChanged, liqFills, predictedFunding, WALLET_TOP, WALLET_REFRESH_MS, MAJORS, TRADE_IDS, TRADE_ORDER, tradeSubs, okxCt, tradeParse, tradeBook, tradeRows, tradeShare, vol24Parse, vol24Share, bookSubs, bookParse, bnBookSub, hlBookParse, hlCoarse, hlBookSummary, perpBook, crc32, bookCompare, BOOK_PERP, BOOK_PERP_ORDER, BOOK_PERP_REC, venueSubs, venueParse, venueApply, venueRecord, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
+  return {perpFlowSubs, perpFlow, REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, due, calendar, OWNER, EXPECT_MS, ownerOf, tally, ageText, health, FEATURES, FEATURE_INFO, featureSeries, featureMaxAge, context, venueLead, leadText, liqDriven, usdText, wallQuality, marketState, marketStateSeries, STATE_VERSION, EVENT_LABEL, evSpan, eventsNear, eventClock, volLens, lensSeries, gridReturns, LENS_TEXT, walletSeries, takerNet, crowdIndex, crowdNetAt, whaleFlow, whaleSeries, WHALE_FLOOR_USD, deribitCoin, optName, optionsChain, walletTracker, walletPosition, walletChanged, liqFills, predictedFunding, WALLET_TOP, WALLET_REFRESH_MS, MAJORS, TRADE_IDS, TRADE_ORDER, tradeSubs, okxCt, tradeParse, tradeBook, tradeRows, tradeShare, vol24Parse, vol24Share, bookSubs, bookParse, bnBookSub, hlBookParse, hlCoarse, hlBookSummary, perpBook, crc32, bookCompare, BOOK_PERP, BOOK_PERP_ORDER, BOOK_PERP_REC, venueSubs, venueParse, venueApply, venueRecord, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
 })();

@@ -8,7 +8,7 @@
 // and the predicted funding across venues (60 s).
 // Collector "options" (BTC and ETH only): Deribit's volatility index and index price (pushed, sampled every 10 s) and the whole option chain summarised every 120 s.
 // Collector "book" (fast): Binance and Hyperliquid book depth summaries, one record a second each, only while a recording is on (the page says so with `recording`). Collector "tradeVol" (fast, like venues): every venue's BTC trades in one-second buckets (record "tv", every 10 s). Collector "vol24" (slow): each venue's 24 h ticker volume once a minute (record "vol24").
-// The page says which collectors are on in the start message: {t:"start", sym, want:{derivs, calendar, venues, tradeVol, book, bookPerp, vol24, wallets, options}, rec, recording}, and tells when a recording starts or stops: {t:"rec", on, recording} (on = recording or armed).
+// The page says which collectors are on in the start message: {t:"start", sym, want:{derivs, calendar, venues, tradeVol, book, bookPerp, perpFlow, vol24, wallets, options}, rec, recording}, and tells when a recording starts or stops: {t:"rec", on, recording} (on = recording or armed).
 let recording = false, on = false, gen = 0, sym = "btc", want = {}, ws = null, lastMsg = 0, timer = null, mk = null, prevRatios = null, lastCal = 0, recOn = false, vOn = false, vGen = 0, vSock = {}, vState = {}, lastVen = 0, lastPing = 0, wtr = null, wsk = null, wTracked = new Map(), wGen = 0, startAt = 0, dsk = null, dGen = 0, dState = {}, optOn = false;
 const last = {}, busy = {}, hold = {}, said = {};
 const BN = "https://fapi.binance.com", HLI = "https://api.hyperliquid.xyz/info";
@@ -248,6 +248,42 @@ function bookTick(now) {
   if (now - bAt >= 10000) { bAt = now; for (const id in bBook) { const p = bBook[id].summary(); if (p) col(BREC[id], now, p); } }
 }
 
+// ---- perp liquidations and open interest, Bybit and OKX (fast collector "perpFlow"): one socket each (Bybit: tickers + allLiquidation, OKX: open-interest + liquidation-orders), a "liqPerp" record for
+// every message that carries liquidations and an "oiPerp" record every 10 s with each venue's latest open interest. Open only while the page says so (like the extra venues); a socket silent for 60 s
+// is closed and reopened (open interest changes every few seconds on both, so silence means a dead socket).
+let pOn = false, pGen = 0, pSock = {}, pState = null, pAt = 0, pPing = 0;
+function pOpen(v) {
+  const g = pGen; let w;
+  try { w = new WebSocket(v.url); } catch (e) { say("perpFlow " + v.id, e); return; }
+  pSock[v.id] = {w, last:Date.now()};
+  w.onopen = () => { try { w.send(JSON.stringify(v.sub)); } catch {} };
+  w.onmessage = ev => {
+    const s = pSock[v.id]; if (!s || s.w !== w || !pState) return;
+    const now = s.last = Date.now(); let j; try { j = JSON.parse(ev.data); } catch { return; }      // OKX answers a ping with the plain text "pong"
+    try { const rows = pState.add(v.id, j, now); if (rows.length) col("liqPerp", now, {v:v.id, rows}); } catch {}
+  };
+  w.onclose = () => { if (!pOn || g !== pGen) return; say("perpFlow " + v.id, "closed, reopening"); setTimeout(() => { if (pOn && g === pGen) pOpen(v); }, 5000); };
+}
+async function perpStart() {
+  const g = ++pGen; pOn = true; pAt = Date.now(); pState = null; let ct = null;
+  try { const j = await (await fetch(`https://www.okx.com/api/v5/public/instruments?instType=SWAP&instId=${sym.toUpperCase()}-USDT-SWAP`, {cache:"no-store"})).json(); ct = COLLECT.okxCt(j); } catch (e) { say("perpFlow okx", e); }
+  if (!pOn || g !== pGen) return;
+  if (!ct) say("perpFlow okx", "no contract size: OKX liquidations are skipped (open interest is still read)");
+  pState = COLLECT.perpFlow(sym, ct);
+  for (const v of COLLECT.perpFlowSubs(sym)) pOpen(v);
+}
+function perpClose() { pOn = false; pGen++; for (const id in pSock) try { pSock[id].w.close(); } catch {} pSock = {}; pState = null; }
+function perpSync() {
+  const wanted = !!(want.perpFlow && recOn && on);
+  if (wanted && !pOn) perpStart(); else if (!wanted && pOn) perpClose();
+}
+function perpTick(now) {
+  if (!pOn) return;
+  if (now - pPing >= 20000) { pPing = now; for (const v of COLLECT.perpFlowSubs(sym)) { const s = pSock[v.id]; if (v.ping && s && s.w.readyState === 1) try { s.w.send(typeof v.ping === "string" ? v.ping : JSON.stringify(v.ping)); } catch {} } }
+  for (const id in pSock) { const s = pSock[id]; if (now - s.last > 60000) try { s.w.close(); } catch {} }
+  if (now - pAt >= 10000) { pAt = now; const p = pState && pState.sample(); if (p) col("oiPerp", now, p); }
+}
+
 // ---- book depth, Binance and Hyperliquid (fast collector "book"): while a recording is on, the worker keeps its own books so a hidden tab cannot starve them. Binance: the diff stream plus the REST
 // snapshot (COLLECT.perpBook("bn")); Hyperliquid: the exact 20 levels from its socket, topped up with the bucketed book asked for every 2 s. One record a second each ("bookBn", "bookHl").
 let kOn = false, kGen = 0, kSock = {}, kBn = null, kBuf = [], kSnapAt = 0, kSnapBusy = false, kHl = null, kCo = null, kCoAt = 0, kAt = 0, kCoLast = 0, kPing = 0;
@@ -341,6 +377,7 @@ function tick() {
   venuesTick(now);
   tradesTick(now);
   bookTick(now);
+  perpTick(now);
   depthTick(now);
   if (want.vol24 && COLLECT.due(last.vol24, now, COLLECT.EVERY.vol24)) { last.vol24 = now; run("vol24", pollVol24); }
   if (want.wallets) {
@@ -359,7 +396,7 @@ function tick() {
 }
 self.onmessage = ev => {
   const m = ev.data;
-  if (m.t === "start") { on = true; gen++; venuesClose(); tradesClose(); bookClose(); depthClose(); walletsStop(); optionsStop(); sym = String(m.sym || "btc"); want = m.want || {derivs:true}; recOn = !!m.rec; recording = !!m.recording; mk = null; prevRatios = null; lastCal = Date.now(); for (const k of [last, busy, hold, said]) for (const i in k) delete k[i]; startAt = Date.now(); if (want.derivs) open(); if (want.wallets) walletsStart(); if (want.options) optionsStart(); venuesSync(); tradesSync(); bookSync(); depthSync(); clearInterval(timer); timer = setInterval(tick, 1000); tick(); }
-  else if (m.t === "rec") { recOn = !!m.on; recording = !!m.recording; venuesSync(); tradesSync(); bookSync(); depthSync(); }
-  else if (m.t === "stop") { venuesClose(); tradesClose(); bookClose(); depthClose(); walletsStop(); optionsStop(); on = false; gen++; clearInterval(timer); try { if (ws) ws.close(); } catch {} ws = null; }
+  if (m.t === "start") { on = true; gen++; venuesClose(); tradesClose(); bookClose(); perpClose(); depthClose(); walletsStop(); optionsStop(); sym = String(m.sym || "btc"); want = m.want || {derivs:true}; recOn = !!m.rec; recording = !!m.recording; mk = null; prevRatios = null; lastCal = Date.now(); for (const k of [last, busy, hold, said]) for (const i in k) delete k[i]; startAt = Date.now(); if (want.derivs) open(); if (want.wallets) walletsStart(); if (want.options) optionsStart(); venuesSync(); tradesSync(); bookSync(); perpSync(); depthSync(); clearInterval(timer); timer = setInterval(tick, 1000); tick(); }
+  else if (m.t === "rec") { recOn = !!m.on; recording = !!m.recording; venuesSync(); tradesSync(); bookSync(); perpSync(); depthSync(); }
+  else if (m.t === "stop") { venuesClose(); tradesClose(); bookClose(); perpClose(); depthClose(); walletsStop(); optionsStop(); on = false; gen++; clearInterval(timer); try { if (ws) ws.close(); } catch {} ws = null; }
 };

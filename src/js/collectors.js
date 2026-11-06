@@ -55,8 +55,8 @@ setInterval(colSample, 10000);
 // ---- the always-on worker (collectors-worker.js): derivatives context and calendar tags. It runs whether or not auto-record is armed, in a worker so a hidden tab
 // does not slow it. Its records come here and go onto the tape; a record posted while the page is frozen is written when the page thaws.
 function colWorkerSync() {
-  const sym = cl$("sym").value.trim().toLowerCase(), wants = {derivs:colOn("derivs"), calendar:colOn("calendar"), venues:colOn("venues"), tradeVol:colOn("tradeVol"), book:colOn("book"), bookPerp:colOn("bookPerp"), vol24:colOn("vol24"), wallets:colOn("wallets"), options:colOn("options")}, key = sym + "|" + wants.derivs + "|" + wants.calendar + "|" + wants.venues + "|" + wants.tradeVol + "|" + wants.book + "|" + wants.bookPerp + "|" + wants.vol24 + "|" + wants.wallets + "|" + wants.options;
-  const want = (wants.derivs || wants.calendar || wants.venues || wants.tradeVol || wants.book || wants.bookPerp || wants.vol24 || wants.wallets || wants.options) && !!sym;
+  const sym = cl$("sym").value.trim().toLowerCase(), wants = {derivs:colOn("derivs"), calendar:colOn("calendar"), venues:colOn("venues"), tradeVol:colOn("tradeVol"), book:colOn("book"), bookPerp:colOn("bookPerp"), perpFlow:colOn("perpFlow"), vol24:colOn("vol24"), wallets:colOn("wallets"), options:colOn("options")}, key = sym + "|" + wants.derivs + "|" + wants.calendar + "|" + wants.venues + "|" + wants.tradeVol + "|" + wants.book + "|" + wants.bookPerp + "|" + wants.vol24 + "|" + wants.wallets + "|" + wants.options;
+  const want = (wants.derivs || wants.calendar || wants.venues || wants.tradeVol || wants.book || wants.bookPerp || wants.perpFlow || wants.vol24 || wants.wallets || wants.options) && !!sym;
   if (CL.worker && (!want || CL.workerKey !== key)) { try { CL.worker.postMessage({t:"stop"}); CL.worker.terminate(); } catch {} CL.worker = null; }
   if (!want || CL.worker) return;
   let w;
@@ -86,6 +86,7 @@ function colWhy(id) {
     case "venues": return CL.worker ? (colWatching() ? null : "waits for a recording or auto-record armed") : "worker not running";
     case "tradeVol": return CL.worker ? (colWatching() ? null : "waits for a recording or auto-record armed") : "worker not running";
     case "bookPerp": return CL.worker ? (colWatching() ? null : "waits for a recording or auto-record armed") : "worker not running";
+    case "perpFlow": return CL.worker ? (colWatching() ? null : "waits for a recording or auto-record armed") : "worker not running";
     case "book": return CL.worker ? (RT.rec ? null : "waits for a recording") : "worker not running";
     default: return CL.worker ? null : "worker not running";
   }

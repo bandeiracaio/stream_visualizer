@@ -234,6 +234,33 @@ const READER_SELFTEST=(()=>{
       &&reg&&reg.speed==="fast"&&reg.owner==="worker"&&COLLECT.ownerOf("bookBy")==="bookPerp"&&COLLECT.ownerOf("bookOk")==="bookPerp"&&subs.length===2&&subs[0].sub.args[0]==="orderbook.1000.BTCUSDT"&&subs[1].sub.args[0].instId==="BTC-USDT-SWAP"&&subs[1].unsub.op==="unsubscribe",
       detail:J({r0,r1,s1,r2,s2,r3,r5,r6,r7,r8,st,o1,os1,o2,os2,o3,o4,c1,c2,c3,cmp})};
   });
+  add("collectors: Bybit and OKX liquidations and open interest: every liquidation with the forced order's side, open interest kept from deltas, OKX contracts turned into coin, other coins and bad messages ignored",E=>{
+    const J=JSON.stringify,T0=1793932000000,subs=COLLECT.perpFlowSubs("btc"),reg=COLLECT.REGISTRY.find(c=>c.id==="perpFlow");
+    const f=COLLECT.perpFlow("btc",0.01),empty=f.sample();
+    // Bybit: messages captured live 2026-11-05 (snapshot with open interest, a delta without it, a delta that carries it again) and an allLiquidation message in the documented shape
+    const tk=(type,d)=>({topic:"tickers.BTCUSDT",type,ts:T0,data:Object.assign({symbol:"BTCUSDT"},d)});
+    const a0=f.add("by",tk("snapshot",{lastPrice:"76051.50",markPrice:"76057.00",openInterest:"68162.557",openInterestValue:"5184239597.75"}),T0),s1=f.sample();
+    const a1=f.add("by",tk("delta",{bid1Price:"76049.60",ask1Price:"76049.70"}),T0),s2=f.sample();
+    const a2=f.add("by",tk("delta",{openInterest:"68170.1"}),T0),s3=f.sample();
+    const bl=f.add("by",{topic:"allLiquidation.BTCUSDT",type:"snapshot",ts:T0+500,data:[{T:T0+400,s:"BTCUSDT",S:"Buy",v:"0.5",p:"76000"},{T:T0+450,s:"BTCUSDT",S:"Sell",v:"0.25",p:"76100"},{T:T0+460,s:"ETHUSDT",S:"Buy",v:"3",p:"2000"},{T:T0+470,s:"BTCUSDT",S:"Buy",v:"0",p:"76000"}]},T0+500);
+    // OKX: open interest as captured live (oiCcy in coin, oiUsd), a liquidation of BTC (8 contracts of 0.01 coin) beside another coin's, and the same without the contract size
+    const oi=(c,u)=>({arg:{channel:"open-interest",instId:"BTC-USDT-SWAP"},data:[{instId:"BTC-USDT-SWAP",instType:"SWAP",oi:"3485534.67",oiCcy:c,oiUsd:u,ts:String(T0)}]});
+    const o1=f.add("ok",oi("34855.3467000001545","2650804885.0897317499722"),T0),s4=f.sample();
+    const lq=(id,side,sz,px)=>({instId:id,instType:"SWAP",details:[{side,posSide:side==="sell"?"long":"short",sz,bkPx:px,bkLoss:"0",ccy:"",ts:String(T0+700)}]});
+    const ol=f.add("ok",{arg:{channel:"liquidation-orders",instType:"SWAP"},data:[lq("ZEC-USDT-SWAP","buy","8","1280.71"),lq("BTC-USDT-SWAP","sell","8","75900")]},T0+700);
+    const g=COLLECT.perpFlow("btc",null),og=g.add("ok",{arg:{channel:"liquidation-orders",instType:"SWAP"},data:[lq("BTC-USDT-SWAP","sell","8","75900")]},T0),gOi=g.add("ok",oi("100","7600000"),T0),gs=g.sample();
+    const junk=[f.add("by",null,T0),f.add("ok",{arg:{channel:"open-interest"},data:"x"},T0),f.add("by",{topic:"tickers.BTCUSDT",data:{openInterest:"abc"}},T0),f.add("zz",{},T0)];
+    return{ok:empty===null&&a0.length===0&&J(s1)==='{"by":{"oi":68162.557,"usd":5184239598}}'&&a1.length===0&&J(s2)===J(s1)&&J(s3)==='{"by":{"oi":68170.1,"usd":5184239598}}'
+      &&bl.length===2&&J(bl[0])===J({t:T0+400,side:"sell",px:76000,q:0.5})&&J(bl[1])===J({t:T0+450,side:"buy",px:76100,q:0.25})
+      &&o1.length===0&&J(s4.ok)==='{"oi":34855.3467,"usd":2650804885}'&&J(s4.by)===J(s3.by)
+      &&ol.length===1&&J(ol[0])===J({t:T0+700,side:"sell",px:75900,q:0.08})
+      &&og.length===0&&gOi.length===0&&J(gs)==='{"ok":{"oi":100,"usd":7600000}}'
+      &&junk.every(x=>x.length===0)&&J(f.sample().ok)===J(s4.ok)
+      &&subs.length===2&&subs[0].id==="by"&&subs[0].url==="wss://stream.bybit.com/v5/public/linear"&&J(subs[0].sub.args)==='["tickers.BTCUSDT","allLiquidation.BTCUSDT"]'
+      &&subs[1].id==="ok"&&subs[1].url==="wss://ws.okx.com/ws/v5/public"&&subs[1].url.indexOf(":8443")<0&&subs[1].sub.args[0].channel==="open-interest"&&subs[1].sub.args[1].channel==="liquidation-orders"
+      &&reg&&reg.speed==="fast"&&reg.owner==="worker"&&reg.expectMs===10000&&COLLECT.ownerOf("liqPerp")==="perpFlow"&&COLLECT.ownerOf("oiPerp")==="perpFlow"&&COLLECT.EXPECT_MS.perpFlow===10000,
+      detail:J({empty,a0,s1,s2,s3,bl,o1,s4,ol,og,gOi,gs,junk:junk.map(x=>x.length),subs:subs.map(s=>s.id)})};
+  });
   add("collectors: Binance and Hyperliquid books in the worker: snapshot window as reach, stale and straddling first diff, pu chain, gap resync, flow, Hyperliquid parse, bucketed top-up and stale book",E=>{
     const J=JSON.stringify,P=COLLECT.bookParse,T0=1792800000000;
     const snap=id=>({lastUpdateId:id,E:T0,T:T0,bids:[["100000","2"],["99990","3"],["99900","5"]],asks:[["100001","1"],["100010","4"],["100100","6"]]});
@@ -329,7 +356,7 @@ const READER_SELFTEST=(()=>{
       &&by("hlCtx.fund")&&by("hlCtx.fund").unusual&&by("hlCtx.fund").z===99&&by("hlCtx.fund").text==="+1 bps"
       &&by("bookBn.depth5")&&!by("bookBn.depth5").unusual&&by("bookBn.depth5").z===0&&!by("optChain.atmVol")&&by("dvol.vol").x===60
       &&c.liq.bn===2&&c.liq.hl===1&&early.items.length>=2&&!early.items.find(x=>x.f==="dvol.vol").unusual&&none.items.length===0&&none.liq.bn===0
-      &&c.items.every((x,i,a)=>!i||Math.abs(a[i-1].z)>=Math.abs(x.z))&&COLLECT.REGISTRY.length===10&&Object.keys(COLLECT.FEATURES).length===21,
+      &&c.items.every((x,i,a)=>!i||Math.abs(a[i-1].z)>=Math.abs(x.z))&&COLLECT.REGISTRY.length===11&&Object.keys(COLLECT.FEATURES).length===21,
       detail:J({n:c.items.length,top:c.items.slice(0,4).map(x=>[x.f,x.z,x.text,x.unusual]),liq:c.liq,early:early.items.length})};
   });
   add("collectors: who moved first: a venue that covered half of the move earlier led, one within 2 s is with it, a flat or silent one is named, and no clear or only a gradual move says so",E=>{

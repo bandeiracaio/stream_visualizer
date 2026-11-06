@@ -38,6 +38,7 @@ Collectors write records `["c", name, t, payload]` to a rolling 24 h tape on the
 
 **Only while connected and recording** (`book`) or **while recording or auto-record is armed** (`venues`):
 - `book`: depth within 1 / 5 / 10 / 20 bps, spread, touch size, size added and removed (`bookBn`, `bookHl`). Runs on the page, so a hidden tab thins it out.
+- `perpFlow`: every Bybit and OKX liquidation of the coin (`liqPerp`: side of the forced order, bankruptcy price, size) and each venue's open interest every 10 s (`oiPerp`); Binance's liquidation stream keeps only the latest per second, these two are complete.
 - `venues`: Coinbase, Bybit, OKX, Binance spot and the majors' marks, once a second (`venues`). The page tells the worker when a recording starts or stops or auto-record is armed or disarmed, so a hidden tab may start it a few seconds late. This is what gives an auto-recording the cross-venue context from before the trigger. `book` cannot do that: it needs the full feeds connected, and an armed app listens to one price stream only.
 
 Things to know:
