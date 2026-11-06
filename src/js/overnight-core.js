@@ -3,7 +3,7 @@
 // preflight turns a plain description of the environment into checklist items; morning turns the saved recordings and Health log notes of a time window into a summary.
 // Display only: nothing here changes a feed, a recording or a detection. Spec: .scratch/overnight/spec.md.
 const OVERNIGHT = (() => {
-  const HOUR = 3600000, DAY = 24 * HOUR, PROBLEM_NOTE = /^(gap|silent|page frozen|wake lock lost|learning started over|auto-record not ready|price-stream drop|tab hidden|page error|promise error)/;
+  const HOUR = 3600000, DAY = 24 * HOUR, PROBLEM_NOTE = /^(gap|silent|page frozen|wake lock lost|learning started over|auto-record not ready|price-stream drop|tab hidden|page error|promise error|armed page ended)/;
   // env: {online, newer (latest version string or null), connected, armed, hidden, wakeLockApi,
   //       folder:{supported, state:"ok"|"none"|"denied"|"failed", name}|null, disk:{tone,text}|null, persisted:true|false|null,
   //       battery:{charging, level 0..1}|null, collectors:{expected, active, slow:[label]}|null}

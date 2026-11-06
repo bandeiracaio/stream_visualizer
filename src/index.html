@@ -11,6 +11,7 @@
 </head>
 <body>
 <header>
+  <div id="armBar" hidden><span id="armText"></span><button id="armBtn" class="primary">Re-arm now</button><button id="armClose" title="Forget that it was armed">Dismiss</button></div>
   <div id="updBar" hidden><span id="updText"></span><button id="updBtn" class="primary">Reload</button><button id="updClose" title="Hide until the next check">✕</button></div>
   <h1>Live Stream Visualizer <small id="ver"></small></h1>
   <button id="go" class="primary">Connect</button>
@@ -592,6 +593,9 @@
 <!--@include js/liq-core.js-->
 </script>
 <script>
+<!--@include js/arm-memory-core.js-->
+</script>
+<script>
 <!--@include js/scoreboard-core.js-->
 </script>
 <script>
@@ -626,6 +630,9 @@
 </script>
 <script>
 <!--@include js/status-button.js-->
+</script>
+<script>
+<!--@include js/arm-memory.js-->
 </script>
 </body>
 </html>

@@ -19,6 +19,8 @@ For the first real collection weeks. Numbers come from the code defaults (`reade
 
 ## Unattended collection: how to tell it worked
 
+- Since v124, if an armed page is reloaded, restarted or closed, the next page that opens shows a bar under the header: "Auto-record was armed (last seen ...) and this page is not armed" with Re-arm now. Also look for `armed page ended` in the Health log. Arming is not remembered across a reload on its own: press Re-arm now.
+
 - The header chips show `armed · waiting`, not `learning` after the first 15 minutes. If it keeps going back to `learning`, the tab is being throttled or frozen: open **Health log** (Reader tab, under Saved recordings) and look for `page frozen by the browser`, `gap`, `tab hidden`, `price-stream drop`, `wake lock lost`.
 - Each saved recording shows a quality line in **Saved recordings** (`47 of 61 min with data, longest silence 60 s, clock at 43%`). It is amber when there are holes. A `hollow` file (fewer than half the minutes have data) is not worth analysing; keep its health log.
 - An auto-recording also holds `pre`: the 30 minutes of Binance mark price before the trigger and the reading that fired it. Use it to see whether the trigger was late.
