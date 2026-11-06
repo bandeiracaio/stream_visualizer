@@ -49,6 +49,7 @@ function arStartFeed() {
     if (m.t === "vol") { AR.v = m.v; AR.lastMsg = m.lastMsg; AR.volAt = Date.now(); AR.ws = {readyState:m.ws, close:() => w.postMessage({t:"close"})}; }
     else if (m.t === "col") { if (typeof colAdd === "function") colAdd(m.rec); }      // a collector record from the worker (collectors.js keeps the tape)
     else if (m.t === "trace") { if (AR.preMeta) AR.pre = Object.assign({}, AR.preMeta, {prices:m.rows}); }
+    else if (m.t === "note") { if (typeof hlNote === "function") hlNote(m.k, m.d); }      // the worker's socket close log, for the Health log
     else if (m.t === "drop") AR.drops = AR.drops.concat(m.d).slice(-20);      // kept so a pattern in the drops can be read afterwards
   };
   w.onerror = () => { if (w !== AR.worker) return; AR.worker = null; try { w.terminate(); } catch {} arOpen(); };      // the worker failed: do the same job on the page

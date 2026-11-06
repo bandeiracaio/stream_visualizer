@@ -51,6 +51,32 @@ const COLLECT = (() => {
     };
   }
 
+  // Socket close log (a worker's sockets; the Health log shows it as "socket closed"). watch(name, w) listens to one socket without touching its own handlers and, on every close that was not
+  // collection ending, posts the close code, wasClean, the reason, how long it had been up, how long since its last message, how many messages it carried, and ours = why OUR code closed it
+  // (shut(w, "silent") is a worker's silence check, so a "closed, reopening" can be told from a server close; shut(w, "stop") is collection ending and is not logged). A flapping source writes
+  // at most 5 notes an hour so the 400-event Health log is not pushed out; the notes carry the running close and error counts and how many were left out. now() and post() come from the worker.
+  function sockWatch(post, now) {
+    const stat = {};
+    return {
+      watch(name, w) {
+        const st = stat[name] || (stat[name] = {closes:0, errors:0, win:0, logged:0, suppressed:0}), at = {open:0, msg:0, n:0};
+        w.addEventListener("open", () => { at.open = now(); });
+        w.addEventListener("message", () => { at.msg = now(); at.n++; });
+        w.addEventListener("error", () => { st.errors++; });
+        w.addEventListener("close", ev => {
+          const t = now(), why = w._why || null; st.closes++;
+          if (why === "stop") return;
+          if (!st.win || t - st.win >= 3600000) { st.win = t; st.logged = 0; }
+          if (st.logged >= 5) { st.suppressed++; return; }
+          st.logged++; const lastIn = at.msg || at.open;
+          post({t:"note", k:"socket closed", d:{src:name, code:ev.code, clean:!!ev.wasClean, reason:String(ev.reason || "").slice(0, 60) || null, upMs:at.open ? t - at.open : null, silentMs:lastIn ? t - lastIn : null, msgs:at.n, ours:why, closes:st.closes, errors:st.errors, left_out:st.suppressed || null}});
+          st.suppressed = 0;
+        });
+      },
+      shut(w, why) { try { w._why = why; w.close(); } catch (e) { /* already closed */ } }
+    };
+  }
+
   // ---- derivatives context (collector "derivs", run by collectors-worker.js). Readers of the public endpoints; each returns null for an answer that is not usable.
   // Verified live 2026-10-23, see .scratch/collectors/01-collectors.md.
   const EVERY = {prem:15000, hl:15000, ratios:60000, basis:10000, wallets:30000, funding:60000, options:120000, dvol:10000, vol24:60000}, BACKOFF_MS = 300000;      // polling spacing per source; a rate-limited source rests this long
@@ -1024,5 +1050,5 @@ const COLLECT = (() => {
     for (let i = recs.length - 1; i >= 0; i--) { const b = JSON.stringify(recs[i]).length + 1; if (size + b > lim) break; size += b; out.push(recs[i]); }
     return out.reverse();
   }
-  return {perpFlowSubs, perpFlow, REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, due, calendar, OWNER, EXPECT_MS, ownerOf, tally, ageText, health, FEATURES, FEATURE_INFO, featureSeries, featureMaxAge, context, venueLead, leadText, liqDriven, usdText, wallQuality, marketState, marketStateSeries, STATE_VERSION, EVENT_LABEL, evSpan, eventsNear, eventClock, volLens, lensSeries, gridReturns, LENS_TEXT, walletSeries, takerNet, crowdIndex, crowdNetAt, whaleFlow, whaleSeries, WHALE_FLOOR_USD, deribitCoin, optName, optionsChain, walletTracker, walletPosition, walletChanged, liqFills, predictedFunding, WALLET_TOP, WALLET_REFRESH_MS, MAJORS, TRADE_IDS, TRADE_ORDER, tradeSubs, okxCt, tradeParse, tradeBook, tradeRows, tradeShare, vol24Parse, vol24Share, bookSubs, bookParse, bnBookSub, hlBookParse, hlCoarse, hlBookSummary, perpBook, crc32, bookCompare, BOOK_PERP, BOOK_PERP_ORDER, BOOK_PERP_REC, venueSubs, venueParse, venueApply, venueRecord, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
+  return {perpFlowSubs, perpFlow, REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, sockWatch, due, calendar, OWNER, EXPECT_MS, ownerOf, tally, ageText, health, FEATURES, FEATURE_INFO, featureSeries, featureMaxAge, context, venueLead, leadText, liqDriven, usdText, wallQuality, marketState, marketStateSeries, STATE_VERSION, EVENT_LABEL, evSpan, eventsNear, eventClock, volLens, lensSeries, gridReturns, LENS_TEXT, walletSeries, takerNet, crowdIndex, crowdNetAt, whaleFlow, whaleSeries, WHALE_FLOOR_USD, deribitCoin, optName, optionsChain, walletTracker, walletPosition, walletChanged, liqFills, predictedFunding, WALLET_TOP, WALLET_REFRESH_MS, MAJORS, TRADE_IDS, TRADE_ORDER, tradeSubs, okxCt, tradeParse, tradeBook, tradeRows, tradeShare, vol24Parse, vol24Share, bookSubs, bookParse, bnBookSub, hlBookParse, hlCoarse, hlBookSummary, perpBook, crc32, bookCompare, BOOK_PERP, BOOK_PERP_ORDER, BOOK_PERP_REC, venueSubs, venueParse, venueApply, venueRecord, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, ratioPoint, ratiosChanged, hlCtx, force, basis, prune, slice, fit};
 })();

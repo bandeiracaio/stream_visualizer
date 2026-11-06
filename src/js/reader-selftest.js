@@ -92,6 +92,18 @@ const READER_SELFTEST=(()=>{
     st.note(T0-100,T0);st.note(T0+900,T0+1000);st.note(T0+3910,T0+4000);const w=st.take(T0+4500,5000),again=st.take(T0+9500,5000);
     return{ok:f.a.n===60&&f.a.hz===6&&f.a.ageMs===400&&f.a.late===3&&f.a.latMed===30&&f.a.latP90===200&&!f.b&&w.n===3&&w.hz===.6&&w.lagMed===100&&w.gapMs===3000&&w.ageMs===500&&again.n===0&&again.gapMs===0&&COLLECT.isRec(COLLECT.rec("x",T0,{}))&&!COLLECT.isRec(["t",{}])&&!COLLECT.isRec(["c","x","no"]),detail:JSON.stringify({f,w,again})};
   });
+  add("collectors: a worker socket close is logged with its code and who closed it; our own stop is not; a flapping source is capped at 5 notes an hour and counts what it left out",E=>{
+    const notes=[];let t=T0;const sw=COLLECT.sockWatch(m=>notes.push(m),()=>t);
+    const mk=()=>{const h={};return{addEventListener(n,f){h[n]=f;},close(){},fire(n,e){h[n]&&h[n](e||{});}};};
+    const a=mk();sw.watch("venue x",a);t=T0;a.fire("open");t=T0+1000;a.fire("message");a.fire("message");t=T0+31000;a.fire("error");a.fire("close",{code:1006,wasClean:false,reason:""});
+    const b=mk();sw.watch("venue y",b);t=T0;b.fire("open");sw.shut(b,"silent");t=T0+40000;b.fire("close",{code:1000,wasClean:true,reason:"bye"});
+    const c=mk();sw.watch("venue z",c);sw.shut(c,"stop");c.fire("close",{code:1000,wasClean:true});
+    const n0=notes.length,d=notes[0].d,e=notes[1].d;
+    const f=mk();sw.watch("flap",f);for(let i=0;i<8;i++){t=T0+100000+i*5000;f.fire("open");f.fire("close",{code:1006,wasClean:false});}
+    const fl=notes.filter(x=>x.d.src==="flap");t=T0+100000+3600000+5000;const g=mk();sw.watch("flap",g);g.fire("open");g.fire("close",{code:1001,wasClean:true});
+    const after=notes.filter(x=>x.d.src==="flap");
+    return{ok:n0===2&&notes[0].k==="socket closed"&&d.src==="venue x"&&d.code===1006&&d.clean===false&&d.upMs===31000&&d.silentMs===30000&&d.msgs===2&&d.errors===1&&d.ours===null&&e.ours==="silent"&&e.code===1000&&e.clean===true&&e.reason==="bye"&&fl.length===5&&after.length===6&&after[5].d.left_out===3&&after[5].d.closes===9,detail:JSON.stringify({n0,d,e,fl:fl.length,after:after.length,last:after[after.length-1]&&after[after.length-1].d})};
+  });
   add("collectors: the tape is pruned to its window, sliced for a session, and fitted to the file budget",E=>{
     const recs=[];for(let i=0;i<100;i++)recs.push(COLLECT.rec("feeds",T0+i*10000,{n:i,pad:"x".repeat(50)}));
     const now=T0+99*10000,pr=COLLECT.prune(recs,now,200000),sl=COLLECT.slice(recs,T0+100000,T0+200000),ft=COLLECT.fit(recs,1500);

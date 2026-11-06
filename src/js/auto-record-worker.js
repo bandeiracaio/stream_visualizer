@@ -5,10 +5,11 @@
 let ws = null, on = false, gen = 0, url = "", cfg = {}, h = null, lastMsg = 0, tickTimer = null, lastCol = 0;
 const stat = COLLECT.streamStat();      // self-telemetry of this stream (collectors-core.js is placed before this file)
 const post = m => self.postMessage(m);
+const { watch, shut } = COLLECT.sockWatch(post, Date.now);      // close log (code, wasClean, up time, who closed it), posted as a note for the Health log
 function open() {
   const g = gen; let s;
   try { s = new WebSocket(url); } catch (err) { post({t:"error", msg:String(err && err.message || err)}); return; }
-  ws = s; lastMsg = Date.now(); const opened = lastMsg;
+  watch("price stream", s); ws = s; lastMsg = Date.now(); const opened = lastMsg;
   s.onmessage = ev => { try { const j = JSON.parse(ev.data), d = j.data || j; if (d && d.p){ lastMsg = Date.now(); AUTOREC.push(h, lastMsg, +d.p); stat.note(+d.E, lastMsg); } } catch {} };
   s.onclose = () => {
     if (!on || g !== gen) return;
@@ -18,7 +19,7 @@ function open() {
 }
 function tick() {
   if (!on) return;
-  if (ws && Date.now() - lastMsg > 15000) try { ws.close(); } catch {}      // a socket that went silent without closing: close it so onclose reopens it
+  if (ws && Date.now() - lastMsg > 15000) shut(ws, "silent");      // a socket that went silent without closing: close it so onclose reopens it
   const now = Date.now();
   post({t:"vol", v:AUTOREC.vol(h, cfg, now), lastMsg, ws:ws ? ws.readyState : -1, at:now});
   if (!lastCol) lastCol = now;
@@ -29,6 +30,6 @@ self.onmessage = ev => {
   if (m.t === "start") { on = true; gen++; url = m.url; cfg = m.cfg || {}; h = AUTOREC.createHistory(); open(); clearInterval(tickTimer); tickTimer = setInterval(tick, 2000); tick(); }
   else if (m.t === "cfg") cfg = m.cfg || {};
   else if (m.t === "dump") post({t:"trace", rows:AUTOREC.dump(h, Date.now(), m.secs || 1800)});
-  else if (m.t === "close") { try { if (ws) ws.close(); } catch {} }
-  else if (m.t === "stop") { on = false; gen++; clearInterval(tickTimer); try { if (ws) ws.close(); } catch {} ws = null; }
+  else if (m.t === "close") { if (ws) shut(ws, "page"); }
+  else if (m.t === "stop") { on = false; gen++; clearInterval(tickTimer); if (ws) shut(ws, "stop"); ws = null; }
 };

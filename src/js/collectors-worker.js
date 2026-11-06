@@ -13,6 +13,7 @@ let recording = false, on = false, gen = 0, sym = "btc", want = {}, ws = null, l
 const last = {}, busy = {}, hold = {}, said = {};
 const BN = "https://fapi.binance.com", HLI = "https://api.hyperliquid.xyz/info";
 const post = m => self.postMessage(m);
+const { watch, shut } = COLLECT.sockWatch(post, Date.now);      // close log for every socket below (collectors-core.js)
 const col = (name, t, payload) => post({t:"col", rec:COLLECT.rec(name, t, payload)});
 function say(name, err) {      // one note per source per 5 minutes: an outage must not fill the log
   const now = Date.now(); if (said[name] && now - said[name] < 300000) return; said[name] = now;
@@ -59,6 +60,7 @@ async function pollRatios() {
 function open() {
   const g = gen, s = sym.toLowerCase(); let w;
   try { w = new WebSocket(`wss://fstream.binance.com/market/stream?streams=${s}usdt@markPrice@1s/${s}usdt@forceOrder`); } catch (e) { say("stream", e); return; }
+  watch("stream", w);
   ws = w; lastMsg = Date.now();
   w.onmessage = ev => {
     try {
@@ -73,6 +75,7 @@ function open() {
 function wOpen() {
   const g = wGen; let w;
   try { w = new WebSocket("wss://api.hyperliquid.xyz/ws"); } catch (e) { say("wallets", e); return; }
+  watch("wallets", w);
   wsk = {w, last:Date.now()};
   w.onopen = () => {
     try { w.send(JSON.stringify({method:"subscribe", subscription:{type:"trades", coin:sym.toUpperCase()}})); for (const a of wTracked.keys()) w.send(JSON.stringify({method:"subscribe", subscription:{type:"userFills", user:a}})); } catch {}
@@ -112,12 +115,13 @@ async function pollFunding() {
   col("fundPred", t, f);
 }
 function walletsStart() { wGen++; wtr = COLLECT.walletTracker(); wTracked = new Map(); wOpen(); }
-function walletsStop() { wGen++; wtr = null; wTracked = new Map(); if (wsk) try { wsk.w.close(); } catch {} wsk = null; }
+function walletsStop() { wGen++; wtr = null; wTracked = new Map(); if (wsk) shut(wsk.w, "stop"); wsk = null; }
 
 // ---- options and volatility (Deribit): the volatility and price index arrive on a socket; the chain is a request (about 400 KB, sent compressed)
 function dOpen() {
   const g = dGen, c = sym.toLowerCase(); let w;
   try { w = new WebSocket("wss://www.deribit.com/ws/api/v2"); } catch (e) { say("options", e); return; }
+  watch("options", w);
   dsk = {w, last:Date.now()};
   w.onopen = () => { try { w.send(JSON.stringify({jsonrpc:"2.0", id:1, method:"public/subscribe", params:{channels:["deribit_volatility_index." + c + "_usd", "deribit_price_index." + c + "_usd"]}})); } catch {} };
   w.onmessage = ev => {
@@ -140,10 +144,10 @@ function optionsStart() {
   if (!COLLECT.deribitCoin(sym)) { say("options", "Deribit has options for BTC and ETH only, not " + sym.toUpperCase()); return; }
   optOn = true; dOpen();
 }
-function optionsStop() { dGen++; optOn = false; if (dsk) try { dsk.w.close(); } catch {} dsk = null; dState = {}; }
+function optionsStop() { dGen++; optOn = false; if (dsk) shut(dsk.w, "stop"); dsk = null; dState = {}; }
 function optionsTick(now) {
   if (!optOn) return;
-  if (dsk && now - dsk.last > 60000) try { dsk.w.close(); } catch {}      // the volatility index pushes every few seconds, so a minute of silence is a dead socket
+  if (dsk && now - dsk.last > 60000) shut(dsk.w, "silent");      // the volatility index pushes every few seconds, so a minute of silence is a dead socket
   if (now - (last.dping || 0) >= 30000) { last.dping = now; if (dsk && dsk.w.readyState === 1) try { dsk.w.send(JSON.stringify({jsonrpc:"2.0", id:2, method:"public/test"})); } catch {} }
   if (COLLECT.due(last.dvol, now, COLLECT.EVERY.dvol) && (dState.vol != null || dState.idx != null)) {
     last.dvol = now;
@@ -156,6 +160,7 @@ function optionsTick(now) {
 function vOpen(v) {
   const g = vGen; let w;
   try { w = new WebSocket(v.url); } catch (e) { say("venue " + v.id, e); return; }
+  watch("venue " + v.id, w);
   vSock[v.id] = {w, last:Date.now()};
   w.onopen = () => { if (v.sub) try { w.send(JSON.stringify(v.sub)); } catch {} };
   w.onmessage = ev => {
@@ -165,7 +170,7 @@ function vOpen(v) {
   };
   w.onclose = () => { if (!vOn || g !== vGen) return; say("venue " + v.id, "closed, reopening"); setTimeout(() => { if (vOn && g === vGen) vOpen(v); }, 5000); };
 }
-function venuesClose() { vOn = false; vGen++; for (const id in vSock) try { vSock[id].w.close(); } catch {} vSock = {}; }
+function venuesClose() { vOn = false; vGen++; for (const id in vSock) shut(vSock[id].w, "stop"); vSock = {}; }
 function venuesSync() {
   const wanted = !!(want.venues && recOn && on);
   if (wanted && !vOn) { vOn = true; vGen++; vState = {}; lastVen = 0; for (const v of COLLECT.venueSubs(sym)) vOpen(v); }
@@ -174,7 +179,7 @@ function venuesSync() {
 function venuesTick(now) {
   if (!vOn) return;
   if (now - lastPing >= 20000) { lastPing = now; for (const v of COLLECT.venueSubs(sym)) { const s = vSock[v.id]; if (v.ping && s && s.w.readyState === 1) try { s.w.send(typeof v.ping === "string" ? v.ping : JSON.stringify(v.ping)); } catch {} } }
-  for (const id in vSock) { const s = vSock[id]; if (now - s.last > 30000) try { s.w.close(); } catch {} }      // silent without closing: close it so onclose reopens it
+  for (const id in vSock) { const s = vSock[id]; if (now - s.last > 30000) shut(s.w, "silent"); }      // silent without closing: close it so onclose reopens it
   if (now - lastVen >= 1000) { lastVen = now; const p = COLLECT.venueRecord(vState, now); if (p) col("venues", now, p); }
 }
 // ---- venue trade volume (fast collector "tradeVol"): every venue's BTC trades into one-second buckets, a record ("tv") every 10 s. Open only while the page says so (like the extra venues).
@@ -182,6 +187,7 @@ let tOn = false, tGen = 0, tSock = {}, tBook = null, tCt = null, tFlushAt = 0, t
 function tOpen(v) {
   const g = tGen; let w;
   try { w = new WebSocket(v.url); } catch (e) { say("trades " + v.id, e); return; }
+  watch("trades " + v.id, w);
   tSock[v.id] = {w, last:Date.now()};
   w.onopen = () => { if (v.sub) try { w.send(JSON.stringify(v.sub)); } catch {} };
   w.onmessage = ev => {
@@ -199,7 +205,7 @@ async function tradesStart() {
   for (const v of COLLECT.tradeSubs(sym, {swap:!!tCt})) tOpen(v);
 }
 function tradesFlush(now, all) { if (!tBook) return; const p = tBook.flush(now, all); if (p) col("tv", now, p); }
-function tradesClose() { if (tOn) tradesFlush(Date.now(), true); tOn = false; tGen++; for (const id in tSock) try { tSock[id].w.close(); } catch {} tSock = {}; tBook = null; }
+function tradesClose() { if (tOn) tradesFlush(Date.now(), true); tOn = false; tGen++; for (const id in tSock) shut(tSock[id].w, "stop"); tSock = {}; tBook = null; }
 function tradesSync() {
   const wanted = !!(want.tradeVol && recOn && on);
   if (wanted && !tOn) tradesStart(); else if (!wanted && tOn) tradesClose();
@@ -207,7 +213,7 @@ function tradesSync() {
 function tradesTick(now) {
   if (!tOn) return;
   if (now - tPing >= 20000) { tPing = now; for (const v of COLLECT.tradeSubs(sym, {swap:!!tCt})) { const s = tSock[v.id]; if (v.ping && s && s.w.readyState === 1) try { s.w.send(typeof v.ping === "string" ? v.ping : JSON.stringify(v.ping)); } catch {} } }
-  for (const id in tSock) { const s = tSock[id]; if (now - s.last > 60000) try { s.w.close(); } catch {} }      // silent without closing: close it so onclose reopens it
+  for (const id in tSock) { const s = tSock[id]; if (now - s.last > 60000) shut(s.w, "silent"); }      // silent without closing: close it so onclose reopens it
   if (now - tFlushAt >= 10000) { tFlushAt = now; tradesFlush(now, false); }
 }
 
@@ -219,6 +225,7 @@ function bResub(v, w) { try { w.send(JSON.stringify(v.unsub)); w.send(JSON.strin
 function bOpen(v) {
   const g = bGen; let w;
   try { w = new WebSocket(v.url); } catch (e) { say("book " + v.id, e); return; }
+  watch("book " + v.id, w);
   bSock[v.id] = {w, last:Date.now()};
   bBook[v.id] = COLLECT.perpBook(v.id, {ct:bCt});
   w.onopen = () => { try { w.send(JSON.stringify(v.sub)); } catch {} };
@@ -236,7 +243,7 @@ async function bookStart() {
   if (!bCt) say("book okx", "no contract size: the OKX book is skipped");
   for (const v of COLLECT.bookSubs(sym)) if (v.id !== "ok" || bCt) bOpen(v);
 }
-function bookClose() { bOn = false; bGen++; for (const id in bSock) try { bSock[id].w.close(); } catch {} bSock = {}; bBook = {}; }
+function bookClose() { bOn = false; bGen++; for (const id in bSock) shut(bSock[id].w, "stop"); bSock = {}; bBook = {}; }
 function bookSync() {
   const wanted = !!(want.bookPerp && recOn && on);
   if (wanted && !bOn) bookStart(); else if (!wanted && bOn) bookClose();
@@ -244,7 +251,7 @@ function bookSync() {
 function bookTick(now) {
   if (!bOn) return;
   if (now - bPing >= 20000) { bPing = now; for (const v of COLLECT.bookSubs(sym)) { const s = bSock[v.id]; if (v.ping && s && s.w.readyState === 1) try { s.w.send(typeof v.ping === "string" ? v.ping : JSON.stringify(v.ping)); } catch {} } }
-  for (const id in bSock) { const s = bSock[id]; if (now - s.last > 30000) try { s.w.close(); } catch {} }      // silent without closing: close it so onclose reopens it
+  for (const id in bSock) { const s = bSock[id]; if (now - s.last > 30000) shut(s.w, "silent"); }      // silent without closing: close it so onclose reopens it
   if (now - bAt >= 10000) { bAt = now; for (const id in bBook) { const p = bBook[id].summary(); if (p) col(BREC[id], now, p); } }
 }
 
@@ -255,6 +262,7 @@ let pOn = false, pGen = 0, pSock = {}, pState = null, pAt = 0, pPing = 0;
 function pOpen(v) {
   const g = pGen; let w;
   try { w = new WebSocket(v.url); } catch (e) { say("perpFlow " + v.id, e); return; }
+  watch("perpFlow " + v.id, w);
   pSock[v.id] = {w, last:Date.now()};
   w.onopen = () => { try { w.send(JSON.stringify(v.sub)); } catch {} };
   w.onmessage = ev => {
@@ -272,7 +280,7 @@ async function perpStart() {
   pState = COLLECT.perpFlow(sym, ct);
   for (const v of COLLECT.perpFlowSubs(sym)) pOpen(v);
 }
-function perpClose() { pOn = false; pGen++; for (const id in pSock) try { pSock[id].w.close(); } catch {} pSock = {}; pState = null; }
+function perpClose() { pOn = false; pGen++; for (const id in pSock) shut(pSock[id].w, "stop"); pSock = {}; pState = null; }
 function perpSync() {
   const wanted = !!(want.perpFlow && recOn && on);
   if (wanted && !pOn) perpStart(); else if (!wanted && pOn) perpClose();
@@ -280,7 +288,7 @@ function perpSync() {
 function perpTick(now) {
   if (!pOn) return;
   if (now - pPing >= 20000) { pPing = now; for (const v of COLLECT.perpFlowSubs(sym)) { const s = pSock[v.id]; if (v.ping && s && s.w.readyState === 1) try { s.w.send(typeof v.ping === "string" ? v.ping : JSON.stringify(v.ping)); } catch {} } }
-  for (const id in pSock) { const s = pSock[id]; if (now - s.last > 60000) try { s.w.close(); } catch {} }
+  for (const id in pSock) { const s = pSock[id]; if (now - s.last > 60000) shut(s.w, "silent"); }
   if (now - pAt >= 10000) { pAt = now; const p = pState && pState.sample(); if (p) col("oiPerp", now, p); }
 }
 
@@ -302,6 +310,7 @@ function kApply(m) { if (kBn.apply(m) === "resync") { say("book bn", "book out o
 function kOpenBn() {
   const g = kGen; let w;
   try { w = new WebSocket(COLLECT.bnBookSub(sym).url); } catch (e) { say("book bn", e); return; }
+  watch("book bn", w);
   kSock.bn = {w, last:Date.now()};
   kBn = COLLECT.perpBook("bn"); kBuf = [];
   w.onopen = () => kSnap(g);
@@ -316,6 +325,7 @@ function kOpenBn() {
 function kOpenHl() {
   const g = kGen; let w;
   try { w = new WebSocket("wss://api.hyperliquid.xyz/ws"); } catch (e) { say("book hl", e); return; }
+  watch("book hl", w);
   kSock.hl = {w, last:Date.now()};
   w.onopen = () => { try { w.send(JSON.stringify({method:"subscribe", subscription:{type:"l2Book", coin:sym.toUpperCase()}})); } catch {} };
   w.onmessage = ev => {
@@ -325,7 +335,7 @@ function kOpenHl() {
   };
   w.onclose = () => { if (!kOn || g !== kGen) return; say("book hl", "closed, reopening"); kHl = null; setTimeout(() => { if (kOn && g === kGen) kOpenHl(); }, 5000); };
 }
-function depthClose() { kOn = false; kGen++; for (const id in kSock) try { kSock[id].w.close(); } catch {} kSock = {}; kBn = null; kBuf = []; kHl = null; kCo = null; kCoAt = 0; kSnapBusy = false; }
+function depthClose() { kOn = false; kGen++; for (const id in kSock) shut(kSock[id].w, "stop"); kSock = {}; kBn = null; kBuf = []; kHl = null; kCo = null; kCoAt = 0; kSnapBusy = false; }
 function depthSync() {
   const wanted = !!(want.book && recording && on);
   if (wanted && !kOn) { kOn = true; kGen++; kHl = null; kCo = null; kCoAt = 0; kAt = Date.now(); kCoLast = 0; kOpenBn(); kOpenHl(); }
@@ -339,7 +349,7 @@ async function pollCoarse(g) {
 function depthTick(now) {
   if (!kOn) return;
   if (now - kPing >= 30000) { kPing = now; const s = kSock.hl; if (s && s.w.readyState === 1) try { s.w.send(JSON.stringify({method:"ping"})); } catch {} }
-  for (const id in kSock) { const s = kSock[id]; if (now - s.last > 30000) try { s.w.close(); } catch {} }      // silent without closing: close it so onclose reopens it
+  for (const id in kSock) { const s = kSock[id]; if (now - s.last > 30000) shut(s.w, "silent"); }      // silent without closing: close it so onclose reopens it
   if (kBn && !kBn.ready() && !kSnapBusy && kSock.bn && kSock.bn.w.readyState === 1 && now - kSnapAt >= 3000) kSnap(kGen);      // a book that was dropped (gap, crossed) gets a new snapshot
   if (now - kCoLast >= 2000) { kCoLast = now; const g = kGen; run("bookCoarse", () => pollCoarse(g)); }
   if (now - kAt >= 1000) {
@@ -369,7 +379,7 @@ async function pollVol24() {
 function tick() {
   if (!on) return;
   const now = Date.now();
-  if (want.derivs && ws && now - lastMsg > 15000) try { ws.close(); } catch {}      // silent without closing: close it so onclose reopens it
+  if (want.derivs && ws && now - lastMsg > 15000) shut(ws, "silent");      // silent without closing: close it so onclose reopens it
   if (want.calendar) {      // a gap longer than 6 h (the computer slept) is not back-filled
     for (const c of COLLECT.calendar(Math.max(lastCal, now - 6*3600000), now)) col("cal", c.t, {tags:c.tags});
     lastCal = now;
@@ -381,7 +391,7 @@ function tick() {
   depthTick(now);
   if (want.vol24 && COLLECT.due(last.vol24, now, COLLECT.EVERY.vol24)) { last.vol24 = now; run("vol24", pollVol24); }
   if (want.wallets) {
-    if (wsk && now - wsk.last > 30000) try { wsk.w.close(); } catch {}      // silent without closing (the coin's trades keep it busy): close it so onclose reopens it
+    if (wsk && now - wsk.last > 30000) shut(wsk.w, "silent");      // silent without closing (the coin's trades keep it busy): close it so onclose reopens it
     if (now - (last.wping || 0) >= 30000) { last.wping = now; if (wsk && wsk.w.readyState === 1) try { wsk.w.send(JSON.stringify({method:"ping"})); } catch {} }
     if (now - startAt >= 60000 && COLLECT.due(last.wallets, now, COLLECT.EVERY.wallets)) { last.wallets = now; run("wallets", pollWallets); }
     if (COLLECT.due(last.fundPred, now, COLLECT.EVERY.funding)) { last.fundPred = now; run("fundPred", pollFunding); }
@@ -398,5 +408,5 @@ self.onmessage = ev => {
   const m = ev.data;
   if (m.t === "start") { on = true; gen++; venuesClose(); tradesClose(); bookClose(); perpClose(); depthClose(); walletsStop(); optionsStop(); sym = String(m.sym || "btc"); want = m.want || {derivs:true}; recOn = !!m.rec; recording = !!m.recording; mk = null; prevRatios = null; lastCal = Date.now(); for (const k of [last, busy, hold, said]) for (const i in k) delete k[i]; startAt = Date.now(); if (want.derivs) open(); if (want.wallets) walletsStart(); if (want.options) optionsStart(); venuesSync(); tradesSync(); bookSync(); perpSync(); depthSync(); clearInterval(timer); timer = setInterval(tick, 1000); tick(); }
   else if (m.t === "rec") { recOn = !!m.on; recording = !!m.recording; venuesSync(); tradesSync(); bookSync(); perpSync(); depthSync(); }
-  else if (m.t === "stop") { venuesClose(); tradesClose(); bookClose(); perpClose(); depthClose(); walletsStop(); optionsStop(); on = false; gen++; clearInterval(timer); try { if (ws) ws.close(); } catch {} ws = null; }
+  else if (m.t === "stop") { venuesClose(); tradesClose(); bookClose(); perpClose(); depthClose(); walletsStop(); optionsStop(); on = false; gen++; clearInterval(timer); if (ws) shut(ws, "stop"); ws = null; }
 };
