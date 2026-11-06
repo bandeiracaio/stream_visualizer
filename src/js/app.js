@@ -45,7 +45,7 @@ const fmt = (x, d=2) => x==null||isNaN(x) ? "–" : Number(x).toLocaleString("en
 const fmtK = x => { if (x==null||isNaN(x)) return "–"; const a=Math.abs(x), s=x<0?"-":""; return a>=1e9?s+(a/1e9).toFixed(2)+"B":a>=1e6?s+(a/1e6).toFixed(2)+"M":a>=1e3?s+(a/1e3).toFixed(1)+"k":s+a.toFixed(0); };
 const hhmmss = t => { const d=new Date(t); return d.toTimeString().slice(0,8)+"."+String(d.getMilliseconds()).padStart(3,"0"); };
 const pct = (a,p) => { if(!a.length) return null; const s=[...a].sort((x,y)=>x-y); return s[Math.min(s.length-1, Math.floor(p*s.length))]; };
-let paused = false, selected = null, connected = false, connectedAt = 0;
+let selected = null, connected = false, connectedAt = 0;
 
 // ---------- clock: offset of this device vs Binance server time ----------
 let clockOffset = 0, clockRtt = null, clockOk = false, clockTimer = null;
@@ -958,7 +958,6 @@ function renderReader(){
 
 // ---------- loops ----------
 function renderSlow(){
-  if (paused) return;
   if (visible("streams")) renderCards();
   if (visible("health")) renderHealth();
   renderAlerts();
@@ -970,13 +969,11 @@ setInterval(()=>{
 }, 1000);
 let lastFast = 0;
 (function frame(ts){
-  if (!paused){
-    VIEWS.tick(ts, visible);   // overview, futures, micro, the reader views, trading: registered above
-    if (dirty && ts - lastFast > 150){
-      dirty = false; lastFast = ts;
-      if (visible("market")){ renderMetrics(); renderBooks(); renderTape(); }
-      if (visible("raw")){ renderLog(); renderInspector(); }
-    }
+  VIEWS.tick(ts, visible);   // overview, futures, micro, the reader views, trading: registered above
+  if (dirty && ts - lastFast > 150){
+    dirty = false; lastFast = ts;
+    if (visible("market")){ renderMetrics(); renderBooks(); renderTape(); }
+    if (visible("raw")){ renderLog(); renderInspector(); }
   }
   requestAnimationFrame(frame);
 })(0);
@@ -996,7 +993,6 @@ $("go").onclick = () => {
   bnConnect(); hlConnect(); rdStartHeartbeat();
   $("go").textContent="Disconnect"; $("go").classList.remove("primary");
 };
-$("pause").onclick = () => { paused=!paused; $("pause").classList.toggle("on",paused); $("pause").textContent = paused?"Resume":"Pause"; };
 $("route").onchange = () => scheduleReconnect("bn");
 $("bnSrc").onchange = () => {
   const id = $("bnSrc").value;                       // make sure the chosen source is subscribed
