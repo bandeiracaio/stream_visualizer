@@ -25,7 +25,11 @@ function accBtnRender() {
 accEl("accMain").onclick = e => { e.stopPropagation(); accPanelOpen(ACC.mode ? "info" : "switch"); };
 accEl("accCaret").onclick = e => { e.stopPropagation(); accPanelOpen("switch"); };
 accEl("accClose1").onclick = accEl("accClose2").onclick = accPanelClose;
-document.addEventListener("click", e => { if (!e.target.closest("#accSplit, .accpanel")) accPanelClose(); });
+document.addEventListener("click", e => {
+  const o = e.target.closest("[data-acc-open]");      // any button elsewhere in the page that opens one of the panels (Overview)
+  if (o) { e.stopPropagation(); accPanelOpen(o.dataset.accOpen); return; }
+  if (!e.target.closest("#accSplit, .accpanel")) accPanelClose();
+});
 document.addEventListener("keydown", e => { if (e.key === "Escape") accPanelClose(); });
 HOOKS.on("renderAccount", () => {
   accBtnRender();

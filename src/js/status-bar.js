@@ -33,6 +33,9 @@ function sbRender() {
   let html = "";
   try { html = STATUS.chips(sbSnapshot()).map(c => `<span class="chip sb-${c.tone}" title="${c.title.replace(/"/g, "&quot;")}">${c.text}</span>`).join(""); } catch {}
   const el = sb$("liveChips"); if (el && el.innerHTML !== html) el.innerHTML = html;
+  const pc = sb$("stChips"); if (pc && pc.innerHTML !== html) pc.innerHTML = html;
+  const btn = sb$("stBtn");      // the status button shows only what needs attention: bad beats warn, info chips (armed, saved) stay in the panel
+  if (btn) { let lvl = "", n = 0; try { for (const c of STATUS.chips(sbSnapshot())) if (c.tone === "bad" || c.tone === "warn") { n++; if (c.tone === "bad" || !lvl) lvl = c.tone; } } catch {} if (btn.dataset.alert !== lvl) btn.dataset.alert = lvl; if (btn.dataset.n !== String(n || "")) btn.dataset.n = n || ""; }
 }
 async function sbCheckVersion() {
   try {

@@ -137,7 +137,8 @@ function renderOverview(){
   if (!ACC.mode || !d) ov$("ovAcc").innerHTML = `<div class="note" style="margin:0">No account connected.</div>`;
   else {
     const up = d.balance.upnl, pos = d.positions.slice(0,3);
-    ov$("ovAcc").innerHTML = `<div class="metrics"><div class="metric"><span>wallet</span><b>$${fmt(d.balance.wallet,2)}</b></div>`
+    const nm = ACC.mode==="sim" ? "simulated paper" : ACC.mode==="demo" ? "Binance demo" : "Binance LIVE, real money";
+    ov$("ovAcc").innerHTML = `<div class="stat" style="margin-bottom:4px"><b${ACC.mode==="live"?' style="color:var(--sell)"':""}>${ACC.mode.toUpperCase()}</b> ${nm}</div><div class="metrics"><div class="metric"><span>wallet</span><b>$${fmt(d.balance.wallet,2)}</b></div>`
       + `<div class="metric"><span>unrealized PnL</span><b class="${ovCls(up)}">${ovSigned(up, a=>"$"+fmt(a,2))}</b></div></div>`
       + (pos.length ? `<table class="tt" style="margin-top:6px">${pos.map(p=>`<tr><td>${p.symbol}</td><td>${p.qty>0?"long":"short"} ${Math.abs(p.qty)}</td><td class="${ovCls(p.upnl)}">${ovSigned(p.upnl, a=>"$"+fmt(a,2))}</td></tr>`).join("")}</table>` : `<div class="note">No open positions.</div>`);
   }
@@ -145,6 +146,5 @@ function renderOverview(){
 ov$("ovWin").onchange = () => { if (typeof visible==="function" && visible("overview")) renderOverview(); };
 ov$("ovOpenReader").onclick = () => setTab("reader");
 ov$("ovOpenState").onclick = () => setTab("reader");
-ov$("ovOpenAcc").onclick = () => accPanelOpen("switch");
 ov$("ovOpenRec").onclick = () => setTab("record");
 ov$("ovOpenCharts").onclick = () => setTab("market");

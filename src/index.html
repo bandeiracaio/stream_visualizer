@@ -23,6 +23,7 @@
     <h2>Status <span class="ctl"><button id="stClose" aria-label="Close">✕</button></span></h2>
     <div class="stat pill">BN <b id="bnState">off</b></div>
     <div class="stat pill">HL <b id="hlState">off</b></div>
+    <div id="stChips" class="chips-row" style="margin-top:8px"></div>
     <div class="row" style="margin-top:8px"><button id="catLock" aria-pressed="false">🐱 Cat mode</button><span class="stat">locks the keyboard so cats cannot type</span></div>
   </section>
   <section id="accSwitchPanel" class="accpanel" hidden>
@@ -135,7 +136,7 @@
   </section>
 
   <section data-tab="overview">
-    <h2>Account <span class="ctl"><button id="ovOpenAcc">manage</button></span></h2>
+    <h2>Account <span class="ctl"><button data-acc-open="info">details</button><button data-acc-open="switch">switch</button></span></h2>
     <div id="ovAcc"></div>
   </section>
 

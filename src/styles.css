@@ -29,6 +29,7 @@ button.on{border-color:var(--accent);color:var(--accent)}
 #stBtn{display:inline-flex;align-items:center;gap:9px}#stBtn .sd{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--dim)}
 #stBtn .sd::after{content:"";width:9px;height:9px;border-radius:50%;flex:none;background:var(--warn)}
 #stBtn .sd[data-st=ok]::after{background:var(--buy)}#stBtn .sd[data-st=bad]::after{background:var(--sell)}#stBtn .sd[data-st=off]::after{background:transparent;border:2px solid var(--dim)}
+#stBtn[data-alert=warn]{border-color:var(--warn)}#stBtn[data-alert=bad]{border-color:var(--sell)}#stBtn[data-n]:not([data-n=""])::before{content:attr(data-n);font-size:10.5px;font-weight:700;padding:0 5px;border-radius:var(--r);background:var(--warn);color:var(--ink)}#stBtn[data-alert=bad]::before{background:var(--sell)}
 #stBtn[data-cat=on]{border-color:var(--warn)}#stBtn[data-cat=on]::after{content:"🐱"}
 #stPanel{width:min(340px,calc(100vw - 16px))}#stPanel .pill{display:flex;gap:8px;font-size:12px;margin:2px 0}#stPanel .pill b{position:static;width:auto;height:auto;clip:auto;overflow:visible}#stPanel .pill::after{display:none}
 
@@ -285,3 +286,4 @@ td.up{color:var(--buy)}td.dn{color:var(--sell)}
 .fs-row .buy{background:var(--buy);color:var(--ink);border-color:var(--buy);font-weight:600}.fs-row .sell{background:var(--sell);color:var(--ink);border-color:var(--sell);font-weight:600}
 .fs-hit{border-left:3px solid var(--mark);padding:2px 8px;margin:4px 0;color:var(--text)}
 .fs-ck b{color:var(--mark)}.fs-ck .yes{color:var(--buy)}.fs-ck .no{color:var(--dim)}
+#stChips{display:flex;flex-wrap:wrap;gap:5px}
