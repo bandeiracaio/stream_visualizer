@@ -1,0 +1,2 @@
+# The pre-commit hook runs under sh: CRLF would break it.
+hooks/* text eol=lf
