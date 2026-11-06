@@ -8,3 +8,4 @@ health_*.json
 .scratch/trade-system/cache/
 .scratch/trade-system/cache-flow/
 .scratch/trade-system/cache-quotes/
+panel/
