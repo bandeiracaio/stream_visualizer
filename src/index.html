@@ -340,11 +340,13 @@
   </section>
 
   <section data-tab="armmode" class="full ovhero"><div id="amHero"></div></section>
+  <section data-tab="armmode" class="full"><h2>Ready to arm?</h2><div id="amPre"></div></section>
   <section data-tab="armmode" class="full"><h2>Needs attention</h2><div id="amAlerts"></div></section>
   <section data-tab="armmode"><h2>Data quality</h2><div id="amQuality"></div></section>
   <section data-tab="armmode"><h2>Market now</h2><div id="amMarket"></div></section>
   <section data-tab="armmode"><h2>Reader</h2><div id="amReader"></div></section>
   <section data-tab="armmode"><h2>Recordings this session</h2><div id="amRecs"></div></section>
+  <section data-tab="armmode" class="full"><h2>Last night <span class="ctl"><select id="onHours" title="How far back to look"><option value="12">12 h</option><option value="24" selected>24 h</option><option value="48">48 h</option></select><button id="onCount" title="Replay these recordings (current thresholds) and count the episodes you have not labelled yet">Count episodes to label</button></span></h2><div id="onStatus" class="stat"></div><div id="amMorning"></div></section>
   <section data-tab="armmode" class="full"><h2>Health log (latest)</h2><div id="amHealth"></div></section>
 
   <section data-tab="saved" class="full">
@@ -583,6 +585,9 @@
 <!--@include js/scoreboard-core.js-->
 </script>
 <script>
+<!--@include js/overnight-core.js-->
+</script>
+<script>
 <!--@include js/futures-view.js-->
 </script>
 <script>
@@ -593,6 +598,9 @@
 </script>
 <script>
 <!--@include js/scoreboard-view.js-->
+</script>
+<script>
+<!--@include js/overnight-view.js-->
 </script>
 <script>
 <!--@include js/disk-core.js-->

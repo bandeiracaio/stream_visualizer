@@ -38,6 +38,14 @@ function sbvRender() {
     ${recall ? `<div style="overflow-x:auto"><table class="tt"><thead><tr><th>family</th><th>found</th><th>agree</th><th>missed</th><th>found now</th></tr></thead><tbody>${recall}</tbody></table></div>` : `<div class="note">No agree or missed labels in range.</div>`}</div>
     <div class="note">Descriptive and small-sample: a rate needs at least ${P.minN} labelled groups, every number shows its n. It says where to look, never keep or drop. Replayed with the current settings (approved thresholds included).</div>`;
 }
+// Replay one saved recording and keep the result (shared with the Overnight view: same cache, same thresholds). The caller clears SBV.parts when the thresholds changed (sbvCompute does).
+async function sbvPartFor(r, cfg) {
+  const key = JSON.stringify(cfg || rtCfg()); if (key !== SBV.cfgKey) { SBV.parts.clear(); SBV.cfgKey = key; }
+  if (SBV.parts.has(r.name)) return SBV.parts.get(r.name);
+  const s = await rtReadSessionFile(rcFile(r)), span = rtSpan(s.inputs);
+  const part = SCOREBOARD.sessionPart({file:r.name, inputs:s.inputs, t0:span ? span.t0 : s.startedAt, t1:span ? span.t1 : s.startedAt}, READER_ENGINE, cfg || rtCfg());
+  SBV.parts.set(r.name, part); return part;
+}
 async function sbvCompute() {
   if (SBV.busy) return; SBV.busy = true; const btn = sbv$("sbGo"), st = sbv$("sbStatus"); btn.disabled = true;
   try {
@@ -48,10 +56,8 @@ async function sbvCompute() {
     for (const r of rows) {
       i++; if (SBV.parts.has(r.name)) continue;
       st.textContent = `Replaying ${i}/${rows.length}: ${r.name}`; await new Promise(ok => setTimeout(ok, 30));      // let the page draw between recordings
-      try {
-        const s = await rtReadSessionFile(rcFile(r)), span = rtSpan(s.inputs);
-        SBV.parts.set(r.name, SCOREBOARD.sessionPart({file:r.name, inputs:s.inputs, t0:span ? span.t0 : s.startedAt, t1:span ? span.t1 : s.startedAt}, READER_ENGINE, cfg));
-      } catch (err) { st.textContent = `Skipped ${r.name}: ${err && err.message || err}`; await new Promise(ok => setTimeout(ok, 1500)); }
+      try { await sbvPartFor(r, cfg); }
+      catch (err) { st.textContent = `Skipped ${r.name}: ${err && err.message || err}`; await new Promise(ok => setTimeout(ok, 1500)); }
     }
     RC.rows = rows; st.textContent = `Done: ${SBV.parts.size} recording${SBV.parts.size === 1 ? "" : "s"} replayed.`;
   } catch (err) { st.textContent = "Could not compute: " + (err && err.message || err); }
