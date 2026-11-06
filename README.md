@@ -132,6 +132,16 @@ To try the dev build locally (the hosted page checks for updates; a local copy d
 cd dist && python -m http.server 8765    # then open http://localhost:8765/stream-visualizer.html
 ```
 
+### Commit hook
+
+A tracked pre-commit hook (`hooks/pre-commit`) refuses a commit that changes a file's line-ending style (several files are deliberately CRLF or mixed) or that breaks `node build.mjs`. Enable it once per clone:
+
+```bash
+git config core.hooksPath hooks
+```
+
+Bypass it for one commit with `git commit --no-verify`. `.gitattributes` keeps the hook itself LF.
+
 ## Publishing
 
 The repository is public and serves GitHub Pages. `.github/workflows/pages.yml` runs on every push to `main` and publishes the **newest** `releases/stream-visualizer_vNNN.html` as the site, plus a `version.json` the page reads to offer updates. So the flow is: `node build.mjs --release`, commit, push. Unreleased work in `src/` never goes live. GitHub caches the page for about ten minutes, so a phone may need a reload.
