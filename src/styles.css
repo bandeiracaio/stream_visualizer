@@ -30,7 +30,6 @@ button.on{border-color:var(--accent);color:var(--accent)}
 #stBtn .sd::after{content:"";width:9px;height:9px;border-radius:50%;flex:none;background:var(--warn)}
 #stBtn .sd[data-st=ok]::after{background:var(--buy)}#stBtn .sd[data-st=bad]::after{background:var(--sell)}#stBtn .sd[data-st=off]::after{background:transparent;border:2px solid var(--dim)}
 #stBtn[data-alert=warn]{border-color:var(--warn)}#stBtn[data-alert=bad]{border-color:var(--sell)}#stBtn[data-n]:not([data-n=""])::before{content:attr(data-n);font-size:10.5px;font-weight:700;padding:0 5px;border-radius:var(--r);background:var(--warn);color:var(--ink)}#stBtn[data-alert=bad]::before{background:var(--sell)}
-#stBtn[data-cat=on]{border-color:var(--warn)}#stBtn[data-cat=on]::after{content:"🐱"}
 #stPanel{width:min(340px,calc(100vw - 16px))}#stPanel .pill{display:flex;gap:8px;font-size:12px;margin:2px 0}#stPanel .pill b{position:static;width:auto;height:auto;clip:auto;overflow:visible}#stPanel .pill::after{display:none}
 
 #arHdr.on,#recHdr.on{border-color:var(--warn);color:var(--warn)}#arHdrMsg{max-width:100%}#arHdrMsg:empty{display:none}
@@ -176,6 +175,7 @@ section.collapsed > .pbody{height:0;overflow:hidden;visibility:hidden}
   #cog{padding:4px 6px}
   #accSplit button{padding:4px 3px;gap:0;font-size:12px}#accMain .dot{display:none}
   #accLbl{font-size:0}#accLbl::before{content:attr(data-s);font-size:12.5px}      /* one letter (S / D / L, + when not connected): the word stays for screen readers */
+  #stBtn{gap:6px;padding:4px 6px}#stBtn .sd{font-size:0}      /* phone: two dots (BN, HL in that order), the words are in the panel */
   #accPnl{display:none}                  /* the phone keeps the header at two rows: mode only, the number is in the panel */
   .accpanel{right:4px;max-height:calc(100vh - var(--hh,95px) - 70px)}
   #arHdrMsg{position:absolute;top:100%;left:0;right:0;z-index:6;max-width:none;background:var(--panel2);border-bottom:1px solid var(--accent);padding:6px 10px}      /* the answer to Arm floats under the header instead of pushing the page down */
