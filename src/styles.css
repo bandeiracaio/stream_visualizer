@@ -289,3 +289,10 @@ td.up{color:var(--buy)}td.dn{color:var(--sell)}
 #stChips{display:flex;flex-wrap:wrap;gap:5px}
 .sbfam{margin-top:12px;padding-top:8px;border-top:1px solid var(--line)}.sbfam h3{margin:0 0 6px;font-size:13px;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
 .sbfam .tt{width:auto}.sbfam .tt th,.sbfam .tt td{text-align:left;padding-right:20px;white-space:nowrap}
+/* Liquidations readout (Now > Market and tape): longs liquidated = forced sells = --sell, shorts liquidated = forced buys = --buy */
+.lq-src-row{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;margin-bottom:6px}.lq-src{font-size:11.5px;color:var(--dim)}.lq-src.on{color:var(--buy)}
+.lq-bars{display:flex;gap:1px;height:70px;margin-top:4px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.lq-col{flex:1 1 0;min-width:2px;display:flex;flex-direction:column}.lq-up,.lq-dn{flex:1 1 0;display:flex}.lq-up{align-items:flex-end;border-bottom:1px solid var(--line)}.lq-dn{align-items:flex-start}
+.lq-up i,.lq-dn i{display:block;width:100%;min-height:0}.lq-up i{background:var(--buy)}.lq-dn i{background:var(--sell)}
+.lq-tab td,.lq-tab th{text-align:left;padding-right:14px;white-space:nowrap}.lq-l{color:var(--sell)}.lq-s{color:var(--buy)}.lq-now{color:var(--warn)}.lq-cont{color:var(--warn)}.lq-back{color:var(--mark)}
+.lq-tab tr.huge td:nth-child(4){color:var(--accent)}

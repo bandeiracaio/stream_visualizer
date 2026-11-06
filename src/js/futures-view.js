@@ -55,7 +55,7 @@
     let ws; try { ws = new WebSocket(k === "by" ? "wss://stream.bybit.com/v5/public/linear" : "wss://ws.okx.com/ws/v5/public"); } catch (e) { s.st = "blocked"; s.coin = null; s.hold = Date.now() + 30000; return; }
     s.ws = ws;
     ws.onopen = () => { if (gen !== s.gen) return; ws.send(JSON.stringify(k === "by" ? { op:"subscribe", args:["allLiquidation." + coin + "USDT"] } : { op:"subscribe", args:[{ channel:"liquidation-orders", instType:"SWAP" }] })); s.st = "live"; s.ping = setInterval(() => { try { ws.send(k === "by" ? '{"op":"ping"}' : "ping"); } catch (e) { /* closing */ } }, 20000); };
-    ws.onmessage = e => { if (gen !== s.gen || e.data === "pong") return; let j; try { j = JSON.parse(e.data); } catch (x) { return; } for (const t of FUTSTACK.parseLiq(k, j, { coin, ctVal })) FUTSTACK.addTrade(st, t); };
+    ws.onmessage = e => { if (gen !== s.gen || e.data === "pong") return; let j; try { j = JSON.parse(e.data); } catch (x) { return; } for (const t of FUTSTACK.parseLiq(k, j, { coin, ctVal })) { FUTSTACK.addTrade(st, t); HOOKS.emit("liquidation", t); } };
     ws.onclose = () => { if (gen !== s.gen) return; clearInterval(s.ping); s.ws = null; s.st = "reconnecting"; s.retry = setTimeout(() => { if (gen === s.gen && typeof connected !== "undefined" && connected) lqConnect(k, coin); }, 3000); };
   }
   function lqManage() {
@@ -71,7 +71,7 @@
     for (let i = trades.length - 1; i >= 0; i--) {
       const t = trades[i]; if (t.t < watermark - 5000) break;
       if (seen.has(t) || t.bf) continue; seen.add(t); if (t.t > watermark) watermark = t.t;
-      FUTSTACK.addTrade(st, t);
+      FUTSTACK.addTrade(st, t); if (t.liq) HOOKS.emit("liquidation", t);
     }
     FUTSTACK.setOi(st, "bn", M.bnOI); FUTSTACK.setOi(st, "hl", M.hlOI); FUTSTACK.stamp(st, now); FUTSTACK.prune(st, KEEP, now);
     for (const v of ["bn", "hl"]) {
@@ -264,5 +264,6 @@
   for (const id of ["fsVenue", "fsWin", "fsBin", "fsHeat", "fsMark", "fsMin", "fsLiqAll", "fsProf", "fsStats"]) g(id).onchange = g(id).oninput = () => { heatKey = ""; futuresRender(); };
 
   window.futuresRender = function futuresRender() { try { draw(); panels(); tradeUi(); } catch (e) { console.error("futures", e); } };
+  window.futuresRender.lq = LQ;                                             // read-only, for the Liquidations readout (liq-readout.js): the state of the Bybit and OKX sockets
   window.futuresRender.store = st;                                          // for tests: fill the store with simulated history from the console
 })();
