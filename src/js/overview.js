@@ -147,4 +147,4 @@ ov$("ovOpenReader").onclick = () => setTab("reader");
 ov$("ovOpenState").onclick = () => setTab("reader");
 ov$("ovOpenAcc").onclick = () => setTab("accounts");
 ov$("ovOpenRec").onclick = () => setTab("record");
-ov$("ovOpenCharts").onclick = () => setTab("charts");
+ov$("ovOpenCharts").onclick = () => setTab("market");

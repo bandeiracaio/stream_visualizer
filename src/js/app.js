@@ -138,94 +138,6 @@ function timeAxis(ctx, X, t0, t1, h, B, L, R, w){
 }
 const COL = {buy:TH.buy, sell:TH.sell, bn:TH.bn, hl:TH.hl};
 
-// ---------- trade bubble chart ----------
-function drawBubbles(){
-  const {ctx,w,h} = prep($("cvBub"));
-  const win = +$("win").value, t1 = nowEx(), t0 = t1 - win, scale = +$("bubScale").value;
-  const pts = trades.filter(t => t.t >= t0);
-  const mids = midHist.filter(m => m.t >= t0);
-  let lo=Infinity, hi=-Infinity;
-  for (const p of pts){ lo=Math.min(lo,p.px); hi=Math.max(hi,p.px); }
-  for (const m of mids){ for (const v of [m.bn,m.hl]) if (v){ lo=Math.min(lo,v); hi=Math.max(hi,v); } }
-  if (!isFinite(lo)) return emptyMsg(ctx,w,h, connected ? "waiting for trades…" : "press Connect");
-  const pad = Math.max((hi-lo)*0.08, hi*0.00005); lo-=pad; hi+=pad;
-  const L=6, R=64, T=6, B=18;
-  const X = t => L + (t-t0)/win*(w-L-R), Y = p => T + (hi-p)/(hi-lo)*(h-T-B);
-  // price grid
-  const st = niceStep((hi-lo)/6);
-  ctx.strokeStyle=TH.line; ctx.fillStyle=TH.dim; ctx.textAlign="left"; ctx.lineWidth=1;
-  for (let p=Math.ceil(lo/st)*st; p<=hi; p+=st){ const y=Y(p); ctx.beginPath(); ctx.moveTo(L,y); ctx.lineTo(w-R,y); ctx.stroke(); ctx.fillText(fmt(p, st<1?1:0), w-R+4, y+3.5); }
-  timeAxis(ctx, X, t0, t1, h, B, L, R, w);
-  // mid lines
-  for (const v of ["bn","hl"]){
-    ctx.strokeStyle = COL[v]; ctx.globalAlpha=.8; ctx.lineWidth=1.3; ctx.beginPath(); let started=false;
-    for (const m of mids){ if (!m[v]){ started=false; continue; } const x=X(m.t), y=Y(m[v]); started ? ctx.lineTo(x,y) : ctx.moveTo(x,y); started=true; }
-    ctx.stroke(); ctx.globalAlpha=1;
-  }
-  // bubbles: big first so small ones stay visible on top
-  const sorted = [...pts].sort((a,b)=>b.ntl-a.ntl);
-  for (const p of sorted){
-    const r = Math.min(30, Math.max(1.6, Math.sqrt(p.ntl)/14*scale)), x=X(p.t), y=Y(p.px), c=COL[p.side];
-    if (p.liq){
-      ctx.strokeStyle=c; ctx.lineWidth=2.2; const s=Math.max(r,6);
-      ctx.beginPath(); ctx.moveTo(x-s,y-s); ctx.lineTo(x+s,y+s); ctx.moveTo(x+s,y-s); ctx.lineTo(x-s,y+s); ctx.stroke(); continue;
-    }
-    const hollow = p.v==="hl" && r > 8;
-    ctx.fillStyle=c; ctx.strokeStyle=c; ctx.lineWidth = hollow ? 1.6 : 1; ctx.globalAlpha = p.bf ? .2 : .45;
-    ctx.beginPath(); p.v==="bn" ? ctx.arc(x,y,r,0,Math.PI*2) : ctx.rect(x-r*.89,y-r*.89,r*1.78,r*1.78);
-    if (!hollow) ctx.fill(); ctx.globalAlpha=.9; ctx.stroke(); ctx.globalAlpha=1;
-  }
-  // Reader signals: compact directional markers on the shared price/time axes.
-  for (const e of READER.events){
-    if (e.t<t0 || e.t>t1 || !(e.px>=lo && e.px<=hi)) continue;
-    const x=X(e.t),y=Y(e.px),up=e.dir==="bull",neutral=e.dir==="neutral";
-    ctx.fillStyle=neutral?TH.accent:up?COL.buy:COL.sell;ctx.strokeStyle=TH.ink;ctx.lineWidth=1;
-    ctx.beginPath();
-    if(neutral){ctx.arc(x,y,4,0,Math.PI*2);}else{ctx.moveTo(x,y+(up?6:-6));ctx.lineTo(x-5,y+(up?-3:3));ctx.lineTo(x+5,y+(up?-3:3));ctx.closePath();}
-    ctx.fill();ctx.stroke();
-  }
-  // current mids on the axis
-  const last = mids[mids.length-1];
-  if (last) for (const v of ["bn","hl"]) if (last[v]){ const y=Y(last[v]); ctx.fillStyle=COL[v]; ctx.fillRect(w-R+1,y-7,R-2,14); ctx.fillStyle=TH.ink; ctx.fillText(fmt(last[v],1), w-R+4, y+3.5); }
-}
-
-// ---------- CVD chart (dual axis, rebased at window start) ----------
-let cvdBase = null;
-function drawCvd(){
-  const {ctx,w,h} = prep($("cvCvd"));
-  const win = +$("win").value, t1 = nowEx(), t0 = Math.max(t1 - win, cvdBase ? cvdBase.t : -Infinity);
-  const pts = cvdHist.filter(p => p.t >= t0);
-  if (pts.length < 2) return emptyMsg(ctx,w,h, connected ? "collecting…" : "press Connect");
-  const b0 = pts[0], L=54, R=54, T=8, B=18;
-  const X = t => L + (t-(t1-win))/win*(w-L-R);
-  timeAxis(ctx, X, t1-win, t1, h, B, L, R, w);
-  for (const [v, side] of [["bn","left"],["hl","right"]]){
-    const vals = pts.map(p => p[v]-b0[v]);
-    let lo = Math.min(0,...vals), hi = Math.max(0,...vals); if (hi-lo < 1){ hi+=1; lo-=1; }
-    const pad=(hi-lo)*.1; lo-=pad; hi+=pad;
-    const Y = x => T + (hi-x)/(hi-lo)*(h-T-B);
-    if (v==="bn"){ ctx.strokeStyle=TH.edge; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(L,Y(0)); ctx.lineTo(w-R,Y(0)); ctx.stroke(); ctx.setLineDash([]); }
-    ctx.fillStyle = COL[v]; ctx.textAlign = side==="left" ? "right" : "left";
-    for (const val of [hi-pad, 0, lo+pad]) ctx.fillText(fmtK(val), side==="left" ? L-4 : w-R+4, Y(val)+3.5);
-    ctx.strokeStyle = COL[v]; ctx.lineWidth=1.6; ctx.beginPath();
-    pts.forEach((p,i)=>{ const x=X(p.t), y=Y(vals[i]); i ? ctx.lineTo(x,y) : ctx.moveTo(x,y); }); ctx.stroke();
-  }
-}
-
-// ---------- aggressor flow ----------
-function renderFlow(){
-  const t1 = nowEx(), rows = [];
-  for (const [label, win] of [["1m",60000],["5m",300000]]) for (const v of ["bn","hl"]){
-    let buy=0, sell=0, n=0;
-    for (const t of trades) if (t.v===v && !t.liq && !t.bf && t.t >= t1-win){ t.side==="buy" ? buy+=t.ntl : sell+=t.ntl; n++; }
-    const tot = buy+sell, bp = tot ? buy/tot*100 : 50, imb = tot ? (buy-sell)/tot*100 : 0;
-    rows.push(`<span><span class="venue v-${v}">${v.toUpperCase()}</span> ${label}</span>
-      <div class="fbar"><span class="b" style="width:${bp}%">${bp>18?"$"+fmtK(buy):""}</span><span class="s" style="width:${100-bp}%">${100-bp>18?"$"+fmtK(sell):""}</span></div>
-      <div class="fsub">delta ${buy-sell>=0?"+":""}$${fmtK(buy-sell)} · imbalance ${imb>=0?"+":""}${imb.toFixed(1)}% · ${n} trades</div>`);
-  }
-  $("flow").innerHTML = rows.join("");
-}
-
 // ---------- streams, metrics, books, tape, log ----------
 function buildCards(){
   const box = $("cards"); box.innerHTML = "";
@@ -371,7 +283,7 @@ function renderAlerts(){
 
 // ---------- microstructure ----------
 let microHist = [], heatBn = [], heatHl = [], sweeps = [], bnGroup = null;
-function resetMicro(){ retHist=[]; lastRetMid=null; microHist=[]; heatBn=[]; heatHl=[]; sweeps=[]; bnGroup=null; }
+function resetMicro(){ microHist=[]; heatBn=[]; heatHl=[]; sweeps=[]; bnGroup=null; }
 function topN(map, n, desc){
   const out = [];
   for (const [p, q] of map){
@@ -603,360 +515,16 @@ $("mwin").onchange = $("imbN").onchange = $("hmVenue").onchange = $("hmRange").o
 $("swMin").oninput = renderSweeps;
 
 
-// ---------- visualizations (editorial views; read-only over existing state) ----------
-const VC = {bnbuy:TH.buy, bnsell:TH.sell, hlbuy:"#8fe3b4", hlsell:"#f4a39d"};
-const vwin = () => +$("vwin").value;
-const vTrades = t0 => trades.filter(t => t.t>=t0 && !t.liq && !t.bf);
-const SIZE_EDGES = [1e3, 1e4, 1e5], SIZE_LABELS = ["<1k","1k–10k","10k–100k","≥100k"];
-const sizeIdx = n => { let i=0; while (i<3 && n>=SIZE_EDGES[i]) i++; return i; };
-let retHist = [], lastRetMid = null;
-setInterval(()=>{                                     // 1s Binance mid returns, kept for the whole session
-  if (!connected || !M.bnBid || !M.bnAsk) return;
-  const mid = (M.bnBid+M.bnAsk)/2;
-  if (lastRetMid) retHist.push({t: nowEx(), r: (mid/lastRetMid-1)*1e4});
-  lastRetMid = mid; if (retHist.length > 7200) retHist.shift();
-}, 1000);
-
-function smoothPath(ctx, xs, ys, move){
-  move ? ctx.moveTo(xs[0],ys[0]) : ctx.lineTo(xs[0],ys[0]);
-  for (let i=1;i<xs.length;i++) ctx.quadraticCurveTo(xs[i-1], ys[i-1], (xs[i-1]+xs[i])/2, (ys[i-1]+ys[i])/2);
-  ctx.lineTo(xs[xs.length-1], ys[ys.length-1]);
-}
-function label(ctx, txt, x, y, color, align="left", bold=false){
-  ctx.font = (bold?"600 ":"")+"11px ui-monospace,Menlo,Consolas,monospace"; ctx.textAlign = align;
-  if (color !== TH.ink){ ctx.lineWidth = 3; ctx.strokeStyle = TH.canvas; ctx.strokeText(txt, x, y); }      // light text gets a dark outline; dark text sits on a coloured fill, where a dark outline would swallow it
-  ctx.fillStyle = color; ctx.fillText(txt, x, y);
-  ctx.font = "10.5px ui-monospace,Menlo,Consolas,monospace";
-}
-
-function fitLabel(ctx, options, x, y, maxW, color, bold){
-  ctx.font = (bold?"600 ":"")+"11px ui-monospace,Menlo,Consolas,monospace";
-  for (const t of options){ if (ctx.measureText(t).width <= maxW){ label(ctx, t, x, y, color, "left", bold); return true; } }
-  ctx.font = "10.5px ui-monospace,Menlo,Consolas,monospace"; return false;
-}
-
-// 1. symmetric streamgraph: buyers above, sellers below
-function drawStream(){
-  const {ctx,w,h} = prep($("cvStream")), win = vwin(), t1 = nowEx(), t0 = t1-win;
-  const BIN = win<=60000 ? 2000 : 4000, n = Math.ceil(win/BIN), keys = ["bnbuy","hlbuy","bnsell","hlsell"], b = {};
-  for (const k of keys) b[k] = new Float64Array(n);
-  for (const t of vTrades(t0)){ const i = Math.floor((t.t-t0)/BIN); if (i>=0 && i<n) b[t.v+t.side][i] += t.ntl; }
-  for (const k of keys){ const a = b[k], c = Float64Array.from(a); for (let i=0;i<n;i++) a[i] = (c[Math.max(0,i-1)] + 2*c[i] + c[Math.min(n-1,i+1)])/4; }
-  let max = 0; for (let i=0;i<n;i++) max = Math.max(max, b.bnbuy[i]+b.hlbuy[i], b.bnsell[i]+b.hlsell[i]);
-  if (!max) return emptyMsg(ctx,w,h, connected?"waiting for trades…":"press Connect");
-  const L=8, R=8, T=10, B=18, cy = T+(h-T-B)/2, sc = (h-T-B)/2/max*0.95;
-  const xs = Array.from({length:n}, (_,i)=> L+(i+.5)/n*(w-L-R));
-  const layers = [["bnbuy",-1,0,"bnbuy"],["hlbuy",-1,"bnbuy","hlbuy"],["bnsell",1,0,"bnsell"],["hlsell",1,"bnsell","hlsell"]];
-  for (const [k, dir, under] of layers){
-    const lo = xs.map((_,i)=> under ? b[under][i] : 0), hi = lo.map((v,i)=> v + b[k][i]);
-    ctx.beginPath(); smoothPath(ctx, xs, hi.map(v=>cy+dir*v*sc), true);
-    smoothPath(ctx, [...xs].reverse(), [...lo].reverse().map(v=>cy+dir*v*sc), false);
-    ctx.closePath(); ctx.fillStyle = VC[k]; ctx.globalAlpha = .88; ctx.fill(); ctx.globalAlpha = 1;
-    ctx.strokeStyle = TH.canvas; ctx.lineWidth = 1; ctx.stroke();
-    let bi = 0; for (let i=1;i<n;i++) if (b[k][i] > b[k][bi]) bi = i;
-    if (b[k][bi]*sc > 16){ const y = cy + dir*(lo[bi] + b[k][bi]/2)*sc; const txt = `${k.slice(0,2).toUpperCase()} ${k.slice(2)} $${fmtK(b[k][bi])}`; ctx.font = "600 11px ui-monospace,Menlo,Consolas,monospace"; const tw = ctx.measureText(txt).width;
-      const lx = Math.min(w-R-tw/2-4, Math.max(L+tw/2+4, xs[bi]));      // keep the whole label inside the plot when the peak is at an edge
-      ctx.fillStyle = VC[k]; ctx.fillRect(lx-tw/2-4, y-8, tw+8, 15);      // a chip in the layer's own colour: invisible inside the area, still readable where the text is wider than the area under it
-      label(ctx, txt, lx, y+4, TH.ink, "center", true); }
-  }
-  ctx.strokeStyle = TH.text; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(L,cy); ctx.lineTo(w-R,cy); ctx.stroke();
-  label(ctx, `buy $${fmtK(max)}/${BIN/1000}s`, L+2, T+10, TH.dim); label(ctx, "sell", L+2, h-B-4, TH.dim);
-  timeAxis(ctx, t => L+(t-t0)/win*(w-L-R), t0, t1, h, B, L, R, w);
-}
-
-// 2. beeswarm rows by $ size (log)
-function drawSwarm(){
-  const {ctx,w,h} = prep($("cvSwarm")), t0 = nowEx()-vwin();
-  const rows = [["bn","buy"],["bn","sell"],["hl","buy"],["hl","sell"]], tr = vTrades(t0);
-  if (!tr.length) return emptyMsg(ctx,w,h, connected?"waiting for trades…":"press Connect");
-  const L=62, R=14, T=20, B=8, rh = (h-T-B)/4, x0 = 0.5, x1 = 6.3;
-  const X = v => L + (Math.log10(Math.max(3,v))-x0)/(x1-x0)*(w-L-R);
-  ctx.textAlign="center";
-  for (const [v,lab] of [[10,"$10"],[100,"$100"],[1e3,"$1k"],[1e4,"$10k"],[1e5,"$100k"],[1e6,"$1M"]]){
-    const x = X(v); ctx.strokeStyle=TH.line; ctx.beginPath(); ctx.moveTo(x,T-4); ctx.lineTo(x,h-B); ctx.stroke(); ctx.fillStyle=TH.dim; ctx.fillText(lab, x, 11);
-  }
-  const rr = 2.7, gap = rr*2+0.4;
-  rows.forEach(([v,side], r)=>{
-    const cy = T + rh*(r+.5), pts = tr.filter(t=>t.v===v && t.side===side).slice(-300).map(t=>({x:X(t.ntl), t})).sort((a,b)=>a.x-b.x);
-    label(ctx, `${v.toUpperCase()} ${side}`, 4, cy+4, VC[v+side], "left", true);
-    if (!pts.length) return;
-    ctx.strokeStyle = VC[v+side]; ctx.globalAlpha=.6; ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(pts[0].x,cy); ctx.lineTo(pts[pts.length-1].x,cy); ctx.stroke(); ctx.globalAlpha=1;
-    const placed = [], lim = rh/2 - rr;
-    for (const p of pts){
-      let y = cy;
-      for (let k=0; k<60; k++){
-        const off = (k%2 ? 1 : -1) * Math.ceil(k/2) * gap; if (Math.abs(off) > lim){ y = null; break; }
-        y = cy + off; let hit = false;
-        for (let j=placed.length-1; j>=0 && placed[j].x > p.x-2*rr; j--) if (Math.hypot(placed[j].x-p.x, placed[j].y-y) < 2*rr){ hit = true; break; }
-        if (!hit) break;
-      }
-      if (y==null) continue;
-      placed.push({x:p.x, y});
-      ctx.fillStyle = VC[v+side]; ctx.globalAlpha=.8; ctx.beginPath(); ctx.arc(p.x, y, rr, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha=1;
-    }
-    const big = pts[pts.length-1];
-    ctx.strokeStyle=TH.hi; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(big.x, cy, rr+2, 0, Math.PI*2); ctx.stroke();
-    label(ctx, "$"+fmtK(big.t.ntl), Math.min(big.x+8, w-40), cy-6, TH.text);
-  });
-}
-
-// 3. diverging delta-by-price bars
-function drawProfile(){
-  const {ctx,w,h} = prep($("cvProf")), v = $("profVenue").value, t0 = nowEx()-vwin();
-  const tr = vTrades(t0).filter(t=>t.v===v);
-  if (tr.length < 3) return emptyMsg(ctx,w,h, connected?"waiting for trades…":"press Connect");
-  let lo = Infinity, hi = -Infinity; for (const t of tr){ lo = Math.min(lo,t.px); hi = Math.max(hi,t.px); }
-  const st = niceStep(Math.max((hi-lo)/20, hi*1e-6)), base = Math.floor(lo/st)*st, nb = Math.floor((hi-base)/st)+1;
-  const buy = new Float64Array(nb), sell = new Float64Array(nb);
-  for (const t of tr){ const i = Math.min(nb-1, Math.floor((t.px-base)/st)); t.side==="buy" ? buy[i]+=t.ntl : sell[i]+=t.ntl; }
-  const net = Array.from(buy, (b,i)=> b-sell[i]), mx = Math.max(1, ...net.map(Math.abs));
-  const L=70, R=50, T=8, B=8, rh = (h-T-B)/nb, cx = L + (w-L-R)/2, half = (w-L-R)/2 - 44;
-  ctx.strokeStyle=TH.edge; ctx.beginPath(); ctx.moveTo(cx,T); ctx.lineTo(cx,h-B); ctx.stroke();
-  for (let i=0;i<nb;i++){
-    const y = T + (nb-1-i)*rh, bh = Math.max(2, rh*0.64), yy = y + (rh-bh)/2, len = Math.abs(net[i])/mx*half, pos = net[i]>=0;
-    ctx.fillStyle=TH.dim; ctx.textAlign="right"; ctx.fillText(fmt(base+i*st, st<1?1:0), L-6, y+rh/2+3.5);
-    if (buy[i]+sell[i] === 0) continue;
-    ctx.fillStyle = pos ? COL.buy : COL.sell; ctx.fillRect(pos ? cx : cx-len, yy, Math.max(1,len), bh);
-    label(ctx, (pos?"+":"−")+"$"+fmtK(Math.abs(net[i])), pos ? cx+len+4 : cx-len-4, y+rh/2+4, pos?COL.buy:COL.sell, pos?"left":"right", true);
-    const share = buy[i]/(buy[i]+sell[i]);
-    ctx.fillStyle = TH.text; ctx.textAlign="right"; ctx.fillText((share*100).toFixed(0)+"%", w-6, y+rh/2+3.5);
-  }
-  ctx.fillStyle=TH.dim; ctx.textAlign="right"; ctx.fillText("buy %", w-6, T+2);
-  const b = v==="bn" ? M.bnBid : M.hlBid, a = v==="bn" ? M.bnAsk : M.hlAsk;
-  if (b && a){ const mid=(a+b)/2, y = T + (nb-1-(mid-base)/st + 0.5)*rh;
-    if (y>T && y<h-B){ ctx.setLineDash([4,3]); ctx.strokeStyle=TH.hi; ctx.beginPath(); ctx.moveTo(L,y); ctx.lineTo(w-R,y); ctx.stroke(); ctx.setLineDash([]); label(ctx, "mid", L+2, y-3, TH.hi); } }
-}
-
-// 4. basis anomaly vs trailing normal
-function drawAnomaly(){
-  const {ctx,w,h} = prep($("cvAnom")), win = vwin(), t1 = nowEx(), t0 = t1-win;
-  const all = microHist.filter(r => r.basis!=null);
-  const pts = [];
-  let j = 0, sum = 0, sq = 0;
-  for (let i=0;i<all.length;i++){                          // trailing 60s mean / σ, two-pointer window
-    sum += all[i].basis; sq += all[i].basis**2;
-    while (all[i].t - all[j].t > 60000){ sum -= all[j].basis; sq -= all[j].basis**2; j++; }
-    const n = i-j+1, m = sum/n, sd = Math.sqrt(Math.max(0, sq/n - m*m));
-    if (all[i].t >= t0 && n >= 20) pts.push({t:all[i].t, v:all[i].basis, m, sd});
-  }
-  if (pts.length < 2) return emptyMsg(ctx,w,h, connected?"building a 60s baseline…":"press Connect");
-  let lo = Infinity, hi = -Infinity; for (const p of pts){ lo = Math.min(lo, p.v, p.m-2*p.sd); hi = Math.max(hi, p.v, p.m+2*p.sd); }
-  const pad = (hi-lo)*.12 || 1; lo -= pad; hi += pad;
-  const L=6, R=54, T=14, B=18, X = t => L+(t-t0)/win*(w-L-R), Y = v => T+(hi-v)/(hi-lo)*(h-T-B);
-  const st = niceStep((hi-lo)/4); ctx.textAlign="left";
-  for (let v=Math.ceil(lo/st)*st; v<=hi; v+=st){ ctx.strokeStyle=TH.line; ctx.beginPath(); ctx.moveTo(L,Y(v)); ctx.lineTo(w-R,Y(v)); ctx.stroke(); ctx.fillStyle=TH.dim; ctx.fillText(fmt(v, st<1?1:0), w-R+4, Y(v)+3.5); }
-  timeAxis(ctx, X, t0, t1, h, B, L, R, w);
-  for (let i=1;i<pts.length;i++){
-    const a = pts[i-1], b = pts[i], z = b.sd ? (b.v-b.m)/b.sd : 0;
-    ctx.fillStyle = z>2 ? "#b3261e" : z>0 ? "#e8806f" : z<-2 ? "#1f5fb0" : "#6fa8e0";
-    ctx.beginPath(); ctx.moveTo(X(a.t),Y(a.m)); ctx.lineTo(X(a.t),Y(a.v)); ctx.lineTo(X(b.t),Y(b.v)); ctx.lineTo(X(b.t),Y(b.m)); ctx.closePath(); ctx.fill();
-  }
-  const line = (f, color, dash, wd) => { ctx.setLineDash(dash); ctx.strokeStyle=color; ctx.lineWidth=wd; ctx.beginPath(); pts.forEach((p,i)=> i ? ctx.lineTo(X(p.t),Y(f(p))) : ctx.moveTo(X(p.t),Y(f(p)))); ctx.stroke(); ctx.setLineDash([]); };
-  line(p=>p.m+2*p.sd, TH.dim, [3,3], 1); line(p=>p.m-2*p.sd, TH.dim, [3,3], 1); line(p=>p.m, TH.hi, [], 2);
-  const zOf = p => p.sd ? (p.v-p.m)/p.sd : 0;
-  const top = pts.reduce((a,p)=> zOf(p)>zOf(a) ? p : a), bot = pts.reduce((a,p)=> zOf(p)<zOf(a) ? p : a);
-  for (const p of [top, bot]){ const z = zOf(p); if (Math.abs(z) < 1) continue;
-    ctx.fillStyle=TH.hi; ctx.strokeStyle=TH.canvas; ctx.beginPath(); ctx.arc(X(p.t),Y(p.v),3.5,0,Math.PI*2); ctx.fill(); ctx.stroke();
-    label(ctx, (z>0?"+":"")+z.toFixed(1)+"σ", X(p.t), Y(p.v)+(z>0?-8:15), TH.hi, "center", true); }
-  const last = pts[pts.length-1]; label(ctx, "normal", X(last.t)-4, Y(last.m)-5, TH.hi, "right");
-}
-
-// 5. shifting bell curve of 1s returns
-function drawBell(){
-  const {ctx,w,h} = prep($("cvBell"));
-  if (retHist.length < 30){ $("bellHead").textContent=""; $("bellLeg").innerHTML=""; return emptyMsg(ctx,w,h, connected?`collecting returns… ${retHist.length}/30s`:"press Connect"); }
-  const all = retHist.map(x=>x.r), mu = all.reduce((a,b)=>a+b,0)/all.length;
-  const sd = Math.sqrt(all.reduce((a,b)=>a+(b-mu)**2,0)/(all.length-1)) || 1e-9;
-  const zs = all.map(r=>(r-mu)/sd), cur = retHist.filter(x=>x.t >= nowEx()-60000).map(x=>(x.r-mu)/sd);
-  const kde = (arr, x) => { const bw = 0.35; let s = 0; for (const z of arr) s += Math.exp(-0.5*((x-z)/bw)**2); return s/(arr.length*bw*Math.sqrt(2*Math.PI)); };
-  const N = 160, xs = Array.from({length:N}, (_,i)=> -5 + i*10/(N-1));
-  const dBase = xs.map(x=>kde(zs,x)), dCur = cur.length ? xs.map(x=>kde(cur,x)) : xs.map(()=>0);
-  const max = Math.max(...dBase, ...dCur), L=10, R=10, T=8, B=22;
-  const X = z => L+(z+5)/10*(w-L-R), Y = d => h-B-(d/max)*(h-T-B)*0.95;
-  const edges = [-Infinity,-3,-2,-0.43,0.43,2,3,Infinity];
-  const cols = ["#2a63bd","#4a86d6","#a9c8ee","#e9e9e4","#f2c39b","#e07a45","#b03626"];   // both ends lightened to at least 3:1 against the chart background
-  const names = ["−3σ or worse","−3σ to −2σ","−2σ to −0.43σ","normal ±0.43σ","+0.43σ to +2σ","+2σ to +3σ","+3σ or more"];
-  for (let k=0;k<7;k++){
-    ctx.beginPath(); let started = false;
-    for (let i=0;i<N;i++){ if (xs[i] < edges[k] || xs[i] > edges[k+1]) continue; const x=X(xs[i]), y=Y(dCur[i]); if (!started){ ctx.moveTo(x,h-B); started=true; } ctx.lineTo(x,y); }
-    if (!started) continue;
-    const lastX = X(Math.min(5, edges[k+1])); ctx.lineTo(lastX, h-B); ctx.closePath(); ctx.fillStyle = cols[k]; ctx.fill();
-  }
-  ctx.strokeStyle=TH.hi; ctx.lineWidth=1.6; ctx.beginPath(); xs.forEach((x,i)=> i ? ctx.lineTo(X(x),Y(dCur[i])) : ctx.moveTo(X(x),Y(dCur[i]))); ctx.stroke();
-  ctx.setLineDash([3,3]); ctx.strokeStyle=TH.dim; ctx.lineWidth=1.2; ctx.beginPath(); xs.forEach((x,i)=> i ? ctx.lineTo(X(x),Y(dBase[i])) : ctx.moveTo(X(x),Y(dBase[i]))); ctx.stroke(); ctx.setLineDash([]);
-  ctx.fillStyle=TH.dim; ctx.textAlign="center";
-  for (let z=-4; z<=4; z++) ctx.fillText((z>0?"+":"")+z+"σ", X(z), h-8);
-  const pct = k => cur.length ? cur.filter(z=>z>=edges[k] && z<edges[k+1]).length/cur.length*100 : 0;
-  const tails = pct(0)+pct(1)+pct(5)+pct(6);
-  $("bellHead").innerHTML = `<b>${tails.toFixed(0)}%</b> of the last 60 seconds moved more than 2σ · 1σ = ${sd.toFixed(2)} bps (session of ${all.length}s)`;
-  $("bellLeg").innerHTML = names.map((n,k)=>`<span><i style="background:${cols[k]}"></i>${n} <b style="color:var(--text)">${pct(k).toFixed(0)}%</b></span>`).join("");
-}
-
-// 6. radial clock of the last minute
-function drawRadial(){
-  const {ctx,w,h} = prep($("cvRad")), t1 = nowEx(), cx = w/2, cy = h/2, R = Math.min(w,h)/2-22, r0 = R*0.26;
-  const bins = {}; for (const v of ["bn","hl"]) bins[v] = Array.from({length:60}, ()=>({buy:0,sell:0,age:60}));
-  for (const t of vTrades(t1-60000)){ const sec = Math.floor(t.t/1000)%60, b = bins[t.v][sec]; b[t.side] += t.ntl; b.age = Math.min(b.age, (t1-t.t)/1000); }
-  const ring = {hl:[r0, r0+(R-r0)*0.38], bn:[r0+(R-r0)*0.44, R]}, ang = s => -Math.PI/2 + (s/60)*Math.PI*2;
-  ctx.strokeStyle=TH.line; ctx.lineWidth=1;
-  for (const v of ["bn","hl"]) for (const r of ring[v]){ ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke(); }
-  ctx.fillStyle=TH.dim; ctx.textAlign="center";
-  for (let s=0;s<60;s+=5){ const a=ang(s); ctx.fillText(String(s), cx+Math.cos(a)*(R+12), cy+Math.sin(a)*(R+12)+3.5); }
-  let tot = 0, buyTot = 0;
-  for (const v of ["bn","hl"]){
-    const [ri, ro] = ring[v], mx = Math.max(1, ...bins[v].map(b=>b.buy+b.sell));
-    bins[v].forEach((b, s)=>{
-      const sum = b.buy+b.sell; if (!sum) return; tot += sum; buyTot += b.buy;
-      const len = Math.sqrt(sum/mx)*(ro-ri), a0 = ang(s)+0.012, a1 = ang(s+1)-0.012, rb = ri + len*b.buy/sum;
-      ctx.globalAlpha = 1 - Math.min(0.75, b.age/60*0.75);
-      for (const [ra, rz, c] of [[ri, rb, v==="bn"?VC.bnbuy:VC.hlbuy],[rb, ri+len, v==="bn"?VC.bnsell:VC.hlsell]]){
-        if (rz-ra < 0.3) continue;
-        ctx.fillStyle = c; ctx.beginPath(); ctx.arc(cx,cy,rz,a0,a1); ctx.arc(cx,cy,ra,a1,a0,true); ctx.closePath(); ctx.fill();
-      }
-      ctx.globalAlpha = 1;
-    });
-    label(ctx, v.toUpperCase(), cx, cy - (ri+ro)/2 - 0, TH.dim, "center");
-  }
-  const now = (t1/1000)%60, a = ang(now);
-  ctx.strokeStyle=TH.hi; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(cx+Math.cos(a)*r0*0.9, cy+Math.sin(a)*r0*0.9); ctx.lineTo(cx+Math.cos(a)*(R+4), cy+Math.sin(a)*(R+4)); ctx.stroke();
-  ctx.fillStyle=TH.text; ctx.textAlign="center"; ctx.font="600 15px ui-monospace,Menlo,monospace"; ctx.fillText("$"+fmtK(tot), cx, cy+2);
-  ctx.font="10.5px ui-monospace,Menlo,monospace"; ctx.fillStyle = buyTot/tot>=.5 ? COL.buy : COL.sell;
-  ctx.fillText(tot ? `${(buyTot/tot*100).toFixed(0)}% buy` : "", cx, cy+16);
-}
-
-// 7. treemap: venue → side × size
-function squarify(items, x, y, w, h){
-  const out = []; let rest = items.filter(q=>q.a>0);
-  while (rest.length && w>0.5 && h>0.5){
-    const short = Math.min(w,h), worst = r => { const s=r.reduce((a,q)=>a+q.a,0), mx=Math.max(...r.map(q=>q.a)), mn=Math.min(...r.map(q=>q.a)); return Math.max(short*short*mx/(s*s), s*s/(short*short*mn)); };
-    let row = [rest[0]], i = 1;
-    while (i<rest.length && worst([...row, rest[i]]) <= worst(row)){ row.push(rest[i]); i++; }
-    const s = row.reduce((a,q)=>a+q.a,0);
-    if (w >= h){ const cw = s/h; let yy = y; for (const q of row){ const ch = q.a/cw; out.push({...q, x, y:yy, w:cw, h:ch}); yy += ch; } x += cw; w -= cw; }
-    else { const ch = s/w; let xx = x; for (const q of row){ const cw = q.a/ch; out.push({...q, x:xx, y, w:cw, h:ch}); xx += cw; } y += ch; h -= ch; }
-    rest = rest.slice(i);
-  }
-  return out;
-}
-function drawTree(){
-  const {ctx,w,h} = prep($("cvTree")), tr = vTrades(nowEx()-vwin());
-  const vol = {}; let total = 0;
-  for (const t of tr){ const k = `${t.v}|${t.side}|${sizeIdx(t.ntl)}`; vol[k] = (vol[k]||0)+t.ntl; total += t.ntl; }
-  if (!total) return emptyMsg(ctx,w,h, connected?"waiting for trades…":"press Connect");
-  const area = w*h, venues = ["bn","hl"].map(v=>({v, val: Object.keys(vol).filter(k=>k.startsWith(v)).reduce((a,k)=>a+vol[k],0)}))
-    .map(q=>({...q, a:q.val/total*area})).sort((a,b)=>b.a-a.a);
-  for (const g of squarify(venues, 0, 0, w, h)){
-    const P = 3, gx = g.x+P, gy = g.y+16, gw = g.w-2*P, gh = g.h-16-P;
-    ctx.fillStyle = TH.panel2; ctx.fillRect(g.x+1, g.y+1, g.w-2, g.h-2);
-    const pc = (g.val/total*100).toFixed(0)+"%", nm = g.v==="bn" ? "Binance" : "Hyperliquid";
-    fitLabel(ctx, [`${nm} · $${fmtK(g.val)} · ${pc}`, `${nm} · ${pc}`, `${g.v.toUpperCase()} ${pc}`, g.v.toUpperCase()], g.x+5, g.y+12, g.w-8, COL[g.v], true);
-    if (gw<4 || gh<4) continue;
-    const leaves = [];
-    for (const side of ["buy","sell"]) for (let s=0;s<4;s++){ const val = vol[`${g.v}|${side}|${s}`]||0; if (val) leaves.push({side, s, val}); }
-    leaves.forEach(q => q.a = q.val/g.val*gw*gh); leaves.sort((a,b)=>b.a-a.a);
-    for (const c of squarify(leaves, gx, gy, gw, gh)){
-      const shade = [0.42,0.6,0.8,1][c.s], base = c.side==="buy" ? [47,191,113] : [229,83,75];
-      ctx.fillStyle = `rgb(${base.map(v=>Math.round(14+(v-14)*shade)).join(",")})`;
-      ctx.fillRect(c.x+1, c.y+1, Math.max(0,c.w-2), Math.max(0,c.h-2));
-      const mw = c.w-8;
-      if (c.h > 30 && fitLabel(ctx, [`${c.side} ${SIZE_LABELS[c.s]}`, SIZE_LABELS[c.s]], c.x+4, c.y+14, mw, TH.hi)) fitLabel(ctx, [`$${fmtK(c.val)}`], c.x+4, c.y+27, mw, TH.hi, true);
-      else if (c.h > 15) fitLabel(ctx, [`$${fmtK(c.val)}`], c.x+4, c.y+12, mw, TH.hi);
-    }
-  }
-}
-
-// 8. waterfall of net delta by venue × size
-function drawWater(){
-  const {ctx,w,h} = prep($("cvWater")), tr = vTrades(nowEx()-vwin());
-  if (!tr.length) return emptyMsg(ctx,w,h, connected?"waiting for trades…":"press Connect");
-  const steps = [];
-  for (const v of ["bn","hl"]) for (let s=0;s<4;s++){ let d = 0; for (const t of tr) if (t.v===v && sizeIdx(t.ntl)===s) d += t.side==="buy" ? t.ntl : -t.ntl; steps.push({v, s, d}); }
-  let run = 0; const bars = steps.map(st => { const a = run; run += st.d; return {...st, a, b: run}; });
-  const lo = Math.min(0, ...bars.map(b=>Math.min(b.a,b.b))), hi = Math.max(0, ...bars.map(b=>Math.max(b.a,b.b)));
-  const pad = (hi-lo)*.12 || 1, ylo = lo-pad, yhi = hi+pad, L=8, R=54, T=10, B=34, n = bars.length+1, cw = (w-L-R)/n;
-  const Y = v => T+(yhi-v)/(yhi-ylo)*(h-T-B);
-  ctx.fillStyle = TH.a("bn",.06); ctx.fillRect(L, T, cw*4, h-T-B+16);
-  ctx.fillStyle = TH.a("hl",.06); ctx.fillRect(L+cw*4, T, cw*4, h-T-B+16);
-  label(ctx, "Binance", L+cw*2, h-4, COL.bn, "center", true); label(ctx, "Hyperliquid", L+cw*6, h-4, COL.hl, "center", true);
-  const st = niceStep((yhi-ylo)/4); ctx.textAlign="left";
-  for (let v=Math.ceil(ylo/st)*st; v<=yhi; v+=st){ ctx.strokeStyle = v===0 ? TH.edge : TH.line; ctx.beginPath(); ctx.moveTo(L,Y(v)); ctx.lineTo(w-R,Y(v)); ctx.stroke(); ctx.fillStyle=TH.dim; ctx.fillText("$"+fmtK(v), w-R+4, Y(v)+3.5); }
-  bars.forEach((b,i)=>{
-    const x = L+cw*i+cw*.18, bw = cw*.64, pos = b.d >= 0;
-    ctx.fillStyle = pos ? COL.buy : COL.sell; ctx.fillRect(x, Y(Math.max(b.a,b.b)), bw, Math.max(1, Math.abs(Y(b.a)-Y(b.b))));
-    ctx.setLineDash([2,2]); ctx.strokeStyle=TH.dim; ctx.beginPath(); ctx.moveTo(x+bw, Y(b.b)); ctx.lineTo(x+cw, Y(b.b)); ctx.stroke(); ctx.setLineDash([]);   // connector to the next bar (also to "net")
-    const short = v => { const a=Math.abs(v); return a>=1e6 ? (a/1e6).toFixed(1)+"M" : a>=1e3 ? Math.round(a/1e3)+"k" : a.toFixed(0); };
-    let vt = (pos?"+":"−")+fmtK(Math.abs(b.d)); if (ctx.measureText(vt).width > cw+6) vt = (pos?"+":"−")+short(b.d);
-    if (Math.abs(b.d) > 0 && ctx.measureText(vt).width <= cw+6) label(ctx, vt, x+bw/2, pos ? Y(b.b)-4 : Y(b.b)+12, pos?COL.buy:COL.sell, "center");
-    ctx.fillStyle=TH.dim;
-    const sl = ctx.measureText(SIZE_LABELS[b.s]).width <= cw-2 ? SIZE_LABELS[b.s] : ["<1k","<10k","<100k","≥100k"][b.s]; // compact on narrow screens
-    ctx.textAlign="center"; ctx.fillText(sl, x+bw/2, h-B+12);
-  });
-  const x = L+cw*(n-1)+cw*.18, bw = cw*.64, pos = run>=0;
-  ctx.fillStyle = pos ? "#1f8a52" : "#a8352e"; ctx.fillRect(x, Y(Math.max(0,run)), bw, Math.max(1, Math.abs(Y(0)-Y(run))));
-  ctx.strokeStyle=TH.hi; ctx.strokeRect(x, Y(Math.max(0,run)), bw, Math.max(1, Math.abs(Y(0)-Y(run))));
-  label(ctx, (pos?"+":"−")+fmtK(Math.abs(run)), x+bw/2, pos ? Y(run)-4 : Y(0)-5, TH.hi, "center", true); // net value sits beside the zero line, never off-canvas
-  ctx.fillStyle=TH.text; ctx.textAlign="center"; ctx.fillText("net", x+bw/2, h-B+12);
-}
-
-// 9. fan of trades from mid into a marginal density
-function drawFan(){
-  const {ctx,w,h} = prep($("cvFan")), tr = vTrades(nowEx()-30000).filter(t=>t.mid);
-  if (tr.length < 3) return emptyMsg(ctx,w,h, connected?"waiting for trades…":"press Connect");
-  const off = tr.map(t => (t.px - t.mid)/t.mid*1e4), sorted = off.map(Math.abs).sort((a,b)=>a-b);
-  const lim = Math.max(1, sorted[Math.floor(sorted.length*0.98)]*1.15);
-  const L=60, T=10, B=10, ox = L, oy = T+(h-T-B)/2, xe = w*0.64, dx0 = xe+8, dx1 = w-14;
-  const Y = b => oy - Math.max(-lim, Math.min(lim, b))/lim*(h-T-B)/2;
-  const maxN = Math.max(...tr.map(t=>t.ntl));
-  ctx.strokeStyle=TH.line; ctx.fillStyle=TH.dim; ctx.textAlign="right";
-  const st = niceStep(lim/3);
-  for (let b=-Math.floor(lim/st)*st; b<=lim; b+=st){ ctx.beginPath(); ctx.moveTo(xe,Y(b)); ctx.lineTo(dx1,Y(b)); ctx.stroke(); ctx.fillText((b>0?"+":"")+fmt(b, st<1?1:0)+" bps", xe-4, Y(b)+3.5); }
-  const order = tr.map((t,i)=>i).sort((a,b)=>tr[a].ntl-tr[b].ntl);
-  for (const i of order){
-    const t = tr[i], y = Y(off[i]), f = Math.sqrt(t.ntl/maxN);
-    ctx.strokeStyle = t.side==="buy" ? COL.buy : COL.sell; ctx.globalAlpha = 0.08 + 0.6*f; ctx.lineWidth = 0.6 + 2.6*f;
-    ctx.beginPath(); ctx.moveTo(ox, oy); ctx.bezierCurveTo(ox+(xe-ox)*0.45, oy, ox+(xe-ox)*0.55, y, xe, y); ctx.stroke();
-  }
-  ctx.globalAlpha = 1;
-  ctx.fillStyle=TH.hi; ctx.beginPath(); ctx.arc(ox, oy, 4, 0, Math.PI*2); ctx.fill();
-  label(ctx, "mid", ox-8, oy+4, TH.text, "right", true);
-  const NB = 48, dens = new Float64Array(NB);
-  tr.forEach((t,i)=>{ const k = Math.max(0, Math.min(NB-1, Math.floor((off[i]+lim)/(2*lim)*NB))); dens[k] += t.ntl; });
-  const sm = Array.from(dens, (_,k)=> (dens[Math.max(0,k-1)] + 2*dens[k] + dens[Math.min(NB-1,k+1)])/4), dm = Math.max(...sm) || 1;
-  const yk = k => T + (1 - (k+.5)/NB)*(h-T-B);
-  for (const [cond, c] of [[k=>yk(k)<=oy, COL.buy],[k=>yk(k)>=oy, COL.sell]]){
-    ctx.beginPath(); ctx.moveTo(dx0, oy); let any = false;
-    for (let k=0;k<NB;k++) if (cond(k)){ ctx.lineTo(dx0 + sm[k]/dm*(dx1-dx0), yk(k)); any = true; }
-    if (!any) continue;
-    ctx.lineTo(dx0, cond(0) ? yk(0) : yk(NB-1)); ctx.closePath(); ctx.fillStyle = c; ctx.globalAlpha=.35; ctx.fill(); ctx.globalAlpha=1; ctx.strokeStyle=c; ctx.stroke();
-  }
-  ctx.strokeStyle=TH.text; ctx.beginPath(); ctx.moveTo(dx0, T); ctx.lineTo(dx0, h-B); ctx.stroke();
-  const above = tr.reduce((a,t,i)=> a + (off[i]>0 ? t.ntl : 0), 0), totN = tr.reduce((a,t)=>a+t.ntl,0);
-  label(ctx, `${(above/totN*100).toFixed(0)}% of $ above mid`, dx1, T+12, COL.buy, "right", true);
-  label(ctx, `${(100-above/totN*100).toFixed(0)}% at/below`, dx1, h-B-4, COL.sell, "right", true);
-}
-
-const VIZ = [[drawStream,"cvStream"],[drawSwarm,"cvSwarm"],[drawProfile,"cvProf"],[drawAnomaly,"cvAnom"],[drawBell,"cvBell"],[drawRadial,"cvRad"],[drawTree,"cvTree"],[drawWater,"cvWater"],[drawFan,"cvFan"]];
-function renderViz(){
-  for (const [f, id] of VIZ){
-    if (!$(id).clientWidth) continue;                              // panel is on a hidden tab: nothing to draw (and a 0-size canvas makes arc() throw)
-    try{ f(); }catch(e){ console.error(f.name, e); }               // one broken panel must not blank the rest
-  }
-}
-$("vwin").onchange = $("profVenue").onchange = () => { if (visible("viz")) renderViz(); };
-
 // ---------- tabs ----------
-// Six areas by what you are doing; an area with several views shows them as a sub-row. Every view is one VIEWS.register (views.js): its place in
+// Seven areas by what you are doing; an area with several views shows them as a sub-row. Every view is one VIEWS.register (views.js): its place in
 // the navigation, and (render + minIntervalMs) how the frame loop draws it. Views of one slot (reader) share one render and one throttle.
-for (const [id, l, icon] of [["now","Now","M3 12h4l3-8 4 16 3-8h4"],["reader","Reader","M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 9a3 3 0 100 6 3 3 0 000-6z"],["review","Review","M4 6l2 2 3-3M4 14l2 2 3-3M13 7h8M13 15h8"],["rec","Recordings","M12 4a8 8 0 100 16 8 8 0 000-16zM12 9a3 3 0 100 6 3 3 0 000-6z"],["trade","Trade","M7 4v16M7 4L4 7M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3"],["system","System","M4 7h8M18 7h2M4 17h2M10 17h10M14 4v6M8 14v6"]]) VIEWS.area(id, l, icon);
+for (const [id, l, icon] of [["now","Now","M3 12h4l3-8 4 16 3-8h4"],["setups","Setups","M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"],["reader","Reader","M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 9a3 3 0 100 6 3 3 0 000-6z"],["review","Review","M4 6l2 2 3-3M4 14l2 2 3-3M13 7h8M13 15h8"],["rec","Recordings","M12 4a8 8 0 100 16 8 8 0 000-16zM12 9a3 3 0 100 6 3 3 0 000-6z"],["trade","Trade","M7 4v16M7 4L4 7M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3"],["system","System","M4 7h8M18 7h2M4 17h2M10 17h10M14 4v6M8 14v6"]]) VIEWS.area(id, l, icon);
 const READER_SLOT = {slot:"reader", render:()=>renderReader(), minIntervalMs:250};   // renderReader draws all of these views
 VIEWS.register({id:"overview", label:"Overview", area:"now", minIntervalMs:250, render:()=>{ try{ renderOverview(); }catch(e){ console.error("overview", e); } }});
 VIEWS.register({id:"armmode", label:"Arm mode", area:"now"});
-VIEWS.register({id:"charts", label:"Charts", area:"now", minIntervalMs:100, render:()=>{ drawBubbles(); drawCvd(); }});
-VIEWS.register({id:"futures", label:"Futures stack", area:"now", minIntervalMs:250, render:()=>{ if (typeof futuresRender === "function") futuresRender(); }});
-VIEWS.register({id:"micro", label:"Microstructure", area:"now", minIntervalMs:250, render:()=>renderMicro()});
-VIEWS.register({id:"viz", label:"Visuals", area:"now", minIntervalMs:400, render:()=>renderViz()});
-VIEWS.register({id:"tape", label:"Tape", area:"now"});
-VIEWS.register({id:"market", label:"Market", area:"now"});
+VIEWS.register({id:"market", label:"Market and tape", area:"now"});
+VIEWS.register({id:"futures", label:"Futures stack", area:"setups", minIntervalMs:250, render:()=>{ if (typeof futuresRender === "function") futuresRender(); }});
+VIEWS.register({id:"micro", label:"Microstructure", area:"setups", minIntervalMs:250, render:()=>renderMicro()});
 VIEWS.register(Object.assign({id:"reader", label:"Episodes", area:"reader"}, READER_SLOT));
 VIEWS.register({id:"signals", label:"Signals", area:"reader", slot:"reader"});
 VIEWS.register({id:"replay", label:"Replay and labels", area:"review", slot:"reader"});
@@ -1393,7 +961,6 @@ function renderSlow(){
   if (paused) return;
   if (visible("streams")) renderCards();
   if (visible("health")) renderHealth();
-  if (visible("charts")) renderFlow();
   renderAlerts();
 }
 setInterval(()=>{
@@ -1404,11 +971,10 @@ setInterval(()=>{
 let lastFast = 0;
 (function frame(ts){
   if (!paused){
-    VIEWS.tick(ts, visible);   // overview, charts, micro, viz, the reader views, trading: registered above
+    VIEWS.tick(ts, visible);   // overview, futures, micro, the reader views, trading: registered above
     if (dirty && ts - lastFast > 150){
       dirty = false; lastFast = ts;
-      if (visible("market")){ renderMetrics(); renderBooks(); }
-      if (visible("tape")) renderTape();
+      if (visible("market")){ renderMetrics(); renderBooks(); renderTape(); }
       if (visible("raw")){ renderLog(); renderInspector(); }
     }
   }
@@ -1423,7 +989,7 @@ $("go").onclick = () => {
   }
   connected = true; connectedAt = Date.now();
   for (const id in S) Object.assign(S[id], freshStats());
-  trades=[]; cvd={bn:0,hl:0}; cvdHist=[]; midHist=[]; cvdBase=null; resetMicro(); logLines.length=0; hlBook=null; bnBook=null;
+  trades=[]; cvd={bn:0,hl:0}; cvdHist=[]; midHist=[]; resetMicro(); logLines.length=0; hlBook=null; bnBook=null;
   resetMarket(); Object.assign(health, {bnReconnects:0, hlReconnects:0, hlReplays:0});
   READER.reset(); rdLastBook.bn = rdLastBook.hl = 0;
   syncClock(); clockTimer = setInterval(syncClock, 60000);
@@ -1436,10 +1002,9 @@ $("bnSrc").onchange = () => {
   const id = $("bnSrc").value;                       // make sure the chosen source is subscribed
   if (!S[id].on){ S[id].on = true; const el=$("c-"+id); el.classList.remove("off"); el.querySelector("input").checked = true; scheduleReconnect("bn"); }
   trades = trades.filter(t => t.v!=="bn" || t.liq);   // avoid mixing sources in the history
-  cvd.bn = 0; cvdHist = []; cvdBase = null;
+  cvd.bn = 0; cvdHist = [];
 };
 $("sym").onchange = () => { if (connected){ resetMicro(); trades=[]; midHist=[]; cvdHist=[]; cvd={bn:0,hl:0}; resetMarket(); READER.reset(); rdLastBook.bn = rdLastBook.hl = 0; hlBook=null; bnConnect(); hlConnect(); } };
-$("cvdReset").onclick = () => { cvdBase = {t: nowEx()}; };
 $("logFilter").onchange = renderLog;
 $("clearLog").onclick = () => { logLines.length=0; renderLog(); };
 $("minNtl").oninput = renderTape;
@@ -1453,7 +1018,7 @@ document.addEventListener("keydown", e => { if (e.key==="Escape") sheet(false); 
 $("sym").addEventListener("input", () => { $("symLbl").textContent = $("sym").value.trim().toUpperCase() || "–"; });
 
 // ---------- remembered setup ----------
-for (const id of ["sym","route","bnSrc","vwin","ovWin","rdSens","rdMin","minNtl","swMin","tlWin","rtMissFam","rtMissSide"]){
+for (const id of ["sym","route","bnSrc","ovWin","rdSens","rdMin","minNtl","swMin","tlWin","rtMissFam","rtMissSide"]){
   const el = $(id); if (!el) continue;
   const v = store.get("v:"+id, null);
   if (v != null && (el.tagName!=="SELECT" || [...el.options].some(o=>o.value===v))) el.value = v;
@@ -1474,7 +1039,6 @@ $("rdDetectors").addEventListener("change", () => store.set("rdOff", [...$("rdDe
 // Each titled panel gets a body wrapper; tapping the title folds it. State is remembered by panel title.
 (function initPanels(){
   const saved = store.get("collapsed", null), fold = new Set(saved || []), narrow = matchMedia("(max-width:700px)").matches;
-  let vizN = 0;
   document.querySelectorAll("main > section[data-tab]").forEach(sec=>{
     const h2 = sec.querySelector(":scope > h2"); if (!h2 || sec.classList.contains("tcontainer")) return;
     const body = document.createElement("div"); body.className = "pbody";
@@ -1482,7 +1046,6 @@ $("rdDetectors").addEventListener("change", () => store.set("rdOff", [...$("rdDe
     sec.appendChild(body); sec.classList.add("cx");
     const key = sec.dataset.tab + "/" + (h2.childNodes[0].textContent || "").trim();
     sec.dataset.fold = key;
-    if (!saved && narrow && sec.dataset.tab==="viz" && ++vizN > 2) fold.add(key);   // first visit on a phone: Visualizations opens with its first panels only
     sec.classList.toggle("collapsed", fold.has(key));
   });
   document.getElementById("main").addEventListener("click", e => {

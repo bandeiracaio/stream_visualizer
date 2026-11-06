@@ -15,6 +15,7 @@
   <h1>Live Stream Visualizer <small id="ver"></small></h1>
   <button id="go" class="primary">Connect</button>
   <button id="pause">Pause</button>
+  <button id="recHdr" title="Record the raw inputs now (same as Record in the Recordings tab)">Record</button>
   <button id="arHdr" title="Auto-record: watch the price and record when the market gets volatile (settings: Recordings tab)">Arm</button><span id="arHdrMsg" class="stat"></span>
   <span class="stat pill">BN <b id="bnState">off</b></span>
   <span class="stat pill">HL <b id="hlState">off</b></span>
@@ -55,7 +56,7 @@
   </section>
 
   <section data-tab="overview" class="full">
-    <h2>Market now <span class="ctl"><button id="ovOpenCharts">charts</button></span></h2>
+    <h2>Market now <span class="ctl"><button id="ovOpenCharts">market</button></span></h2>
     <div class="metrics" id="ovMetrics"></div>
   </section>
 
@@ -92,36 +93,6 @@
   <section data-tab="overview">
     <h2>Account <span class="ctl"><button id="ovOpenAcc">manage</button></span></h2>
     <div id="ovAcc"></div>
-  </section>
-
-  <section data-tab="charts" class="full">
-    <h2>Trade bubbles <span class="ctl">window
-      <select id="win"><option value="60000">1m</option><option value="180000" selected>3m</option><option value="300000">5m</option></select>
-      size <input id="bubScale" type="range" min="0.4" max="3" step="0.1" value="1" style="width:80px"></span></h2>
-    <canvas id="cvBub" class="chart"></canvas>
-    <div class="legend">
-      <span><i style="border-radius:50%;background:var(--buy)"></i>BN buy</span>
-      <span><i style="border-radius:50%;background:var(--sell)"></i>BN sell</span>
-      <span><i style="background:var(--buy)"></i>HL buy</span>
-      <span><i style="background:var(--sell)"></i>HL sell</span>
-      <span>✕ liquidation</span>
-      <span><i style="height:2px;background:var(--bn)"></i>BN mid</span>
-      <span><i style="height:2px;background:var(--hl)"></i>HL mid</span>
-    </div>
-    <div class="note">Every trade is a dot: x = exchange time, y = price, area ∝ $ notional. The mid lines show where each book sits, so the gap between them is the HL − BN basis.</div>
-  </section>
-
-  <section data-tab="charts">
-    <h2>CVD — cumulative buy − sell $ <span class="ctl"><button id="cvdReset">rebase</button></span></h2>
-    <canvas id="cvCvd" class="chart"></canvas>
-    <div class="legend"><span><i style="height:2px;background:var(--bn)"></i>BN (left axis)</span><span><i style="height:2px;background:var(--hl)"></i>HL (right axis)</span></div>
-    <div class="note">Rebased to zero at the left edge of the window. Each venue has its own scale since Binance volume is far larger.</div>
-  </section>
-
-  <section data-tab="charts">
-    <h2>Aggressor flow</h2>
-    <div class="flow" id="flow"></div>
-    <div class="note">Taker buy vs sell $ volume. Imbalance = (buy − sell) / (buy + sell).</div>
   </section>
 
   <section data-tab="futures" class="full">
@@ -222,68 +193,6 @@
     <div class="metrics" id="swSum" style="margin-bottom:8px"></div>
     <div class="tape"><table class="sw" id="swTable"></table></div>
     <div class="note">A sweep is one aggressive order filling at 2+ price levels. HL is exact (fills share a hash). BN is a heuristic: consecutive fills with the same millisecond and side.</div>
-  </section>
-
-  <section data-tab="viz" class="full">
-    <h2>Visualizations <span class="ctl">window <select id="vwin"><option value="60000">1m</option><option value="180000" selected>3m</option><option value="300000">5m</option></select></span></h2>
-    <div class="note" style="margin-top:0">Editorial-style views of the same live data. Nothing here changes the other tabs.</div>
-  </section>
-
-  <section data-tab="viz" class="full">
-    <h2>Who is pushing — flow streamgraph</h2>
-    <canvas id="cvStream" class="chart"></canvas>
-    <div class="legend"><span><i style="background:#2fbf71"></i>BN buy</span><span><i style="background:#8fe3b4"></i>HL buy</span><span><i style="background:#e5534b"></i>BN sell</span><span><i style="background:#f4a39d"></i>HL sell</span></div>
-    <div class="note">Taker $ volume in small time bins. Buyers flow above the centre line, sellers below; the thicker side is in control.</div>
-  </section>
-
-  <section data-tab="viz">
-    <h2>Every trade, by size — beeswarm</h2>
-    <canvas id="cvSwarm" class="chart"></canvas>
-    <div class="note">One dot per trade (latest 300 per row), placed by $ size on a log scale. The line spans smallest to largest; the largest is labelled.</div>
-  </section>
-
-  <section data-tab="viz">
-    <h2>Where the fight happened — delta by price <span class="ctl"><select id="profVenue"><option value="bn">Binance</option><option value="hl">Hyperliquid</option></select></span></h2>
-    <canvas id="cvProf" class="chart"></canvas>
-    <div class="note">Net taker $ (buy − sell) at each price band in the window. Right column = buyers' share of the volume traded there. Dashed line = current mid.</div>
-  </section>
-
-  <section data-tab="viz">
-    <h2>Is the basis unusual? — anomaly vs its normal</h2>
-    <canvas id="cvAnom" class="chart"></canvas>
-    <div class="note">HL − BN basis against its trailing 60s mean (white) and ±2σ band (dashed). Red = above normal, blue = below, darker beyond 2σ.</div>
-  </section>
-
-  <section data-tab="viz">
-    <h2>The shifting bell curve — 1s returns</h2>
-    <div class="headline" id="bellHead"></div>
-    <canvas id="cvBell" class="chart"></canvas>
-    <div class="vleg" id="bellLeg"></div>
-    <div class="note">Binance mid returns per second, in units of this session's σ. Dashed = whole session; coloured = last 60 seconds.</div>
-  </section>
-
-  <section data-tab="viz">
-    <h2>The last minute on a clock — radial volume</h2>
-    <canvas id="cvRad" class="chart"></canvas>
-    <div class="note">Each spoke is one second of the clock minute; length = $ volume (√ scale), green buy / red sell stacked outward. Outer ring Binance, inner ring Hyperliquid. Older seconds fade.</div>
-  </section>
-
-  <section data-tab="viz">
-    <h2>Where the money went — treemap</h2>
-    <canvas id="cvTree" class="chart"></canvas>
-    <div class="note">Area = $ volume in the window, grouped by venue, then side and trade size. Darker = larger trades.</div>
-  </section>
-
-  <section data-tab="viz">
-    <h2>What built the delta — waterfall</h2>
-    <canvas id="cvWater" class="chart"></canvas>
-    <div class="note">Net buy − sell $ in the window, decomposed by venue and trade size. Shows whether small or large traders drove the move.</div>
-  </section>
-
-  <section data-tab="viz" class="full">
-    <h2>How far from mid trades land — fan</h2>
-    <canvas id="cvFan" class="chart"></canvas>
-    <div class="note">Last 30s. Each curve runs from the mid to the price a trade printed at, in bps of its own venue's mid; thickness and opacity grow with size. Right: $-weighted distribution.</div>
   </section>
 
   <section data-tab="reader" class="full">
@@ -530,7 +439,7 @@
     <div class="note">HL: full snapshot each message, n = resting orders at the level. BN: rebuilt from @depth@100ms diffs on a REST snapshot, with pu/u sequence checks.</div>
   </section>
 
-  <section data-tab="tape">
+  <section data-tab="market">
     <h2>Tape <span class="ctl">min $ <input id="minNtl" type="number" value="0" style="width:90px"></span></h2>
     <div class="tape"><table id="tape"><thead><tr><th style="text-align:left">time</th><th>venue</th><th>side</th><th>price</th><th>size</th><th>$</th></tr></thead><tbody></tbody></table></div>
   </section>

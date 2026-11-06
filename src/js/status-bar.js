@@ -59,3 +59,14 @@ if (APP_VERSION !== "dev") {
 // the browser can take back the folder permission without telling the page: while something is armed or recording, ask it again every 30 s so the chip shows it before a save fails
 setInterval(() => { if (typeof fsQuery === "function" && typeof FS !== "undefined" && FS.dir && (AR.on || RT.rec)) fsQuery().catch(() => {}); }, 30000);
 setInterval(sbRender, 1000); sbRender();
+// header Record button: the same switch as Record in Recordings (#rtRec), whose label and recording state it mirrors
+(function () {
+  const hb = document.getElementById("recHdr"), rb = document.getElementById("rtRec");
+  if (!hb || !rb) return;
+  const sync = () => { hb.textContent = rb.textContent; hb.classList.toggle("on", !!RT.rec); };
+  hb.onclick = () => {
+    if (!RT.rec && !connected) { const m = document.getElementById("arHdrMsg"); if (m) { m.textContent = "Connect first, then record."; setTimeout(() => { m.textContent = ""; }, 4000); } return; }
+    rb.click(); sync();
+  };
+  new MutationObserver(sync).observe(rb, {childList:true, characterData:true, subtree:true}); sync();
+})();
