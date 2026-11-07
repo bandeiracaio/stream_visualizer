@@ -73,6 +73,21 @@ Message activity: no official doc says traffic on a WebSocket affects freezing. 
 - Whether a lock held inside a worker counts as the page holding it.
 - Throttled, frozen and discarded have separate rules; the exemptions above are not the same list for each.
 
+## Experiment: hidden-tab test on this machine (2026-11-06)
+
+Not an official source; this is a measurement, kept apart from the docs above. Three tabs of a local test page (`127.0.0.1`, own port), each with a main-thread `setInterval` and a dedicated worker `setInterval`, both sending a 1 s heartbeat to a local server that logged the arrival time. Variants: `none` (control), `lock` (`navigator.locks.request('sv-armed', () => new Promise(() => {}))` held), `ws` (open WebSocket receiving a frame every second). A fourth blank tab was left in front, so the three were hidden; no tool call touched them. Chrome version not recorded. Run length 10.2 minutes (planned 12; the tabs and server were closed early).
+
+| Variant | Page beats | Page median / longest gap | Worker beats | Worker median / longest gap |
+|---|---|---|---|---|
+| none | 41 | 2.0 s / 60 s | 609 | 1.0 s / 1.02 s |
+| lock | 69 | 1.0 s / 60 s | 608 | 1.0 s / 1.05 s |
+| ws | 39 | 2.0 s / 60 s | 603 | 1.0 s / 1.02 s |
+
+- Within the first minute the hidden pages beat at 1 s (lock) or 2 s (none, ws). From about minute 1 on, all three pages ticked once a minute (9 or 10 gaps of about 60 s each), the lock page included.
+- All three workers kept a steady 1 s beat for the whole run, with no gap above about 1.05 s, while their pages were stalled.
+- The pages were throttled, not frozen: a frozen document blocks its dedicated worker (WICG draft 5.1), and these workers never stopped. The control was not frozen either, so **the test cannot say whether a held Web Lock prevents freezing**. It shows a lock does not prevent the once-a-minute timer throttling of the page.
+- Not tested: a longer hide, Android, Memory Saver, a lock held inside the worker, a page with a busy main thread.
+
 ## Implication for this app
 
 - The main protection against freezing in Chromium's list is the Web Lock (`sv-armed`). The WebSocket and the wake lock should not be counted on: WebSocket is not a freeze blocker, and the wake lock is released at hide.
