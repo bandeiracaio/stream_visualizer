@@ -1,6 +1,6 @@
 # Chrome and hidden tabs: dedicated workers, WebSocket, Web Lock, wake lock
 
-Read 2026-11-06. Official sources only (developer.chrome.com, W3C/WICG specs, Chromium source on chromium.googlesource.com). Quotes come from WebFetch summaries of each page, so the wording is as the fetcher returned it; re-check a quote on the page before relying on it for a decision. Anything not found in an official source is marked UNVERIFIED.
+Read 2026-11-06. Official sources only (developer.chrome.com, W3C/WICG specs, Chromium source on chromium.googlesource.com). Quotes were re-fetched and checked against each page on 2026-11-06 (WebFetch, which answers through a small model, so wording is as returned; the WICG, Page Lifecycle, Chrome 57, Chrome 88 and Screen Wake Lock quotes matched). Corrections from that check: the Chromium enum values have no description text in the source (the earlier "the page uses WebRTC" / "the page holds a Web Lock" glosses were paraphrases, now removed), and the Chrome 57 sentence is "The run-timers-once-a-second rule is still applied in these cases." Anything not found in an official source is marked UNVERIFIED.
 
 Three different things are easy to mix up here:
 - **Throttled**: timers run late (once a second, then once a minute). Code still runs.
@@ -35,20 +35,20 @@ So per the spec, a dedicated worker of a frozen document is blocked: its timers 
 
 The Page Lifecycle article has no freezing exemption list. It lists audio and WebRTC as reasons a page "won't be discarded unless under extreme resource constraints", and tells developers for the frozen state: "Stop any network polling or close any open Web Socket connections." (same URL as above).
 
-Chromium's freezing policy (https://chromium.googlesource.com/chromium/src/+/main/components/performance_manager/freezing/freezing_policy.cc, main branch, read 2026-11-06) lists the `CannotFreezeReason` values: kVisible, kRecentlyVisible, kAudible, kRecentlyAudible, kMostRecentlyUsed, kLoading, kOptedOut, kFreezingOriginTrialOptOut, kWebRTC, kNotificationPermission, kHoldingWebLock, kHoldingBlockingIndexedDBLock, kWebUI, device connections (USB, Bluetooth, HID, serial), capturing (video, audio, window, display), kBeingMirrored. **WebSocket is not in the list.** WebRTC is ("kWebRTC: the page uses WebRTC").
+Chromium's freezing policy (https://chromium.googlesource.com/chromium/src/+/main/components/performance_manager/freezing/freezing_policy.cc, main branch, read 2026-11-06) lists the `CannotFreezeReason` values: kVisible, kRecentlyVisible, kAudible, kRecentlyAudible, kMostRecentlyUsed, kLoading, kOptedOut, kFreezingOriginTrialOptOut, kWebRTC, kNotificationPermission, kHoldingWebLock, kHoldingBlockingIndexedDBLock, kWebUI, device connections (USB, Bluetooth, HID, serial), capturing (video, audio, window, display), kBeingMirrored. **WebSocket is not in the list.** WebRTC is (kWebRTC, set from `page_node->UsesWebRTC()`). The enum (`components/performance_manager/public/freezing/cannot_freeze_reason.h`) carries no per-value comments, only "List of reasons not to freeze a browsing instance."
 
 Related but different: the scheduler tracks `kWebSocket` as "WebSocket live connection" and `kWebRTC` as "WebRTC live connection" (https://chromium.googlesource.com/chromium/src/+/main/third_party/blink/common/scheduler/web_scheduler_tracked_feature.cc). That file is about back/forward cache eligibility, not tab freezing; the fetcher found no freezing comment in it.
 
-Timer throttling is a separate path: the Chrome 57 post says real-time connections are exempt from the budget throttling ("Applications with real-time connections (WebSockets and WebRTC), to avoid closing these connections by timeout"), "though timers still run once per second". That is the old budget throttle, not freezing. The Chrome 88 intensive throttling exemption is for WebRTC with an open `RTCDataChannel`, not WebSocket.
+Timer throttling is a separate path: the Chrome 57 post says real-time connections are exempt from the budget throttling ("Applications with real-time connections (WebSockets and WebRTC), to avoid closing these connections by timeout"), and adds "The run-timers-once-a-second rule is still applied in these cases." That is the old budget throttle, not freezing. The Chrome 88 intensive throttling exemption is for WebRTC with an open `RTCDataChannel`, not WebSocket.
 
 Message activity: no official doc says traffic on a WebSocket affects freezing. UNVERIFIED either way.
 
 ## 3. Held Web Lock
 
-- Chromium source: `kHoldingWebLock`: "the page holds a Web Lock" (freezing_policy.cc, link above). So a page holding a lock is not frozen by this policy.
+- Chromium source: `kHoldingWebLock` is set from `page_node->IsHoldingWebLock()` in `OnPageIsHoldingWebLockChanged` (freezing_policy.cc, link above), with no comment text. So a page holding a lock is not frozen by this policy.
 - The Web Locks spec (https://w3c.github.io/web-locks/, Editor's Draft 24 September 2025) does not mention freezing or the page lifecycle. It covers unload: "Whenever the unloading document cleanup steps run with a document, terminate remaining locks and requests with its agent." and "The lock will be released when the callback exits for any reason."
 - The Page Lifecycle draft only says in an example to "Release any web locks" on freeze and re-acquire on resume; it does not define lock behaviour.
-- Which context holds the lock matters (page vs worker): the source line says "the page holds"; whether a lock taken in a worker counts is not shown. UNVERIFIED.
+- Which context holds the lock matters (page vs worker): the accessor is on the page node (`IsHoldingWebLock`); whether a lock taken in a worker counts is not shown. UNVERIFIED.
 - The source is code on `main`, not a versioned doc. The Chrome version where `kHoldingWebLock` was added was not checked.
 
 ## 4. Screen wake lock
