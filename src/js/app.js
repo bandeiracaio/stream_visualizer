@@ -712,6 +712,7 @@ const rdOff = new Set(store.get("rdOff", []));
 for (const cb of $("rdDetectors").querySelectorAll("input[data-d]")) if (rdOff.has(cb.dataset.d)){ cb.checked = false; READER.setDetector(cb.dataset.d, false); }
 {
   const epf = store.get("epf", null); if (epf) for (const k of ["family","horizon"]) for (const v of epf[k] || []){ epFilter[k].add(v); const b = $("epChips").querySelector(`button[data-kind="${k}"][data-v="${v}"]`); if (b) b.classList.add("on"); }
+  { const m = +store.get("epMinAge", 0) || 0; if ([0,1000,3000].includes(m)){ epFilter.minWallMs = m; $("epMinAge").value = String(m); } }
   for (const f of store.get("epOff", [])){ const cb = $("epFamilies").querySelector(`input[data-f="${f}"]`); if (cb){ cb.checked = false; READER.setFamily(f, false); } }
 }
 $("rdDetectors").addEventListener("change", () => store.set("rdOff", [...$("rdDetectors").querySelectorAll("input[data-d]")].filter(c=>!c.checked).map(c=>c.dataset.d)));

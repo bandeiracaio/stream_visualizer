@@ -3,7 +3,7 @@
 // and the call to rdInit(); reader-tools.js, label-queue.js and collectors.js read epFilter / epOpen / epLast / rdView / RD at run time.
 // ---------- market reader: tab ----------
 const rdFilter = {family:new Set(), venue:new Set(), min:0};
-const epFilter = {family:new Set(), horizon:new Set()}, epOpen = new Set(), epLast = {};
+const epFilter = {family:new Set(), horizon:new Set(), minWallMs:0}, epOpen = new Set(), epLast = {};
 const rdView = {engine:null};                      // a replayed engine while viewing a recorded session, else null (live)
 const RD = () => rdView.engine || READER;
 const rdEsc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;");
@@ -12,6 +12,7 @@ function rdInit(){
   const chip = (kind,v) => `<button class="chip" data-kind="${kind}" data-v="${v}">${v}</button>`;
   $("rdChips").innerHTML = ["wall","book","burst","absorption","exhaustion","silence","leadlag","cluster"].map(f=>chip("family",f)).join("") + ["bn","hl"].map(v=>chip("venue",v)).join("");
   $("rdChips").onclick = e => { const b=e.target.closest("button"); if(!b)return; const set=rdFilter[b.dataset.kind]; set.has(b.dataset.v)?set.delete(b.dataset.v):set.add(b.dataset.v); b.classList.toggle("on",set.has(b.dataset.v)); renderReader(); };
+  $("epMinAge").onchange = () => { epFilter.minWallMs = +$("epMinAge").value; store.set("epMinAge", epFilter.minWallMs); renderReader(); };
   $("rdMin").oninput = () => { rdFilter.min=+$("rdMin").value; renderReader(); };
   $("rdSens").onchange = () => READER.setSensitivity(+$("rdSens").value);
   const ec = (kind,v) => `<button class="chip" data-kind="${kind}" data-v="${v}">${v}</button>`;
@@ -44,8 +45,10 @@ function epCard(ep, now, compact){
     + (compact ? "" : `<div class="epbar"><i style="width:${Math.round(ep.intensity*100)}%"></i></div>`)
     + `<div class="epread">${ep.stage==="ended" && ep.peakReading ? "At its peak: " + ep.peakReading : ep.reading}</div><div class="epmeta stat">${timing} · peak ${Math.round(ep.peak*100)}%</div>${epOpen.has(String(ep.id)) ? epEvidence(ep) + epMembers(ep) + (typeof epCtxBar==="function" ? epCtxBar(ep) : "") + (typeof epLabelBar==="function" ? epLabelBar(ep) : "") : ""}</div>`;
 }
+// Display only: a wall card is hidden until it has lasted minWallMs after detection (an ended one needs to have lasted that long). The Reader still detects and records every wall.
+const epShortWall = (e, now) => e.family==="wall" && epFilter.minWallMs > 0 && e.tDetected != null && ((e.tEnd != null ? e.tEnd : now) - e.tDetected) < epFilter.minWallMs;
 function renderEpisodes(s){
-  const keep = e => (!epFilter.family.size || epFilter.family.has(e.family)) && (!epFilter.horizon.size || (e.horizons||[e.horizon]).some(h=>epFilter.horizon.has(h)) || e.horizon==="book");
+  const keep = e => !epShortWall(e, s.now) && (!epFilter.family.size || epFilter.family.has(e.family)) && (!epFilter.horizon.size || (e.horizons||[e.horizon]).some(h=>epFilter.horizon.has(h)) || e.horizon==="book");
   const groups = RD().episodeGroups();
   const live = groups.filter(g=>g.stage!=="ended").concat(RD().formingEpisodes()).filter(keep).sort((a,b)=>(a.stage==="forming")-(b.stage==="forming") || b.intensity-a.intensity);
   const done = groups.filter(g=>g.stage==="ended" && keep(g)).slice(-40).reverse();
