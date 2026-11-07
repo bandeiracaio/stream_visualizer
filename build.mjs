@@ -12,9 +12,9 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 const src = p => path.join(root, "src", p);
 const read = p => fs.readFileSync(src(p), "utf8");
 
-function selfTest() {
-  const code = read("js/reader-drift.js") + "\n" + read("js/reader-proposals.js") + "\n" + read("js/reader-register.js") + "\n" + read("js/reader-episodes.js") + "\n" + read("js/reader-engine.js") + "\n" + read("js/reader-review.js") + "\n" + read("js/reader-landscape.js") + "\n" + read("js/auto-record-core.js") + "\n" + read("js/status-core.js") + "\n" + read("js/session-quality.js") + "\n" + read("js/history-core.js") + "\n" + read("js/collectors-core.js") + "\n" + read("js/label-queue-core.js") + "\n" + read("js/disk-core.js") + "\n" + read("js/futures-core.js") + "\n" + read("js/paper-broker-core.js") + "\n" + read("js/micro-core.js") + "\n" + read("js/scoreboard-core.js") + "\n" + read("js/overnight-core.js") + "\n" + read("js/liq-core.js") + "\n" + read("js/arm-memory-core.js") + "\n" + read("js/hooks.js") + "\n" + read("js/views.js") + "\n" +read("js/reader-selftest.js") + "\n;READER_SELFTEST.run(READER_ENGINE).concat(FUTSTACK.selftest(), PAPER.selftest(), SCOREBOARD.selftest(), OVERNIGHT.selftest(), LIQ.selftest(), MICRO.selftest(), ARMMEM.selftest());";
-  const results = vm.runInNewContext(code, {}, { timeout: 120000 });
+async function selfTest() {
+  const code = read("js/reader-drift.js") + "\n" + read("js/reader-proposals.js") + "\n" + read("js/reader-register.js") + "\n" + read("js/reader-episodes.js") + "\n" + read("js/reader-engine.js") + "\n" + read("js/reader-review.js") + "\n" + read("js/reader-landscape.js") + "\n" + read("js/auto-record-core.js") + "\n" + read("js/status-core.js") + "\n" + read("js/session-quality.js") + "\n" + read("js/history-core.js") + "\n" + read("js/collectors-core.js") + "\n" + read("js/label-queue-core.js") + "\n" + read("js/disk-core.js") + "\n" + read("js/futures-core.js") + "\n" + read("js/paper-broker-core.js") + "\n" + read("js/broker.js") + "\n" + read("js/micro-core.js") + "\n" + read("js/scoreboard-core.js") + "\n" + read("js/overnight-core.js") + "\n" + read("js/liq-core.js") + "\n" + read("js/arm-memory-core.js") + "\n" + read("js/hooks.js") + "\n" + read("js/views.js") + "\n" +read("js/reader-selftest.js") + "\n;BROKER.selftest().then(bk => READER_SELFTEST.run(READER_ENGINE).concat(FUTSTACK.selftest(), PAPER.selftest(), SCOREBOARD.selftest(), OVERNIGHT.selftest(), LIQ.selftest(), MICRO.selftest(), ARMMEM.selftest(), bk));";
+  const results = await vm.runInNewContext(code, {}, { timeout: 120000 });
   const bad = results.filter(r => !r.ok);
   for (const r of results) console.log((r.ok ? "  pass  " : "  FAIL  ") + r.name + (r.ok ? "" : "\n        " + r.detail));
   if (bad.length) { console.error(`\n${bad.length}/${results.length} self-test scenarios failed; build aborted.`); process.exit(1); }
@@ -46,7 +46,7 @@ function nextRelease() {
 
 const args = process.argv.slice(2);
 if (args.includes("--out") && !args[args.indexOf("--out") + 1]) { console.error("--out needs a file path"); process.exit(1); }
-selfTest();
+await selfTest();
 const out = args.includes("--out") ? path.resolve(args[args.indexOf("--out") + 1])
           : args.includes("--release") ? nextRelease()
           : path.join(root, "dist", "stream-visualizer.html");

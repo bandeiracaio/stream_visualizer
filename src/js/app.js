@@ -555,22 +555,14 @@ function simPlace(o){
 function simOnTrade(t){ if (SIM) PAPER.onTrade(SIM, simCtx(), t); }
 function simSnapshot(){ return PAPER.snapshot(SIM, simCtx()); }
 
-// ---- Binance (demo / live) broker ----
-async function bnRefresh(){
-  const sym = accSym();
-  const [bal, pos, ords, fills] = await Promise.all([
-    bnSigned("GET","/fapi/v2/balance"), bnSigned("GET","/fapi/v2/positionRisk",{symbol:sym}),
-    bnSigned("GET","/fapi/v1/openOrders",{symbol:sym}), bnSigned("GET","/fapi/v1/userTrades",{symbol:sym, limit:"30"})]);
-  if (![bal, pos, ords, fills].every(Array.isArray)) throw new Error("unexpected response from Binance (check the keys and that USD-M futures is enabled)");
-  const u = bal.find(b=>b.asset==="USDT") || {};
-  ACC.data = {balance:{wallet:+u.balance, available:+u.availableBalance, upnl:+u.crossUnPnl},
-    positions: pos.filter(p=>+p.positionAmt!==0).map(p=>({symbol:p.symbol, qty:+p.positionAmt, entry:+p.entryPrice, mark:+p.markPrice, upnl:+p.unRealizedProfit, liq:+p.liquidationPrice||null, lev:p.leverage})),
-    orders: ords.map(o=>({id:o.orderId, side:o.side, type:o.type, qty:+o.origQty, filled:+o.executedQty, price:+o.price, reduce:o.reduceOnly, t:o.time})),
-    fills: fills.slice().reverse().map(f=>({t:f.time, side:f.side, qty:+f.qty, price:+f.price, fee:+f.commission, pnl:+f.realizedPnl}))};
-}
+// ---- the broker seam: broker.js holds the two adapters; validation and the live confirm stay in placeOrder below ----
+const SIMB = BROKER.sim({getSim:()=>SIM, sym:accSym, place:simPlace, logEnd:simLogEnd, snapshot:simSnapshot});
+const BNB = BROKER.binance({signed:bnSigned, sym:accSym});   // demo and live
+const broker = () => ACC.mode==="sim" ? SIMB : BNB;
+async function bnRefresh(){ ACC.data = await BNB.snapshot(); }
 async function accRefresh(){
   if (!ACC.mode) return;
-  if (ACC.mode==="sim"){ ACC.data = simSnapshot(); return; }
+  if (ACC.mode==="sim"){ ACC.data = SIMB.snapshot(); return; }
   try{ await bnRefresh(); ACC.status = ""; }catch(e){ ACC.status = e.message; }
 }
 setInterval(()=>{ if (ACC.mode && ACC.mode!=="sim") accRefresh(); }, 3000);
@@ -585,25 +577,15 @@ async function placeOrder(o){
   if (!o.reduce && f.minNotional && notional < f.minNotional) throw new Error(`order value $${notional.toFixed(2)} is below Binance's $${f.minNotional} minimum`);
   if (ACC.mode==="live" && notional > ACC.maxUsd) throw new Error(`order value $${notional.toFixed(0)} is above your $${ACC.maxUsd} live cap`);
   if (ACC.mode==="live" && !confirm(`REAL-MONEY ORDER on Binance\n\n${o.side} ${q} ${accSym()} · ${o.type}${o.type==="LIMIT" ? " @ "+price : ""}\n≈ $${notional.toFixed(2)}${o.reduce ? "\nreduce-only" : ""}\n\nSend this order?`)) throw new Error("cancelled");
-  let res;
-  if (ACC.mode==="sim") res = simPlace({...o, qty:q, price});
-  else {
-    const prm = {symbol:accSym(), side:o.side, type:o.type, quantity:roundStep(q, f.step)};
-    if (o.type==="LIMIT"){ prm.price = roundTick(price, f.tick); prm.timeInForce = "GTC"; }
-    if (o.reduce) prm.reduceOnly = "true";
-    const r = await bnSigned("POST","/fapi/v1/order", prm);
-    res = {msg:`order ${r.orderId} ${r.status}`};
-  }
+  const res = await broker().place({...o, qty:q, price, qtyStr:roundStep(q, f.step), priceStr:o.type==="LIMIT" ? roundTick(price, f.tick) : undefined});
   accRefresh(); refreshSoon(); return res;
 }
 async function cancelOrder(id){
-  if (ACC.mode==="sim"){ if (SIM.orders.some(o=>o.id===id)) simLogEnd(id, "CANCELED"); SIM.orders = SIM.orders.filter(o=>o.id!==id); }
-  else await bnSigned("DELETE","/fapi/v1/order",{symbol:accSym(), orderId:String(id)});
+  await broker().cancel(id);
   accRefresh(); refreshSoon();
 }
 async function cancelAll(){
-  if (ACC.mode==="sim"){ SIM.orders.filter(o=>o.symbol===accSym()).forEach(o=>simLogEnd(o.id, "CANCELED")); SIM.orders = SIM.orders.filter(o=>o.symbol!==accSym()); }   // same scope as live: this asset only
-  else await bnSigned("DELETE","/fapi/v1/allOpenOrders",{symbol:accSym()});
+  await broker().cancelAll();   // this asset only, in both adapters
   accRefresh(); refreshSoon();
 }
 
