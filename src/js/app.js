@@ -67,16 +67,15 @@ async function syncClock(){
 
 // ---------- market + analytics state ----------
 const M = {};
-function resetMarket(){ Object.assign(M, {bnMark:null,bnIndex:null,bnFund:null,bnNextFund:null,bnOI:null,bnBid:null,bnAsk:null,
-  hlMark:null,hlOracle:null,hlFund:null,hlOI:null,hlVol:null,hlBid:null,hlAsk:null,liqs:0,liqUsd:0}); }
+function resetMarket(){ Object.assign(M, MARKET.freshQuotes()); }
 resetMarket();
 let hlBook = null, hlBookT = 0;
-const KEEP = 300000;                 // 5 min of history for charts
+const KEEP = MARKET.KEEP;            // 5 min of history for charts (market-core.js)
 let trades = [];                     // {t, v, side, px, q, ntl, liq, bf, users}
-let cvd = {bn:0, hl:0}, cvdHist = []; // sampled every 500ms
+let cvd = MARKET.freshCvd(), cvdHist = []; // sampled every 500ms
 let midHist = [];                    // sampled every 250ms
 const logLines = [];
-const health = {bnReconnects:0, hlReconnects:0, hlReplays:0};
+const health = MARKET.freshHealth();
 let dirty = false;
 
 function record(id, raw, evtTime, payload, opts={}){
@@ -96,25 +95,23 @@ function record(id, raw, evtTime, payload, opts={}){
 }
 function addTrade(t){
   if (!t.bf) rdSafe(() => READER.onTrade(t));
-  if (t.mid == null){ const b = t.v==="bn" ? M.bnBid : M.hlBid, a = t.v==="bn" ? M.bnAsk : M.hlAsk; if (b && a) t.mid = (b+a)/2; }
+  MARKET.stampMid(t, M);
   trades.push(t);
   if (ACC.mode==="sim" && t.v==="bn" && !t.liq) simOnTrade(t);
-  if (!t.liq && !t.bf) cvd[t.v] += t.side==="buy" ? t.ntl : -t.ntl; // liquidations already appear as trades
+  MARKET.bumpCvd(cvd, t);
 }
 
 // ---------- sampling for charts ----------
 setInterval(()=>{
   if (!connected) return;
-  const t = nowEx();
-  const bnMid = M.bnBid&&M.bnAsk ? (M.bnBid+M.bnAsk)/2 : null;
-  const hlMid = M.hlBid&&M.hlAsk ? (M.hlBid+M.hlAsk)/2 : null;
-  if (bnMid||hlMid) midHist.push({t, bn:bnMid, hl:hlMid});
-}, 250);
-setInterval(()=>{ if (connected) cvdHist.push({t:nowEx(), bn:cvd.bn, hl:cvd.hl}); }, 500);
+  const row = MARKET.midRow(M, nowEx());
+  if (row) midHist.push(row);
+}, MARKET.MID_MS);
+setInterval(()=>{ if (connected) cvdHist.push(MARKET.cvdRow(cvd, nowEx())); }, MARKET.CVD_MS);
 function prune(){
   const cut = nowEx() - KEEP;
   const drop = (a) => { let i=0; while (i<a.length && a[i].t<cut) i++; return i ? a.slice(i) : a; };
-  trades.sort((a,b)=>a.t-b.t); trades = drop(trades); midHist = drop(midHist); cvdHist = drop(cvdHist); MI.hist = drop(MI.hist); MI.heatBn = drop(MI.heatBn); MI.heatHl = drop(MI.heatHl);
+  ({trades, midHist, cvdHist} = MARKET.prune(nowEx(), trades, midHist, cvdHist)); MI.hist = drop(MI.hist); MI.heatBn = drop(MI.heatBn); MI.heatHl = drop(MI.heatHl);
 }
 
 // ---------- canvas helpers ----------
@@ -674,8 +671,8 @@ $("go").onclick = () => {
   }
   connected = true; connectedAt = Date.now();
   for (const id in S) Object.assign(S[id], freshStats());
-  trades=[]; cvd={bn:0,hl:0}; cvdHist=[]; midHist=[]; resetMicro(); logLines.length=0; hlBook=null; bnBook=null;
-  resetMarket(); Object.assign(health, {bnReconnects:0, hlReconnects:0, hlReplays:0});
+  trades=[]; cvd=MARKET.freshCvd(); cvdHist=[]; midHist=[]; resetMicro(); logLines.length=0; hlBook=null; bnBook=null;
+  resetMarket(); Object.assign(health, MARKET.freshHealth());
   READER.reset(); rdLastBook.bn = rdLastBook.hl = 0;
   syncClock(); clockTimer = setInterval(syncClock, 60000);
   bnConnect(); hlConnect(); rdStartHeartbeat();
@@ -688,7 +685,7 @@ $("bnSrc").onchange = () => {
   trades = trades.filter(t => t.v!=="bn" || t.liq);   // avoid mixing sources in the history
   cvd.bn = 0; cvdHist = [];
 };
-$("sym").onchange = () => { if (connected){ resetMicro(); trades=[]; midHist=[]; cvdHist=[]; cvd={bn:0,hl:0}; resetMarket(); READER.reset(); rdLastBook.bn = rdLastBook.hl = 0; hlBook=null; bnConnect(); hlConnect(); } };
+$("sym").onchange = () => { if (connected){ resetMicro(); trades=[]; midHist=[]; cvdHist=[]; cvd=MARKET.freshCvd(); resetMarket(); READER.reset(); rdLastBook.bn = rdLastBook.hl = 0; hlBook=null; bnConnect(); hlConnect(); } };
 $("logFilter").onchange = renderLog;
 $("clearLog").onclick = () => { logLines.length=0; renderLog(); };
 $("minNtl").oninput = renderTape;
