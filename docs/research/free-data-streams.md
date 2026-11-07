@@ -2,6 +2,8 @@
 
 Research done 2026-11-05 (brainstorm, nothing built). Some official doc sites (new Binance docs, OKX, Coinbase) did not load for the fetcher, so a few points are second-hand; those are marked *(second-hand)* or *(unverified)*. Check the official page before building on any of them.
 
+Update 2026-11-06: Bybit `allLiquidation` and Bybit/OKX open interest are already collected by the `perpFlow` collector (v122, `.scratch/perp-flow/spec.md`; records `liqPerp` and `oiPerp`, fast collector, only while recording or armed). Binance's `liq` record still comes from `@forceOrder` and undercounts cascades.
+
 Related: our own count of how much data each venue has in the saved sessions (98 hours, 166 sessions, BTC, 18 Oct to 5 Nov 2026): Hyperliquid has about 10% of Binance's trade count and about 26% of its traded notional; Hyperliquid trades are about 3x larger (median $466 against $156) and all carry wallet addresses; Binance has 5,827 liquidation-flagged trades ($394M), Hyperliquid none. 158 of the 166 sessions are auto-recordings, so they lean toward volatile stretches.
 
 ## Best free source for each kind of data
