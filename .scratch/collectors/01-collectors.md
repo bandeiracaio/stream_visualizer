@@ -21,7 +21,7 @@ is missing when a recording is analysed afterwards.
   proves that adding collectors leaves every detection byte-identical.
 - **Raw or summarized:** slow collectors store each raw sample (at most one record per poll or message); fast ones store a once-a-second
   summary while recording. The existing raw book stream is unchanged.
-- **Where they run:** in the same Web Worker as the auto-record price feed, so they survive a hidden tab. REST polling no more often than every
+- **Where they run:** in the same Web Worker as the auto-record price feed, so a hidden tab slows them less (a frozen tab still stops them; see "Frozen page" under v055). REST polling no more often than every
   15 s. A collector that errors or is rate-limited only logs to the Health log and can never affect auto-record or a recording.
 - **Judging them:** a monthly check of coverage, variance and whether a collector leads the next 5 minutes of volatility or movement. Drop the
   ones that show nothing.
@@ -65,7 +65,7 @@ All answer 200 with `Access-Control-Allow-Origin: *`, so the page and the worker
 - **Records** (all `["c", name, t, payload]`): `bnDerivs` every 15 s (premium index + open interest, either part `null` if it failed), `hlCtx` every 15 s (Hyperliquid funding, open interest, premium, oracle, mark, mid), `ratios` every 60 s but only when a new 5 minute point arrived (account long-short, top-trader position long-short, taker buy/sell), `basis` every 10 s (mark, index, funding, next funding, basis in bps, from the `@markPrice@1s` stream), `liq` one per liquidation (from `@forceOrder`). About 3.7 MB a day measured live (70 s run: 2965 bytes, before any liquidation).
 - **Failure isolation:** one failing source logs `collector error` to the Health log at most once per 5 minutes and the others carry on; HTTP 429 / 418 rests that source for 5 minutes.
 - **Stream:** one socket `wss://fstream.binance.com/market/stream?streams=<sym>usdt@markPrice@1s/<sym>usdt@forceOrder`, reopened after 5 s, closed and reopened after 15 s of silence.
-- **Frozen page:** the worker keeps running, but the tape is written by the page, so records posted while the page is frozen are written when it thaws (they carry their own time).
+- **Frozen page (corrected 2026-11-06, `docs/research/chrome-hidden-tab-worker-freezing.md`):** a dedicated worker whose page is frozen is blocked with it (Page Lifecycle draft 5.1), so its timers and sockets stop too; the worker is no protection against freezing. What protects is the page's Web Lock `sv-armed` (a freeze blocker in Chromium's `freezing_policy.cc`; checked 2026-11-06: the page takes it, in `arKeepAlive()` at `auto-record.js:59`, not a worker, and only while armed, so a hand-made recording with auto-record not armed has no freeze protection). Hidden but not frozen: whether worker timers are throttled is undocumented. If a frozen page thaws, the silence watchdogs may close every socket at once. (Earlier text here said the worker keeps running and posted records are written at thaw; that was an assumption.)
 
 ## Built in v056 (collector G, calendar tags: rules only)
 - Decision (user, 2026-10-23): rule-based tags only. Scheduled macro releases (CPI, FOMC, jobs) follow no rule and are not collected; they need a hand-kept list or a calendar source, left for later.

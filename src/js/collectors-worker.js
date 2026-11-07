@@ -1,5 +1,5 @@
 // Always-on collectors, run in a Web Worker (the page puts collectors-core.js before this file and starts it from collectors.js, whether or not
-// auto-record is armed). Why a worker: its timers and sockets are not slowed with a hidden tab. It reads public endpoints only (no keys),
+// auto-record is armed). Why a worker: it keeps the page's heavy work off the page thread; whether a worker's timers are throttled while its page is hidden is undocumented, and a FROZEN page blocks its dedicated workers too (only the page's Web Lock prevents freezing). It reads public endpoints only (no keys),
 // posts {t:"col", rec} for each record and {t:"note", k, d} for the Health log, and never touches anything else. An error or a rate limit
 // stops only the source concerned. Collector "derivs": Binance premium index + open interest (15 s), Hyperliquid funding / open interest
 // (15 s), long-short and taker ratios (60 s), and from one stream the basis (10 s) and every liquidation. Collector "calendar": a record at every

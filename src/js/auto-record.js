@@ -37,7 +37,7 @@ function arOpen() {
   ws.onclose = () => { if (AR.on && gen === AR.gen) AR.drops = AR.drops.concat({at:Date.now(), upMs:Date.now() - opened, silentMs:Date.now() - AR.lastMsg}).slice(-20);      // kept so a pattern in the drops can be read afterwards
     if (AR.on && gen === AR.gen) setTimeout(() => { if (AR.on && gen === AR.gen) arOpen(); }, 5000); };
 }
-// The price feed in a Web Worker (auto-record-worker.js): its socket and timers are not slowed or frozen with a hidden tab the way the page's are.
+// The price feed in a Web Worker (auto-record-worker.js): its socket and timers may be slowed less than the page's in a hidden tab (undocumented), but a frozen page blocks its worker too.
 // Falls back to the page's own socket (arOpen) when workers are unavailable.
 function arStartFeed() {
   let w;
