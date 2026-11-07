@@ -75,7 +75,7 @@
     }
     FUTSTACK.setOi(st, "bn", M.bnOI); FUTSTACK.setOi(st, "hl", M.hlOI); FUTSTACK.stamp(st, now); FUTSTACK.prune(st, KEEP, now);
     for (const v of ["bn", "hl"]) {
-      const src = v === "bn" ? heatBn : heatHl, last = src[src.length - 1], list = heats[v];
+      const src = v === "bn" ? MI.heatBn : MI.heatHl, last = src[src.length - 1], list = heats[v];
       if (last && last.t - lastHeat[v] >= 4900) { list.push(last); lastHeat[v] = last.t; }
       while (list.length && list[0].t < now - KEEP) list.shift();
     }
