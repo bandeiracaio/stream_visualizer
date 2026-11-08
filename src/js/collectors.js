@@ -70,7 +70,9 @@ function colWorkerSync() {
 cl$("sym").addEventListener("change", colWorkerSync);
 // tell the worker when the extra venues should be listened to: while a recording is on, and while auto-record is armed (so an auto-recording has the lead-in)
 const colWatching = () => !!RT.rec || (typeof AR !== "undefined" && !!AR.on);
-setInterval(() => { const on = colWatching(), rec = !!RT.rec; if (CL.worker && (CL.recSent !== on || CL.recNow !== rec)) { CL.recSent = on; CL.recNow = rec; CL.worker.postMessage({t:"rec", on, recording:rec}); } }, 1000);
+// colRelay is called the moment a recording starts or stops, because the 1 s timer below runs only once a minute in a hidden tab: the worker's book collectors started up to 60 s after the recording (a "holes" book in 11 of 20 overnight files, v129)
+function colRelay() { const on = colWatching(), rec = !!RT.rec; if (CL.worker && (CL.recSent !== on || CL.recNow !== rec)) { CL.recSent = on; CL.recNow = rec; CL.worker.postMessage({t:"rec", on, recording:rec}); } }
+setInterval(colRelay, 1000);
 
 // ---- book depth summaries (fast collector "book"): moved into the worker (collectors-worker.js), which keeps its own Binance and Hyperliquid books while a recording is on, so a hidden
 // tab cannot starve it. The page only tells the worker when a recording starts and stops (colWorkerSync, `recording`); nothing here watches the page's books any more.

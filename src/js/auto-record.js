@@ -114,7 +114,7 @@ function arStart(why, v) {
   RT.recLimit = {ms:(AR.cfg.maxMin + 2)*60000, n:2000000};
   if (!RT.rec){      // adopt the rolling lead-in as the recording (the engine has been recording since the arming); startedAt is the trigger, the inputs begin earlier
     if (!READER.recording().on) READER.startRecording({quoteMs:100});
-    RT.rec = {t0:Date.now(), sym:ar$("sym").value.trim().toUpperCase(), baseline:READER.register.snapshot()}; AR.roll = false;
+    RT.rec = {t0:Date.now(), sym:ar$("sym").value.trim().toUpperCase(), baseline:READER.register.snapshot()}; AR.roll = false; if (typeof colRelay === "function") colRelay();      // tell the worker now: a hidden tab's timer would be a minute late
     ar$("rtRec").textContent = "Stop recording"; RT.recTimer = setInterval(rtRecTick, 1000); rtRecTick();
   }
   arMsg(`Recording since ${new Date().toLocaleTimeString()}: ${why === "collectors" ? `the collectors read ${AR.ep.colWhy.join(" and ")} (volatility is x${v.ratio.toFixed(2)} of the hour).` : why === "episode" ? `the Reader sees ${AR.ep.fams.join(", ")} (volatility is x${v.ratio.toFixed(2)} of the hour).` : `the last 5 minutes are x${v.ratio.toFixed(2)} of the hour (sigma ${v.fast.toFixed(2)}).`} It stops after ${AR.cfg.calmMin} calm minutes or ${AR.cfg.maxMin} minutes in all.`);

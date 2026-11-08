@@ -46,7 +46,7 @@ function rtRecTick(){
   const lim = RT.recLimit || {n:600000, ms:1800000}; if (r.n > lim.n || ms > lim.ms) rtRecStop();
 }
 function rtRecStop(){
-  clearInterval(RT.recTimer); const inputs = READER.stopRecording(), meta = RT.rec; RT.rec = null; RT.recLimit = null;
+  clearInterval(RT.recTimer); const inputs = READER.stopRecording(), meta = RT.rec; RT.rec = null; RT.recLimit = null; if (typeof colRelay === "function") colRelay();
   rt$("rtRec").textContent = "Record"; rt$("rtStat").textContent = "not recording";
   rtSetSession({inputs, sym:meta.sym, startedAt:meta.t0, baseline:meta.baseline});
 }
@@ -54,7 +54,7 @@ rt$("rtRec").onclick = () => {
   if (RT.rec) return rtRecStop();
   if (!connected){ rtMsg("Connect first, then record."); return; }
   READER.startRecording({quoteMs:100});       // quotes are decimated to one per 100 ms per venue; the live engine still sees every one
-  RT.rec = {t0:Date.now(), sym:rt$("sym").value.trim().toUpperCase(), baseline:READER.register.snapshot()};
+  RT.rec = {t0:Date.now(), sym:rt$("sym").value.trim().toUpperCase(), baseline:READER.register.snapshot()}; if (typeof colRelay === "function") colRelay();
   rt$("rtRec").textContent = "Stop recording"; RT.recTimer = setInterval(rtRecTick, 1000); rtRecTick();
   rtMsg("Recording the raw inputs. It stops by itself after 30 minutes. The engine needs 2 minutes of data before it can detect anything, so record at least 3.");
 };
