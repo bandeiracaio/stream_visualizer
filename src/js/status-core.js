@@ -29,12 +29,12 @@ const STATUS = (() => {
     }
     const f = i.folder;
     if (f && (a.on || (i.rec && i.rec.on))) {      // only while something is going to be saved: a lost folder means the file is downloaded instead, away from where the analysis looks
-      if (f.state === "denied") out.push({id:"folder", text:"save folder needs OK", tone:"bad", title:"The browser took back write access to the save folder (usually after the page reloaded). Recordings are downloaded instead until you press Allow (Recordings, Saved)."});
-      else if (f.state === "failed") out.push({id:"folder", text:"last save failed", tone:"bad", title:"The last write into the save folder failed (" + (f.err || "unknown error") + "); that recording was downloaded instead (Recordings, Saved)."});
-      else if (f.state === "none") out.push({id:"folder", text:"no save folder", tone:"info", title:"No save folder is chosen: recordings are downloaded (Recordings, Saved, Choose folder)."});
+      if (f.state === "denied") out.push({id:"folder", text:"save folder needs OK", tone:"bad", title:"The browser took back write access to the save folder (usually after the page reloaded). Recordings are downloaded instead until you press Allow (Recordings, Saved recordings)."});
+      else if (f.state === "failed") out.push({id:"folder", text:"last save failed", tone:"bad", title:"The last write into the save folder failed (" + (f.err || "unknown error") + "); that recording was downloaded instead (Recordings, Saved recordings)."});
+      else if (f.state === "none") out.push({id:"folder", text:"no save folder", tone:"info", title:"No save folder is chosen: recordings are downloaded (Recordings, Saved recordings, Choose folder)."});
     }
     if (i.rec && i.rec.on && !(a.on && a.mode === "recording")) out.push({id:"rec", text:"REC " + dur(i.rec.ms) + " · " + (i.rec.n || 0).toLocaleString() + " inputs", tone:"bad", title:"A recording is running"});
-    if (i.kept > 0) out.push({id:"kept", text:i.kept + " saved", tone:"info", title:"Recordings kept on this device (Recordings, Saved)"});
+    if (i.kept > 0) out.push({id:"kept", text:i.kept + " saved", tone:"info", title:"Recordings kept on this device (Recordings, Saved recordings)"});
     return out;
   }
   const num = v => { const m = /^v(\d+)$/.exec(String(v || "")); return m ? +m[1] : null; };

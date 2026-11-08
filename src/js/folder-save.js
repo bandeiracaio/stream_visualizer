@@ -2,7 +2,7 @@
 // Save folder (view): on a browser with the File System Access API (desktop Chrome / Edge) the user picks one folder once and every session file
 // ("Save session" and auto-record) is written straight into it, with no download prompt. The folder handle is remembered in IndexedDB; after a
 // restart the browser may ask to allow it again (one click on "Allow"). Without a folder, or if a write fails, the file is downloaded as before.
-// The panel at the top of Recordings > Saved shows what was written this session. Read-only for the Reader: nothing here touches detections.
+// The panel at the top of Recordings > Saved recordings shows what was written this session. Read-only for the Reader: nothing here touches detections.
 // Loaded after recordings.js; reader-tools.js calls fsSave() when it saves a session.
 const FS = {dir:null, name:"", perm:"none", log:[], listing:null, supported:typeof window.showDirectoryPicker === "function", db:null};      // perm: none | granted | prompt | unsupported
 const fs$ = id => document.getElementById(id);
@@ -60,7 +60,7 @@ async function fsSave(name, blob) {
   const row = {name, size:blob.size, at:Date.now(), ok:false, err:""};
   FS.log.unshift(row); FS.log.length = Math.min(FS.log.length, 200);
   try {
-    if (FS.perm !== "granted") { await fsQuery(); if (FS.perm !== "granted") throw new Error("folder access needs your OK (open Recordings, Saved, Allow)"); }
+    if (FS.perm !== "granted") { await fsQuery(); if (FS.perm !== "granted") throw new Error("folder access needs your OK (open Recordings, Saved recordings, Allow)"); }
     const n = await fsFreeName(name), w = await (await FS.dir.getFileHandle(n, {create:true})).createWritable();
     try { await w.write(blob); } finally { await w.close(); }
     row.name = n; row.ok = true; FS.listing = null;

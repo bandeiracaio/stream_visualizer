@@ -28,7 +28,7 @@ function sbvFamily(fam, o, P) {
 }
 function sbvRender() {
   const out = sbv$("sbOut"), r = sbvSummary();
-  if (!r) { out.innerHTML = `<div class="note">${RC.rows.length ? "Press Compute to replay the saved recordings." : "No saved recordings yet (Recordings, Saved)."}</div>`; return; }
+  if (!r) { out.innerHTML = `<div class="note">${RC.rows.length ? "Press Compute to replay the saved recordings." : "No saved recordings yet (Recordings, Saved recordings)."}</div>`; return; }
   const P = r.plan, fams = Object.keys(r.families), rec = r.missed.perFamily;
   const recall = Object.keys(rec).map(f => { const x = rec[f]; return `<tr><td>${sbvName(f)}</td><td>${x.enough ? `<b>${sbvPct(x.recall)}</b> (95% ${sbvPct(x.ci[0])} to ${sbvPct(x.ci[1])})` : `too few (n ${x.real})`}</td><td>${x.agree}</td><td>${x.missed}</td><td>${x.caughtNow}</td></tr>`; }).join("");
   out.innerHTML = `<div class="headline">${r.groups} episode groups in ${r.sessions} recording${r.sessions === 1 ? "" : "s"}${r.sessions < RC.rows.length ? ` (of ${RC.rows.length} saved: press Compute for the rest)` : ""}</div>

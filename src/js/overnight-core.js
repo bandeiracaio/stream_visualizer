@@ -15,8 +15,8 @@ const OVERNIGHT = (() => {
     const f = env.folder;
     if (f && f.supported) {
       if (f.state === "ok") add("folder", "ok", `Save folder "${f.name || ""}" is allowed`);
-      else if (f.state === "none") add("folder", "warn", "No save folder chosen: recordings are downloaded, and a phone may block that when nobody is looking", "Recordings, Saved, Choose folder.");
-      else if (f.state === "denied") add("folder", "bad", `Save folder "${f.name || ""}" needs your OK again`, "Recordings, Saved, Allow (the browser takes the permission back after a reload).");
+      else if (f.state === "none") add("folder", "warn", "No save folder chosen: recordings are downloaded, and a phone may block that when nobody is looking", "Recordings, Saved recordings, Choose folder.");
+      else if (f.state === "denied") add("folder", "bad", `Save folder "${f.name || ""}" needs your OK again`, "Recordings, Saved recordings, Allow (the browser takes the permission back after a reload).");
       else add("folder", "bad", "The last save into the folder failed", "Check that the folder still exists and has room, then choose it again.");
     }
     const d = env.disk;

@@ -75,7 +75,7 @@ rt$("rtSave").onclick = async () => {
   const inFolder = typeof fsSave === "function" ? await fsSave(name, blob) : false;      // the chosen save folder (folder-save.js); if there is none, or it failed, download as before
   if (!inFolder) rtDownload(blob, name);
   const kept = typeof rcKeep === "function" ? await rcKeep(name, blob, {sym:s.sym, startedAt:s.startedAt, quality}) : false;      // a copy stays on the device (recordings.js)
-  rtMsg("Saved" + (SQ.clean(quality) ? "" : ` (${SQ.line(quality)})`) + (inFolder ? ` into the folder "${FS.name}".` : ".") + (kept ? " A copy is kept on this device (Recordings, Saved)." : "") + " Load it later (or on another device) with Load session.");
+  rtMsg("Saved" + (SQ.clean(quality) ? "" : ` (${SQ.line(quality)})`) + (inFolder ? ` into the folder "${FS.name}".` : ".") + (kept ? " A copy is kept on this device (Recordings, Saved recordings)." : "") + " Load it later (or on another device) with Load session.");
 };
 rt$("rtLoadBtn").onclick = () => rt$("rtLoad").click();
 async function rtReadSessionFile(f){

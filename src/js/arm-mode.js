@@ -37,8 +37,8 @@ function amAlerts(now, snap) {
   if (snap) for (const c of amTry(() => STATUS.chips(snap), [])) if ((c.tone === "bad" || c.tone === "warn") && !/^armed/.test(c.text)) out.push([c.tone, c.text.replace(/<[^>]+>/g, "") + (c.title ? " — " + c.title : "")]);
   if (AR.on && AR.drops && AR.drops.length) out.push(["warn", `The price stream dropped ${AR.drops.length}x, last at ${amClock(AR.drops[AR.drops.length - 1].at)}`]);
   if (typeof FS !== "undefined" && FS.supported) {
-    if (!FS.dir) out.push(["info", "No save folder chosen: recordings are downloaded (Recordings, Saved, Choose folder)"]);
-    else if (FS.perm !== "granted") out.push(["warn", `Save folder "${FS.name}" needs your OK again (Recordings, Saved, Allow): recordings are downloaded meanwhile`]);
+    if (!FS.dir) out.push(["info", "No save folder chosen: recordings are downloaded (Recordings, Saved recordings, Choose folder)"]);
+    else if (FS.perm !== "granted") out.push(["warn", `Save folder "${FS.name}" needs your OK again (Recordings, Saved recordings, Allow): recordings are downloaded meanwhile`]);
     else if (FS.log.length && !FS.log[0].ok) out.push(["bad", `The last save into the folder failed (${FS.log[0].err}); it was downloaded instead`]);
   }
   const dk = typeof DW !== "undefined" ? amTry(() => DW.assess(), null) : null;
