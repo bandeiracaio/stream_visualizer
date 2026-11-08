@@ -470,10 +470,7 @@ VIEWS.register({id:"replay", label:"Replay and labels", area:"review", slot:"rea
 VIEWS.register({id:"drift", label:"Drift", area:"review", slot:"reader"});
 VIEWS.register({id:"assumptions", label:"Assumptions", area:"review", slot:"reader"});
 VIEWS.register({id:"scoreboard", label:"Scoreboard", area:"review"});
-VIEWS.register({id:"record", label:"Record", area:"rec", slot:"reader"});
-VIEWS.register({id:"saved", label:"Saved", area:"rec", slot:"reader"});
-VIEWS.register({id:"healthlog", label:"Health log", area:"rec", slot:"reader"});
-VIEWS.register({id:"collectors", label:"Collectors", area:"rec", slot:"reader"});
+VIEWS.register({id:"record", label:"Recordings", area:"rec", slot:"reader"});   // Record, Saved, Health log and Collectors are blocks of this one view
 VIEWS.register({id:"trading", label:"Trading", area:"trade", minIntervalMs:400, render:()=>renderTrading()});
 VIEWS.register({id:"history", label:"History", area:"trade"});
 VIEWS.register({id:"streams", label:"Streams", area:"system"});
