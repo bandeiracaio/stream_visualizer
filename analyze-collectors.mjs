@@ -11,6 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
 import zlib from "node:zlib";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -18,11 +19,13 @@ const COLLECT = vm.runInNewContext(fs.readFileSync(path.join(root, "src/js/colle
 const MIN = 60000;
 
 // ---------- reading files
-export function readInput(file) {
+export function readInput(file, light = false) {      // light: a session's `inputs` (the bulk of the file) is not kept or scanned; --merge does not use it
   let buf = fs.readFileSync(file);
   if (buf[0] === 0x1f && buf[1] === 0x8b) buf = zlib.gunzipSync(buf);
   const j = JSON.parse(buf.toString("utf8"));
+  buf = null;
   if (j.kind === "sv-tape") return { file, kind:"tape", version:j.version, records:(j.records || []).filter(COLLECT.isRec), t0:null, t1:null };
+  if (j.kind === "sv-session" && light) return { file, kind:"session", sym:j.sym, auto:!!j.pre, records:(j.ext || []).filter(COLLECT.isRec), t0:j.startedAt, t1:null, quality:j.quality || null, inputs:[] };
   if (j.kind === "sv-session") {
     const recs = (j.ext || []).filter(COLLECT.isRec), times = (j.inputs || []).map(r => r[0] === "t" ? r[1] && r[1].t : r[2]).filter(Number.isFinite);
     let end = recs.length ? recs[recs.length - 1][2] : j.startedAt; if (times.length) { end = -Infinity; for (const t of times) if (t > end) end = t; }      // a loop: a long recording has more inputs than Math.max can take as arguments
@@ -38,6 +41,9 @@ function minutesWith(times, a, b) { const set = new Set(); for (const t of times
 export function coverage(records, a, b) {
   const byName = {}, byOwner = {};
   for (const r of records) { (byName[r[1]] ||= []).push(r[2]); const o = COLLECT.ownerOf(r[1]); if (o) (byOwner[o] ||= []).push(r[2]); }
+  return coverageOf(byName, byOwner, a, b);
+}
+export function coverageOf(byName, byOwner, a, b) {      // the same from the per-name and per-owner record times (what the streamed --merge keeps instead of the records)
   const total = Math.max(1, Math.floor(b/MIN) - Math.floor(a/MIN) + 1);
   const sum = (times, expect) => {
     const t = times.filter(x => x >= a && x <= b).sort((x, y) => x - y), g = gapsOf(t), mx = g.length ? g.reduce((m, x) => x > m ? x : m, -Infinity) : null;
@@ -75,7 +81,24 @@ export function fieldStats(records) {
   }
   return out;
 }
-export const constantFields = (stats, minN = 20) => { const out = []; for (const name in stats) for (const k in stats[name]) { const s = stats[name][k]; if (s.n >= minN && s.distinct === 1) out.push(name + "." + k + " = " + s.min + " (" + s.n + " records)"); } return out; };
+// The same statistics, one record at a time (for the streamed --merge, which cannot hold every record). min / max / n are exact; sd is a running (Welford) value, equal to the
+// two-pass one to the 4 digits shown; `distinct` is exact up to DISTINCT_CAP values and then stops counting (distinctCapped), which cannot change the "never changes" check (distinct === 1).
+const DISTINCT_CAP = 2000;
+export function fieldAcc() {
+  const by = {};
+  return {
+    add(r) {
+      const o = {}; flatten(r[3], "", o, 0); const m = (by[r[1]] ||= {});
+      for (const k in o) { const v = o[k], s = (m[k] ||= { n:0, mean:0, m2:0, min:Infinity, max:-Infinity, set:new Set(), capped:false }); s.n++; const d = v - s.mean; s.mean += d/s.n; s.m2 += d*(v - s.mean); if (v < s.min) s.min = v; if (v > s.max) s.max = v; if (!s.capped) { s.set.add(v); if (s.set.size > DISTINCT_CAP) s.capped = true; } }
+    },
+    result() {
+      const out = {};
+      for (const name in by) { out[name] = {}; for (const k in by[name]) { const s = by[name][k]; out[name][k] = { n:s.n, distinct:s.set.size, min:s.min, max:s.max, sd:+Math.sqrt(s.m2/s.n).toPrecision(4), ...(s.capped ? { distinctCapped:true } : {}) }; } }
+      return out;
+    }
+  };
+}
+export const constantFields =(stats, minN = 20) => { const out = []; for (const name in stats) for (const k in stats[name]) { const s = stats[name][k]; if (s.n >= minN && s.distinct === 1) out.push(name + "." + k + " = " + s.min + " (" + s.n + " records)"); } return out; };
 
 // ---------- 4. evaluation: does a feature say something about the NEXT horizon of the Binance mark that the CURRENT volatility does not?
 // The plan is fixed here, in advance, and printed with every result. The questions it answers badly are listed in .scratch/collectors/01-collectors.md.
@@ -181,6 +204,26 @@ export function analyze(input, plan = PLAN) {
   const cov = recs.length ? coverage(recs, a, b) : null, st = recs.length ? fieldStats(recs) : {};
   return { file:input.file, kind:input.kind, window:{ from:a, to:b, minutes:cov ? cov.totalMinutes : 0 }, records:recs.length, coverage:cov, leadIn:input.t0 != null ? leadIn(recs, input.t0) : null, auto:!!input.auto, constants:constantFields(st), fields:st, evaluation:evaluate(recs, plan) };
 }
+// --merge without holding the files: one file at a time is read, its records are counted once (by a hash of the record; a collision is about 1 in 10^12 per pair), and only what the analysis needs is kept:
+// the full records of the collectors the features read, the times of every record (coverage) and the running field statistics. The result has the shape of analyze() on the merged records.
+const FEATURE_RECORDS = new Set(Object.values(FEATURES).map(f => f[0]));
+export function analyzeMerged(files, plan = PLAN, log = () => {}) {
+  const seen = new Set(), kept = [], byName = {}, byOwner = {}, acc = fieldAcc();
+  let total = 0, a = Infinity, b = -Infinity;
+  files.forEach((file, i) => {
+    const inp = readInput(file, true);
+    for (const r of inp.records) {
+      const key = createHash("sha1").update(JSON.stringify(r)).digest("base64").slice(0, 12);
+      if (seen.has(key)) continue; seen.add(key); total++;
+      const t = r[2]; if (t < a) a = t; if (t > b) b = t;
+      (byName[r[1]] ||= []).push(t); const o = COLLECT.ownerOf(r[1]); if (o) (byOwner[o] ||= []).push(t);
+      acc.add(r); if (FEATURE_RECORDS.has(r[1])) kept.push(r);
+    }
+    inp.records = null; log(i + 1, files.length, total, kept.length);
+  });
+  const cov = total ? coverageOf(byName, byOwner, a, b) : null, st = total ? acc.result() : {};
+  return { file:"(" + files.length + " files merged)", kind:"merged", window:{ from:a, to:b, minutes:cov ? cov.totalMinutes : 0 }, records:total, coverage:cov, leadIn:null, auto:false, constants:constantFields(st), fields:st, evaluation:evaluate(kept, plan) };
+}
 const fmt = x => x == null ? "-" : (x.rho >= 0 ? "+" : "") + x.rho.toFixed(2) + " (p " + (x.p < 0.001 ? "<.001" : x.p.toFixed(3)) + ")";
 function printEvaluation(ev) {
   const L = s => console.log(s), p = ev.plan;
@@ -206,7 +249,7 @@ function print(r, showFields) {
   }
   L("\n   FIELDS that never change: " + (r.constants.length ? "" : "none"));
   for (const c of r.constants) L("   " + c);
-  if (showFields) { L("\n   ALL FIELDS (n, distinct, min, max, sd)"); for (const n in r.fields) for (const k in r.fields[n]) { const s = r.fields[n][k]; L("   " + (n + "." + k).padEnd(40) + [s.n, s.distinct, s.min, s.max, s.sd].join("  ")); } }
+  if (showFields) { L("\n   ALL FIELDS (n, distinct, min, max, sd)"); for (const n in r.fields) for (const k in r.fields[n]) { const s = r.fields[n][k]; L("   " + (n + "." + k).padEnd(40) + [s.n, s.distinct + (s.distinctCapped ? "+" : ""), s.min, s.max, s.sd].join("  ")); } }
   printEvaluation(r.evaluation);
 }
 
@@ -269,13 +312,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const hi = args.indexOf("--horizon"), horizon = hi >= 0 ? +args[hi + 1] : PLAN.horizonSec, files = args.filter((x, i) => !x.startsWith("--") && !(hi >= 0 && i === hi + 1));
     if (!files.length) { console.error("usage: node analyze-collectors.mjs FILE... [--merge] [--horizon 300] [--fields] [--json]   |   --plan   |   --selftest"); process.exit(1); }
     const plan = Object.assign({}, PLAN, { horizonSec:horizon });
-    let inputs = files.map(readInput);
-    if (args.includes("--merge")) {      // one analysis over all files: tapes of consecutive days overlap, and a session's slice overlaps the tape, so identical records are counted once
-      const seen = new Set(), records = [];
-      for (const i of inputs) for (const r of i.records) { const k = JSON.stringify(r); if (!seen.has(k)) { seen.add(k); records.push(r); } }
-      inputs = [{ file:"(" + files.length + " files merged)", kind:"merged", records, t0:null, t1:null }];
-    }
-    const results = inputs.map(i => analyze(i, plan));
+    let results;
+    if (args.includes("--merge")) {      // one analysis over all files: tapes of consecutive days overlap, and a session's slice overlaps the tape, so identical records are counted once; streamed, one file at a time
+      results = [analyzeMerged(files, plan, (i, n, tot, kept) => { if (i % 10 === 0 || i === n) console.error("  merged " + i + "/" + n + " files, " + tot + " records, " + kept + " kept, heap " + Math.round(process.memoryUsage().heapUsed/1048576) + " MB"); })];
+    } else results = files.map(readInput).map(i => analyze(i, plan));
     if (args.includes("--json")) console.log(JSON.stringify(results, null, 1));
     else for (const r of results) print(r, args.includes("--fields"));
   }

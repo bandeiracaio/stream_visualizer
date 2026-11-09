@@ -1,0 +1,99 @@
+sessions analysed: 192 (187 with the venues collector); grid hours: 130.6
+
+A. LEAD INDEX  A = c(+1) - c(-1) of block returns, venue vs Binance perp. A > 0: venue moves first. Per session, then across sessions: median [q25, q75], share of sessions > 0, sign-flip p, bootstrap 95% CI of the median (n = sessions).
+
+-- regime: all
+Hyperliquid perp    1 s  -0.454 [-0.515,-0.394] pos 0 p 0.0001 CI(-0.463,-0.44) n=192
+Hyperliquid perp    5 s  -0.211 [-0.258,-0.17] pos 0.01 p 0.0001 CI(-0.223,-0.202) n=191
+Hyperliquid perp   30 s  -0.055 [-0.094,-0.028] pos 0.055 p 0.0001 CI(-0.069,-0.039) n=55
+Coinbase spot       1 s  -0.341 [-0.411,-0.268] pos 0.005 p 0.0001 CI(-0.357,-0.317) n=187
+Coinbase spot       5 s  -0.073 [-0.113,-0.019] pos 0.144 p 0.0001 CI(-0.088,-0.061) n=187
+Coinbase spot      30 s  -0.013 [-0.034,0.024] pos 0.364 p 0.0405 CI(-0.022,-0.003) n=55
+Binance spot        1 s  -0.432 [-0.49,-0.35] pos 0 p 0.0001 CI(-0.456,-0.408) n=187
+Binance spot        5 s  -0.249 [-0.334,-0.193] pos 0.016 p 0.0001 CI(-0.273,-0.233) n=187
+Binance spot       30 s  -0.065 [-0.093,-0.029] pos 0.055 p 0.0001 CI(-0.086,-0.047) n=55
+OKX spot            1 s  -0.447 [-0.511,-0.369] pos 0.005 p 0.0001 CI(-0.463,-0.426) n=187
+OKX spot            5 s  -0.19 [-0.268,-0.14] pos 0.011 p 0.0001 CI(-0.208,-0.175) n=187
+OKX spot           30 s  -0.031 [-0.054,-0.005] pos 0.182 p 0.0001 CI(-0.043,-0.016) n=55
+OKX perp            1 s  -0.427 [-0.49,-0.348] pos 0.016 p 0.0001 CI(-0.443,-0.409) n=187
+OKX perp            5 s  -0.136 [-0.196,-0.087] pos 0.021 p 0.0001 CI(-0.153,-0.118) n=187
+OKX perp           30 s  -0.027 [-0.045,-0.004] pos 0.218 p 0.0003 CI(-0.037,-0.019) n=55
+Bybit perp          1 s  -0.4 [-0.472,-0.305] pos 0 p 0.0001 CI(-0.415,-0.374) n=187
+Bybit perp          5 s  -0.101 [-0.181,-0.045] pos 0.091 p 0.0001 CI(-0.123,-0.087) n=187
+Bybit perp         30 s  -0.013 [-0.032,0.019] pos 0.364 p 0.0971 CI(-0.02,-0.002) n=55
+Bybit spot (last)   1 s  -0.434 [-0.496,-0.343] pos 0.011 p 0.0001 CI(-0.448,-0.417) n=187
+Bybit spot (last)   5 s  -0.161 [-0.218,-0.125] pos 0.016 p 0.0001 CI(-0.176,-0.154) n=187
+Bybit spot (last)  30 s  -0.031 [-0.059,-0.008] pos 0.182 p 0.0001 CI(-0.047,-0.018) n=55
+PLACEBO bn perp sampled like venues  1 s  -0.294 [-0.356,-0.246] pos 0 p 0.0001 CI(-0.307,-0.287) n=187
+PLACEBO bn perp sampled like venues  5 s  -0.061 [-0.084,-0.042] pos 0.016 p 0.0001 CI(-0.065,-0.056) n=187
+PLACEBO bn perp sampled like venues 30 s  -0.007 [-0.019,0.003] pos 0.309 p 0.0091 CI(-0.014,-0.001) n=55
+
+-- regime: vol
+Hyperliquid perp    1 s  -0.418 [-0.503,-0.333] pos 0.016 p 0.0001 CI(-0.443,-0.393) n=191
+Hyperliquid perp    5 s  -0.211 [-0.269,-0.138] pos 0.041 p 0.0001 CI(-0.227,-0.172) n=98
+Hyperliquid perp   30 s  n=0
+Coinbase spot       1 s  -0.309 [-0.418,-0.225] pos 0.032 p 0.0001 CI(-0.344,-0.29) n=187
+Coinbase spot       5 s  -0.065 [-0.143,-0.015] pos 0.176 p 0.0001 CI(-0.101,-0.047) n=91
+Coinbase spot      30 s  n=0
+Binance spot        1 s  -0.404 [-0.495,-0.277] pos 0.032 p 0.0001 CI(-0.432,-0.378) n=187
+Binance spot        5 s  -0.198 [-0.305,-0.134] pos 0.041 p 0.0001 CI(-0.233,-0.172) n=97
+Binance spot       30 s  n=0
+OKX spot            1 s  -0.415 [-0.501,-0.298] pos 0.032 p 0.0001 CI(-0.447,-0.386) n=187
+OKX spot            5 s  -0.172 [-0.257,-0.109] pos 0.031 p 0.0001 CI(-0.214,-0.136) n=97
+OKX spot           30 s  n=0
+OKX perp            1 s  -0.415 [-0.486,-0.307] pos 0.032 p 0.0001 CI(-0.428,-0.39) n=187
+OKX perp            5 s  -0.133 [-0.2,-0.07] pos 0.103 p 0.0001 CI(-0.158,-0.102) n=97
+OKX perp           30 s  n=0
+Bybit perp          1 s  -0.372 [-0.468,-0.26] pos 0.027 p 0.0001 CI(-0.395,-0.339) n=187
+Bybit perp          5 s  -0.09 [-0.168,-0.025] pos 0.165 p 0.0001 CI(-0.12,-0.065) n=97
+Bybit perp         30 s  n=0
+Bybit spot (last)   1 s  -0.418 [-0.496,-0.297] pos 0.032 p 0.0001 CI(-0.439,-0.391) n=187
+Bybit spot (last)   5 s  -0.142 [-0.232,-0.089] pos 0.063 p 0.0001 CI(-0.171,-0.118) n=96
+Bybit spot (last)  30 s  n=0
+PLACEBO bn perp sampled like venues  1 s  -0.277 [-0.343,-0.212] pos 0 p 0.0001 CI(-0.29,-0.265) n=187
+PLACEBO bn perp sampled like venues  5 s  -0.052 [-0.08,-0.019] pos 0.113 p 0.0001 CI(-0.057,-0.036) n=97
+PLACEBO bn perp sampled like venues 30 s  n=0
+
+-- regime: calm
+Hyperliquid perp    1 s  -0.393 [-0.488,-0.319] pos 0.005 p 0.0001 CI(-0.424,-0.379) n=191
+Hyperliquid perp    5 s  -0.197 [-0.256,-0.133] pos 0.098 p 0.0001 CI(-0.222,-0.177) n=92
+Hyperliquid perp   30 s  n=0
+Coinbase spot       1 s  -0.296 [-0.388,-0.187] pos 0.021 p 0.0001 CI(-0.32,-0.27) n=187
+Coinbase spot       5 s  -0.063 [-0.106,0.004] pos 0.259 p 0.0001 CI(-0.08,-0.027) n=85
+Coinbase spot      30 s  n=0
+Binance spot        1 s  -0.399 [-0.485,-0.25] pos 0.027 p 0.0001 CI(-0.426,-0.365) n=186
+Binance spot        5 s  -0.21 [-0.291,-0.128] pos 0.077 p 0.0001 CI(-0.256,-0.181) n=91
+Binance spot       30 s  n=0
+OKX spot            1 s  -0.413 [-0.497,-0.272] pos 0.016 p 0.0001 CI(-0.444,-0.375) n=186
+OKX spot            5 s  -0.162 [-0.208,-0.107] pos 0.066 p 0.0001 CI(-0.182,-0.142) n=91
+OKX spot           30 s  n=0
+OKX perp            1 s  -0.375 [-0.471,-0.285] pos 0.016 p 0.0001 CI(-0.393,-0.352) n=187
+OKX perp            5 s  -0.114 [-0.182,-0.036] pos 0.143 p 0.0001 CI(-0.136,-0.088) n=91
+OKX perp           30 s  n=0
+Bybit perp          1 s  -0.36 [-0.454,-0.254] pos 0 p 0.0001 CI(-0.391,-0.335) n=187
+Bybit perp          5 s  -0.084 [-0.152,-0.003] pos 0.231 p 0.0001 CI(-0.106,-0.051) n=91
+Bybit perp         30 s  n=0
+Bybit spot (last)   1 s  -0.378 [-0.469,-0.241] pos 0.021 p 0.0001 CI(-0.406,-0.341) n=187
+Bybit spot (last)   5 s  -0.144 [-0.21,-0.072] pos 0.088 p 0.0001 CI(-0.165,-0.126) n=91
+Bybit spot (last)  30 s  n=0
+PLACEBO bn perp sampled like venues  1 s  -0.256 [-0.343,-0.191] pos 0.005 p 0.0001 CI(-0.275,-0.243) n=187
+PLACEBO bn perp sampled like venues  5 s  -0.048 [-0.073,-0.019] pos 0.066 p 0.0001 CI(-0.054,-0.036) n=91
+PLACEBO bn perp sampled like venues 30 s  n=0
+
+B. GAP -> next Binance move, partial Spearman (controls: previous 60 s Binance move), per session then across sessions. 14 estimates: Bonferroni line p < 0.0036.
+Hyperliquid perp   H  60 s  -0.008 [-0.086,0.064] pos 0.447 p 0.3367 CI(-0.03,0.007) n=188
+Hyperliquid perp   H 300 s  -0.035 [-0.153,0.093] pos 0.436 p 0.0298 CI(-0.068,0.004) n=188
+Coinbase spot      H  60 s  +0.019 [-0.055,0.112] pos 0.548 p 0.0324 CI(-0.003,0.045) n=186
+Coinbase spot      H 300 s  +0.003 [-0.111,0.147] pos 0.511 p 0.8938 CI(-0.027,0.031) n=186
+Binance spot       H  60 s  -0.021 [-0.088,0.068] pos 0.446 p 0.0866 CI(-0.032,0.003) n=186
+Binance spot       H 300 s  -0.017 [-0.114,0.085] pos 0.468 p 0.4087 CI(-0.037,0.019) n=186
+OKX spot           H  60 s  +0.011 [-0.062,0.092] pos 0.527 p 0.2768 CI(-0.01,0.035) n=186
+OKX spot           H 300 s  +0.002 [-0.126,0.151] pos 0.505 p 0.8679 CI(-0.03,0.04) n=186
+OKX perp           H  60 s  +0.006 [-0.066,0.1] pos 0.532 p 0.5756 CI(-0.028,0.031) n=186
+OKX perp           H 300 s  +0.005 [-0.092,0.121] pos 0.522 p 0.7705 CI(-0.039,0.03) n=186
+Bybit perp         H  60 s  +0.005 [-0.078,0.082] pos 0.516 p 0.7274 CI(-0.02,0.024) n=186
+Bybit perp         H 300 s  -0.006 [-0.161,0.125] pos 0.484 p 0.7739 CI(-0.056,0.031) n=186
+Bybit spot (last)  H  60 s  -0.009 [-0.097,0.09] pos 0.457 p 0.3969 CI(-0.029,0.012) n=186
+Bybit spot (last)  H 300 s  -0.013 [-0.149,0.125] pos 0.441 p 0.1314 CI(-0.043,0.007) n=186
+PLACEBO bn perp sampled like venues H  60 s  -0.093 [-0.221,0.024] pos 0.29 p 0.0001 CI(-0.129,-0.064) n=186
+PLACEBO bn perp sampled like venues H 300 s  -0.158 [-0.38,0.075] pos 0.317 p 0.0001 CI(-0.221,-0.096) n=186
