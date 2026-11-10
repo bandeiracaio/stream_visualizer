@@ -14,8 +14,8 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { loadEngine } from "./compare-detections.mjs";
-import { readInput } from "./analyze-collectors.mjs";
-import { sigmaOf, sideDir } from "./reader-scoreboard.mjs";
+import { readInput } from "./lib/session-io.mjs";
+import { sigmaOf, sideDir } from "./lib/sigma.mjs";
 import { rng, generate, loadPool } from "./sample-designs.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));

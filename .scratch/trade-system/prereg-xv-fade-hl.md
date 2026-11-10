@@ -33,3 +33,7 @@ Over-null at 1 s below +0.2 bps, or fewer than 12 of 36 designs with an interval
 The command above regenerates designs with `--seed 5 --ids ...`. After this document was written the harness gained more triggers, exits and a region template, which changed what the sampler draws: regenerating with the current code no longer reproduces these 36 designs (0 of 36 identical when checked). The frozen parameters are unaffected. The fresh-data run must therefore use the frozen file instead:
 `node design-harness.mjs --designs-file .scratch/trade-system/prereg-xv-fade-hl-designs.json --split fresh --confirm-holdout --null 40 --latency 1000 --out <file>` (and `--latency 4000`).
 Checked on dev: two designs (M00010, M00316) replayed from the file give exactly the stored trade counts and mean gross of `results-seed5-3trig.jsonl`. The `--ids` filter does not apply with `--designs-file`.
+
+## Amendment 2026-11-10: test closed without being run
+
+The fresh-data test registered here was not run and is closed as "not run". No fresh-session outcome was looked at. The Trader's own live record (`.scratch/trader/spec.md` section 9, decision 3) replaces it. The frozen design files stay in this folder.

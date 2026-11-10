@@ -36,3 +36,7 @@ Between the thresholds: inconclusive. Each family gets its own verdict; a pass f
 Once at least 30 fresh sessions exist. Two harness runs on all 50 ids (1 s and 4 s, 40 random-entry repeats), then split by the venue in each design's parameters; one run of the lag-control script (1 s signal, 5 s lookback).
 `node design-harness.mjs --n 700 --balance --balance-by trig,thes --seed 6 --ids .scratch/trade-system/prereg-book-depth-ids.json --split fresh --confirm-holdout --null 40 --latency 1000 --out <file>` (and `--latency 4000`).
 Before running, re-run two designs on dev and check they match `results-seed6-wide.jsonl` (this was done for M00001 and M00278 on 2026-11-05). No design, parameter, threshold or cost change after seeing fresh data.
+
+## Amendment 2026-11-10: test closed without being run
+
+The fresh-data test registered here was not run and is closed as "not run". No fresh-session outcome was looked at. The Trader's own live record (`.scratch/trader/spec.md` section 9, decision 3) replaces it. The frozen design files stay in this folder.

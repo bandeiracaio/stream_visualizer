@@ -62,3 +62,7 @@ node analyze-liquidations.mjs --selftest   # 9 checks on synthetic tapes
 node analyze-liquidations.mjs --status     # counts only: test sessions, clusters, pairs
 node analyze-liquidations.mjs              # the test, once, when --status shows enough; add --json for everything
 ```
+
+## Amendment 2026-11-10: test closed without being run
+
+The registered test (`analyze-liquidations.mjs`, 60 clusters and 30 pairs) was never run. It is closed as "not run". No test-set outcome was looked at: the sessions after the cutoff were counted (`--status` shows no outcome) and nothing else. The Trader's own live record (`.scratch/trader/spec.md` section 9, decision 3) replaces this test. The script is in `archive/` and is not expected to keep working.

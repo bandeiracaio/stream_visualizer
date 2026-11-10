@@ -1,6 +1,6 @@
 # Trade-system design study: findings
 
-Written 2026-11-05. Status: dev and hold-out results in; three pre-registered tests on fresh data are waiting (1 fresh session recorded so far, 30 needed).
+Written 2026-11-05. Status (2026-11-10): dev and hold-out results in; the three pre-registered fresh-data tests (and the liquidation test) were closed without being run, no test-set outcome was looked at; the Trader's live record replaces them (`.scratch/trader/spec.md` section 9, decision 3).
 
 ## 1. Summary
 

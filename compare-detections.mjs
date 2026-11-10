@@ -10,7 +10,7 @@ import path from "node:path";
 import vm from "node:vm";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { readInput } from "./analyze-collectors.mjs";
+import { readInput } from "./lib/session-io.mjs";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const ENGINE_FILES = ["reader-drift", "reader-proposals", "reader-register", "reader-episodes", "reader-engine"];

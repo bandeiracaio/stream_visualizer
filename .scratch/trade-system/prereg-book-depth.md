@@ -42,3 +42,7 @@ The Binance and Hyperliquid designs of this family are registered separately for
 
 ## Note 2026-11-05 (later): replay from the frozen file
 Regenerating these 50 designs with the current sampler still reproduces them exactly (checked, 50 of 50), but that depends on the sampler's categories staying as they are. Safer and equivalent: `--designs-file .scratch/trade-system/prereg-book-depth-designs.json` in place of `--n/--balance/--seed/--ids`. The same applies to `prereg-book-depth-split.md`, using the bn or hl subset of that file.
+
+## Amendment 2026-11-10: test closed without being run
+
+The fresh-data test registered here was not run and is closed as "not run". No fresh-session outcome was looked at. The Trader's own live record (`.scratch/trader/spec.md` section 9, decision 3) replaces it. The frozen design files stay in this folder.
