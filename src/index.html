@@ -141,50 +141,6 @@
     <div id="ovAcc"></div>
   </section>
 
-  <section data-tab="futures" class="full">
-    <h2>Futures stack <span class="ctl">
-      <select id="fsVenue"><option value="bn">Binance</option><option value="hl">Hyperliquid</option><option value="all">Both</option></select>
-      <select id="fsWin"><option value="1800000">30m</option><option value="3600000" selected>1h</option><option value="7200000">2h</option><option value="14400000">4h</option></select>
-      <select id="fsBin"><option value="15000">15s</option><option value="60000" selected>1m</option><option value="300000">5m</option></select>
-      <label><input type="checkbox" id="fsHeat" checked> book heatmap</label>
-      <label><input type="checkbox" id="fsProf" checked> volume profile</label>
-      <label><input type="checkbox" id="fsStats" checked> bar stats</label>
-      <label><input type="checkbox" id="fsMark" checked> highlights</label>
-      <label title="Add Bybit and OKX to the liquidation panel and to open interest (price, delta and the book stay Binance / Hyperliquid)"><input type="checkbox" id="fsLiqAll" checked> all venues: liq + OI</label>
-      min liq $ <input id="fsMin" type="number" value="100000" step="50000" min="0" style="width:90px"></span></h2>
-    <canvas id="cvFut" class="chart" style="height:660px;touch-action:pan-y"></canvas>
-    <div class="note" id="fsLiqSrc"></div>
-    <div class="note" id="fsHover">Move over the chart (or tap it) to read one candle.</div>
-    <div class="legend">
-      <span><i style="background:var(--buy)"></i>shorts liquidated / net buying</span>
-      <span><i style="background:var(--sell)"></i>longs liquidated / net selling</span>
-      <span><i style="height:2px;background:var(--buy)"></i>open interest rising (positions opening)</span><span><i style="height:2px;background:var(--sell)"></i>falling (closing)</span>
-      <span>bar stats rows: delta share, open interest change, volume, trades, range</span>
-      <span><i style="border:1.5px solid var(--mark);width:8px;height:12px"></i>look here: liquidation spike confirmed by delta and open interest</span>
-    </div>
-    <div class="fs-grid">
-      <div class="fs-box" id="fsCheck" style="margin-top:0"></div>
-      <div class="fs-box" id="fsHits" style="margin-top:0"></div>
-    </div>
-    <div class="fs-box">
-      <b>Trade it</b> <span class="note" id="fsAcct" style="display:inline"></span>
-      <div class="fs-row"><input id="fsSize" type="number" value="100" min="0" step="any"> USD
-        <button id="fsBuy" class="buy">Buy now</button><button id="fsSell" class="sell">Sell now</button><button id="fsClose">Close position</button><button id="fsStart">Start paper account</button></div>
-      <div class="note" id="fsMsg"></div><div class="metrics" id="fsPos"></div>
-      <div class="note">Orders go to the account chosen with the account button in the header (paper, demo or live) on the asset in the header, at the Binance bid / ask, whatever venue the chart shows. A live account still asks for confirmation.</div>
-    </div>
-    <details class="fs-box"><summary>The setup: what to build and what to look for</summary>
-      <ol><li><b>Stack three things on one time axis</b>: liquidations, volume delta (taker buy minus sell $), open interest. Price (here over the order-book heatmap) sits on top.</li>
-      <li><b>Liquidations</b> tell you who got forced out: a long liquidation is a forced sell, a short liquidation is a forced buy.</li>
-      <li><b>Volume delta</b> tells you who is aggressive: buyers lifting the ask or sellers hitting the bid.</li>
-      <li><b>Open interest</b> tells you whether positions are opening (rising) or closing (falling).</li>
-      <li><b>Look for rotations</b>: a liquidation spike on one side, a delta spike the same way, and open interest dropping at the same moment (the cyan boxes). That is positions being closed by force, often near where a move stalls or turns.</li>
-      <li>Delta up with open interest up is new longs opening; delta up with open interest down is shorts closing; delta down with open interest up is new shorts; delta down with open interest down is longs closing.</li>
-      <li><b>Use small size</b>, get screen time, catch rotations, build experience. The point is to learn to read it fast.</li></ol>
-      <div class="note">From a trader's post. This view only shows and marks; the boxes are a reading aid, not a signal, and nothing here is validated. History starts when you press Connect and is not kept after a reload. Liquidations come from Binance, Bybit and OKX (the original shows nine venues); Hyperliquid's feed does not flag liquidations, so it adds none. Open interest is Binance, Bybit and OKX (Hyperliquid's is live only, so it joins once the window starts after you connected); price, delta and the book are Binance and Hyperliquid only.</div>
-    </details>
-  </section>
-
   <section data-tab="micro" class="full">
     <h2>Liquidity heatmap <span class="ctl">
       <select id="hmVenue"><option value="bn">Binance book</option><option value="hl">HL book (20 lvls)</option></select>
@@ -261,26 +217,6 @@
     <div class="lqbar" id="lqBar"><span class="stat" id="lqInfo"></span><button id="lqPrev" title="Previous unlabelled episode (key: left arrow or P)">&larr; prev</button><button id="lqNext" title="Next unlabelled episode (key: right arrow or N)">next &rarr;</button><label><input type="checkbox" id="lqAuto" checked> next after a label</label></div>
     <div class="note" id="lqKeys">Going through episodes: tap a bar or use next, then agree / disagree. Keys on a computer: &rarr; or N next, &larr; or P previous, A agree, D disagree.</div>
     <div id="tlDetail"></div>
-  </section>
-
-  <section data-tab="reader" class="full" id="lsSection">
-    <h2>Flow landscape <span class="ctl">
-      <label>source <select id="lsSrc"><option value="live">Live (last 5 min)</option><option value="session">Loaded session</option></select></label>
-      <label>venue <select id="lsVenue"><option value="both">BN + HL</option><option value="bn">Binance</option><option value="hl">Hyperliquid</option><option value="split">BN | HL split</option></select></label>
-      <label>window <select id="lsSpan"><option value="30000">30 s</option><option value="60000">60 s</option><option value="120000">2 min</option></select></label>
-      <label>episodes <select id="lsMarks" title="Reader episodes drawn on the floor"><option value="all">all</option><option value="nowall">no walls</option><option value="off">off</option></select></label>
-    </span></h2>
-    <div id="lsWrap" class="lswrap"><canvas id="lsCv" class="chart" style="height:440px;touch-action:pan-y;cursor:grab"></canvas><canvas id="lsCv2" class="chart" hidden style="height:440px;touch-action:pan-y;cursor:grab"></canvas></div>
-    <div class="lsbar">
-      <button id="lsLive" title="Follow the market again">Live</button>
-      <button id="lsPlay">Play</button>
-      <select id="lsSpeed" title="Playback speed"><option value="1">1x</option><option value="4">4x</option><option value="16">16x</option></select>
-      <input id="lsT" type="range" min="0" max="1000" value="1000" step="1">
-      <span id="lsClock" class="stat"></span><span id="lsPerf" class="stat" title="Time to compute the data and to draw one frame"></span>
-      <span id="lsView" class="lsview"><button data-v="3d">3D</button><button data-v="top">Top</button><button data-v="front">Front</button><button data-v="side">Side</button></span>
-    </div>
-    <div id="lsRead" class="lsread"></div>
-    <div class="note">How to read it. Floor: left to right is price relative to where the mid is at the playhead; front to back is how many seconds ago. Height and colour: net aggressor flow in that spot, green where buyers hit the asks, red where sellers hit the bids, flat where nothing traded. The white line on the floor is where the mid price actually was. A ridge that runs straight back at one price while the white line stays put is flow being absorbed there; a ridge that slides sideways along the white line is flow that pushed price. Drag to rotate (sideways only on a phone), use the buttons for fixed angles, and move the slider or press Play to walk through time; Live follows the market. Read-only: nothing here changes any detection.</div>
   </section>
 
   <section data-tab="reader" class="full">
@@ -444,11 +380,6 @@
     <div class="metrics" id="metrics"></div>
   </section>
 
-  <section data-tab="market" class="full">
-    <h2>Liquidations</h2>
-    <div id="lqBox"></div>
-  </section>
-
   <section data-tab="market">
     <h2>Books</h2>
     <div class="books">
@@ -504,9 +435,6 @@
 </script>
 <script id="reader-review">
 <!--@include js/reader-review.js-->
-</script>
-<script id="reader-landscape">
-<!--@include js/reader-landscape.js-->
 </script>
 <script id="auto-record-core">
 <!--@include js/auto-record-core.js-->
@@ -565,9 +493,6 @@
 <script>
 <!--@include js/order-history.js-->
 </script>
-<script>
-<!--@include js/reader-landscape-view.js-->
-</script>
 <script type="text/plain" id="arWorkerSrc">
 <!--@include js/auto-record-core.js-->
 <!--@include js/collectors-core.js-->
@@ -602,13 +527,7 @@
 <!--@include js/arm-mode.js-->
 </script>
 <script>
-<!--@include js/futures-core.js-->
-</script>
-<script>
 <!--@include js/paper-broker-core.js-->
-</script>
-<script>
-<!--@include js/liq-core.js-->
 </script>
 <script>
 <!--@include js/arm-memory-core.js-->
@@ -618,12 +537,6 @@
 </script>
 <script>
 <!--@include js/overnight-core.js-->
-</script>
-<script>
-<!--@include js/futures-view.js-->
-</script>
-<script>
-<!--@include js/liq-readout.js-->
 </script>
 <script>
 <!--@include js/label-queue-core.js-->

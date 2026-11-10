@@ -85,7 +85,7 @@ function print(results, limit) {
 
 // ---------- self-test: simulated sessions through the Reader's own simulator
 function selfTest() {
-  const { E, S } = loadEngine(null, ["reader-landscape", "auto-record-core", "status-core", "session-quality", "collectors-core", "reader-selftest"]);
+  const { E, S } = loadEngine(null, ["auto-record-core", "status-core", "session-quality", "collectors-core", "reader-selftest"]);
   const burst = { rate:200, buyP:.1, driftBps:-6, liqSell:3, sweepSell:2, bidMult:.4 }, sessions = [];
   for (let k = 0; k < 3; k++) {
     const e = E.create(); e.startRecording();

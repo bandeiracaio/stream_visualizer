@@ -83,7 +83,6 @@ pre.inspect{margin:0;max-height:300px;overflow:auto;background:var(--canvas);bor
 .full{grid-column:1/-1}
 canvas.chart{width:100%;display:block;background:var(--canvas);border-radius:var(--r)}
 #cvBub{height:340px}#cvCvd{height:200px}#cvHeat{height:400px}.mchart{height:170px}#cvHist{height:190px}
-#cvStream{height:260px}#cvSwarm{height:290px}#cvProf{height:400px}#cvAnom{height:230px}#cvBell{height:250px}#cvRad{height:360px}#cvTree{height:300px}#cvWater{height:300px}#cvFan{height:340px}
 .vleg{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:2px 10px;font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:6px}.vleg i{display:inline-block;width:10px;height:10px;margin-right:5px;vertical-align:-1px}
 #tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr));gap:10px}
 #tgrid > section{grid-column:auto}#tgrid > section.full{grid-column:1/-1}
@@ -190,7 +189,7 @@ section.collapsed > .pbody{height:0;overflow:hidden;visibility:hidden}
   .accpanel{right:4px;max-height:calc(100vh - var(--hh,95px) - 70px)}
   #arHdrMsg{position:absolute;top:100%;left:0;right:0;z-index:6;max-width:none;background:var(--panel2);border-bottom:1px solid var(--accent);padding:6px 10px}      /* the answer to Arm floats under the header instead of pushing the page down */
   input,select,button{min-height:44px}
-  .chip,#views button,.rm,.tt button,.eplab button,.lsview button{min-height:36px}      /* small controls inside panels */
+  .chip,#views button,.rm,.tt button,.eplab button{min-height:36px}      /* small controls inside panels */
   .pill{gap:2px;font-size:10.5px}
   .pill b{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}      /* the text stays for screen readers; the dot below is what is seen */
   .pill::after{content:"";width:10px;height:10px;border-radius:50%;flex:none;background:var(--warn)}
@@ -259,10 +258,6 @@ td.up{color:var(--buy)}td.dn{color:var(--sell)}
 .rv-row .grow{flex:1 1 220px}
 .rv-tbl{width:100%;border-collapse:collapse;font-size:12px}
 .rv-tbl td,.rv-tbl th{text-align:left;padding:3px 6px;border-bottom:1px solid var(--line);vertical-align:middle}
-.lsbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px}.lsbar input[type=range]{flex:1 1 160px;min-width:120px;padding:0}.lsview{display:inline-flex;gap:4px;margin-left:auto}.lsread{margin:8px 0 4px;font-size:12.5px;line-height:1.5}.lsread b{font-family:var(--mono);color:var(--text)}
-.lswrap{display:grid;grid-template-columns:1fr;gap:6px}
-@media(min-width:900px){.lswrap.split{grid-template-columns:1fr 1fr}}
-#lsSection h2 .ctl{flex-wrap:wrap}
 @media(max-width:640px){                                   /* phone: the Reader review tables wrap instead of widening the page */
   .rd-det{overflow-x:auto}                              /* a wide data table scrolls inside its box, not the page */
   .rv-tbl td,.rv-tbl th{white-space:normal;overflow-wrap:anywhere}
@@ -286,26 +281,9 @@ td.up{color:var(--buy)}td.dn{color:var(--sell)}
 .am-t-ok,.am-t-up{color:var(--buy)!important}.am-t-warn{color:var(--warn)!important}.am-t-bad,.am-t-dn,.am-t-rec{color:var(--sell)!important}
 .am-sub{color:var(--dim);font-size:11.5px;margin:8px 0 3px}.am-chip{display:inline-block;margin:2px 10px 2px 0;font-size:12px;color:var(--text)}
 .am-ep{font-size:12px;padding:3px 0;color:var(--text);border-bottom:1px solid var(--line)}.am-ep b{color:var(--accent)}
-/* Futures stack (Now): the cyan --mark box is the "look here" highlight */
-.fs-box{border:1px solid var(--mark);border-radius:var(--r);padding:8px 10px;margin-top:8px}
-.fs-box summary{cursor:pointer;color:var(--mark);font-weight:600}
-.fs-box ol,.fs-box ul{margin:6px 0 0 18px;padding:0}.fs-box li{margin:3px 0}
-.fs-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;margin-top:8px}
-.fs-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
-.fs-row input[type=number]{width:100px}
-.fs-row .buy{background:var(--buy);color:var(--ink);border-color:var(--buy);font-weight:600}.fs-row .sell{background:var(--sell);color:var(--ink);border-color:var(--sell);font-weight:600}
-.fs-hit{border-left:3px solid var(--mark);padding:2px 8px;margin:4px 0;color:var(--text)}
-.fs-ck b{color:var(--mark)}.fs-ck .yes{color:var(--buy)}.fs-ck .no{color:var(--dim)}
 #stChips{display:flex;flex-wrap:wrap;gap:5px}
 .sbfam{margin-top:12px;padding-top:8px;border-top:1px solid var(--line)}.sbfam h3{margin:0 0 6px;font-size:13px;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
 .sbfam .tt{width:auto}.sbfam .tt th,.sbfam .tt td{text-align:left;padding-right:20px;white-space:nowrap}
-/* Liquidations readout (Now > Market and tape): longs liquidated = forced sells = --sell, shorts liquidated = forced buys = --buy */
-.lq-src-row{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;margin-bottom:6px}.lq-src{font-size:11.5px;color:var(--dim)}.lq-src.on{color:var(--buy)}
-.lq-bars{display:flex;gap:1px;height:70px;margin-top:4px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
-.lq-col{flex:1 1 0;min-width:2px;display:flex;flex-direction:column}.lq-up,.lq-dn{flex:1 1 0;display:flex}.lq-up{align-items:flex-end;border-bottom:1px solid var(--line)}.lq-dn{align-items:flex-start}
-.lq-up i,.lq-dn i{display:block;width:100%;min-height:0}.lq-up i{background:var(--buy)}.lq-dn i{background:var(--sell)}
-.lq-tab td,.lq-tab th{text-align:left;padding-right:14px;white-space:nowrap}.lq-l{color:var(--sell)}.lq-s{color:var(--buy)}.lq-now{color:var(--warn)}.lq-cont{color:var(--warn)}.lq-back{color:var(--mark)}
-.lq-tab tr.huge td:nth-child(4){color:var(--accent)}
 
 </style>
 </head>
@@ -441,50 +419,6 @@ td.up{color:var(--buy)}td.dn{color:var(--sell)}
     <div id="ovAcc"></div>
   </section>
 
-  <section data-tab="futures" class="full">
-    <h2>Futures stack <span class="ctl">
-      <select id="fsVenue"><option value="bn">Binance</option><option value="hl">Hyperliquid</option><option value="all">Both</option></select>
-      <select id="fsWin"><option value="1800000">30m</option><option value="3600000" selected>1h</option><option value="7200000">2h</option><option value="14400000">4h</option></select>
-      <select id="fsBin"><option value="15000">15s</option><option value="60000" selected>1m</option><option value="300000">5m</option></select>
-      <label><input type="checkbox" id="fsHeat" checked> book heatmap</label>
-      <label><input type="checkbox" id="fsProf" checked> volume profile</label>
-      <label><input type="checkbox" id="fsStats" checked> bar stats</label>
-      <label><input type="checkbox" id="fsMark" checked> highlights</label>
-      <label title="Add Bybit and OKX to the liquidation panel and to open interest (price, delta and the book stay Binance / Hyperliquid)"><input type="checkbox" id="fsLiqAll" checked> all venues: liq + OI</label>
-      min liq $ <input id="fsMin" type="number" value="100000" step="50000" min="0" style="width:90px"></span></h2>
-    <canvas id="cvFut" class="chart" style="height:660px;touch-action:pan-y"></canvas>
-    <div class="note" id="fsLiqSrc"></div>
-    <div class="note" id="fsHover">Move over the chart (or tap it) to read one candle.</div>
-    <div class="legend">
-      <span><i style="background:var(--buy)"></i>shorts liquidated / net buying</span>
-      <span><i style="background:var(--sell)"></i>longs liquidated / net selling</span>
-      <span><i style="height:2px;background:var(--buy)"></i>open interest rising (positions opening)</span><span><i style="height:2px;background:var(--sell)"></i>falling (closing)</span>
-      <span>bar stats rows: delta share, open interest change, volume, trades, range</span>
-      <span><i style="border:1.5px solid var(--mark);width:8px;height:12px"></i>look here: liquidation spike confirmed by delta and open interest</span>
-    </div>
-    <div class="fs-grid">
-      <div class="fs-box" id="fsCheck" style="margin-top:0"></div>
-      <div class="fs-box" id="fsHits" style="margin-top:0"></div>
-    </div>
-    <div class="fs-box">
-      <b>Trade it</b> <span class="note" id="fsAcct" style="display:inline"></span>
-      <div class="fs-row"><input id="fsSize" type="number" value="100" min="0" step="any"> USD
-        <button id="fsBuy" class="buy">Buy now</button><button id="fsSell" class="sell">Sell now</button><button id="fsClose">Close position</button><button id="fsStart">Start paper account</button></div>
-      <div class="note" id="fsMsg"></div><div class="metrics" id="fsPos"></div>
-      <div class="note">Orders go to the account chosen with the account button in the header (paper, demo or live) on the asset in the header, at the Binance bid / ask, whatever venue the chart shows. A live account still asks for confirmation.</div>
-    </div>
-    <details class="fs-box"><summary>The setup: what to build and what to look for</summary>
-      <ol><li><b>Stack three things on one time axis</b>: liquidations, volume delta (taker buy minus sell $), open interest. Price (here over the order-book heatmap) sits on top.</li>
-      <li><b>Liquidations</b> tell you who got forced out: a long liquidation is a forced sell, a short liquidation is a forced buy.</li>
-      <li><b>Volume delta</b> tells you who is aggressive: buyers lifting the ask or sellers hitting the bid.</li>
-      <li><b>Open interest</b> tells you whether positions are opening (rising) or closing (falling).</li>
-      <li><b>Look for rotations</b>: a liquidation spike on one side, a delta spike the same way, and open interest dropping at the same moment (the cyan boxes). That is positions being closed by force, often near where a move stalls or turns.</li>
-      <li>Delta up with open interest up is new longs opening; delta up with open interest down is shorts closing; delta down with open interest up is new shorts; delta down with open interest down is longs closing.</li>
-      <li><b>Use small size</b>, get screen time, catch rotations, build experience. The point is to learn to read it fast.</li></ol>
-      <div class="note">From a trader's post. This view only shows and marks; the boxes are a reading aid, not a signal, and nothing here is validated. History starts when you press Connect and is not kept after a reload. Liquidations come from Binance, Bybit and OKX (the original shows nine venues); Hyperliquid's feed does not flag liquidations, so it adds none. Open interest is Binance, Bybit and OKX (Hyperliquid's is live only, so it joins once the window starts after you connected); price, delta and the book are Binance and Hyperliquid only.</div>
-    </details>
-  </section>
-
   <section data-tab="micro" class="full">
     <h2>Liquidity heatmap <span class="ctl">
       <select id="hmVenue"><option value="bn">Binance book</option><option value="hl">HL book (20 lvls)</option></select>
@@ -561,26 +495,6 @@ td.up{color:var(--buy)}td.dn{color:var(--sell)}
     <div class="lqbar" id="lqBar"><span class="stat" id="lqInfo"></span><button id="lqPrev" title="Previous unlabelled episode (key: left arrow or P)">&larr; prev</button><button id="lqNext" title="Next unlabelled episode (key: right arrow or N)">next &rarr;</button><label><input type="checkbox" id="lqAuto" checked> next after a label</label></div>
     <div class="note" id="lqKeys">Going through episodes: tap a bar or use next, then agree / disagree. Keys on a computer: &rarr; or N next, &larr; or P previous, A agree, D disagree.</div>
     <div id="tlDetail"></div>
-  </section>
-
-  <section data-tab="reader" class="full" id="lsSection">
-    <h2>Flow landscape <span class="ctl">
-      <label>source <select id="lsSrc"><option value="live">Live (last 5 min)</option><option value="session">Loaded session</option></select></label>
-      <label>venue <select id="lsVenue"><option value="both">BN + HL</option><option value="bn">Binance</option><option value="hl">Hyperliquid</option><option value="split">BN | HL split</option></select></label>
-      <label>window <select id="lsSpan"><option value="30000">30 s</option><option value="60000">60 s</option><option value="120000">2 min</option></select></label>
-      <label>episodes <select id="lsMarks" title="Reader episodes drawn on the floor"><option value="all">all</option><option value="nowall">no walls</option><option value="off">off</option></select></label>
-    </span></h2>
-    <div id="lsWrap" class="lswrap"><canvas id="lsCv" class="chart" style="height:440px;touch-action:pan-y;cursor:grab"></canvas><canvas id="lsCv2" class="chart" hidden style="height:440px;touch-action:pan-y;cursor:grab"></canvas></div>
-    <div class="lsbar">
-      <button id="lsLive" title="Follow the market again">Live</button>
-      <button id="lsPlay">Play</button>
-      <select id="lsSpeed" title="Playback speed"><option value="1">1x</option><option value="4">4x</option><option value="16">16x</option></select>
-      <input id="lsT" type="range" min="0" max="1000" value="1000" step="1">
-      <span id="lsClock" class="stat"></span><span id="lsPerf" class="stat" title="Time to compute the data and to draw one frame"></span>
-      <span id="lsView" class="lsview"><button data-v="3d">3D</button><button data-v="top">Top</button><button data-v="front">Front</button><button data-v="side">Side</button></span>
-    </div>
-    <div id="lsRead" class="lsread"></div>
-    <div class="note">How to read it. Floor: left to right is price relative to where the mid is at the playhead; front to back is how many seconds ago. Height and colour: net aggressor flow in that spot, green where buyers hit the asks, red where sellers hit the bids, flat where nothing traded. The white line on the floor is where the mid price actually was. A ridge that runs straight back at one price while the white line stays put is flow being absorbed there; a ridge that slides sideways along the white line is flow that pushed price. Drag to rotate (sideways only on a phone), use the buttons for fixed angles, and move the slider or press Play to walk through time; Live follows the market. Read-only: nothing here changes any detection.</div>
   </section>
 
   <section data-tab="reader" class="full">
@@ -742,11 +656,6 @@ td.up{color:var(--buy)}td.dn{color:var(--sell)}
   <section data-tab="market">
     <h2>Market state</h2>
     <div class="metrics" id="metrics"></div>
-  </section>
-
-  <section data-tab="market" class="full">
-    <h2>Liquidations</h2>
-    <div id="lqBox"></div>
   </section>
 
   <section data-tab="market">
@@ -1865,145 +1774,6 @@ const READER_REVIEW = (() => {
 })();
 
 </script>
-<script id="reader-landscape">
-"use strict";
-// Flow landscape (pure, no DOM): the grid behind the 3D view in the Reader tab. It only READS trades and mid prices; it never feeds the
-// Reader engine, so nothing it does can change a detection.
-//   X  price relative to the venue's mid at the playhead, in bps
-//   Y  age: seconds before the playhead (the newest slice is index 0)
-//   Z  net aggressor flow in that cell, in $ (buy aggression positive, sell aggression negative)
-//   4th dimension: the playhead (any moment the source still has), so the terrain re-forms as time moves.
-// A source is {trades:[{t,v,side,ntl}] sorted by t, mid:(venue,t)=>number|null}.
-const READER_LANDSCAPE = (() => {
-  const VENUES = ["bn", "hl"];
-  const DEFAULTS = {xBins:41, yBins:24, spanMs:60000, halfBps:4, venue:"both"};
-  const lower = (a, t, key) => { let lo = 0, hi = a.length; while (lo < hi){ const m = (lo+hi) >> 1; if (key(a[m]) < t) lo = m+1; else hi = m; } return lo; };
-  const venuesOf = o => o.venue === "bn" ? ["bn"] : o.venue === "hl" ? ["hl"] : VENUES;
-
-  // Offset of a price from the venue's mid at the playhead, in bps.
-  const off = (px, mid) => (px/mid - 1) * 1e4;
-
-  // The mid-price path over the window (offset from the playhead's mid, averaged over the chosen venues); null where unknown.
-  function path(src, tNow, o) {
-    const vs = venuesOf(o), base = {}; for (const v of vs){ const m = src.mid(v, tNow); if (m > 0) base[v] = m; }
-    const out = [];
-    for (let j = 0; j < o.yBins; j++){
-      const t = tNow - (j+.5)/o.yBins*o.spanMs; let s = 0, n = 0;
-      for (const v of vs){ if (!base[v]) continue; const m = src.mid(v, t); if (m > 0){ s += off(m, base[v]); n++; } }
-      out.push(n ? s/n : null);
-    }
-    return out;
-  }
-
-  // A symmetric price range that holds the trades and the mid path of the window (at least 1.5 bps, rounded up so it does not jitter).
-  // opt.path lets a caller that already has the path pass it in instead of computing it again.
-  function autoHalf(src, tNow, opt) {
-    const o = Object.assign({}, DEFAULTS, opt), vs = venuesOf(o), [i0, i1] = span(src, tNow, o), a = [];
-    for (const v of vs){ const m = src.mid(v, tNow); if (!(m > 0)) continue; for (let i = i0; i < i1; i++){ const tr = src.trades[i]; if (tr.v === v && tr.px > 0) a.push(Math.abs(off(tr.px, m))); } }
-    for (const p of (o.path || path(src, tNow, o))) if (p != null) a.push(Math.abs(p));
-    if (!a.length) return o.halfBps;
-    a.sort((x, y) => x-y); const p95 = a[Math.min(a.length-1, Math.floor(a.length*.95))];
-    const x = Math.max(1.5, p95*1.15), step = x < 5 ? .5 : x < 20 ? 1 : 5;
-    return Math.ceil(x/step)*step;
-  }
-
-  // The index range [i0, i1) of the trades inside the window; nothing is copied.
-  function span(src, tNow, o) {
-    const i0 = lower(src.trades, tNow - o.spanMs, x => x.t);
-    let i1 = i0; while (i1 < src.trades.length && src.trades[i1].t <= tNow) i1++;
-    return [i0, i1];
-  }
-
-  // The surface at the playhead tNow. z is the raw net flow per cell; zs is the lightly smoothed copy used for drawing.
-  function grid(src, tNow, opt) {
-    const o = Object.assign({}, DEFAULTS, opt), nx = o.xBins, ny = o.yBins, z = new Float64Array(nx*ny), half = o.halfBps;
-    const vs = venuesOf(o), base = {}; for (const v of vs){ const m = src.mid(v, tNow); if (m > 0) base[v] = m; }
-    let buy = 0, sell = 0, n = 0, clipped = 0;
-    const [i0, i1] = span(src, tNow, o);
-    for (let k = i0; k < i1; k++){
-      const tr = src.trades[k], m = base[tr.v]; if (!m || !(tr.px > 0) || !(tr.ntl > 0)) continue;
-      const xi = Math.floor((off(tr.px, m) + half)/(2*half)*nx), yi = Math.floor((tNow - tr.t)/o.spanMs*ny);
-      if (xi < 0 || xi >= nx){ clipped++; continue; }
-      const yj = Math.min(ny-1, Math.max(0, yi)), s = tr.side === "buy" ? tr.ntl : -tr.ntl;
-      z[yj*nx + xi] += s; n++; if (s > 0) buy += s; else sell -= s;
-    }
-    const blur = src => { const out = new Float64Array(src.length);                // two passes of a 3x3 weighted blur, for the picture only
-      for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++){
-        let s = 0, c = 0;
-        for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++){ const jj = j+dj, ii = i+di; if (jj < 0 || jj >= ny || ii < 0 || ii >= nx) continue; const w = (dj === 0 ? 2 : 1) * (di === 0 ? 2 : 1); s += src[jj*nx+ii]*w; c += w; }
-        out[j*nx+i] = s/c;
-      } return out; };
-    const zs = blur(blur(z));
-    const tmp = new Float64Array(zs.length); let cnt = 0; for (let k = 0; k < zs.length; k++){ const m = Math.abs(zs[k]); if (m > 0) tmp[cnt++] = m; }
-    const sorted = tmp.subarray(0, cnt).sort(), scale = cnt ? sorted[Math.min(cnt-1, Math.floor(cnt*.97))] : 0;   // the 97th percentile of the smoothed flow: what the picture treats as full height
-    let peakBuy = null, peakSell = null;
-    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++){
-      const v = z[j*nx+i], cell = {z:v, xBps:-half + (i+.5)/nx*2*half, ageS:(j+.5)/ny*o.spanMs/1000};
-      if (v > 0 && (!peakBuy || v > peakBuy.z)) peakBuy = cell;
-      if (v < 0 && (!peakSell || v < peakSell.z)) peakSell = cell;
-    }
-    const p = o.path || path(src, tNow, o), first = p.slice().reverse().find(x => x != null);
-    return {nx, ny, half, scale, spanMs:o.spanMs, venue:o.venue, tNow, z, zs, buy, sell, net:buy-sell, trades:n, clipped, peakBuy, peakSell, path:p, moveBps:first == null ? null : -first};
-  }
-
-  // A recorded session (the inputs of the Reader's record/replay) as a source: trades in time order and a mid series per venue.
-  function fromInputs(inputs) {
-    const trades = [], mids = {bn:[], hl:[]}; let t0 = Infinity, t1 = -Infinity;
-    for (const r of inputs){
-      if (r[0] === "t" && r[1] && r[1].t > 0 && r[1].px > 0 && r[1].ntl > 0 && VENUES.includes(r[1].v)){ const x = r[1]; trades.push({t:x.t, v:x.v, side:x.side, px:x.px, ntl:x.ntl}); if (x.t < t0) t0 = x.t; if (x.t > t1) t1 = x.t; }
-      else if (r[0] === "q" && VENUES.includes(r[1]) && r[3] > 0 && r[4] >= r[3] && r[2] > 0){ const a = mids[r[1]]; if (!a.length || r[2] >= a[a.length-1][0]) a.push([r[2], (r[3]+r[4])/2]); if (r[2] < t0) t0 = r[2]; if (r[2] > t1) t1 = r[2]; }
-    }
-    trades.sort((a, b) => a.t - b.t);
-    return {trades, mids, t0, t1, mid:(v, t) => midAt(mids[v], t)};
-  }
-  // Latest mid at or before t (within 5 s), else the first one after it.
-  function midAt(a, t) {
-    if (!a || !a.length) return null;
-    const i = lower(a, t, x => x[0]);
-    if (i < a.length && a[i][0] === t) return a[i][1];
-    if (i > 0 && t - a[i-1][0] <= 5000) return a[i-1][1];
-    return i < a.length && a[i][0] - t <= 5000 ? a[i][1] : null;
-  }
-  // Identifies what a drawn grid was computed from, so a redraw (rotating) can reuse it. live: the playhead follows the market, rounded to
-  // half a second; a session is told apart by id, live trades by count and first/last time (the buffer is trimmed, so the count alone can repeat).
-  function cacheKey(o) {
-    const tq = o.live ? Math.round(o.tNow/500)*500 : o.tNow, n = o.trades ? o.trades.length : 0;
-    const data = o.sessId != null ? "s" + o.sessId : n + "@" + (n ? o.trades[0].t + "-" + o.trades[n-1].t : 0);
-    return [o.src, o.venue, o.spanMs, tq, data].join("|");
-  }
-  // Reader episodes drawn on the floor of the landscape. list: episode groups ({family, venue|venues, stage, tStart, tEnd, tDetected, px}).
-  // An episode becomes a mark when it overlaps the window; z0..z1 is its stretch along the age axis (-1 = newest, 1 = oldest edge of the window),
-  // zd where it was detected, and u its price as a share of half the price range (offset from the mid of its venue at the playhead). Read only.
-  // opt.hide: {family:true} leaves a family out. opt.merge (default true): marks of one family and venue at the same price (within a cell) whose
-  // stretches touch or are less than 5 s apart become one mark (n counts them), so a wall that was re-posted again and again reads as one line.
-  function episodeMarks(src, tNow, g, list, opt) {
-    const o = Object.assign({hide:{}, merge:true}, opt), out = [], w0 = tNow - g.spanMs, toZ = t => Math.max(-1, Math.min(1, (tNow - t)/g.spanMs*2 - 1));
-    for (const e of list || []){
-      if (o.hide[e.family]) continue;
-      const t0 = e.tStart, t1 = e.tEnd == null ? tNow : Math.min(e.tEnd, tNow);
-      if (t0 > tNow || t1 < w0) continue;
-      const v = g.venue !== "both" && e.venues && e.venues.includes(g.venue) ? g.venue : e.venue || (e.venues && e.venues[0]) || "bn", m = src.mid(v, tNow);
-      if (g.venue !== "both" && g.venue !== v && !(e.venues && e.venues.includes(g.venue))) continue;
-      const px = e.px != null ? e.px : e.pxStart;
-      if (!(m > 0) || !(px > 0)) continue;
-      out.push({family:e.family, venue:v, stage:e.stage, wall:e.family === "wall", n:1, u:Math.max(-1, Math.min(1, off(px, m)/g.half)), outside:Math.abs(off(px, m)) > g.half,
-                z0:toZ(t1), z1:toZ(t0), zd:e.tDetected != null && e.tDetected >= w0 && e.tDetected <= tNow ? toZ(e.tDetected) : null});
-    }
-    if (!o.merge) return out;
-    const cell = 2/(g.nx || DEFAULTS.xBins), gapZ = 5000/g.spanMs*2, merged = [];
-    out.sort((a, b) => a.z0 - b.z0);
-    for (const m of out){
-      const k = merged.find(x => x.family === m.family && x.venue === m.venue && Math.abs(x.u - m.u) <= cell && m.z0 <= x.z1 + gapZ && m.z1 >= x.z0 - gapZ);
-      if (!k){ merged.push(m); continue; }
-      k.z0 = Math.min(k.z0, m.z0); k.z1 = Math.max(k.z1, m.z1); k.n += m.n; k.outside = k.outside && m.outside;     // k is the newest mark (sorted), so it keeps its stage
-      k.zd = k.zd == null ? m.zd : m.zd == null ? k.zd : Math.max(k.zd, m.zd); k.u = (k.u*(k.n-m.n) + m.u*m.n)/k.n;
-    }
-    return merged;
-  }
-  return {DEFAULTS, grid, autoHalf, path, span, fromInputs, midAt, cacheKey, episodeMarks};
-})();
-
-</script>
 <script id="auto-record-core">
 "use strict";
 // Auto-record on volatility (pure, no DOM, no timers): how volatile the market is now against its own last hour, and when a recording should
@@ -2119,7 +1889,7 @@ const STATUS = (() => {
 // Hooks (pure, no DOM): the one way a late-loaded module extends an owner's function without reassigning the owner's global.
 // The owner (app.js) calls HOOKS.emit(name, ...args) at a fixed point; modules call HOOKS.on(name, fn). Subscribers run in the order
 // they subscribed (= script load order); an error in one is logged and does not stop the owner or the other subscribers.
-// Names in use: "renderReader" (end of renderReader), "logout" (end of logout), "renderAccount" (end of renderAccount), "liquidation" (futures-view.js: every liquidation of the coin from Binance, Bybit and OKX as a trade {t, v, side, px, ntl, liq}; subscriber: liq-readout.js), "bnDepth" (start of bnDepth, arg d; no subscriber now, the book collector runs in the worker).
+// Names in use: "renderReader" (end of renderReader), "logout" (end of logout), "renderAccount" (end of renderAccount), "bnDepth" (start of bnDepth, arg d; no subscriber now, the book collector runs in the worker).
 const HOOKS = (() => {
   const subs = Object.create(null);
   function on(name, fn) { (subs[name] || (subs[name] = [])).push(fn); }
@@ -3079,27 +2849,6 @@ const READER_SELFTEST=(()=>{
     const on=run(true),off=run(false),strip=x=>JSON.stringify(x.events.filter(y=>!y.raw),(k,v)=>k==="id"?undefined:v);
     return{ok:strip(on)===strip(off)&&JSON.stringify(on.episodes)===JSON.stringify(off.episodes)&&off.events.every(x=>!x.raw),detail:"legacy signals or episodes differ with the raw events on"};
   });
-  // ---- flow landscape (v020): the pure grid behind the 3D view ----
-  const LS=READER_LANDSCAPE;
-  add("landscape: buying above the mid and selling below it land in the right cells with the right sign, and totals add up",E=>{
-    const src={trades:[{t:T0+59000,v:"bn",side:"buy",px:100.02,ntl:300},{t:T0+59500,v:"bn",side:"sell",px:99.98,ntl:200},{t:T0+30000,v:"bn",side:"buy",px:100.02,ntl:50},{t:T0+59900,v:"bn",side:"buy",px:105,ntl:999}],mid:()=>100};
-    const g=LS.grid(src,T0+60000,{venue:"bn",halfBps:4,xBins:41,yBins:24,spanMs:60000}),at=(xBps,ageS)=>g.z[Math.floor(ageS/60*24)*41+Math.floor((xBps+4)/8*41)];
-    return{ok:at(2,1)===300&&at(-2,.5)===-200&&at(2,30)===50&&g.clipped===1&&g.buy===350&&g.sell===200&&g.net===150&&g.peakBuy.z===300&&g.peakSell.z===-200,detail:JSON.stringify({a:at(2,1),b:at(-2,.5),c:at(2,30),clipped:g.clipped,buy:g.buy,sell:g.sell})};
-  });
-  add("landscape: a steady price makes a ridge along time, a trend makes a diagonal, and the price path ends at the playhead",E=>{
-    const steady=[],trend=[];for(let s=0;s<60;s++){steady.push({t:T0+s*1000+500,v:"bn",side:"buy",px:100.02,ntl:100});trend.push({t:T0+s*1000+500,v:"bn",side:"buy",px:100+s*.0005,ntl:100});}
-    const midTrend=(v,t)=>100+Math.max(0,(t-T0)/1000)*.0005,gs=LS.grid({trades:steady,mid:()=>100},T0+60000,{venue:"bn",halfBps:4}),cols=new Set();
-    for(let j=0;j<gs.ny;j++)for(let i=0;i<gs.nx;i++)if(gs.z[j*gs.nx+i]>0)cols.add(i);
-    const gt=LS.grid({trades:trend,mid:midTrend},T0+60000,{venue:"bn",halfBps:4}),cols2=new Set();
-    for(let j=0;j<gt.ny;j++)for(let i=0;i<gt.nx;i++)if(gt.z[j*gt.nx+i]>0)cols2.add(i);
-    const p=gt.path;
-    return{ok:cols.size===1&&cols2.size>=4&&p[0]>p[p.length-1]*0-1&&p[p.length-1]<-.5&&gt.moveBps>.5&&Math.abs(p[0])<Math.abs(p[p.length-1]),detail:JSON.stringify({cols:cols.size,cols2:cols2.size,p0:p[0],pn:p[p.length-1],move:gt.moveBps})};
-  });
-  add("landscape: a recorded session becomes a source, the playhead can sit anywhere in it, and the grid never changes its input",E=>{
-    const inputs=[["q","bn",T0,99.99,100.01],["t",{t:T0+1000,v:"bn",side:"buy",px:100.02,q:1,ntl:200}],["q","bn",T0+2000,100.09,100.11],["t",{t:T0+2500,v:"hl",side:"sell",px:100.08,q:1,ntl:70}],["q","hl",T0+2000,100.07,100.09]];
-    const s=LS.fromInputs(inputs),before=JSON.stringify(s.trades),g1=LS.grid(s,T0+3000,{venue:"both",spanMs:60000}),g2=LS.grid(s,T0+3000,{venue:"both",spanMs:60000}),early=LS.grid(s,T0+1500,{venue:"bn",spanMs:60000});
-    return{ok:s.trades.length===2&&s.t0===T0&&s.mid("bn",T0+1000)===100&&Math.abs(s.mid("bn",T0+2500)-100.1)<1e-9&&s.mid("bn",T0+90000)===null&&JSON.stringify(Array.from(g1.z))===JSON.stringify(Array.from(g2.z))&&JSON.stringify(s.trades)===before&&early.trades===1&&early.buy===200,detail:JSON.stringify({n:s.trades.length,e:early.trades,eb:early.buy,m:s.mid("bn",T0+2500)})};
-  });
   // ---- adaptive sigma (v021): a fast component so sigma follows a market that suddenly gets busier ----
   add("sigma: with the fast component a market that gets four times busier is measured against its new pace within minutes; a steady market is barely changed",E=>{
     const run=(cfg,volAfter)=>{const e=E.create(cfg),a=sim(e,{seconds:900,seed:3,params:()=>({vol:.3})});sim(e,{t0:a.t,mid0:a.mid,seconds:180,seed:4,params:()=>({vol:volAfter})});return e.debug().sigmaBps("bn");};
@@ -3109,35 +2858,6 @@ const READER_SELFTEST=(()=>{
   add("sigma: the fast component is off unless asked for, so older settings and recordings read exactly as before",E=>{
     const mk=cfg=>{const e=E.create(cfg),a=sim(e,{seconds:400,seed:3,params:()=>({vol:.3})});sim(e,{t0:a.t,mid0:a.mid,seconds:60,seed:4,params:()=>({vol:1})});return e.debug().sigmaBps("bn");};
     return{ok:E.DEFAULTS.sigmaFastN===0&&mk({})===mk({sigmaFastN:0,sigmaFastW:.9}),detail:String(E.DEFAULTS.sigmaFastN)};
-  });
-  // ---- landscape view (v025): the cache key decides when a drawn grid may be reused, so a stale one would show the wrong market ----
-  add("landscape: the cache key reuses a grid for the same moment and changes for anything that changes the picture",E=>{
-    const K=READER_LANDSCAPE.cacheKey,tr=(t0,n)=>Array.from({length:n},(_,i)=>({t:t0+i*10})),base={src:"live",venue:"both",spanMs:60000,tNow:100000,live:true,trades:tr(0,50)};
-    const k=K(base),same=K(Object.assign({},base,{tNow:100200}))===k,moved=K(Object.assign({},base,{tNow:100400}))!==k,grown=K(Object.assign({},base,{trades:tr(0,51)}))!==k;
-    const trimmed=K(Object.assign({},base,{trades:tr(500,50)}))!==k,venue=K(Object.assign({},base,{venue:"bn"}))!==k,span=K(Object.assign({},base,{spanMs:120000}))!==k;
-    const play=Object.assign({},base,{live:false,tNow:100200,sessId:1,src:"session"}),s1=K(play),sNext=K(Object.assign({},play,{sessId:2}))!==s1,exact=K(Object.assign({},play,{tNow:100201}))!==s1;
-    return{ok:same&&moved&&grown&&trimmed&&venue&&span&&sNext&&exact,detail:JSON.stringify({same,moved,grown,trimmed,venue,span,sNext,exact})};
-  });
-  add("landscape: episodes become marks on the floor at their price and time, and only when they overlap the window",E=>{
-    const LS=READER_LANDSCAPE,T=100000,src={trades:[],t0:0,t1:T,mid:()=>100},g={spanMs:60000,half:4,venue:"both"};
-    const eps=[{family:"wall",venue:"bn",stage:"active",tStart:T-20000,tEnd:null,tDetected:T-15000,px:100.02},
-      {family:"absorption",venue:"hl",stage:"ended",tStart:T-90000,tEnd:T-70000,tDetected:T-85000,px:100},
-      {family:"burst",venue:"hl",stage:"ended",tStart:T-80000,tEnd:T-30000,tDetected:T-79000,px:99.96},
-      {family:"exhaustion",venue:"bn",stage:"active",tStart:T-5000,tEnd:null,tDetected:T-1000,px:101}];
-    const m=LS.episodeMarks(src,T,g,eps),w=m.find(x=>x.family==="wall"),b=m.find(x=>x.family==="burst"),x=m.find(x=>x.family==="exhaustion");
-    const hl=LS.episodeMarks(src,T,Object.assign({},g,{venue:"hl"}),eps);
-    return{ok:m.length===3&&!m.some(y=>y.family==="absorption")&&Math.abs(w.u-.5)<1e-9&&Math.abs(w.z0+1)<1e-9&&Math.abs(w.z1-(20000/60000*2-1))<1e-9&&Math.abs(w.zd-(15000/60000*2-1))<1e-9
-      &&b.zd===null&&b.z1===1&&Math.abs(b.u+1)<1e-9&&x.u===1&&x.outside===true&&hl.length===1&&hl[0].family==="burst"&&LS.episodeMarks(src,T,g,null).length===0,
-      detail:JSON.stringify({n:m.length,w,b,x,hl:hl.length})};
-  });
-  add("landscape: a wall that was re-posted again and again is one mark; different prices, venues and far-apart times stay separate; a family can be hidden",E=>{
-    const LS=READER_LANDSCAPE,T=100000,src={trades:[],t0:0,t1:T,mid:()=>100},g={spanMs:60000,half:4,nx:41,venue:"both"};
-    const w=(a,b,px,v)=>({family:"wall",venue:v||"bn",stage:"ended",tStart:T-a,tEnd:T-b,tDetected:T-a+1000,px});
-    const eps=[w(50000,40000,100.02),w(39000,30000,100.0201),w(28000,20000,100.02),w(10000,5000,100.02),w(45000,35000,100.05),w(45000,35000,100.02,"hl"),{family:"absorption",venue:"bn",stage:"active",tStart:T-8000,tEnd:null,tDetected:T-6000,px:100.02}];
-    const m=LS.episodeMarks(src,T,g,eps),raw=LS.episodeMarks(src,T,g,eps,{merge:false}),walls=m.filter(x=>x.wall),hid=LS.episodeMarks(src,T,g,eps,{hide:{wall:true}});
-    const big=walls.find(x=>x.n===3);
-    return{ok:raw.length===7&&m.length===5&&walls.length===4&&!!big&&Math.abs(big.z0+1/3)<1e-9&&Math.abs(big.z1-2/3)<1e-9&&Math.abs(big.zd-(49000/60000*2-1))<1e-9&&hid.length===1&&hid[0].family==="absorption"&&walls.filter(x=>x.venue==="hl").length===1,
-      detail:JSON.stringify({raw:raw.length,m:m.length,walls:walls.map(x=>[x.venue,x.n,+x.u.toFixed(3)]),hid:hid.length})};
   });
   // ---- auto-record (v031): when to start and stop recording, from a one-second price series ----
   add("autorec: sigma of a random walk matches its true scale, on the same footing as the engine's sigma",E=>{
@@ -3164,14 +2884,6 @@ const READER_SELFTEST=(()=>{
     const A=AUTOREC,r=rng(3),h=A.createHistory();let px=82000,t=T0;for(let i=0;i<3700;i++){px*=1+(r()-.5)*2*1.5/1e4;t+=1000;A.push(h,t,px);}
     const live=A.vol(h,{},t+2000),stale=A.vol(h,{},t+60000),a=A.step({mode:"waiting"},stale,t+60000,{});
     return{ok:live.ready&&!stale.ready&&a.action===null,detail:JSON.stringify({live:live.ready,stale:stale.ready,action:a.action})};
-  });
-  add("landscape: a multi-venue episode on a single-venue grid is placed against that venue's mid; a merged mark keeps the newest stage and is dashed only if every mark was",E=>{
-    const LS=READER_LANDSCAPE,T=100000,src={trades:[],t0:0,t1:T,mid:v=>v==="hl"?100:200},g={spanMs:60000,half:4,nx:41,venue:"hl"};
-    const one=LS.episodeMarks(src,T,g,[{family:"burst",venues:["bn","hl"],stage:"ended",tStart:T-20000,tEnd:T-10000,tDetected:T-19000,px:100.02}]);
-    const w=(a,b,px,st)=>({family:"wall",venue:"hl",stage:st,tStart:T-a,tEnd:T-b,tDetected:T-a+1000,px});
-    const m=LS.episodeMarks(src,T,g,[w(20000,10000,100.02,"ended"),w(40000,23000,100.02,"fading"),w(60000,50000,104.5,"ended"),w(55000,52000,104.5,"ended")]);
-    const mid=m.find(x=>!x.outside),far=m.find(x=>x.outside);
-    return{ok:one.length===1&&Math.abs(one[0].u-.5)<1e-9&&m.length===2&&mid.n===2&&mid.stage==="ended"&&!!far&&far.n===2&&far.outside===true,detail:JSON.stringify({one:one.length&&one[0].u,m:m.map(x=>[x.n,x.stage,x.outside])})};
   });
   add("replay: an empty recording and one with unknown record types replay to a quiet engine without throwing",E=>{
     const a=E.replayEngine([]),b=E.replayEngine([["zz",1],["a",T0],["x"],["a",T0+1000]]);
@@ -4746,7 +4458,6 @@ const READER_SLOT = {slot:"reader", render:()=>renderReader(), minIntervalMs:250
 VIEWS.register({id:"overview", label:"Overview", area:"now", minIntervalMs:250, render:()=>{ try{ renderOverview(); }catch(e){ console.error("overview", e); } }});
 VIEWS.register({id:"armmode", label:"Arm mode", area:"now"});
 VIEWS.register({id:"market", label:"Market and tape", area:"now"});
-VIEWS.register({id:"futures", label:"Futures stack", area:"setups", minIntervalMs:250, render:()=>{ if (typeof futuresRender === "function") futuresRender(); }});
 VIEWS.register({id:"micro", label:"Microstructure", area:"setups", minIntervalMs:250, render:()=>renderMicro()});
 VIEWS.register(Object.assign({id:"reader", label:"Episodes", area:"reader"}, READER_SLOT));
 VIEWS.register({id:"signals", label:"Signals", area:"reader", slot:"reader"});
@@ -5855,231 +5566,6 @@ hs$("hsCsv").onclick = hsCsv;
 VIEWS.onOpen("history", () => hsLoad());
 HOOKS.on("logout", () => { HS.cache = {}; HS.found = []; HS.sym = null; hsRender(); });      // another account must never show this one's rows      // open the view: load only what is not loaded yet for this choice
 hsRender();
-
-</script>
-<script>
-"use strict";
-// Flow landscape view (Reader tab): a 3D surface of where, and how long ago, buyers and sellers hit the book, with the playhead as the
-// fourth dimension. All the maths is in reader-landscape.js. This file only reads app state (trades, mids, the loaded session, the
-// episodes) and draws; it never writes to the Reader engine. It hooks renderReader, and every call is guarded, so if anything here
-// fails the rest of the Reader tab keeps working.
-const LV = {
-  src: "live", venue: store.get("ls.venue", "both"), spanMs: +store.get("ls.span", 60000) || 60000, speed: +store.get("ls.speed", 4) || 4, marks: store.get("ls.marks", "all"),
-  yaw: -.62, pitch: .62, t: null, play: false, half: 0, zscale: 0, sess: null, sessOf: null, drag: null, last: 0, raf: 0, dirty: true, cache: null, order: null, orderKey: "", ms: 0,
-};
-const ls$ = id => document.getElementById(id);
-const LS_HEIGHT = .78;                      // tallest peak, as a share of half the floor width
-
-function lsSource() {
-  if (LV.src === "session") {
-    if (typeof RT === "undefined" || !RT.session) return null;
-    if (LV.sessOf !== RT.session){ LV.sessOf = RT.session; LV.sessId = (LV.sessId || 0) + 1; LV.sess = READER_LANDSCAPE.fromInputs(RT.session.inputs); LV.t = null; }
-    return LV.sess.trades.length ? LV.sess : null;
-  }
-  return {
-    trades, t0: nowEx() - KEEP, t1: nowEx() - 300,
-    mid: (v, t) => {
-      const last = midHist.length ? midHist[midHist.length-1] : null;
-      if (!last) return null;
-      if (t >= last.t) return last[v] > 0 ? last[v] : null;
-      let lo = 0, hi = midHist.length;
-      while (lo < hi){ const m = (lo+hi) >> 1; if (midHist[m].t < t) lo = m+1; else hi = m; }
-      const e = midHist[Math.min(lo, midHist.length-1)];
-      return e && e[v] > 0 && Math.abs(e.t - t) < 5000 ? e[v] : null;
-    },
-  };
-}
-const lsRange = src => src === LV.sess ? {a: src.t0, b: src.t1} : {a: src.t0 + LV.spanMs, b: src.t1};
-
-// ---------- drawing ----------
-// Cost control (v022): the data (grid) is computed only when the playhead, window, venue or live data changes; rotating redraws from the cached
-// grid. Each frame projects the 41x24 vertices once (not four corners per quad), walks the cells far to near in an order that is sorted only
-// when the angle changes, and fills from a small colour table. While dragging or playing it draws at 1x resolution without cell outlines.
-const LS_BUY = [47,191,113], LS_SELL = [229,83,75], LS_LEVELS = 24;
-const lsRgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
-const LS_FILL = [LS_SELL, LS_BUY].map(col => Array.from({length: LS_LEVELS+1}, (_, k) => { const m = k/LS_LEVELS; return lsRgba(col.map(c => Math.round(c*(.45+.55*Math.sqrt(m)) + 12*(1-m))), (.25 + .7*Math.sqrt(m)).toFixed(3)); }));
-const LS_FAM = {absorption:"122,162,247", exhaustion:"240,185,80", burst:"187,134,252", wall:"214,221,230"};   // episode marks on the floor
-const LS_EDGE = [LS_SELL, LS_BUY].map(col => lsRgba(col, .28));
-
-function lsPrepCanvas(cv, fast) {
-  const dpr = fast ? 1 : Math.min(window.devicePixelRatio || 1, 2), w = cv.clientWidth, h = cv.clientHeight;
-  if (cv.width !== Math.round(w*dpr) || cv.height !== Math.round(h*dpr)){ cv.width = Math.round(w*dpr); cv.height = Math.round(h*dpr); }
-  const ctx = cv.getContext("2d"); ctx.setTransform(cv.width/w, 0, 0, cv.height/h, 0, 0); ctx.clearRect(0, 0, w, h);
-  ctx.font = "10.5px ui-monospace,Menlo,Consolas,monospace";
-  return {ctx, w, h};
-}
-
-function lsDraw(cv, g, info, fast, marks) {
-  const {ctx, w, h} = lsPrepCanvas(cv, fast); if (w < 60) return;
-  const nx = g.nx, ny = g.ny, n = nx*ny, S = Math.min(w*.27, h*.33), cx = w/2, cy = h*.5;
-  const cyw = Math.cos(LV.yaw), syw = Math.sin(LV.yaw), cp = Math.cos(LV.pitch), sp = Math.sin(LV.pitch);
-  const P = (X, H, Z) => { const x1 = X*1.6*cyw - Z*syw, z1 = X*1.6*syw + Z*cyw, y2 = H*cp + z1*sp, z2 = z1*cp - H*sp, f = 3.6/(3.6 + z2); return [cx + x1*f*S, cy - y2*f*S]; };
-  const U = i => (i+.5)/nx*2 - 1, Zc = j => (j+.5)/ny*2 - 1;
-  const sc = LV.zscale || 1, sq = x => Math.sign(x)*Math.sqrt(Math.min(1, Math.abs(x)/sc));
-  ctx.lineWidth = 1;
-  // floor and grid
-  const c4 = [P(-1,0,-1), P(1,0,-1), P(1,0,1), P(-1,0,1)];
-  ctx.beginPath(); c4.forEach((p, k) => k ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath();
-  ctx.fillStyle = TH.a("accent",.05); ctx.fill(); ctx.strokeStyle = TH.line; ctx.stroke();
-  ctx.strokeStyle = TH.a("dim",.16); ctx.beginPath();
-  for (let k = 1; k < 4; k++){ const u = -1 + k/2, a = P(u,0,-1), b = P(u,0,1), c = P(-1,0,u), d = P(1,0,u); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.moveTo(c[0],c[1]); ctx.lineTo(d[0],d[1]); }
-  ctx.stroke();
-  ctx.setLineDash([4,4]); ctx.strokeStyle = TH.a("text",.4); { const a = P(0,0,-1), b = P(0,0,1); ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke(); } ctx.setLineDash([]);
-  const trace = (style, width) => {                              // where the price actually was
-    ctx.strokeStyle = style; ctx.lineWidth = width; ctx.beginPath(); let pen = false;
-    g.path.forEach((off, j) => { if (off == null){ pen = false; return; } const p = P(Math.max(-1, Math.min(1, off/g.half)), 0, Zc(j)); pen ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); pen = true; });
-    ctx.stroke(); ctx.lineWidth = 1;
-  };
-  trace(TH.a("hi",.95), 2);
-  // vertices, projected once
-  const vx = new Float32Array(n), vy = new Float32Array(n);
-  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++){ const k = j*nx + i, p = P(U(i), sq(g.zs[k]) * LS_HEIGHT, Zc(j)); vx[k] = p[0]; vy[k] = p[1]; }
-  // far-to-near cell order depends only on the angle
-  const key = LV.yaw.toFixed(3) + "|" + LV.pitch.toFixed(3) + "|" + nx + "x" + ny;
-  if (LV.orderKey !== key){
-    const m = (nx-1)*(ny-1), depth = new Float64Array(m), idx = new Uint16Array(m);
-    for (let j = 0; j < ny-1; j++) for (let i = 0; i < nx-1; i++){ const q = j*(nx-1) + i; idx[q] = q; depth[q] = (U(i)+.5/nx)*1.6*syw + (Zc(j)+.5/ny)*cyw; }
-    idx.sort((a, b) => depth[b] - depth[a]); LV.order = idx; LV.orderKey = key;
-  }
-  const order = LV.order;
-  for (let t = 0; t < order.length; t++){
-    const q = order[t], j = (q / (nx-1)) | 0, i = q - j*(nx-1), k = j*nx + i;
-    const v = sq((g.zs[k] + g.zs[k+1] + g.zs[k+nx] + g.zs[k+nx+1]) / 4);
-    if (v > -.04 && v < .04) continue;
-    const side = v > 0 ? 1 : 0, lv = Math.min(LS_LEVELS, Math.round(Math.abs(v)*LS_LEVELS));
-    ctx.beginPath(); ctx.moveTo(vx[k], vy[k]); ctx.lineTo(vx[k+1], vy[k+1]); ctx.lineTo(vx[k+nx+1], vy[k+nx+1]); ctx.lineTo(vx[k+nx], vy[k+nx]); ctx.closePath();
-    ctx.fillStyle = LS_FILL[side][lv]; ctx.fill();
-    ctx.strokeStyle = fast ? LS_FILL[side][lv] : LS_EDGE[side]; ctx.stroke();      // fast mode: a hairline in the fill colour only hides the seams
-  }
-  trace(TH.a("hi",.5), 1);
-  for (const m of marks || []){                                  // Reader episodes: a stripe along the age axis at the episode's price, a diamond where it was detected
-    const col = LS_FAM[m.family] || "214,221,230", a0 = P(m.u, 0, m.z0), a1 = P(m.u, 0, m.z1);
-    ctx.strokeStyle = `rgba(${col},${m.stage === "ended" ? .45 : .95})`; ctx.lineWidth = m.wall ? 3 : 2; ctx.setLineDash(m.outside ? [3,3] : []);
-    ctx.beginPath(); ctx.moveTo(a0[0], a0[1]); ctx.lineTo(a1[0], a1[1]); ctx.stroke(); ctx.setLineDash([]); ctx.lineWidth = 1;
-    if (m.zd != null){ const d = P(m.u, 0, m.zd); ctx.fillStyle = `rgb(${col})`; ctx.beginPath(); ctx.moveTo(d[0], d[1]-5); ctx.lineTo(d[0]+4, d[1]); ctx.lineTo(d[0], d[1]+5); ctx.lineTo(d[0]-4, d[1]); ctx.closePath(); ctx.fill(); }
-  }                              // the path again over the surface, so a peak cannot hide it
-  ctx.strokeStyle = TH.a("hi",.9); ctx.lineWidth = 1.5; { const a = P(-1,0,-1), b = P(1,0,-1); ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke(); } ctx.lineWidth = 1;
-  // axes
-  ctx.fillStyle = TH.dim; ctx.textAlign = "center";
-  for (const u of [-1, 0, 1]){ const p = P(u,0,-1.2); ctx.fillText((u > 0 ? "+" : u < 0 ? "-" : "") + (Math.abs(u)*g.half).toFixed(g.half < 10 ? 1 : 0) + " bps", p[0], p[1]+4); }
-  ctx.textAlign = "left";
-  for (const z of [-1, 0, 1]){ const p = P(1.08,0,z); ctx.fillText(z === -1 ? "now" : ((z+1)/2*g.spanMs/1000).toFixed(0) + " s ago", p[0], p[1]+3); }
-  { const b = P(-1,LS_HEIGHT,1), c = P(-1,-LS_HEIGHT,1); ctx.strokeStyle = TH.line; ctx.beginPath(); ctx.moveTo(c[0],c[1]); ctx.lineTo(b[0],b[1]); ctx.stroke();
-    ctx.fillStyle = lsRgba(LS_BUY, 1); ctx.fillText("buyers", b[0]+4, b[1]+3); ctx.fillStyle = lsRgba(LS_SELL, 1); ctx.fillText("sellers", c[0]+4, c[1]+3); }
-  ctx.fillStyle = TH.dim; ctx.textAlign = "left"; ctx.fillText(info + "   \u00b7   full height = " + fmtK(sc) + " net per spot (square-root scale)", 8, 14);
-}
-
-// ---------- readout ----------
-function lsEpisodeList(tNow, all) {
-  const eng = RD(); if (!eng || !eng.episodeGroups) return [];
-  if (LV.src === "session" && !rdView.engine) return [];
-  if (LV.src === "live" && rdView.engine) return [];
-  const gs = eng.episodeGroups();
-  return all ? gs : gs.filter(e => e.tStart <= tNow && (e.tEnd == null || e.tEnd >= tNow - 5000));
-}
-function lsEpisodes(tNow) {
-  const list = lsEpisodeList(tNow);
-  if (!list.length) return "";
-  return " Reader episodes at this moment: " + list.map(e => `${READER_EPISODES.FAMILY_LABEL[e.family] || e.family} (${(e.venues || [e.venue]).map(v => v.toUpperCase()).join("+")}, ${e.stage})`).join("; ") + ".";
-}
-function lsReadout(g, tNow, withEpisodes = true) {
-  const cell = c => c ? `${fmtK(Math.abs(c.z))} at ${c.xBps >= 0 ? "+" : "-"}${Math.abs(c.xBps).toFixed(1)} bps, ${c.ageS.toFixed(0)} s ago` : "none";
-  const tot = g.buy + g.sell, lean = tot > 0 ? g.net/tot : 0;
-  const side = Math.abs(lean) < .15 ? "flow was balanced" : lean > 0 ? "buyers were the aggressors" : "sellers were the aggressors";
-  const move = g.moveBps == null ? "" : ` The mid moved ${g.moveBps >= 0 ? "+" : ""}${g.moveBps.toFixed(1)} bps over the window.`;
-  return `<b>${hhmmss(tNow).slice(0,8)}</b> · last ${(g.spanMs/1000).toFixed(0)} s · ${g.venue === "both" ? "BN + HL" : g.venue.toUpperCase()}: ${side} (buy ${fmtK(g.buy)}, sell ${fmtK(g.sell)}).` +
-    ` Biggest buying pocket: ${cell(g.peakBuy)}. Biggest selling pocket: ${cell(g.peakSell)}.${move}${g.clipped ? ` ${g.clipped} trade${g.clipped === 1 ? "" : "s"} fell outside the price range.` : ""}${withEpisodes ? lsEpisodes(tNow) : ""}`;
-}
-
-// ---------- frame ----------
-function lsLayout(split) {                                        // side by side: a second canvas, two columns on a wide screen and stacked on a phone
-  const cv2 = ls$("lsCv2"); if (!cv2 || cv2.hidden === !split) return;
-  cv2.hidden = !split; ls$("lsWrap").classList.toggle("split", split); ls$("lsCv").style.height = cv2.style.height = split ? "340px" : "440px"; LV.dirty = true; LV.cache = null;
-}
-function lsPlayhead(src) {
-  const r = lsRange(src);
-  if (LV.t == null) return LV.src === "live" ? r.b : r.a;
-  return Math.max(r.a, Math.min(r.b, LV.t));
-}
-function lsRender() {
-  const sec = ls$("lsSection"); if (!sec || !visible("reader")) return;
-  const cv = ls$("lsCv"), cv2 = ls$("lsCv2"), split = LV.venue === "split", src = lsSource();
-  lsLayout(split);
-  if (!src){ const {ctx, w, h} = prep(cv); emptyMsg(ctx, w, h, LV.src === "session" ? "Load a recorded session (Recordings, Record) to walk through it." : "Connect to see the landscape."); ls$("lsRead").textContent = ""; lsControls(null); LV.cache = null; return; }
-  const live = LV.src === "live" && LV.t == null, tNow = lsPlayhead(src);
-  const key = READER_LANDSCAPE.cacheKey({src: LV.src, venue: LV.venue, spanMs: LV.spanMs, tNow, live, sessId: src === LV.sess ? LV.sessId : null, trades});
-  let c = LV.cache;
-  if (!c || c.key !== key){                                    // new data or a new moment: recompute; otherwise rotate from the cache
-    const t0 = performance.now(), L = READER_LANDSCAPE, vs = split ? ["bn", "hl"] : [LV.venue];                  // side by side: one grid per venue, on a shared price range and height scale
-    const os = vs.map(v => { const o = {venue: v, spanMs: LV.spanMs}; o.path = L.path(src, tNow, o); return o; });
-    const target = Math.max(...os.map(o => L.autoHalf(src, tNow, o)));
-    LV.half = !LV.half ? target : target > LV.half ? target : LV.half + (target - LV.half)*.1;
-    const gs = os.map(o => L.grid(src, tNow, Object.assign({halfBps: Math.ceil(LV.half*2)/2}, o))), g = gs[0], sc = Math.max(...gs.map(x => x.scale));
-    LV.zscale = !LV.zscale || sc > LV.zscale ? Math.max(sc, 1) : Math.max(1, LV.zscale*.96 + sc*.04);
-    c = LV.cache = {key, g, gs, tNow, live, gridMs: performance.now() - t0};
-    const dn = performance.now();                              // text and slider are written at most 4 times a second while playing: each write forces a page layout
-    if (!LV.play || dn - (LV.domAt || 0) > 250){ LV.domAt = dn; ls$("lsRead").innerHTML = gs.map((x, i) => lsReadout(x, tNow, i === gs.length - 1)).join("<br>"); lsControls(src, tNow, live); }
-  } else if (!LV.dirty) return;                                  // nothing changed since the last draw
-  LV.dirty = false;
-  { const b = ls$("lsPlay"), want = LV.play ? "Pause" : "Play"; if (b.textContent !== want) b.textContent = want; }      // a pause lands on a cached grid, so the label is kept right here
-  const fast = !!LV.drag || LV.play, t1 = performance.now();
-  [cv, cv2].slice(0, c.gs.length).forEach((cvx, i) => { const gx = c.gs[i];
-    lsDraw(cvx, gx, (c.live ? "LIVE" : "PLAYHEAD " + hhmmss(c.tNow).slice(0,8)) + (split ? "   ·   " + gx.venue.toUpperCase() : ""), fast, LV.marks === "off" ? [] : READER_LANDSCAPE.episodeMarks(src, c.tNow, gx, lsEpisodeList(c.tNow, true), {hide: LV.marks === "nowall" ? {wall: true} : {}})); });
-  LV.ms = performance.now() - t1;
-  const now = performance.now(); if (now - (LV.perfAt || 0) > 700){ LV.perfAt = now; ls$("lsPerf").textContent = "grid " + c.gridMs.toFixed(1) + " ms · draw " + LV.ms.toFixed(1) + " ms" + (fast ? " (fast mode)" : ""); }      // DOM text is written rarely: writing it every frame forces a page layout
-}
-function lsControls(src, tNow, live) {
-  const sl = ls$("lsT"), has = !!src;
-  sl.disabled = !has; ls$("lsPlay").disabled = !has; ls$("lsLive").disabled = !has || LV.src !== "live";
-  ls$("lsPlay").textContent = LV.play ? "Pause" : "Play";
-  ls$("lsSrc").querySelector('option[value="session"]').disabled = typeof RT === "undefined" || !RT.session;
-  if (!has) { ls$("lsClock").textContent = ""; return; }
-  const r = lsRange(src); if (!LV.drag || LV.drag.kind !== "slider") sl.value = r.b > r.a ? Math.round((tNow - r.a)/(r.b - r.a)*1000) : 1000;
-  ls$("lsClock").textContent = live ? "live" : hhmmss(tNow).slice(0,8) + (LV.src === "live" ? "  (" + Math.round((r.b - tNow)/1000) + " s ago)" : "");
-}
-function lsLoop() {
-  LV.raf = 0;
-  if (!visible("reader")) { LV.play = false; return; }
-  const now = performance.now(), dt = Math.min(100, now - (LV.lastFrame || now)); LV.lastFrame = now;
-  const src = lsSource();
-  if (LV.play && src){
-    const r = lsRange(src); let t = lsPlayhead(src) + dt*LV.speed;
-    if (t >= r.b){ t = r.b; LV.play = false; if (LV.src === "live") t = null; }
-    LV.t = t;
-  }
-  if (LV.dirty || LV.play){ try { lsRender(); } catch (e) { /* the landscape must never take the Reader down */ } }
-  if (LV.play || LV.drag) LV.raf = requestAnimationFrame(lsLoop);
-}
-function lsKick() { LV.dirty = true; if (!LV.raf) { LV.lastFrame = performance.now(); LV.raf = requestAnimationFrame(lsLoop); } }
-
-// ---------- wiring ----------
-(function lsInit() {
-  const cv = ls$("lsCv"), cv2 = ls$("lsCv2"); if (!cv) return;
-  ls$("lsSrc").value = LV.src; ls$("lsVenue").value = LV.venue; ls$("lsSpan").value = String(LV.spanMs); ls$("lsSpeed").value = String(LV.speed);
-  ls$("lsSrc").onchange = e => { LV.src = e.target.value; LV.t = null; LV.play = false; LV.half = LV.zscale = 0; lsKick(); };
-  ls$("lsVenue").onchange = e => { LV.venue = e.target.value; store.set("ls.venue", LV.venue); LV.half = LV.zscale = 0; lsKick(); };
-  ls$("lsSpan").onchange = e => { LV.spanMs = +e.target.value; store.set("ls.span", LV.spanMs); LV.half = LV.zscale = 0; lsKick(); };
-  ls$("lsMarks").value = LV.marks; ls$("lsMarks").onchange = e => { LV.marks = e.target.value; store.set("ls.marks", LV.marks); lsKick(); };
-  ls$("lsSpeed").onchange = e => { LV.speed = +e.target.value; store.set("ls.speed", LV.speed); };
-  ls$("lsLive").onclick = () => { LV.t = null; LV.play = false; lsKick(); };
-  ls$("lsPlay").onclick = () => { const src = lsSource(); if (!src) return; if (!LV.play){ const r = lsRange(src); if (lsPlayhead(src) >= r.b - 500 && LV.src === "session") LV.t = r.a; if (LV.src === "live" && LV.t == null) LV.t = Math.max(r.a, r.b - 120000); } LV.play = !LV.play; lsKick(); };
-  const sl = ls$("lsT");
-  sl.oninput = () => { const src = lsSource(); if (!src) return; const r = lsRange(src), f = +sl.value/1000; LV.play = false; LV.drag = {kind:"slider"};
-    LV.t = LV.src === "live" && f >= .995 ? null : r.a + f*(r.b - r.a); lsKick(); };
-  sl.onchange = () => { LV.drag = null; };
-  ls$("lsView").onclick = e => { const b = e.target.closest("button"); if (!b) return; const v = b.dataset.v;
-    if (v === "3d"){ LV.yaw = -.62; LV.pitch = .62; } else if (v === "top"){ LV.yaw = 0; LV.pitch = 1.5; } else if (v === "side"){ LV.yaw = 1.45; LV.pitch = .12; } else if (v === "front"){ LV.yaw = 0; LV.pitch = .22; }
-    lsKick(); };
-  for (const cvx of [cv, cv2]) cvx.addEventListener("pointerdown", e => { cvx.setPointerCapture(e.pointerId); LV.drag = {kind:"rotate", x:e.clientX, y:e.clientY, touch:e.pointerType !== "mouse"}; lsKick(); });
-  for (const cvx of [cv, cv2]) cvx.addEventListener("pointermove", e => { const d = LV.drag; if (!d || d.kind !== "rotate") return;
-    LV.yaw += (e.clientX - d.x)*.008; if (!d.touch) LV.pitch = Math.max(.05, Math.min(1.5, LV.pitch + (e.clientY - d.y)*.006)); d.x = e.clientX; d.y = e.clientY; LV.dirty = true; });
-  const end = () => { if (LV.drag && LV.drag.kind === "rotate"){ LV.drag = null; lsKick(); } };
-  for (const cvx of [cv, cv2]){ cvx.addEventListener("pointerup", end); cvx.addEventListener("pointercancel", end); }
-  window.addEventListener("resize", () => { LV.dirty = true; });
-})();
-
-// Draw with the Reader tab's own refresh (every 250 ms while it is visible); a failure here is contained.
-HOOKS.on("renderReader", () => { if (!LV.play && !LV.drag) lsRender(); });
 
 </script>
 <script type="text/plain" id="arWorkerSrc">
@@ -9044,7 +8530,7 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden && FS
 "use strict";
 // Header status (view): live chips next to Connect/Pause and the BN/HL pills (STATUS.chips, status-core.js), and the "newer version" bar.
 // Read-only: it only looks at the app's state once a second and never changes a feed, a recording or a detection. Loaded last.
-const APP_VERSION = "v132";            // "vNNN" in a release build, "dev" otherwise (build.mjs stamps it)
+const APP_VERSION = "v133";            // "vNNN" in a release build, "dev" otherwise (build.mjs stamps it)
 const SB = {latest:null, sure:false, timer:null};
 const sb$ = id => document.getElementById(id);
 sb$("ver").textContent = APP_VERSION;           // tiny version tag next to the title
@@ -10716,219 +10202,6 @@ setInterval(amRender, 1000); amRender();
 
 </script>
 <script>
-// Futures stack (pure, self-tested; FUTSTACK): the numbers behind Now > Futures stack, a "who got liquidated / who is aggressive / are positions opening or closing" overview.
-// A store keeps 5-second base bins per venue (price open/high/low/close, liquidation $ by side, taker buy / sell $ without liquidations, open interest); `aggregate` re-bins them for display;
-// `highlights` marks the moments the setup is about: a liquidation spike that is confirmed by a volume-delta spike on the same side and by open interest dropping (positions being closed by force).
-// Reading only. Nothing here touches the Reader engine, the broker or the feeds.
-const FUTSTACK = (() => {
-  const BASE_MS = 5000, VENUES = ["bn", "hl", "by", "ok"], PRICE = ["bn", "hl"];      // by = Bybit, ok = OKX: liquidations only (the other venues give price, delta and open interest)
-  const DEFAULTS = { minLiqUsd:100000, liqMult:3, deltaMult:1.5, oiDropPct:0.0005, oiLag:2, gap:2 };
-  const slot = t => Math.floor(t / BASE_MS);
-  const blank = () => ({ o:null, h:null, l:null, c:null, bl:0, sl:0, b:0, s:0, n:0, p:null, oi:null });      // n = trades, p = Map(price bucket -> [buy $, sell $]) for the volume profile
-  const newStore = () => ({ bins:new Map(), oi:{ bn:null, hl:null }, tick:null, bf:null });
-  // price bucket for the volume profile: about 1/10000 of the price, rounded down to 1, 2 or 5 x 10^k; fixed from the first price seen
-  const niceTick = px => { const t = px * 1e-4, e = Math.pow(10, Math.floor(Math.log10(t))), m = t / e; return (m >= 5 ? 5 : m >= 2 ? 2 : 1) * e; };
-  function addProfile(st, x, px, buy, sell) { if (!st.tick) st.tick = niceTick(px); const k = Math.floor(px / st.tick); if (!x.p) x.p = new Map(); const e = x.p.get(k); if (e) { e[0] += buy; e[1] += sell; } else x.p.set(k, [buy, sell]); }
-  function cell(st, k, v) { let b = st.bins.get(k); if (!b) { b = { k }; for (const x of VENUES) b[x] = blank(); st.bins.set(k, b); } return b[v]; }
-  // t: {t, v, side, px, ntl, liq}. side is the aggressor side; for a liquidation it is the side of the forced order (sell = a long was closed out).
-  function addTrade(st, t) {
-    if (!VENUES.includes(t.v) || !(t.px > 0) || !(t.ntl >= 0)) return;
-    const x = cell(st, slot(t.t), t.v);
-    if (!PRICE.includes(t.v)) { if (t.liq) { if (t.side === "sell") x.sl += t.ntl; else x.bl += t.ntl; } return; }
-    if (x.o == null) x.o = x.h = x.l = x.c = t.px; else { if (t.px > x.h) x.h = t.px; if (t.px < x.l) x.l = t.px; x.c = t.px; }
-    if (t.liq) { if (t.side === "sell") x.sl += t.ntl; else x.bl += t.ntl; }
-    else { x.n++; if (t.side === "buy") x.b += t.ntl; else x.s += t.ntl; addProfile(st, x, t.px, t.side === "buy" ? t.ntl : 0, t.side === "buy" ? 0 : t.ntl); }
-  }
-  function setOi(st, v, val) { if (VENUES.includes(v)) st.oi[v] = val > 0 ? +val : null; }
-  function stamp(st, t) { for (const v of VENUES) if (st.oi[v] != null) cell(st, slot(t), v).oi = st.oi[v]; }   // open interest is polled, so it is written into the current bin every tick
-  function prune(st, keepMs, now) { const cut = slot(now - keepMs); for (const k of st.bins.keys()) if (k < cut) st.bins.delete(k); }
-
-  // o: {venue:"bn"|"hl"|"all", t0, t1, binMs, liqAll}. "all" = Binance + Hyperliquid for price, delta and open interest. liqAll adds the liquidations AND the open interest of every venue (Bybit and OKX too) to whichever venue is shown;
-  // a venue's open interest is only added when it has a reading near the start of the window (first 10% of the bins), and is carried back to the start and forward over gaps, so a venue that appears late never makes a step. The result's .oiVenues lists the ones used. One entry per display bin, including empty ones, so the time axis is even.
-  function aggregate(st, o) {
-    const per = Math.max(1, Math.round(o.binMs / BASE_MS)), t0 = Math.floor(o.t0 / o.binMs) * o.binMs, n = Math.max(1, Math.ceil((o.t1 - t0) / o.binMs));
-    const vs = o.venue === "all" ? PRICE : [o.venue], lv = o.liqAll ? VENUES : vs, ov = o.liqAll ? VENUES : vs, out = [];
-    for (let j = 0; j < n; j++) {
-      const r = { t:t0 + j*o.binMs, o:null, h:null, l:null, c:null, bl:0, sl:0, b:0, s:0, n:0, oi:null, has:false }, k0 = slot(r.t), pv = {}, oiV = {};
-      for (const v of vs) pv[v] = { o:null, h:null, l:null, c:null };
-      for (let k = k0; k < k0 + per; k++) {
-        const bin = st.bins.get(k); if (!bin) continue; r.has = true;
-        for (const v of lv) { r.bl += bin[v].bl; r.sl += bin[v].sl; }
-        for (const v of ov) if (bin[v].oi != null) oiV[v] = bin[v].oi;
-        for (const v of vs) {
-          const x = bin[v], p = pv[v]; r.b += x.b; r.s += x.s; r.n += x.n;
-          if (x.o != null) { if (p.o == null) { p.o = x.o; p.h = x.h; p.l = x.l; } else { if (x.h > p.h) p.h = x.h; if (x.l < p.l) p.l = x.l; } p.c = x.c; }
-        }
-      }
-      const pick = vs.find(v => pv[v].o != null); if (pick) Object.assign(r, pv[pick]);
-      r._oiv = oiV;
-      r.liq = r.bl + r.sl; r.delta = r.b - r.s; r.vol = r.b + r.s; r.range = r.o != null && r.l > 0 ? (r.h - r.l) / r.l * 1e4 : null; r.dpct = r.vol > 0 ? r.delta / r.vol : null; out.push(r);   // range in bps, dpct = delta / volume
-    }
-    const firstOi = out.findIndex(r => ov.some(v => r._oiv[v] != null)), reach = firstOi < 0 ? 0 : firstOi + Math.ceil(out.length * .1), inc = [], carry = {};
-    for (const v of ov) { const j = out.findIndex(r => r._oiv[v] != null); if (j >= 0 && j <= reach) { inc.push(v); carry[v] = out[j]._oiv[v]; } }
-    for (const r of out) { let sum = 0; for (const v of inc) { if (r._oiv[v] != null) carry[v] = r._oiv[v]; sum += carry[v]; } r.oi = inc.length ? sum : null; delete r._oiv; }
-    out.oiVenues = inc;
-    let prev = null; for (const r of out) { r.doi = r.oi != null && prev != null && prev > 0 ? (r.oi - prev) / prev : null; if (r.oi != null) prev = r.oi; }
-    {
-    }
-    return out;
-  }
-
-  // Volume at price over a time range, for the shown venue(s): {tick, rows:[{px, b, s}] ascending by price, max}. px is the bucket centre.
-  function profile(st, o) {
-    const vs = o.venue === "all" ? PRICE : [o.venue], acc = new Map();
-    if (st.tick) for (let k = slot(o.t0); k <= slot(o.t1); k++) { const bin = st.bins.get(k); if (!bin) continue; for (const v of vs) { const p = bin[v].p; if (!p) continue; for (const [kb, e] of p) { const a = acc.get(kb); if (a) { a[0] += e[0]; a[1] += e[1]; } else acc.set(kb, [e[0], e[1]]); } } }
-    const rows = [...acc].sort((a, b) => a[0] - b[0]).map(([kb, e]) => ({ px:(kb + .5) * (st.tick || 1), b:e[0], s:e[1] })); return { tick:st.tick, rows, max:rows.reduce((m, r) => Math.max(m, r.b + r.s), 0) };
-  }
-
-  // History for the start of a session: Binance 1-minute klines (price, and taker buy quote volume = delta) and 5-minute open interest history, spread over the 5 s base bins.
-  // klines: rows of /fapi/v1/klines ([openTime, o, h, l, c, vol, closeTime, quoteVol, trades, takerBuyBase, takerBuyQuote]); oiHist: rows of /futures/data/openInterestHist ({timestamp, sumOpenInterest}); until: the time the open interest is held to.
-  // Live data wins: a base bin that already has live price keeps it, one that already has open interest keeps it. Detail inside a minute is invented (price walks open -> low/high -> close, volume is split evenly), so 1-minute and 5-minute bins are exact and 15-second bins are approximate.
-  // Liquidations cannot be backfilled (Binance keeps no public history), and the kline delta includes liquidation prints. Returns {t0, t1, minutes, oiPoints} of what was written.
-  // Open interest history of one venue: pts = [{t, v}] (any order, v in coin); each reading is held until the next one, the last until `until`. A bin that already has a reading keeps it. Returns the number of points used.
-  function backfillOi(st, venue, pts, until) {
-    if (!VENUES.includes(venue)) return 0; const a = (pts || []).filter(p => p.t > 0 && p.v > 0).sort((x, y) => x.t - y.t);
-    a.forEach((p, j) => { const end = j + 1 < a.length ? a[j + 1].t : Math.max(p.t + 300000, until || 0); for (let k = slot(p.t); k < slot(end); k++) { const x = cell(st, k, venue); if (x.oi == null) x.oi = p.v; } });
-    return a.length;
-  }
-  function backfill(st, klines, oiHist, until) {
-    const per = 60000 / BASE_MS, res = { t0:null, t1:null, minutes:0, oiPoints:0 };
-    for (const r of klines || []) {
-      const t0 = +r[0], o = +r[1], h = +r[2], l = +r[3], c = +r[4], qv = +r[7], tb = +r[10], cnt = +r[8] > 0 ? +r[8] : 0; if (!(o > 0) || !(h > 0) || !(l > 0) || !(c > 0)) continue;
-      const wp = c >= o ? [[0, o], [4, l], [8, h], [per - 1, c]] : [[0, o], [4, h], [8, l], [per - 1, c]], k0 = slot(t0), buy = (tb > 0 ? tb : 0) / per, sell = Math.max(0, qv - (tb > 0 ? tb : 0)) / per; let wrote = false, prof = false;
-      for (let i = 0; i < per; i++) {
-        const x = cell(st, k0 + i, "bn"); if (x.o != null) continue;
-        let j = 0; while (j < wp.length - 2 && i > wp[j + 1][0]) j++;
-        const [i0, p0] = wp[j], [i1, p1] = wp[j + 1], px = p0 + (p1 - p0) * (i - i0) / (i1 - i0);
-        x.o = x.h = x.l = x.c = px; x.b = buy; x.s = sell; x.n = cnt / per; wrote = true;
-        if (!prof) { prof = true; if (!st.tick) st.tick = niceTick(c); const ka = Math.floor(l / st.tick), kz = Math.floor(h / st.tick), nb = kz - ka + 1; for (let kb = ka; kb <= kz; kb++) addProfile(st, x, (kb + .5) * st.tick, buy * per / nb, sell * per / nb); }      // the minute's volume spread evenly over its high-low range (approximate)
-      }
-      if (wrote) { res.minutes++; res.t0 = res.t0 == null ? t0 : Math.min(res.t0, t0); res.t1 = Math.max(res.t1 || 0, t0 + 60000); }
-    }
-    res.oiPoints = backfillOi(st, "bn", (oiHist || []).map(r => ({ t:+r.timestamp, v:+r.sumOpenInterest })), until);
-    if (res.t0 != null) st.bf = { t0:res.t0, t1:res.t1 };
-    return res;
-  }
-  function reset(st) { st.bins.clear(); st.oi.bn = st.oi.hl = null; st.bf = null; st.tick = null; }
-
-  // One liquidation message from Bybit (v5 public linear, topic allLiquidation.<COIN>USDT) or OKX (public, channel liquidation-orders, instType SWAP) -> trades {t, v, side, px, ntl, liq:true}.
-  // side is the side of the forced order: "sell" = a long was closed out. Bybit S "Buy" means a long was liquidated, size v in coin, p the bankruptcy price. OKX gives side directly, sz in contracts (x ctVal coin), bkPx.
-  // Only the coin asked for (USDT-margined); everything else on the channel is ignored. o: {coin:"BTC", ctVal: OKX contract size in coin}.
-  function parseLiq(venue, msg, o) {
-    const out = [], C = String(o.coin || "").toUpperCase(); if (!msg || !C) return out;
-    if (venue === "by") {
-      if (typeof msg.topic !== "string" || !msg.topic.startsWith("allLiquidation.") || !Array.isArray(msg.data)) return out;
-      for (const d of msg.data) { const px = +d.p, q = +d.v; if (d.s !== C + "USDT" || !(px > 0) || !(q > 0)) continue; out.push({ t:+d.T || +msg.ts, v:"by", side:d.S === "Buy" ? "sell" : "buy", px, ntl:px * q, liq:true }); }
-    } else if (venue === "ok") {
-      if (!msg.arg || msg.arg.channel !== "liquidation-orders" || !Array.isArray(msg.data) || !(o.ctVal > 0)) return out;
-      for (const d of msg.data) { if (d.instId !== C + "-USDT-SWAP") continue; for (const x of d.details || []) { const px = +x.bkPx, q = +x.sz * o.ctVal; if (!(px > 0) || !(q > 0) || (x.side !== "sell" && x.side !== "buy")) continue; out.push({ t:+x.ts, v:"ok", side:x.side, px, ntl:px * q, liq:true }); } }
-    }
-    return out;
-  }
-
-  const median = a => { if (!a.length) return 0; const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m-1] + s[m]) / 2; };
-  const usd = x => { const a = Math.abs(x); return (x < 0 ? "-" : "") + "$" + (a >= 1e6 ? (a/1e6).toFixed(2) + "M" : a >= 1e3 ? (a/1e3).toFixed(0) + "k" : a.toFixed(0)); };
-  const lastOi = (bins, from, to) => { for (let j = Math.min(to, bins.length - 1); j >= from; j--) if (bins[j].oi != null) return bins[j].oi; return null; };
-
-  // What delta and open interest say together (the usual four readings). eps: open interest change (a fraction) below which it counts as flat.
-  function reading(delta, oiPct, eps) {
-    const e = eps == null ? 0.0002 : eps, d = delta > 0 ? "buy" : delta < 0 ? "sell" : "none";
-    if (d === "none") return { key:"none", text:"no clear aggressor" };
-    if (oiPct == null) return { key:d, text:d === "buy" ? "aggressive buying (no open interest reading)" : "aggressive selling (no open interest reading)" };
-    if (Math.abs(oiPct) < e) return { key:d + "-flat", text:d === "buy" ? "aggressive buying, open interest flat: trades swapping hands" : "aggressive selling, open interest flat: trades swapping hands" };
-    if (d === "buy") return oiPct > 0 ? { key:"buy-up", text:"aggressive buying + open interest rising: new longs opening" } : { key:"buy-down", text:"aggressive buying + open interest falling: shorts closing" };
-    return oiPct > 0 ? { key:"sell-up", text:"aggressive selling + open interest rising: new shorts opening" } : { key:"sell-down", text:"aggressive selling + open interest falling: longs closing" };
-  }
-
-  // Liquidation spikes (the anchor) with their confirmations. A spike is a bin whose liquidation $ is at least minLiqUsd and, once 8 or more bins had liquidations, liqMult times the typical (median) such bin; nearby spikes on the same side merge.
-  // Confirmations: delta on the same side as the forced order (sell-liquidations with negative delta) of at least deltaMult times the typical |delta|; open interest down by oiDropPct from the bin before to oiLag bins after.
-  function highlights(bins, cfg) {
-    const c = Object.assign({}, DEFAULTS, cfg), liqs = bins.map(b => b.liq).filter(x => x > 0);
-    const liqThr = Math.max(c.minLiqUsd, liqs.length >= 8 ? c.liqMult * median(liqs) : 0), mDelta = median(bins.filter(b => b.has).map(b => Math.abs(b.delta)).filter(x => x > 0));
-    const anchors = [];
-    bins.forEach((b, i) => { if (b.liq >= liqThr) anchors.push({ i, side:b.sl >= b.bl ? "longs" : "shorts" }); });
-    const groups = [];
-    for (const a of anchors) { const g = groups[groups.length - 1]; if (g && g.side === a.side && a.i - g.i1 <= c.gap) g.i1 = a.i; else groups.push({ side:a.side, i0:a.i, i1:a.i }); }
-    return groups.map(g => {
-      let liq = 0, delta = 0; for (let i = g.i0; i <= g.i1; i++) { liq += g.side === "longs" ? bins[i].sl : bins[i].bl; delta += bins[i].delta; }
-      const expect = g.side === "longs" ? -1 : 1, base = lastOi(bins, Math.max(0, g.i0 - 6), g.i0 - 1) ?? bins[g.i0].oi, end = lastOi(bins, g.i0, g.i1 + c.oiLag);
-      const oiPct = base != null && end != null && base > 0 ? (end - base) / base : null;
-      const deltaOk = mDelta > 0 ? delta * expect >= c.deltaMult * mDelta : delta * expect > 0, oiOk = oiPct != null && oiPct <= -c.oiDropPct, score = 1 + (deltaOk ? 1 : 0) + (oiOk ? 1 : 0);
-      const who = g.side === "longs" ? "Longs" : "Shorts", rd = reading(delta, oiPct);
-      return { i0:g.i0, i1:g.i1, t0:bins[g.i0].t, t1:bins[g.i1].t, side:g.side, liq, delta, oiPct, checks:{ liq:true, delta:deltaOk, oi:oiOk }, score, strong:score === 3,
-        text:`${who} forced out: ${usd(liq)} liquidated, delta ${usd(delta)}${oiPct == null ? ", no open interest reading" : `, open interest ${(oiPct*100).toFixed(2)}%`}. ${score === 3 ? "All three agree." : score === 2 ? "Two of three agree." : "Liquidations only."}`, reading:rd };
-    });
-  }
-
-  // The last n bins as one reading (for the live checklist).
-  function summary(bins, n) {
-    const w = bins.slice(-Math.max(1, n)), s = { bl:0, sl:0, delta:0, vol:0 };
-    for (const b of w) { s.bl += b.bl; s.sl += b.sl; s.delta += b.delta; s.vol += b.vol; }
-    const first = bins.length - w.length, base = lastOi(bins, Math.max(0, first - 6), first - 1) ?? w.find(b => b.oi != null)?.oi ?? null, end = lastOi(w, 0, w.length - 1);
-    s.oiPct = base != null && end != null && base > 0 ? (end - base) / base : null; s.reading = reading(s.delta, s.oiPct); return s;
-  }
-
-  function selftest() {
-    const out = [], ok = (name, cond, detail) => out.push({ name:"futures stack: " + name, ok:!!cond, detail:cond ? "" : String(detail) });
-    const st = newStore(), T = 6e9;
-    for (let k = 0; k < 120; k++) {                                                    // 10 minutes of quiet 5 s bins around 100, balanced flow, open interest flat at 1000
-      const t = T + k * BASE_MS; addTrade(st, { t, v:"bn", side:"buy", px:100 + (k % 3) * .01, ntl:1000 + (k % 5) * 100 }); addTrade(st, { t:t + 1, v:"bn", side:"sell", px:100, ntl:1000 + ((k + 2) % 5) * 100 });
-      setOi(st, "bn", 1000); stamp(st, t);
-    }
-    const flushT = T + 60 * BASE_MS;                                                   // minute 5: long liquidations, heavy selling, open interest falls
-    for (let k = 60; k < 63; k++) { const t = T + k * BASE_MS; addTrade(st, { t:t + 2, v:"bn", side:"sell", px:99.5, ntl:400000, liq:true }); addTrade(st, { t:t + 3, v:"bn", side:"sell", px:99.5, ntl:30000 }); }
-    for (let k = 62; k < 120; k++) { setOi(st, "bn", 990); stamp(st, T + k * BASE_MS); }
-    const bins = aggregate(st, { venue:"bn", t0:T, t1:T + 600000, binMs:15000 }), hs = highlights(bins);
-    ok("aggregate even bins", bins.length === 40 && bins.every((b, i) => b.t === T + i * 15000), bins.length);
-    ok("aggregate sums liquidations", Math.abs(bins.reduce((a, b) => a + b.sl, 0) - 1200000) < 1e-6 && bins.every(b => b.bl === 0), bins.reduce((a, b) => a + b.sl, 0));
-    ok("liquidations are not in delta", bins.every(b => b.vol < 200000), Math.max(...bins.map(b => b.vol)));
-    ok("one merged highlight on longs", hs.length === 1 && hs[0].side === "longs" && hs[0].t0 >= flushT - 15000 && hs[0].t0 <= flushT + 15000, JSON.stringify(hs));
-    ok("highlight is confirmed by delta and open interest", hs.length === 1 && hs[0].strong && hs[0].oiPct < -0.005 && hs[0].delta < 0, JSON.stringify(hs));
-    ok("reading: selling with open interest falling is longs closing", hs.length === 1 && hs[0].reading.key === "sell-down", hs.length ? hs[0].reading.key : "none");
-    const quiet = aggregate(st, { venue:"bn", t0:T, t1:T + 300000, binMs:15000 });
-    ok("no highlight in the quiet part", highlights(quiet).length === 0, highlights(quiet).length);
-    const hs2 = highlights(bins, { minLiqUsd:5e6 }); ok("minimum liquidation size is respected", hs2.length === 0, hs2.length);
-    const st2 = newStore(); for (let k = 0; k < 20; k++) addTrade(st2, { t:T + k*BASE_MS, v:"hl", side:"buy", px:50, ntl:500 }); addTrade(st2, { t:T + 40000, v:"hl", side:"buy", px:50.2, ntl:900000, liq:true });
-    const b2 = aggregate(st2, { venue:"hl", t0:T, t1:T + 120000, binMs:5000 }), h2 = highlights(b2);
-    ok("short squeeze without open interest: liquidation only, no open interest reading", h2.length === 1 && h2[0].side === "shorts" && h2[0].oiPct == null && h2[0].checks.oi === false && h2[0].checks.delta === false && h2[0].score === 1, JSON.stringify(h2));
-    ok("reading table", reading(5, .01).key === "buy-up" && reading(5, -.01).key === "buy-down" && reading(-5, .01).key === "sell-up" && reading(-5, -.01).key === "sell-down" && reading(-5, 0).key === "sell-flat" && reading(0, .5).key === "none" && reading(3, null).key === "buy", "");
-    const all = aggregate(st, { venue:"all", t0:T, t1:T + 60000, binMs:60000 }); ok("all venues keeps price from the venue that has it", all[0].o != null && all[0].oi === 1000, JSON.stringify(all[0]));
-    const sm = summary(bins.slice(0, 24), 6); ok("summary of the last bins", sm.oiPct < -0.005 && sm.delta < 0 && sm.reading.key === "sell-down" && sm.sl === 1200000, JSON.stringify(sm));
-    const by = parseLiq("by", { topic:"allLiquidation.BTCUSDT", ts:5, data:[{ T:T + 1000, s:"BTCUSDT", S:"Buy", v:"0.5", p:"60000" }, { T:8, s:"ETHUSDT", S:"Sell", v:"3", p:"3000" }] }, { coin:"BTC" });
-    ok("bybit: a Buy update is a long liquidated (forced sell), other coins ignored", by.length === 1 && by[0].side === "sell" && by[0].ntl === 30000 && by[0].t === T + 1000 && by[0].liq === true, JSON.stringify(by));
-    const okx = parseLiq("ok", { arg:{ channel:"liquidation-orders", instType:"SWAP" }, data:[{ instId:"BTC-USDT-SWAP", details:[{ bkPx:"60000", posSide:"short", side:"buy", sz:"50", ts:String(T + 2000) }] }, { instId:"BTC-USD-SWAP", details:[{ bkPx:"60000", side:"sell", sz:"5", ts:"9" }] }, { instId:"AKE-USDT-SWAP", details:[{ bkPx:"1", side:"sell", sz:"5", ts:"9" }] }] }, { coin:"btc", ctVal:0.01 });
-    ok("okx: contracts x contract size, side as given, only the coin's USDT swap", okx.length === 1 && okx[0].side === "buy" && okx[0].ntl === 30000 && okx[0].t === T + 2000, JSON.stringify(okx));
-    ok("parse: junk and missing contract size give nothing", parseLiq("ok", { arg:{ channel:"liquidation-orders" }, data:[] }, { coin:"BTC" }).length === 0 && parseLiq("by", null, { coin:"BTC" }).length === 0 && parseLiq("ok", { arg:{ channel:"liquidation-orders" }, data:[{ instId:"BTC-USDT-SWAP", details:[{ bkPx:"1", side:"buy", sz:"1", ts:"1" }] }] }, { coin:"BTC" }).length === 0, "");
-    const st3 = newStore(); addTrade(st3, { t:T, v:"bn", side:"buy", px:100, ntl:1000 }); for (const t of by.concat(okx)) addTrade(st3, t);
-    const own = aggregate(st3, { venue:"bn", t0:T, t1:T + 60000, binMs:60000 })[0], allL = aggregate(st3, { venue:"bn", t0:T, t1:T + 60000, binMs:60000, liqAll:true })[0];
-    ok("liqAll adds Bybit and OKX liquidations without touching price or delta", own.liq === 0 && allL.sl === 30000 && allL.bl === 30000 && allL.c === 100 && allL.delta === 1000 && allL.h === 100, JSON.stringify(allL));
-    const sb = newStore(), TB = 6e9, kl = [[TB, "100", "103", "99", "102", "0", TB + 59999, "60000", 10, "0", "42000"], [TB + 60000, "102", "104", "101", "101", "0", TB + 119999, "30000", 5, "0", "10000"]];
-    addTrade(sb, { t:TB + 60000 + 2000, v:"bn", side:"buy", px:102.5, ntl:500 });                       // live data already in the second minute, first 5 s bin
-    const rb = backfill(sb, kl, [{ timestamp:TB - 120000, sumOpenInterest:"1000" }, { timestamp:TB + 60000, sumOpenInterest:"990" }], TB + 400000), ab = aggregate(sb, { venue:"bn", t0:TB, t1:TB + 120000, binMs:60000 });
-    ok("backfill: 1-minute bins keep the kline price", ab[0].o === 100 && ab[0].h === 103 && ab[0].l === 99 && ab[0].c === 102, JSON.stringify(ab[0]));
-    ok("backfill: delta is taker buy minus taker sell", Math.abs(ab[0].delta - (42000 - 18000)) < 1e-6 && Math.abs(ab[0].vol - 60000) < 1e-6, JSON.stringify(ab[0]));
-    ok("backfill: open interest carried forward from each point", ab[0].oi === 1000 && ab[1].oi === 990, JSON.stringify([ab[0].oi, ab[1].oi]));
-    ok("backfill: live data wins over backfill in the same bin", ab[1].b >= 500 && ab[1].o === 102.5 && rb.minutes === 2 && sb.bf.t0 === TB, JSON.stringify([ab[1], rb, sb.bf]));
-    ok("backfill: no liquidations invented, junk rows skipped", ab.every(b => b.liq === 0) && backfill(newStore(), [["x"], [TB, "0", "0", "0", "0"]], [{ timestamp:"a" }], 0).minutes === 0, "");
-    const sp = newStore(); addTrade(sp, { t:T, v:"bn", side:"buy", px:60000, ntl:1000 }); addTrade(sp, { t:T + 1, v:"bn", side:"sell", px:60000.5, ntl:400 }); addTrade(sp, { t:T + 2, v:"bn", side:"buy", px:60020, ntl:700 }); addTrade(sp, { t:T + 3, v:"hl", side:"buy", px:60000, ntl:99 });
-    const pf = profile(sp, { venue:"bn", t0:T, t1:T + 60000 }), tot = pf.rows.reduce((a, r) => [a[0] + r.b, a[1] + r.s], [0, 0]), pa = aggregate(sp, { venue:"bn", t0:T, t1:T + 60000, binMs:60000 })[0];
-    ok("profile: volume at price by venue, buy and sell kept apart", pf.rows.length === 2 && tot[0] === 1700 && tot[1] === 400 && pf.tick === 5 && pf.max === 1400, JSON.stringify(pf));
-    ok("bin stats: trade count, delta share, range in bps, open interest change", pa.n === 3 && Math.abs(pa.dpct - 1300 / 2100) < 1e-9 && pa.range > 3 && pa.range < 3.5 && pa.doi === null, JSON.stringify(pa));
-    ok("bin stats: open interest change against the previous bin", aggregate(st, { venue:"bn", t0:T, t1:T + 600000, binMs:15000 }).filter(b => b.doi != null && b.doi < -0.004).length === 1, "");
-    const pb = profile(sb, { venue:"bn", t0:TB, t1:TB + 120000 }); ok("backfill: profile keeps the minute's volume and its trade count", Math.abs(pb.rows.reduce((a, r) => a + r.b + r.s, 0) - (60000 + 30000 - 0)) < 600 + 1 && aggregate(sb, { venue:"bn", t0:TB, t1:TB + 60000, binMs:60000 })[0].n === 10, JSON.stringify([pb.rows.length, pb.max]));
-    const so = newStore(), TO = 6e9; for (let k = 0; k < 120; k++) addTrade(so, { t:TO + k * BASE_MS, v:"bn", side:"buy", px:100, ntl:10 });
-    backfillOi(so, "bn", [{ t:TO, v:1000 }, { t:TO + 300000, v:990 }], TO + 600000); backfillOi(so, "by", [{ t:TO + 60000, v:500 }, { t:TO + 300000, v:480 }], TO + 600000); backfillOi(so, "ok", [{ t:TO + 540000, v:300 }], TO + 600000);
-    const oa = aggregate(so, { venue:"bn", t0:TO, t1:TO + 600000, binMs:60000, liqAll:true }), ob = aggregate(so, { venue:"bn", t0:TO, t1:TO + 600000, binMs:60000 });
-    ok("open interest of all venues is summed, a venue starting a little late is carried back", oa.oiVenues.includes("bn") && oa.oiVenues.includes("by") && oa[0].oi === 1500 && oa[5].oi === 1470 && oa[9].oi === 1470, JSON.stringify([oa.oiVenues, oa[0].oi, oa[5].oi, oa[9].oi]));
-    ok("a venue whose open interest starts late in the window is left out (no step)", !oa.oiVenues.includes("ok") && ob[0].oi === 1000 && ob.oiVenues.join() === "bn", JSON.stringify([oa.oiVenues, ob.oiVenues]));
-    const before = st.bins.size; prune(st, 60000, T + 600000); ok("prune drops old bins", st.bins.size < before && st.bins.size > 0, st.bins.size);
-    return out;
-  }
-  return { BASE_MS, DEFAULTS, newStore, addTrade, setOi, stamp, prune, aggregate, highlights, summary, reading, parseLiq, backfill, backfillOi, reset, profile, usd, selftest };
-})();
-
-</script>
-<script>
 "use strict";
 // Simulated paper broker (pure, no DOM, timers or storage): state, quotes, symbol and clock are passed in, never read from the page.
 // Display only: the Reader engine, feeds and the Binance broker are untouched. Rows go to the history log through HIST.push.
@@ -11059,83 +10332,6 @@ const PAPER = (() => {
     return out;
   }
   return {MAKER, TAKER, reset, pos, fill, capReduce, logNew, logEnd, place, onTrade, snapshot, selftest};
-})();
-
-</script>
-<script>
-"use strict";
-// Liquidation readout (pure, no DOM, no timers, no clock: the caller passes now): events from Binance, Bybit and OKX grouped into clusters, a window summary, one-minute buckets and the price move
-// before and after a cluster. Display only; it feeds the Liquidations section of Now > Market and tape (liq-readout.js) and never touches a feed, a recording or a detection.
-// An event is {t (ms), v ("bn" | "by" | "ok"), side ("sell" = a long was liquidated, a forced sell; "buy" = a short was liquidated, a forced buy), ntl (dollars)}.
-// A cluster is the events whose gaps are at most GAP_MS (30 s, as in the exploratory look at the saved sessions: .scratch/liquidation-study/exploration-20261105.md).
-const LIQ = (() => {
-  const GAP_MS = 30000, BIG = 100000, HUGE = 1000000, VENUES = ["bn", "by", "ok"], NAME = {bn:"Binance", by:"Bybit", ok:"OKX"}, SHORT = {bn:"BN", by:"BY", ok:"OK"};
-  const valid = e => e && Number.isFinite(e.t) && e.ntl > 0 && (e.side === "buy" || e.side === "sell") && VENUES.indexOf(e.v) >= 0;
-  const usd = x => { const a = Math.abs(x); return "$" + (a >= 1e6 ? (a/1e6).toFixed(a >= 1e7 ? 1 : 2) + "M" : a >= 1e3 ? (a/1e3).toFixed(a >= 1e5 ? 0 : 1) + "k" : a.toFixed(0)); };
-  function clusters(events, gapMs) {
-    const gap = gapMs == null ? GAP_MS : gapMs, ev = (events || []).filter(valid).slice().sort((a, b) => a.t - b.t), out = []; let c = null;
-    const finish = k => { k.ntl = k.buy + k.sell; k.dom = k.sell >= k.buy ? "sell" : "buy"; k.domShare = Math.max(k.buy, k.sell)/k.ntl; k.tier = k.ntl >= HUGE ? "huge" : k.ntl >= BIG ? "big" : "small"; return k; };
-    for (const e of ev) {
-      if (c && e.t - c.t1 <= gap) { c.t1 = e.t; c.n++; c[e.side] += e.ntl; c.venues[e.v] += e.ntl; }
-      else { if (c) out.push(finish(c)); c = {t0:e.t, t1:e.t, n:1, buy:0, sell:0, venues:{bn:0, by:0, ok:0}}; c[e.side] = e.ntl; c.venues[e.v] = e.ntl; }
-    }
-    if (c) out.push(finish(c));
-    return out;
-  }
-  const active = (c, now, gapMs) => now - c.t1 <= (gapMs == null ? GAP_MS : gapMs);      // still forming: the next event would join it
-  // dollars in the window [now - windowMs, now]: per venue {sell, buy, n}, and in total
-  function summary(events, now, windowMs) {
-    const per = {bn:{sell:0, buy:0, n:0}, by:{sell:0, buy:0, n:0}, ok:{sell:0, buy:0, n:0}}; let sell = 0, buy = 0, n = 0;
-    for (const e of events || []) { if (!valid(e) || e.t < now - windowMs || e.t > now) continue; per[e.v][e.side] += e.ntl; per[e.v].n++; if (e.side === "sell") sell += e.ntl; else buy += e.ntl; n++; }
-    return {windowMs, per, sell, buy, total:sell + buy, n};
-  }
-  // spanMs / binMs buckets ending at now, oldest first: {t (start), sell, buy}
-  function buckets(events, now, spanMs, binMs) {
-    const n = Math.max(1, Math.round(spanMs/binMs)), start = now - n*binMs, out = Array.from({length:n}, (_, i) => ({t:start + i*binMs, sell:0, buy:0}));
-    for (const e of events || []) { if (!valid(e) || e.t < start || e.t >= now) continue; out[Math.min(n - 1, Math.floor((e.t - start)/binMs))][e.side] += e.ntl; }
-    return out;
-  }
-  // The price move around a cluster in sigmas, signed in the direction the liquidations pushed (longs liquidated = down): positive = price kept going that way, negative = it came back.
-  // hist: [[t, price]] one point a second; sigma: bps per root second; fm(hist, t, horizonSec, dir, sigma) -> move or null (scoreboard-core's forwardMove).
-  function moves(hist, c, sigma, now, fm) {
-    const out = {pre:null, after60:null, after300:null, soFar:null};
-    if (!hist || !hist.length || !(sigma > 0)) return out;
-    const dir = c.dom === "sell" ? -1 : 1, last = hist[hist.length - 1][0], el = Math.min(now, last) - c.t1;
-    out.pre = fm(hist, c.t0 - 300000, 300, dir, sigma);
-    if (el >= 60000) out.after60 = fm(hist, c.t1, 60, dir, sigma); else if (el >= 5000) out.soFar = {sec:Math.floor(el/1000), move:fm(hist, c.t1, Math.floor(el/1000), dir, sigma)};
-    if (el >= 300000) out.after300 = fm(hist, c.t1, 300, dir, sigma);
-    return out;
-  }
-  const mix = c => VENUES.filter(v => c.venues[v] > 0).sort((a, b) => c.venues[b] - c.venues[a]).map(v => SHORT[v] + " " + Math.round(100*c.venues[v]/c.ntl) + "%").join(" · ");
-  const sideText = c => c.dom === "sell" ? "longs liquidated" : "shorts liquidated";
-
-  function selftest() {
-    const out = [], ok = (name, pass, detail) => out.push({name:"liquidation readout: " + name, ok:!!pass, detail:detail || ""});
-    const T = 1.8e12, ev = (dt, v, side, ntl) => ({t:T + dt, v, side, ntl});
-    const list = [ev(0, "bn", "sell", 40000), ev(5000, "bn", "sell", 30000), ev(9000, "by", "sell", 20000), ev(39000, "ok", "sell", 10000), ev(69001, "bn", "buy", 5000), ev(200000, "by", "buy", 800000), ev(205000, "ok", "buy", 300000)];
-    const copy = JSON.stringify(list), cs = clusters(list);
-    ok("events within 30 s of each other (gap 30000 joins, 30001 splits) form one cluster, across venues", cs.length === 3 && cs[0].n === 4 && cs[0].ntl === 100000 && cs[0].t0 === T && cs[0].t1 === T + 39000 && cs[1].n === 1 && cs[1].t0 === T + 69001, JSON.stringify(cs.map(c => [c.n, c.ntl])));
-    ok("dominant side, its share and the dollars per venue", cs[0].dom === "sell" && cs[0].domShare === 1 && cs[0].venues.bn === 70000 && cs[0].venues.by === 20000 && cs[0].venues.ok === 10000 && cs[2].dom === "buy" && cs[2].ntl === 1100000);
-    ok("tiers: under $100k small, $100k big, $1M huge", cs[1].tier === "small" && cs[0].tier === "big" && cs[2].tier === "huge" && clusters([ev(0, "bn", "sell", 99999)])[0].tier === "small" && clusters([ev(0, "bn", "sell", 1e6)])[0].tier === "huge");
-    ok("a mixed cluster takes the side with more dollars, ties go to longs liquidated", clusters([ev(0, "bn", "sell", 100), ev(1000, "by", "buy", 300)])[0].dom === "buy" && clusters([ev(0, "bn", "sell", 100), ev(1000, "by", "buy", 100)])[0].dom === "sell" && Math.abs(clusters([ev(0, "bn", "sell", 100), ev(1000, "by", "buy", 300)])[0].domShare - 0.75) < 1e-9);
-    ok("bad events are ignored, input order does not matter, the input is not changed", clusters([null, {t:T, v:"bn", side:"sell", ntl:0}, {t:T, v:"zz", side:"sell", ntl:5}, {t:NaN, v:"bn", side:"sell", ntl:5}, {t:T, v:"bn", side:"x", ntl:5}]).length === 0 && JSON.stringify(clusters(list.slice().reverse())) === JSON.stringify(cs) && JSON.stringify(list) === copy);
-    ok("a cluster is forming while the next event would still join it", active(cs[0], T + 39000 + 30000) && !active(cs[0], T + 39000 + 30001));
-    const s = summary(list, T + 210000, 600000), s2 = summary(list, T + 210000, 20000);
-    ok("window summary: dollars per venue and side, outside the window left out", s.total === 1205000 && s.sell === 100000 && s.buy === 1105000 && s.per.bn.sell === 70000 && s.per.by.buy === 800000 && s.per.ok.buy === 300000 && s.n === 7 && s2.total === 1100000 && s2.n === 2);
-    const b = buckets(list, T + 240000, 240000, 60000);
-    ok("buckets: oldest first, one per bin, dollars land in the right bin", b.length === 4 && b[0].sell === 100000 && b[1].buy === 5000 && b[3].buy === 1100000 && b[2].buy === 0 && b[0].t === T);
-    // moves: price falls 1 bp a second from T, then is flat; longs liquidated (down) in [T, T+39 s]
-    const hist = []; for (let i = 0; i <= 700; i++) hist.push([T - 400000 + i*1000, 100000]);
-    const fm = (h, t, H, dir, sigma) => { const end = t + H*1000; if (end > h[h.length - 1][0] || t < h[0][0]) return null; const at = x => h[Math.round((x - h[0][0])/1000)][1]; return dir*((at(end)/at(t) - 1)*1e4)/(sigma*Math.sqrt(H)); };
-    for (let i = 0; i < hist.length; i++) { const t = hist[i][0]; hist[i][1] = t <= T - 300000 ? 100000 : t <= T ? 100000 - (t - (T - 300000))/1000*10 : 100000 - 3000 + (t - T)/1000*5; }      // falls 3000 over the 5 minutes before T, then rises 5 a second
-    const mv = moves(hist, cs[0], 0.5, T + 100000, fm), mvEarly = moves(hist, cs[0], 0.5, T + 39000 + 30000, fm);
-    ok("moves: before the cluster in its direction (price had fallen), 1 minute after it has come back", mv.pre > 1 && mv.after60 < 0 && mv.after300 === null && mv.soFar === null);
-    ok("moves: under a minute after the cluster ends only 'so far' is given, from 5 s on", mvEarly.after60 === null && mvEarly.soFar && mvEarly.soFar.sec === 30 && moves(hist, cs[0], 0.5, T + 39000 + 2000, fm).soFar === null);
-    ok("moves: a buy cluster flips the direction, and no sigma or history gives nothing", moves(hist, {t0:T, t1:T + 1000, dom:"buy"}, 0.5, T + 100000, fm).pre < -1 && moves(hist, cs[0], 0, T + 100000, fm).pre === null && moves([], cs[0], 0.5, T, fm).after60 === null);
-    ok("text: venue mix largest first, side wording, dollars", mix(cs[0]) === "BN 70% · BY 20% · OK 10%" && sideText(cs[2]) === "shorts liquidated" && usd(950) === "$950" && usd(12345) === "$12.3k" && usd(250000) === "$250k" && usd(1200000) === "$1.20M" && usd(42368538) === "$42.4M");
-    return out;
-  }
-  return {GAP_MS, BIG, HUGE, VENUES, NAME, SHORT, clusters, active, summary, buckets, moves, mix, sideText, usd, selftest};
 })();
 
 </script>
@@ -11436,332 +10632,6 @@ const OVERNIGHT = (() => {
   }
   return {preflight, morning, coverage, selftest, PROBLEM_NOTE};
 })();
-
-</script>
-<script>
-// Futures stack (view): Now > Futures stack. Price over the order-book heatmap, then liquidations, volume delta and open interest on one time axis, with the moments the setup is about boxed in cyan
-// (FUTSTACK.highlights, futures-core.js), a live reading of the last few minutes, and Buy now / Sell now buttons that use the account chosen with the account button in the header.
-// Display and its own history only: it reads the page's `trades`, `M` and `heatBn` / `heatHl` by name, keeps its own 4-hour bins, and places orders through the existing placeOrder. The Reader engine is untouched.
-// Registered in app.js (VIEWS.register, id "futures"); loaded after app.js, before label-queue.
-(function futuresSetup() {
-  const cv = document.getElementById("cvFut"); if (!cv || typeof FUTSTACK === "undefined") return;
-  const g = id => document.getElementById(id), KEEP = 4 * 3600e3, MARK = getComputedStyle(document.documentElement).getPropertyValue("--mark").trim() || "#ff00ff";
-  const st = FUTSTACK.newStore(), seen = new WeakSet(), heats = { bn:[], hl:[] }, fills = [];            // fills: what this page placed from the buttons ({t, side, px}), drawn on the price panel
-  const lastHeat = { bn:0, hl:0 };
-  let profData = { rows:[] }, profKey = "", watermark = 0, hovX = null, hits = [], bins = [], geo = null, heatImg = null, heatKey = "";
-  const heatOff = document.createElement("canvas");
-
-  // ---- backfill: on every connect (and when the header coin changes) fetch the last 4 hours from Binance so the chart is not empty ----
-  let curCoin = null, wasConn = false, bfGen = 0, bfMsg = "", liveFrom = null;
-  async function backfill(coin) {
-    const gen = ++bfGen, sym = coin + "USDT"; bfMsg = "backfilling the last 4 hours from Binance…";
-    try {
-      const get = async u => { const r = await fetch(u); if (!r.ok) throw new Error(u.split("?")[0].split("/").pop() + " " + r.status); return r.json(); };
-      const [kl, oh] = await Promise.all([get(`${BN_REST}/fapi/v1/klines?symbol=${sym}&interval=1m&limit=241`), get(`${BN_REST}/futures/data/openInterestHist?symbol=${sym}&period=5m&limit=60`).catch(() => [])]);
-      if (gen !== bfGen) return; if (!Array.isArray(kl)) throw new Error("no klines for " + sym);
-      const now = nowEx(), r = FUTSTACK.backfill(st, kl.filter(x => +x[6] < now), Array.isArray(oh) ? oh : [], now);
-      const hist = await Promise.allSettled([get(`https://api.bybit.com/v5/market/open-interest?category=linear&symbol=${sym}&intervalTime=5min&limit=60`), get(`https://www.okx.com/api/v5/rubik/stat/contracts/open-interest-history?instId=${coin}-USDT-SWAP&period=5m&limit=60`)]);
-      if (gen !== bfGen) return; const exOi = [];
-      if (hist[0].status === "fulfilled" && hist[0].value.result && Array.isArray(hist[0].value.result.list) && FUTSTACK.backfillOi(st, "by", hist[0].value.result.list.map(x => ({ t:+x.timestamp, v:+x.singleOpenInterest })), now)) exOi.push("Bybit");   // singleOpenInterest: one side, the same scale as Binance and OKX (openInterest counts both sides)
-      if (hist[1].status === "fulfilled" && Array.isArray(hist[1].value.data) && FUTSTACK.backfillOi(st, "ok", hist[1].value.data.map(x => ({ t:+x[0], v:+x[2] })), now)) exOi.push("OKX");
-      bfMsg = r.minutes ? `backfilled ${r.minutes} min of price and delta${r.oiPoints ? " and open interest" : " (no open interest history)"} from Binance: 1-minute detail, no liquidations before you connected${exOi.length ? "; open interest history also from " + exOi.join(" and ") : ""}` : "nothing to backfill";
-    } catch (e) { if (gen === bfGen) bfMsg = "backfill failed: " + e.message; }
-    if (gen === bfGen && typeof futuresRender === "function") futuresRender();
-  }
-  function histManage(coin) {
-    const on = typeof connected !== "undefined" && connected;
-    if (!on) { wasConn = false; return; }
-    if (coin && coin !== curCoin) { if (curCoin != null) { FUTSTACK.reset(st); heats.bn.length = heats.hl.length = 0; fills.length = 0; watermark = 0; heatKey = ""; } curCoin = coin; wasConn = false; }
-    if (!wasConn && coin) { wasConn = true; liveFrom = nowEx(); backfill(coin); }
-  }
-
-  // ---- Bybit and OKX open interest: polled every 10 s while connected (public REST, one side, in coin) ----
-  const OIX = { by:"–", ok:"–" }; let lastOiPoll = 0;
-  function oiPoll(coin) {
-    if (!coin || Date.now() - lastOiPoll < 10000) return; lastOiPoll = Date.now();
-    const one = (k, url, pick) => fetch(url).then(r => r.json()).then(j => { if (coin !== curCoin) return; const v = pick(j); if (v > 0) { FUTSTACK.setOi(st, k, v); OIX[k] = "live"; } else OIX[k] = "no reading"; }).catch(() => { OIX[k] = "error"; });
-    one("by", `https://api.bybit.com/v5/market/tickers?category=linear&symbol=${coin}USDT`, j => +(j.result && j.result.list && j.result.list[0] && j.result.list[0].singleOpenInterest));
-    one("ok", `https://www.okx.com/api/v5/public/open-interest?instType=SWAP&instId=${coin}-USDT-SWAP`, j => +(j.data && j.data[0] && j.data[0].oiCcy));
-  }
-
-  // ---- Bybit and OKX liquidation sockets: open while the page is connected, for the coin in the header (own sockets; the collectors' worker is untouched) ----
-  const LQ = { by:{ name:"Bybit", ws:null, coin:null, st:"off", gen:0, ping:null, retry:null, hold:0 }, ok:{ name:"OKX", ws:null, coin:null, st:"off", gen:0, ping:null, retry:null, hold:0 } };
-  function lqClose(k) { const s = LQ[k]; s.gen++; clearInterval(s.ping); clearTimeout(s.retry); if (s.ws) { try { s.ws.close(); } catch (e) { /* already closed */ } } s.ws = null; s.st = "off"; s.coin = null; }
-  async function lqConnect(k, coin) {
-    const s = LQ[k]; lqClose(k); const gen = s.gen; s.coin = coin; s.st = "connecting"; let ctVal = null;
-    if (k === "ok") {                                                                       // OKX sizes are contracts: ask what one contract is in coin
-      try { const j = await (await fetch(`https://www.okx.com/api/v5/public/instruments?instType=SWAP&instId=${coin}-USDT-SWAP`)).json(), d = j.data && j.data[0]; ctVal = d ? +d.ctVal * (+d.ctMult || 1) : null; } catch (e) { ctVal = null; }
-      if (gen !== s.gen) return; if (!(ctVal > 0)) { s.st = "no " + coin + "-USDT swap"; s.coin = null; s.hold = Date.now() + 30000; return; }
-    }
-    let ws; try { ws = new WebSocket(k === "by" ? "wss://stream.bybit.com/v5/public/linear" : "wss://ws.okx.com/ws/v5/public"); } catch (e) { s.st = "blocked"; s.coin = null; s.hold = Date.now() + 30000; return; }
-    s.ws = ws;
-    ws.onopen = () => { if (gen !== s.gen) return; ws.send(JSON.stringify(k === "by" ? { op:"subscribe", args:["allLiquidation." + coin + "USDT"] } : { op:"subscribe", args:[{ channel:"liquidation-orders", instType:"SWAP" }] })); s.st = "live"; s.ping = setInterval(() => { try { ws.send(k === "by" ? '{"op":"ping"}' : "ping"); } catch (e) { /* closing */ } }, 20000); };
-    ws.onmessage = e => { if (gen !== s.gen || e.data === "pong") return; let j; try { j = JSON.parse(e.data); } catch (x) { return; } for (const t of FUTSTACK.parseLiq(k, j, { coin, ctVal })) { FUTSTACK.addTrade(st, t); HOOKS.emit("liquidation", t); } };
-    ws.onclose = () => { if (gen !== s.gen) return; clearInterval(s.ping); s.ws = null; s.st = "reconnecting"; s.retry = setTimeout(() => { if (gen === s.gen && typeof connected !== "undefined" && connected) lqConnect(k, coin); }, 3000); };
-  }
-  function lqManage() {
-    const coin = (typeof accAsset === "function" ? accAsset() : "").replace(/[^A-Z0-9]/g, "");
-    for (const k of ["by", "ok"]) { const s = LQ[k];
-      if (typeof connected === "undefined" || !connected || !coin) { if (s.st !== "off") lqClose(k); continue; }
-      if (s.coin !== coin && s.st !== "connecting" && Date.now() >= s.hold) lqConnect(k, coin); }
-  }
-
-  // ---- history: runs once a second while connected, whether or not the view is open ----
-  setInterval(() => {
-    const coinNow = (typeof accAsset === "function" ? accAsset() : "").replace(/[^A-Z0-9]/g, ""); histManage(coinNow); lqManage(); if (typeof connected !== "undefined" && connected) oiPoll(coinNow); if (typeof connected === "undefined" || !connected) return; const now = nowEx();
-    for (let i = trades.length - 1; i >= 0; i--) {
-      const t = trades[i]; if (t.t < watermark - 5000) break;
-      if (seen.has(t) || t.bf) continue; seen.add(t); if (t.t > watermark) watermark = t.t;
-      FUTSTACK.addTrade(st, t); if (t.liq) HOOKS.emit("liquidation", t);
-    }
-    FUTSTACK.setOi(st, "bn", M.bnOI); FUTSTACK.setOi(st, "hl", M.hlOI); FUTSTACK.stamp(st, now); FUTSTACK.prune(st, KEEP, now);
-    for (const v of ["bn", "hl"]) {
-      const src = v === "bn" ? MI.heatBn : MI.heatHl, last = src[src.length - 1], list = heats[v];
-      if (last && last.t - lastHeat[v] >= 4900) { list.push(last); lastHeat[v] = last.t; }
-      while (list.length && list[0].t < now - KEEP) list.shift();
-    }
-  }, 1000);
-
-  const oiNote = () => { const v = bins.oiVenues; return (v && v.length ? v.map(x => ({ bn:"Binance", hl:"Hyperliquid", by:"Bybit", ok:"OKX" }[x])).join(" + ") : "none yet") + ` (Bybit ${OIX.by}${v && v.includes("by") ? "" : ", left out of this window"}, OKX ${OIX.ok}${v && v.includes("ok") ? "" : ", left out of this window: live only, no history the browser may read"})`; };
-  const cfg = () => ({ minLiqUsd:Math.max(0, +g("fsMin").value || 0) }), liqAll = () => g("fsLiqAll").checked;
-  const fmtOi = v => v == null ? "–" : fmtK(v);
-  const pct = x => x == null ? "–" : (x >= 0 ? "+" : "") + (x * 100).toFixed(3) + "%";
-  const sgn = x => (x >= 0 ? "+" : "-") + "$" + fmtK(Math.abs(x));
-  const hhmm = t => { const d = new Date(t - clockOffset); return d.toTimeString().slice(0, 8); };
-
-  function heatImage(list, bs, binMs, lo, hi, ph) {
-    const n = bs.length, rows = Math.max(30, Math.min(160, Math.round(ph / 3))), rowSz = (hi - lo) / rows, t0 = bs[0].t, sum = new Float32Array(n * rows), cnt = new Uint16Array(n);
-    for (const s of list) {
-      const c = Math.floor((s.t - t0) / binMs); if (c < 0 || c >= n) continue; cnt[c]++; const a = s.arr;
-      for (let i = 0; i < a.length; i++) { const q = a[i]; if (!q) continue; const r = Math.floor((hi - (s.lo + (i + .5) * s.base)) / rowSz); if (r >= 0 && r < rows) sum[r * n + c] += q; }
-    }
-    const nz = []; for (let c = 0; c < n; c++) if (cnt[c]) for (let r = 0; r < rows; r++) { const v = sum[r * n + c] / cnt[c]; if (v > 0) nz.push(v); }
-    nz.sort((a, b) => a - b); const ref = Math.log1p(nz.length ? nz[Math.floor(nz.length * .98)] : 1) || 1;
-    heatOff.width = n; heatOff.height = rows; const hc = heatOff.getContext("2d"), img = hc.createImageData(n, rows), px = img.data;
-    for (let r = 0; r < rows; r++) for (let c = 0; c < n; c++) {
-      const o = (r * n + c) * 4; if (!cnt[c]) { px[o + 3] = 0; continue; }
-      const v = sum[r * n + c] / cnt[c], col = HEAT_LUT[Math.round((v ? Math.min(1, Math.log1p(v) / ref) : 0) * 255)]; px[o] = col[0]; px[o + 1] = col[1]; px[o + 2] = col[2]; px[o + 3] = 235;
-    }
-    hc.putImageData(img, 0, 0); return heatOff;
-  }
-
-  function position() { const d = typeof ACC !== "undefined" && ACC.data; return d && d.positions ? d.positions.find(p => p.symbol === accSym() && p.qty) : null; }
-
-  function draw() {
-    const { ctx, w, h } = prep(cv), venue = g("fsVenue").value, win = +g("fsWin").value, binMs = +g("fsBin").value, t1 = nowEx();
-    let all = FUTSTACK.aggregate(st, { venue, t0:t1 - win, t1, binMs, liqAll:liqAll() }); const first = all.findIndex(b => b.has);
-    if (first < 0) { bins = []; geo = null; hits = []; return emptyMsg(ctx, w, h, connected ? "collecting… history starts when you press Connect" : "press Connect"); }
-    const showProf = g("fsProf").checked, showStats = g("fsStats").checked, STAT_ROWS = 5, rowH = 12, stripH = showStats ? STAT_ROWS * rowH : 0;
-    bins = all.slice(first); bins.oiVenues = all.oiVenues; const n = bins.length, L = 6, R = 64, PG = showProf ? 84 : 0, B = 16, gap = 6, avail = h - B - gap * (showStats ? 4 : 3) - stripH, hP = avail * .5, hL = avail * .14, hD = avail * .18, hO = avail - hP - hL - hD;
-    const top = [4, 4 + hP + gap, 4 + hP + hL + gap * 2, 4 + hP + hL + hD + gap * 3, 4 + hP + hL + hD + hO + gap * 4], pw = w - L - R - PG, t0 = bins[0].t, span = n * binMs, bw = pw / n, bottom = showStats ? top[4] + stripH : top[3] + hO;
-    const X = t => L + (t - t0) / span * pw, xc = j => L + (j + .5) * bw;
-    geo = { L, pw, n, bw, top, hs:[hP, hL, hD, hO], h, bottom };
-    hits = g("fsMark").checked ? FUTSTACK.highlights(bins, cfg()) : [];
-    // price range
-    let lo = Infinity, hi = -Infinity; for (const b of bins) if (b.o != null) { if (b.l < lo) lo = b.l; if (b.h > hi) hi = b.h; }
-    const pos = position(); if (pos && pos.entry) { lo = Math.min(lo, pos.entry); hi = Math.max(hi, pos.entry); }
-    if (!isFinite(lo)) { lo = 0; hi = 1; } const pad = Math.max((hi - lo) * .06, hi * .00005); lo -= pad; hi += pad;
-    const Yp = p => top[0] + (hi - p) / (hi - lo) * hP;
-    // panel frames and titles
-    ctx.fillStyle = TH.dim; ctx.textAlign = "left";
-    const titles = ["", "Liquidations $ (" + (liqAll() ? "Binance + Bybit + OKX" : venue === "bn" ? "Binance" : venue === "hl" ? "Hyperliquid: no feed" : "Binance") + ")   ▲ shorts liquidated   ▼ longs liquidated", "Volume delta $  (taker buy − sell)", "Open interest (" + (bins.oiVenues && bins.oiVenues.length ? bins.oiVenues.map(x => x.toUpperCase()).join(" + ") : venue.toUpperCase()) + ", coin)   green = rising, red = falling"];
-    for (let k = 0; k < 4; k++) { ctx.strokeStyle = TH.line; ctx.strokeRect(L + .5, top[k] + .5, pw, [hP, hL, hD, hO][k]); if (titles[k]) ctx.fillText(titles[k], L + 4, top[k] + 11); }
-    // heatmap
-    if (g("fsHeat").checked && venue !== "all") {
-      const list = heats[venue], key = [venue, t0, n, binMs, lo.toFixed(2), hi.toFixed(2), Math.round(hP), list.length].join("|");
-      if (list.length && key !== heatKey) { heatImg = heatImage(list, bins, binMs, lo, hi, hP); heatKey = key; }
-      if (list.length && heatImg) { ctx.imageSmoothingEnabled = false; ctx.drawImage(heatImg, L, top[0], pw, hP); }
-    }
-    // price grid and candles
-    const stp = niceStep((hi - lo) / 6); ctx.textAlign = "left";
-    for (let p = Math.ceil(lo / stp) * stp; p <= hi; p += stp) { const y = Yp(p); ctx.strokeStyle = TH.a("hi", .12); ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(L + pw, y); ctx.stroke(); ctx.fillStyle = TH.dim; ctx.fillText(fmt(p, stp < 1 ? 1 : 0), w - R + 4, y + 3.5); }
-    for (let j = 0; j < n; j++) {
-      const b = bins[j]; if (b.o == null) continue; const up = b.c >= b.o, col = up ? TH.buy : TH.sell, x = xc(j), bodyW = Math.max(1, bw * .7);
-      ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, Yp(b.h)); ctx.lineTo(x, Yp(b.l)); ctx.stroke();
-      ctx.fillRect(x - bodyW / 2, Math.min(Yp(b.o), Yp(b.c)), bodyW, Math.max(1, Math.abs(Yp(b.o) - Yp(b.c))));
-    }
-    // volume profile: volume at price over the shown window, buy part then sell part, the busiest price (POC) outlined
-    if (showProf) {
-      const key = [venue, t0, span, Math.floor(nowEx() / 5000)].join("|"); if (key !== profKey) { profData = FUTSTACK.profile(st, { venue, t0, t1:t0 + span }); profKey = key; }
-      const rowsPx = new Map(); for (const r of profData.rows) { if (r.px < lo || r.px > hi) continue; const k = Math.floor(Yp(r.px) / 3), a = rowsPx.get(k) || { y:k * 3, b:0, s:0 }; a.b += r.b; a.s += r.s; rowsPx.set(k, a); }
-      let mx = 0, poc = null; for (const a of rowsPx.values()) { const t = a.b + a.s; if (t > mx) { mx = t; poc = a; } }
-      const x0 = L + pw + 8, wmax = PG - 12; ctx.fillStyle = TH.dim; ctx.fillText("volume profile", x0, top[0] + 11);
-      if (mx > 0) {
-        for (const a of rowsPx.values()) { const bw1 = a.b / mx * wmax, sw1 = a.s / mx * wmax; ctx.fillStyle = TH.a("buy", .8); ctx.fillRect(x0, a.y, bw1, 2.6); ctx.fillStyle = TH.a("sell", .8); ctx.fillRect(x0 + bw1, a.y, sw1, 2.6); }
-        ctx.strokeStyle = TH.hi; ctx.lineWidth = 1; ctx.strokeRect(x0 - .5, poc.y - .5, (poc.b + poc.s) / mx * wmax + 1, 3.6);
-        ctx.setLineDash([2, 5]); ctx.strokeStyle = TH.a("hi", .3); ctx.beginPath(); ctx.moveTo(L, poc.y + 1); ctx.lineTo(L + pw, poc.y + 1); ctx.stroke(); ctx.setLineDash([]);
-      }
-    }
-    // my fills and entry price
-    if (pos && pos.entry) { ctx.setLineDash([5, 4]); ctx.strokeStyle = TH.hi; ctx.beginPath(); ctx.moveTo(L, Yp(pos.entry)); ctx.lineTo(L + pw, Yp(pos.entry)); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = TH.hi; ctx.fillText("entry " + fmt(pos.entry, 1), L + 4, Yp(pos.entry) - 3); }
-    for (const f of fills) { if (f.t < t0 || !(f.px >= lo && f.px <= hi)) continue; const x = X(f.t), y = Yp(f.px), up = f.side === "BUY"; ctx.fillStyle = up ? TH.buy : TH.sell; ctx.strokeStyle = TH.hi; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(x, y + (up ? 0 : 0)); ctx.lineTo(x - 6, y + (up ? 11 : -11)); ctx.lineTo(x + 6, y + (up ? 11 : -11)); ctx.closePath(); ctx.fill(); ctx.stroke(); }
-    const lastB = [...bins].reverse().find(b => b.c != null);
-    if (lastB) { const y = Yp(lastB.c); ctx.fillStyle = TH.hi; ctx.fillRect(w - R + 1, y - 7, R - 2, 14); ctx.fillStyle = TH.ink; ctx.fillText(fmt(lastB.c, 1), w - R + 4, y + 3.5); }
-    // liquidations: shorts liquidated (forced buys) up, longs liquidated (forced sells) down
-    const mid = top[1] + hL / 2, maxL = Math.max(1, ...bins.map(b => Math.max(b.bl, b.sl))), half = hL / 2 - 14;
-    ctx.strokeStyle = TH.edge; ctx.beginPath(); ctx.moveTo(L, mid); ctx.lineTo(L + pw, mid); ctx.stroke();
-    for (let j = 0; j < n; j++) { const b = bins[j], x = xc(j) - Math.max(1, bw * .7) / 2, wd = Math.max(1, bw * .7); if (b.bl) { ctx.fillStyle = TH.buy; ctx.fillRect(x, mid - b.bl / maxL * half, wd, b.bl / maxL * half); } if (b.sl) { ctx.fillStyle = TH.sell; ctx.fillRect(x, mid, wd, b.sl / maxL * half); } }
-    ctx.fillStyle = TH.dim; ctx.fillText(fmtK(maxL), w - R + 4, mid - half + 4); ctx.fillText("0", w - R + 4, mid + 3.5);
-    // delta
-    const midD = top[2] + hD / 2, maxD = Math.max(1, ...bins.map(b => Math.abs(b.delta))), halfD = hD / 2 - 14;
-    ctx.strokeStyle = TH.edge; ctx.beginPath(); ctx.moveTo(L, midD); ctx.lineTo(L + pw, midD); ctx.stroke();
-    for (let j = 0; j < n; j++) { const b = bins[j]; if (!b.has) continue; const x = xc(j) - Math.max(1, bw * .7) / 2, wd = Math.max(1, bw * .7), hh = Math.abs(b.delta) / maxD * halfD; ctx.fillStyle = b.delta >= 0 ? TH.buy : TH.sell; ctx.fillRect(x, b.delta >= 0 ? midD - hh : midD, wd, hh); }
-    ctx.fillStyle = TH.dim; ctx.fillText("+" + fmtK(maxD), w - R + 4, midD - halfD + 4); ctx.fillText("-" + fmtK(maxD), w - R + 4, midD + halfD + 4); ctx.fillText("0", w - R + 4, midD + 3.5);
-    // open interest
-    let oLo = Infinity, oHi = -Infinity; for (const b of bins) if (b.oi != null) { if (b.oi < oLo) oLo = b.oi; if (b.oi > oHi) oHi = b.oi; }
-    if (isFinite(oLo)) {
-      const op = Math.max((oHi - oLo) * .15, oHi * .00002); oLo -= op; oHi += op; const Yo = v => top[3] + 14 + (oHi - v) / (oHi - oLo) * (hO - 20);
-      ctx.lineWidth = 1.6; let pj = -1, dirCol = TH.dim;                                       // each segment is coloured by the direction of the change: rising = positions opening, falling = closing
-      for (let j = 0; j < n; j++) { const b = bins[j]; if (b.oi == null) continue; if (pj >= 0 && j - pj <= 3) { const d = b.oi - bins[pj].oi; dirCol = d > 0 ? TH.buy : d < 0 ? TH.sell : TH.dim; ctx.strokeStyle = dirCol; ctx.beginPath(); ctx.moveTo(xc(pj), Yo(bins[pj].oi)); ctx.lineTo(xc(j), Yo(b.oi)); ctx.stroke(); } pj = j; } ctx.lineWidth = 1;
-      ctx.fillStyle = TH.dim; ctx.fillText(fmtK(oHi - op), w - R + 4, top[3] + 18); ctx.fillText(fmtK(oLo + op), w - R + 4, top[3] + hO - 4);
-      const lo2 = [...bins].reverse().find(b => b.oi != null); if (lo2) { const y = Yo(lo2.oi); ctx.fillStyle = dirCol === TH.dim ? TH.accent : dirCol; ctx.fillRect(w - R + 1, y - 7, R - 2, 14); ctx.fillStyle = TH.ink; ctx.fillText(fmtK(lo2.oi), w - R + 4, y + 3.5); }
-    } else { ctx.fillStyle = TH.dim; ctx.textAlign = "center"; ctx.fillText("no open interest reading yet (needs the openInterest stream on)", L + pw / 2, top[3] + hO / 2); ctx.textAlign = "left"; }
-    // bar stats: one row per measure, one cell per candle. Diverging rows (green up / red down) are scaled by the 90th percentile of the window; the others by the 95th.
-    if (showStats) {
-      const pc = (arr, q) => { const a = arr.filter(x => x != null && isFinite(x)).sort((x, y) => x - y); return a.length ? a[Math.min(a.length - 1, Math.floor(a.length * q))] : 0; };
-      const rowsDef = [["Δ share", b => b.dpct, true], ["OI Δ", b => b.doi, true], ["Volume", b => b.has ? b.vol : null, false], ["Trades", b => b.has ? b.n : null, false], ["Range", b => b.range, false]];
-      rowsDef.forEach(([nm, fn, div], ri) => {
-        const vals = bins.map(fn), ref = div ? pc(vals.map(v => v == null ? null : Math.abs(v)), .9) : pc(vals, .95), y = top[4] + ri * rowH;
-        ctx.fillStyle = TH.dim; ctx.textAlign = "left"; ctx.fillText(nm, w - R + 4, y + rowH - 2);
-        if (!(ref > 0)) return;
-        for (let j = 0; j < n; j++) { const v = vals[j]; if (v == null) continue; const m = Math.min(1, Math.abs(v) / ref); ctx.fillStyle = div ? (v >= 0 ? TH.a("buy", .12 + .88 * m) : TH.a("sell", .12 + .88 * m)) : TH.a("accent", .08 + .92 * m); ctx.fillRect(L + j * bw, y, Math.ceil(bw) + .5, rowH - 1); }
-      });
-    }
-    // time axis
-    ctx.fillStyle = TH.dim; ctx.textAlign = "center"; const every = Math.max(1, Math.round(90 / bw));
-    for (let j = 0; j < n; j += every) ctx.fillText(hhmm(bins[j].t).slice(0, binMs >= 60000 ? 5 : 8), xc(j), h - 4);
-    ctx.textAlign = "left";
-    // highlights: one cyan box through every panel, with the three checks above it
-    for (const hl of hits) {
-      const x0 = L + hl.i0 * bw - 2, x1 = L + (hl.i1 + 1 + Math.min(2, n - 1 - hl.i1)) * bw + 2, y0 = top[0] + 2, y1 = bottom - 1;
-      ctx.strokeStyle = MARK; ctx.lineWidth = hl.strong ? 2.6 : 1.4; ctx.setLineDash(hl.strong ? [] : [5, 3]);
-      ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x0, y0, Math.max(8, x1 - x0), y1 - y0, 5); else ctx.rect(x0, y0, Math.max(8, x1 - x0), y1 - y0); ctx.stroke(); ctx.setLineDash([]); ctx.lineWidth = 1;
-      const lab = [["LIQ", true], ["Δ", hl.checks.delta], ["OI", hl.checks.oi]]; let lx = Math.min(Math.max(L + 2, x0 + 3), L + pw - 112); const ly = top[0] + 22;
-      ctx.font = "bold 11px ui-monospace,Menlo,Consolas,monospace";
-      for (const [nm, okc] of lab) { const s = nm + (okc ? "✓" : "✗") + " "; ctx.fillStyle = TH.canvas; ctx.fillRect(lx - 1, ly - 10, ctx.measureText(s).width + 2, 13); ctx.fillStyle = okc ? MARK : TH.dim; ctx.fillText(s, lx, ly); lx += ctx.measureText(s).width; }
-      ctx.font = "10.5px ui-monospace,Menlo,Consolas,monospace";
-    }
-    // where the backfilled history ends and live data starts
-    if (st.bf && liveFrom != null && liveFrom > t0 && liveFrom < t0 + span) {
-      const x = X(liveFrom); ctx.setLineDash([2, 4]); ctx.strokeStyle = TH.a("hi", .5); ctx.beginPath(); ctx.moveTo(x, top[0]); ctx.lineTo(x, bottom); ctx.stroke(); ctx.setLineDash([]);
-      ctx.fillStyle = TH.dim; ctx.textAlign = "right"; ctx.fillText("backfilled ◂", x - 4, top[0] + hP - 6); ctx.textAlign = "left"; ctx.fillText("▸ live", x + 4, top[0] + hP - 6);
-    }
-    // crosshair
-    if (hovX != null && hovX >= L && hovX <= L + pw) {
-      const j = Math.min(n - 1, Math.floor((hovX - L) / bw)), x = xc(j); ctx.strokeStyle = TH.a("hi", .6); ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(x, top[0]); ctx.lineTo(x, bottom); ctx.stroke(); ctx.setLineDash([]);
-    }
-  }
-  const hoverText = j => {
-    const b = bins[j]; if (!b) return "Move over the chart (or tap it) to read one candle.";
-    const prev = bins.slice(0, j).reverse().find(x => x.oi != null), dOi = prev && b.oi != null && prev.oi > 0 ? (b.oi - prev.oi) / prev.oi : null, rd = FUTSTACK.reading(b.delta, dOi), hit = hits.find(x => j >= x.i0 && j <= x.i1 + 2);
-    return `${hhmm(b.t)} · ${b.o != null ? `O ${fmt(b.o, 1)} H ${fmt(b.h, 1)} L ${fmt(b.l, 1)} C ${fmt(b.c, 1)}` : "no trades"} · liq shorts $${fmtK(b.bl)} / longs $${fmtK(b.sl)} · delta ${sgn(b.delta)}${b.dpct == null ? "" : " (" + (b.dpct * 100).toFixed(0) + "% of " + "$" + fmtK(b.vol) + ")"} · trades ${Math.round(b.n)}${b.range == null ? "" : " · range " + b.range.toFixed(1) + " bps"} · OI ${fmtOi(b.oi)} (${pct(dOi)}) · ${rd.text}${hit ? " · " + hit.text : ""}`;
-  };
-  function onPointer(e) { const r = cv.getBoundingClientRect(); hovX = e.clientX - r.left; if (geo && geo.n) { const j = Math.min(geo.n - 1, Math.max(0, Math.floor((hovX - geo.L) / geo.bw))); g("fsHover").textContent = hoverText(j); } requestAnimationFrame(draw); }
-  cv.addEventListener("pointermove", onPointer); cv.addEventListener("pointerdown", onPointer);
-  cv.addEventListener("pointerleave", () => { hovX = null; requestAnimationFrame(draw); });
-
-  // ---- the live reading beside the chart ----
-  const setHtml = (el, html) => { if (el.dataset.h !== html) { el.dataset.h = html; el.innerHTML = html; } };
-  function panels() {
-    setHtml(g("fsLiqSrc"), `Liquidation feeds: Binance ${connected ? "(app feed)" : "off"} · Bybit ${LQ.by.st} · OKX ${LQ.ok.st} · Hyperliquid: its feed does not flag liquidations · Open interest: ${oiNote()}${bfMsg ? " · History: " + bfMsg : ""}`);
-    if (!bins.length) { setHtml(g("fsCheck"), `<b>Reading</b><div class="note">Waiting for data.</div>`); setHtml(g("fsHits"), `<b>Boxed moments</b><div class="note">None yet.</div>`); return; }
-    const n = Math.max(1, Math.ceil(300000 / (+g("fsBin").value))), s = FUTSTACK.summary(bins, n), cls = ok => ok ? "yes" : "no";
-    const liqHit = s.bl + s.sl >= (cfg().minLiqUsd || 1), dHit = s.vol > 0 && Math.abs(s.delta) / s.vol > .1, oHit = s.oiPct != null && Math.abs(s.oiPct) >= .0002;
-    setHtml(g("fsCheck"), `<b>Reading, last 5 minutes</b><div class="fs-ck">
-      <div class="${cls(liqHit)}">Liquidations: shorts $${fmtK(s.bl)} · longs $${fmtK(s.sl)}</div>
-      <div class="${cls(dHit)}">Volume delta: ${sgn(s.delta)} of $${fmtK(s.vol)} traded</div>
-      <div class="${cls(oHit)}">Open interest: ${pct(s.oiPct)}</div>
-      <div style="margin-top:4px"><b>${s.reading.text}</b></div></div>`);
-    const list = [...hits].reverse().slice(0, 6).map(x => `<div class="fs-hit">${hhmm(x.t0).slice(0, 8)} · ${x.text}<br><span class="note" style="margin:0">${x.reading.text}</span></div>`).join("");
-    setHtml(g("fsHits"), `<b>Boxed moments</b>${list || `<div class="note">None in this window. A box needs ≥ $${fmtK(cfg().minLiqUsd)} of liquidations in one candle, then checks delta and open interest.</div>`}`);
-  }
-
-  // ---- trade buttons ----
-  function tradeUi() {
-    if (ACC.mode === "sim") ACC.data = simSnapshot();
-    const d = ACC.data, pos = position(), sz = +g("fsSize").value;
-    g("fsAcct").textContent = ACC.mode ? "· account: " + ACC.mode.toUpperCase() + (ACC.mode === "live" ? " (REAL MONEY)" : "") : "· no account yet";
-    g("fsStart").style.display = ACC.mode ? "none" : "";
-    for (const id of ["fsBuy", "fsSell"]) g(id).disabled = !ACC.mode || !(sz > 0);
-    g("fsClose").disabled = !pos;
-    const px = M.bnBid && M.bnAsk ? (M.bnBid + M.bnAsk) / 2 : null;
-    setHtml(g("fsPos"), !ACC.mode || !d ? "" : [["Position", pos ? `<span class="${pos.qty > 0 ? "ok" : "err"}">${pos.qty > 0 ? "Long" : "Short"} ${Math.abs(pos.qty)}</span> @ ${fmt(pos.entry, 1)}` : "flat"], ["Unrealized", pos ? `<span class="${pos.upnl >= 0 ? "ok" : "err"}">${pos.upnl >= 0 ? "+" : ""}${fmt(pos.upnl, 2)}</span>` : "–"],
-      ["Wallet", "$" + fmt(d.balance.wallet, 2)], ["Price", px ? fmt(px, 1) : "–"]].map(([k, v]) => `<div class="metric"><span>${k}</span><b>${v}</b></div>`).join(""));
-  }
-  async function send(side, qtyUsd, reduceQty) {
-    const msg = g("fsMsg"); const ref = side === "BUY" ? M.bnAsk : M.bnBid;
-    if (!ref) { msg.className = "note err"; msg.textContent = "No live price yet; press Connect."; return; }
-    const qty = reduceQty != null ? reduceQty : qtyUsd / ref; if (!(qty > 0)) { msg.className = "note err"; msg.textContent = "Enter a size."; return; }
-    for (const id of ["fsBuy", "fsSell", "fsClose"]) g(id).disabled = true; msg.className = "note"; msg.textContent = "Sending…";
-    try { const r = await placeOrder({ side, type:"MARKET", qty, price:ref, reduce:reduceQty != null }); fills.push({ t:nowEx(), side, px:ref }); msg.className = "note ok"; msg.textContent = "✓ " + side.toLowerCase() + " " + r.msg; }
-    catch (e) { msg.className = "note err"; msg.textContent = e.message; }
-    tradeUi(); draw();
-  }
-  g("fsBuy").onclick = () => send("BUY", +g("fsSize").value);
-  g("fsSell").onclick = () => send("SELL", +g("fsSize").value);
-  g("fsClose").onclick = () => { const p = position(); if (p) send(p.qty > 0 ? "SELL" : "BUY", 0, Math.abs(p.qty)); };
-  g("fsStart").onclick = () => { g("simGo").click(); tradeUi(); };
-  g("fsSize").oninput = tradeUi;
-  for (const id of ["fsVenue", "fsWin", "fsBin", "fsHeat", "fsMark", "fsMin", "fsLiqAll", "fsProf", "fsStats"]) g(id).onchange = g(id).oninput = () => { heatKey = ""; futuresRender(); };
-
-  window.futuresRender = function futuresRender() { try { draw(); panels(); tradeUi(); } catch (e) { console.error("futures", e); } };
-  window.futuresRender.lq = LQ;                                             // read-only, for the Liquidations readout (liq-readout.js): the state of the Bybit and OKX sockets
-  window.futuresRender.store = st;                                          // for tests: fill the store with simulated history from the console
-})();
-
-</script>
-<script>
-"use strict";
-// Liquidations (view, Now > Market and tape): what is being liquidated right now on Binance, Bybit and OKX, as clusters (events within 30 s), the last 30 minutes in one-minute bars, and for each cluster
-// the price move before it and after it, in sigmas, signed in the direction the forced orders pushed. The events come from the same live feeds the Futures stack reads (the page's Binance feed, and Bybit
-// and OKX sockets opened while the app is connected), through the "liquidation" hook; the maths is in liq-core.js. Display only: it opens no socket and touches no feed, recording or detection.
-const LQV = {ev:[], keepMs:6*3600e3, cap:30000, sigma:null, sigmaAt:0, minUsd:25000};
-const lqv$ = id => document.getElementById(id);
-const lqvEsc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;"}[c]));
-HOOKS.on("liquidation", t => {
-  if (!t || !(t.ntl > 0) || (t.side !== "buy" && t.side !== "sell")) return;
-  LQV.ev.push({t:t.t, v:t.v, side:t.side, ntl:t.ntl});
-  if (LQV.ev.length > LQV.cap) LQV.ev.splice(0, LQV.ev.length - LQV.cap);
-});
-function lqvSigma(now) {      // the Binance mid's sigma, bps per root second, refreshed once a minute (scoreboard-core's ruler)
-  if (now - LQV.sigmaAt < 60000) return LQV.sigma; LQV.sigmaAt = now;
-  const h = READER.priceHistory("bn"); LQV.sigma = h && h.length >= 300 ? SCOREBOARD.sigmaOf(h) : null; return LQV.sigma;
-}
-const lqvAgo = ms => { const s = Math.max(0, Math.round(ms/1000)); return s < 90 ? s + " s" : s < 5400 ? Math.round(s/60) + " min" : (s/3600).toFixed(1) + " h"; };
-const lqvTime = t => new Date(t).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
-const lqvMove = m => m == null ? "–" : `<span class="${m >= 0.3 ? "lq-cont" : m <= -0.3 ? "lq-back" : ""}">${m >= 0 ? "+" : ""}${m.toFixed(2)}</span>`;
-function lqvSource(k) {
-  const lq = typeof futuresRender === "function" && futuresRender.lq ? futuresRender.lq[k] : null, name = LIQ.NAME[k];
-  if (k === "bn") return `<span class="lq-src ${connected ? "on" : ""}">${name} ${connected ? "live" : "off"}</span>`;
-  const st = lq ? lq.st : "off"; return `<span class="lq-src ${st === "live" ? "on" : ""}">${name} ${lqvEsc(st)}</span>`;
-}
-function lqvRender() {
-  if (typeof tab === "undefined" || tab !== "market") return;
-  const box = lqv$("lqBox"); if (!box) return;
-  const now = Date.now(), cut = now - LQV.keepMs; while (LQV.ev.length && LQV.ev[0].t < cut) LQV.ev.shift();
-  const sum = LIQ.summary(LQV.ev, now, 900000), per = LIQ.VENUES.map(v => {
-    const p = sum.per[v]; return `<div class="metric"><span>${LIQ.NAME[v]}, 15 min</span><b>${LIQ.usd(p.sell + p.buy)}</b><span class="stat">longs ${LIQ.usd(p.sell)} · shorts ${LIQ.usd(p.buy)} · ${p.n} ev</span></div>`; }).join("");
-  const bk = LIQ.buckets(LQV.ev, now, 30*60000, 60000), mx = Math.max(1, ...bk.map(b => Math.max(b.sell, b.buy)));
-  const bars = bk.map(b => `<div class="lq-col" title="${lqvTime(b.t)} · longs liquidated ${LIQ.usd(b.sell)} · shorts liquidated ${LIQ.usd(b.buy)}"><div class="lq-up"><i style="height:${(100*b.buy/mx).toFixed(1)}%"></i></div><div class="lq-dn"><i style="height:${(100*b.sell/mx).toFixed(1)}%"></i></div></div>`).join("");
-  const cl = LIQ.clusters(LQV.ev).filter(c => c.ntl >= LQV.minUsd && c.t1 >= now - 2*3600e3).reverse().slice(0, 14);
-  const sg = lqvSigma(now), h = sg ? READER.priceHistory("bn") : null;
-  const rows = cl.map(c => {
-    const m = sg ? LIQ.moves(h, c, sg, now, SCOREBOARD.forwardMove) : {pre:null, after60:null, after300:null, soFar:null}, act = LIQ.active(c, now);
-    const after = m.after60 != null ? lqvMove(m.after60) : m.soFar && m.soFar.move != null ? lqvMove(m.soFar.move) + ` <span class="stat">${m.soFar.sec} s</span>` : "–";
-    return `<tr class="${c.tier}"><td>${lqvTime(c.t0)}</td><td>${act ? '<b class="lq-now">forming</b> ' : ""}${lqvAgo(now - c.t1)} ago</td><td class="${c.dom === "sell" ? "lq-l" : "lq-s"}">${LIQ.sideText(c)}${c.domShare < 0.9 ? " (mixed)" : ""}</td><td><b>${LIQ.usd(c.ntl)}</b></td><td>${c.n}</td><td>${LIQ.mix(c)}</td><td>${lqvMove(m.pre)}</td><td>${after}</td><td>${lqvMove(m.after300)}</td></tr>`;
-  }).join("");
-  const off = typeof connected === "undefined" || !connected;
-  box.innerHTML = `<div class="lq-src-row">${LIQ.VENUES.map(lqvSource).join("")}${LQV.ev.length ? `<span class="stat">${LQV.ev.length.toLocaleString("en-US")} liquidations seen since the page started, newest ${lqvAgo(now - LQV.ev[LQV.ev.length - 1].t)} ago</span>` : ""}</div>
-    ${off ? `<div class="note" style="margin-top:0">Not connected: the liquidation feeds run while the app is connected. An armed or recording session still keeps Binance, Bybit and OKX liquidations in its file.</div>` : ""}
-    <div class="metrics">${per}<div class="metric"><span>All three, 15 min</span><b>${LIQ.usd(sum.total)}</b><span class="stat">longs ${LIQ.usd(sum.sell)} · shorts ${LIQ.usd(sum.buy)}</span></div></div>
-    <div class="stat" style="margin-top:6px">Last 30 minutes, one bar a minute (up: shorts liquidated, forced buys · down: longs liquidated, forced sells; each side scaled to the biggest minute, ${LIQ.usd(mx)})</div>
-    <div class="lq-bars">${bars}</div>
-    <div class="stat" style="margin-top:8px">Clusters of at least <select id="lqMin"><option value="25000">$25k</option><option value="100000">$100k</option><option value="1000000">$1M</option></select> in the last 2 hours (events within ${LIQ.GAP_MS/1000} s of each other), newest first</div>
-    <div style="overflow-x:auto">${rows ? `<table class="tt lq-tab"><thead><tr><th>start</th><th>state</th><th>who</th><th>$</th><th>events</th><th>venues</th><th>5 min before</th><th>after</th><th>after 5 min</th></tr></thead><tbody>${rows}</tbody></table>${sg ? "" : `<div class="stat">Price moves appear after about 5 minutes of Binance price history.</div>`}` : `<div class="note">No cluster of that size in the last 2 hours${sg ? "" : " (price history is still short, moves need about 5 minutes)"}.</div>`}</div>
-    <div class="note">Price moves are in sigmas of the Binance mid (the Scoreboard's ruler, about 0.7 is a typical minute), signed in the direction the liquidations pushed: <span class="lq-cont">plus</span> = price kept moving that way, <span class="lq-back">minus</span> = it came back. "after" is the first minute once a cluster has ended (and "so far" before that). Binance reports at most one liquidation per symbol per second, so its dollars are a lower bound; Bybit and OKX report every one. Bybit and OKX feeds are the same ones the Futures stack uses.</div>`;
-  const sel = lqv$("lqMin"); if (sel) { sel.value = String(LQV.minUsd); sel.onchange = () => { LQV.minUsd = +sel.value; lqvRender(); }; }
-}
-setInterval(lqvRender, 1000);
 
 </script>
 <script>

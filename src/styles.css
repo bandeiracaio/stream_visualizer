@@ -75,7 +75,6 @@ pre.inspect{margin:0;max-height:300px;overflow:auto;background:var(--canvas);bor
 .full{grid-column:1/-1}
 canvas.chart{width:100%;display:block;background:var(--canvas);border-radius:var(--r)}
 #cvBub{height:340px}#cvCvd{height:200px}#cvHeat{height:400px}.mchart{height:170px}#cvHist{height:190px}
-#cvStream{height:260px}#cvSwarm{height:290px}#cvProf{height:400px}#cvAnom{height:230px}#cvBell{height:250px}#cvRad{height:360px}#cvTree{height:300px}#cvWater{height:300px}#cvFan{height:340px}
 .vleg{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:2px 10px;font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:6px}.vleg i{display:inline-block;width:10px;height:10px;margin-right:5px;vertical-align:-1px}
 #tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr));gap:10px}
 #tgrid > section{grid-column:auto}#tgrid > section.full{grid-column:1/-1}
@@ -182,7 +181,7 @@ section.collapsed > .pbody{height:0;overflow:hidden;visibility:hidden}
   .accpanel{right:4px;max-height:calc(100vh - var(--hh,95px) - 70px)}
   #arHdrMsg{position:absolute;top:100%;left:0;right:0;z-index:6;max-width:none;background:var(--panel2);border-bottom:1px solid var(--accent);padding:6px 10px}      /* the answer to Arm floats under the header instead of pushing the page down */
   input,select,button{min-height:44px}
-  .chip,#views button,.rm,.tt button,.eplab button,.lsview button{min-height:36px}      /* small controls inside panels */
+  .chip,#views button,.rm,.tt button,.eplab button{min-height:36px}      /* small controls inside panels */
   .pill{gap:2px;font-size:10.5px}
   .pill b{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}      /* the text stays for screen readers; the dot below is what is seen */
   .pill::after{content:"";width:10px;height:10px;border-radius:50%;flex:none;background:var(--warn)}
@@ -251,10 +250,6 @@ td.up{color:var(--buy)}td.dn{color:var(--sell)}
 .rv-row .grow{flex:1 1 220px}
 .rv-tbl{width:100%;border-collapse:collapse;font-size:12px}
 .rv-tbl td,.rv-tbl th{text-align:left;padding:3px 6px;border-bottom:1px solid var(--line);vertical-align:middle}
-.lsbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px}.lsbar input[type=range]{flex:1 1 160px;min-width:120px;padding:0}.lsview{display:inline-flex;gap:4px;margin-left:auto}.lsread{margin:8px 0 4px;font-size:12.5px;line-height:1.5}.lsread b{font-family:var(--mono);color:var(--text)}
-.lswrap{display:grid;grid-template-columns:1fr;gap:6px}
-@media(min-width:900px){.lswrap.split{grid-template-columns:1fr 1fr}}
-#lsSection h2 .ctl{flex-wrap:wrap}
 @media(max-width:640px){                                   /* phone: the Reader review tables wrap instead of widening the page */
   .rd-det{overflow-x:auto}                              /* a wide data table scrolls inside its box, not the page */
   .rv-tbl td,.rv-tbl th{white-space:normal;overflow-wrap:anywhere}
@@ -278,23 +273,6 @@ td.up{color:var(--buy)}td.dn{color:var(--sell)}
 .am-t-ok,.am-t-up{color:var(--buy)!important}.am-t-warn{color:var(--warn)!important}.am-t-bad,.am-t-dn,.am-t-rec{color:var(--sell)!important}
 .am-sub{color:var(--dim);font-size:11.5px;margin:8px 0 3px}.am-chip{display:inline-block;margin:2px 10px 2px 0;font-size:12px;color:var(--text)}
 .am-ep{font-size:12px;padding:3px 0;color:var(--text);border-bottom:1px solid var(--line)}.am-ep b{color:var(--accent)}
-/* Futures stack (Now): the cyan --mark box is the "look here" highlight */
-.fs-box{border:1px solid var(--mark);border-radius:var(--r);padding:8px 10px;margin-top:8px}
-.fs-box summary{cursor:pointer;color:var(--mark);font-weight:600}
-.fs-box ol,.fs-box ul{margin:6px 0 0 18px;padding:0}.fs-box li{margin:3px 0}
-.fs-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;margin-top:8px}
-.fs-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
-.fs-row input[type=number]{width:100px}
-.fs-row .buy{background:var(--buy);color:var(--ink);border-color:var(--buy);font-weight:600}.fs-row .sell{background:var(--sell);color:var(--ink);border-color:var(--sell);font-weight:600}
-.fs-hit{border-left:3px solid var(--mark);padding:2px 8px;margin:4px 0;color:var(--text)}
-.fs-ck b{color:var(--mark)}.fs-ck .yes{color:var(--buy)}.fs-ck .no{color:var(--dim)}
 #stChips{display:flex;flex-wrap:wrap;gap:5px}
 .sbfam{margin-top:12px;padding-top:8px;border-top:1px solid var(--line)}.sbfam h3{margin:0 0 6px;font-size:13px;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
 .sbfam .tt{width:auto}.sbfam .tt th,.sbfam .tt td{text-align:left;padding-right:20px;white-space:nowrap}
-/* Liquidations readout (Now > Market and tape): longs liquidated = forced sells = --sell, shorts liquidated = forced buys = --buy */
-.lq-src-row{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;margin-bottom:6px}.lq-src{font-size:11.5px;color:var(--dim)}.lq-src.on{color:var(--buy)}
-.lq-bars{display:flex;gap:1px;height:70px;margin-top:4px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
-.lq-col{flex:1 1 0;min-width:2px;display:flex;flex-direction:column}.lq-up,.lq-dn{flex:1 1 0;display:flex}.lq-up{align-items:flex-end;border-bottom:1px solid var(--line)}.lq-dn{align-items:flex-start}
-.lq-up i,.lq-dn i{display:block;width:100%;min-height:0}.lq-up i{background:var(--buy)}.lq-dn i{background:var(--sell)}
-.lq-tab td,.lq-tab th{text-align:left;padding-right:14px;white-space:nowrap}.lq-l{color:var(--sell)}.lq-s{color:var(--buy)}.lq-now{color:var(--warn)}.lq-cont{color:var(--warn)}.lq-back{color:var(--mark)}
-.lq-tab tr.huge td:nth-child(4){color:var(--accent)}

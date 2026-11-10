@@ -910,27 +910,6 @@ const READER_SELFTEST=(()=>{
     const on=run(true),off=run(false),strip=x=>JSON.stringify(x.events.filter(y=>!y.raw),(k,v)=>k==="id"?undefined:v);
     return{ok:strip(on)===strip(off)&&JSON.stringify(on.episodes)===JSON.stringify(off.episodes)&&off.events.every(x=>!x.raw),detail:"legacy signals or episodes differ with the raw events on"};
   });
-  // ---- flow landscape (v020): the pure grid behind the 3D view ----
-  const LS=READER_LANDSCAPE;
-  add("landscape: buying above the mid and selling below it land in the right cells with the right sign, and totals add up",E=>{
-    const src={trades:[{t:T0+59000,v:"bn",side:"buy",px:100.02,ntl:300},{t:T0+59500,v:"bn",side:"sell",px:99.98,ntl:200},{t:T0+30000,v:"bn",side:"buy",px:100.02,ntl:50},{t:T0+59900,v:"bn",side:"buy",px:105,ntl:999}],mid:()=>100};
-    const g=LS.grid(src,T0+60000,{venue:"bn",halfBps:4,xBins:41,yBins:24,spanMs:60000}),at=(xBps,ageS)=>g.z[Math.floor(ageS/60*24)*41+Math.floor((xBps+4)/8*41)];
-    return{ok:at(2,1)===300&&at(-2,.5)===-200&&at(2,30)===50&&g.clipped===1&&g.buy===350&&g.sell===200&&g.net===150&&g.peakBuy.z===300&&g.peakSell.z===-200,detail:JSON.stringify({a:at(2,1),b:at(-2,.5),c:at(2,30),clipped:g.clipped,buy:g.buy,sell:g.sell})};
-  });
-  add("landscape: a steady price makes a ridge along time, a trend makes a diagonal, and the price path ends at the playhead",E=>{
-    const steady=[],trend=[];for(let s=0;s<60;s++){steady.push({t:T0+s*1000+500,v:"bn",side:"buy",px:100.02,ntl:100});trend.push({t:T0+s*1000+500,v:"bn",side:"buy",px:100+s*.0005,ntl:100});}
-    const midTrend=(v,t)=>100+Math.max(0,(t-T0)/1000)*.0005,gs=LS.grid({trades:steady,mid:()=>100},T0+60000,{venue:"bn",halfBps:4}),cols=new Set();
-    for(let j=0;j<gs.ny;j++)for(let i=0;i<gs.nx;i++)if(gs.z[j*gs.nx+i]>0)cols.add(i);
-    const gt=LS.grid({trades:trend,mid:midTrend},T0+60000,{venue:"bn",halfBps:4}),cols2=new Set();
-    for(let j=0;j<gt.ny;j++)for(let i=0;i<gt.nx;i++)if(gt.z[j*gt.nx+i]>0)cols2.add(i);
-    const p=gt.path;
-    return{ok:cols.size===1&&cols2.size>=4&&p[0]>p[p.length-1]*0-1&&p[p.length-1]<-.5&&gt.moveBps>.5&&Math.abs(p[0])<Math.abs(p[p.length-1]),detail:JSON.stringify({cols:cols.size,cols2:cols2.size,p0:p[0],pn:p[p.length-1],move:gt.moveBps})};
-  });
-  add("landscape: a recorded session becomes a source, the playhead can sit anywhere in it, and the grid never changes its input",E=>{
-    const inputs=[["q","bn",T0,99.99,100.01],["t",{t:T0+1000,v:"bn",side:"buy",px:100.02,q:1,ntl:200}],["q","bn",T0+2000,100.09,100.11],["t",{t:T0+2500,v:"hl",side:"sell",px:100.08,q:1,ntl:70}],["q","hl",T0+2000,100.07,100.09]];
-    const s=LS.fromInputs(inputs),before=JSON.stringify(s.trades),g1=LS.grid(s,T0+3000,{venue:"both",spanMs:60000}),g2=LS.grid(s,T0+3000,{venue:"both",spanMs:60000}),early=LS.grid(s,T0+1500,{venue:"bn",spanMs:60000});
-    return{ok:s.trades.length===2&&s.t0===T0&&s.mid("bn",T0+1000)===100&&Math.abs(s.mid("bn",T0+2500)-100.1)<1e-9&&s.mid("bn",T0+90000)===null&&JSON.stringify(Array.from(g1.z))===JSON.stringify(Array.from(g2.z))&&JSON.stringify(s.trades)===before&&early.trades===1&&early.buy===200,detail:JSON.stringify({n:s.trades.length,e:early.trades,eb:early.buy,m:s.mid("bn",T0+2500)})};
-  });
   // ---- adaptive sigma (v021): a fast component so sigma follows a market that suddenly gets busier ----
   add("sigma: with the fast component a market that gets four times busier is measured against its new pace within minutes; a steady market is barely changed",E=>{
     const run=(cfg,volAfter)=>{const e=E.create(cfg),a=sim(e,{seconds:900,seed:3,params:()=>({vol:.3})});sim(e,{t0:a.t,mid0:a.mid,seconds:180,seed:4,params:()=>({vol:volAfter})});return e.debug().sigmaBps("bn");};
@@ -940,35 +919,6 @@ const READER_SELFTEST=(()=>{
   add("sigma: the fast component is off unless asked for, so older settings and recordings read exactly as before",E=>{
     const mk=cfg=>{const e=E.create(cfg),a=sim(e,{seconds:400,seed:3,params:()=>({vol:.3})});sim(e,{t0:a.t,mid0:a.mid,seconds:60,seed:4,params:()=>({vol:1})});return e.debug().sigmaBps("bn");};
     return{ok:E.DEFAULTS.sigmaFastN===0&&mk({})===mk({sigmaFastN:0,sigmaFastW:.9}),detail:String(E.DEFAULTS.sigmaFastN)};
-  });
-  // ---- landscape view (v025): the cache key decides when a drawn grid may be reused, so a stale one would show the wrong market ----
-  add("landscape: the cache key reuses a grid for the same moment and changes for anything that changes the picture",E=>{
-    const K=READER_LANDSCAPE.cacheKey,tr=(t0,n)=>Array.from({length:n},(_,i)=>({t:t0+i*10})),base={src:"live",venue:"both",spanMs:60000,tNow:100000,live:true,trades:tr(0,50)};
-    const k=K(base),same=K(Object.assign({},base,{tNow:100200}))===k,moved=K(Object.assign({},base,{tNow:100400}))!==k,grown=K(Object.assign({},base,{trades:tr(0,51)}))!==k;
-    const trimmed=K(Object.assign({},base,{trades:tr(500,50)}))!==k,venue=K(Object.assign({},base,{venue:"bn"}))!==k,span=K(Object.assign({},base,{spanMs:120000}))!==k;
-    const play=Object.assign({},base,{live:false,tNow:100200,sessId:1,src:"session"}),s1=K(play),sNext=K(Object.assign({},play,{sessId:2}))!==s1,exact=K(Object.assign({},play,{tNow:100201}))!==s1;
-    return{ok:same&&moved&&grown&&trimmed&&venue&&span&&sNext&&exact,detail:JSON.stringify({same,moved,grown,trimmed,venue,span,sNext,exact})};
-  });
-  add("landscape: episodes become marks on the floor at their price and time, and only when they overlap the window",E=>{
-    const LS=READER_LANDSCAPE,T=100000,src={trades:[],t0:0,t1:T,mid:()=>100},g={spanMs:60000,half:4,venue:"both"};
-    const eps=[{family:"wall",venue:"bn",stage:"active",tStart:T-20000,tEnd:null,tDetected:T-15000,px:100.02},
-      {family:"absorption",venue:"hl",stage:"ended",tStart:T-90000,tEnd:T-70000,tDetected:T-85000,px:100},
-      {family:"burst",venue:"hl",stage:"ended",tStart:T-80000,tEnd:T-30000,tDetected:T-79000,px:99.96},
-      {family:"exhaustion",venue:"bn",stage:"active",tStart:T-5000,tEnd:null,tDetected:T-1000,px:101}];
-    const m=LS.episodeMarks(src,T,g,eps),w=m.find(x=>x.family==="wall"),b=m.find(x=>x.family==="burst"),x=m.find(x=>x.family==="exhaustion");
-    const hl=LS.episodeMarks(src,T,Object.assign({},g,{venue:"hl"}),eps);
-    return{ok:m.length===3&&!m.some(y=>y.family==="absorption")&&Math.abs(w.u-.5)<1e-9&&Math.abs(w.z0+1)<1e-9&&Math.abs(w.z1-(20000/60000*2-1))<1e-9&&Math.abs(w.zd-(15000/60000*2-1))<1e-9
-      &&b.zd===null&&b.z1===1&&Math.abs(b.u+1)<1e-9&&x.u===1&&x.outside===true&&hl.length===1&&hl[0].family==="burst"&&LS.episodeMarks(src,T,g,null).length===0,
-      detail:JSON.stringify({n:m.length,w,b,x,hl:hl.length})};
-  });
-  add("landscape: a wall that was re-posted again and again is one mark; different prices, venues and far-apart times stay separate; a family can be hidden",E=>{
-    const LS=READER_LANDSCAPE,T=100000,src={trades:[],t0:0,t1:T,mid:()=>100},g={spanMs:60000,half:4,nx:41,venue:"both"};
-    const w=(a,b,px,v)=>({family:"wall",venue:v||"bn",stage:"ended",tStart:T-a,tEnd:T-b,tDetected:T-a+1000,px});
-    const eps=[w(50000,40000,100.02),w(39000,30000,100.0201),w(28000,20000,100.02),w(10000,5000,100.02),w(45000,35000,100.05),w(45000,35000,100.02,"hl"),{family:"absorption",venue:"bn",stage:"active",tStart:T-8000,tEnd:null,tDetected:T-6000,px:100.02}];
-    const m=LS.episodeMarks(src,T,g,eps),raw=LS.episodeMarks(src,T,g,eps,{merge:false}),walls=m.filter(x=>x.wall),hid=LS.episodeMarks(src,T,g,eps,{hide:{wall:true}});
-    const big=walls.find(x=>x.n===3);
-    return{ok:raw.length===7&&m.length===5&&walls.length===4&&!!big&&Math.abs(big.z0+1/3)<1e-9&&Math.abs(big.z1-2/3)<1e-9&&Math.abs(big.zd-(49000/60000*2-1))<1e-9&&hid.length===1&&hid[0].family==="absorption"&&walls.filter(x=>x.venue==="hl").length===1,
-      detail:JSON.stringify({raw:raw.length,m:m.length,walls:walls.map(x=>[x.venue,x.n,+x.u.toFixed(3)]),hid:hid.length})};
   });
   // ---- auto-record (v031): when to start and stop recording, from a one-second price series ----
   add("autorec: sigma of a random walk matches its true scale, on the same footing as the engine's sigma",E=>{
@@ -995,14 +945,6 @@ const READER_SELFTEST=(()=>{
     const A=AUTOREC,r=rng(3),h=A.createHistory();let px=82000,t=T0;for(let i=0;i<3700;i++){px*=1+(r()-.5)*2*1.5/1e4;t+=1000;A.push(h,t,px);}
     const live=A.vol(h,{},t+2000),stale=A.vol(h,{},t+60000),a=A.step({mode:"waiting"},stale,t+60000,{});
     return{ok:live.ready&&!stale.ready&&a.action===null,detail:JSON.stringify({live:live.ready,stale:stale.ready,action:a.action})};
-  });
-  add("landscape: a multi-venue episode on a single-venue grid is placed against that venue's mid; a merged mark keeps the newest stage and is dashed only if every mark was",E=>{
-    const LS=READER_LANDSCAPE,T=100000,src={trades:[],t0:0,t1:T,mid:v=>v==="hl"?100:200},g={spanMs:60000,half:4,nx:41,venue:"hl"};
-    const one=LS.episodeMarks(src,T,g,[{family:"burst",venues:["bn","hl"],stage:"ended",tStart:T-20000,tEnd:T-10000,tDetected:T-19000,px:100.02}]);
-    const w=(a,b,px,st)=>({family:"wall",venue:"hl",stage:st,tStart:T-a,tEnd:T-b,tDetected:T-a+1000,px});
-    const m=LS.episodeMarks(src,T,g,[w(20000,10000,100.02,"ended"),w(40000,23000,100.02,"fading"),w(60000,50000,104.5,"ended"),w(55000,52000,104.5,"ended")]);
-    const mid=m.find(x=>!x.outside),far=m.find(x=>x.outside);
-    return{ok:one.length===1&&Math.abs(one[0].u-.5)<1e-9&&m.length===2&&mid.n===2&&mid.stage==="ended"&&!!far&&far.n===2&&far.outside===true,detail:JSON.stringify({one:one.length&&one[0].u,m:m.map(x=>[x.n,x.stage,x.outside])})};
   });
   add("replay: an empty recording and one with unknown record types replay to a quiet engine without throwing",E=>{
     const a=E.replayEngine([]),b=E.replayEngine([["zz",1],["a",T0],["x"],["a",T0+1000]]);

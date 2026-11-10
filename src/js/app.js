@@ -462,7 +462,6 @@ const READER_SLOT = {slot:"reader", render:()=>renderReader(), minIntervalMs:250
 VIEWS.register({id:"overview", label:"Overview", area:"now", minIntervalMs:250, render:()=>{ try{ renderOverview(); }catch(e){ console.error("overview", e); } }});
 VIEWS.register({id:"armmode", label:"Arm mode", area:"now"});
 VIEWS.register({id:"market", label:"Market and tape", area:"now"});
-VIEWS.register({id:"futures", label:"Futures stack", area:"setups", minIntervalMs:250, render:()=>{ if (typeof futuresRender === "function") futuresRender(); }});
 VIEWS.register({id:"micro", label:"Microstructure", area:"setups", minIntervalMs:250, render:()=>renderMicro()});
 VIEWS.register(Object.assign({id:"reader", label:"Episodes", area:"reader"}, READER_SLOT));
 VIEWS.register({id:"signals", label:"Signals", area:"reader", slot:"reader"});
