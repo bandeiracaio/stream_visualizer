@@ -2,6 +2,9 @@
 //   node build.mjs            -> dist/stream-visualizer.html   (dev build)
 //   node build.mjs --release  -> stream-visualizer_vNNN.html   (next free version, never overwrites)
 //   node build.mjs --out FILE -> FILE
+//   node build.mjs --version NNN --out FILE -> FILE stamped as vNNN (rebuilds a release from src/)
+//   node build.mjs --verify   -> rebuilds the newest releases/ file from src/ and compares it byte for byte; exit 1 on a difference
+// --release deletes the previous release file from releases/ (older ones live in GitHub Releases).
 // The Reader self-test runs first; a failing scenario aborts the build. Every included .js file must also compile (a syntax error aborts it).
 import fs from "node:fs";
 import path from "node:path";
@@ -45,13 +48,33 @@ function nextRelease() {
 }
 
 const args = process.argv.slice(2);
-if (args.includes("--out") && !args[args.indexOf("--out") + 1]) { console.error("--out needs a file path"); process.exit(1); }
+const argVal = f => args[args.indexOf(f) + 1];
+if (args.includes("--out") && !argVal("--out")) { console.error("--out needs a file path"); process.exit(1); }
+if (args.includes("--version") && !/^\d+$/.test(argVal("--version") || "")) { console.error("--version needs a number, e.g. --version 132"); process.exit(1); }
+const stamp = (html, version) => html.replace("__APP_VERSION__", version);
+
+if (args.includes("--verify")) {
+  const files = fs.existsSync(releaseDir) ? fs.readdirSync(releaseDir).filter(f => /^stream-visualizer_v\d+\.html$/.test(f)).sort() : [];
+  if (!files.length) { console.error("verify: no release file in releases/"); process.exit(1); }
+  const name = files[files.length - 1], committed = fs.readFileSync(path.join(releaseDir, name));
+  await selfTest();
+  const rebuilt = Buffer.from(stamp(assemble(), name.match(/_(v\d+)\.html$/)[1]));
+  if (rebuilt.equals(committed)) { console.log(`\nverify: releases/${name} matches src/ (${committed.length} bytes)`); process.exit(0); }
+  let i = 0; while (i < rebuilt.length && i < committed.length && rebuilt[i] === committed[i]) i++;
+  const hex = b => b.subarray(i, i + 16).toString("hex") + "  " + JSON.stringify(b.subarray(i, i + 16).toString("latin1"));
+  console.error(`\nverify FAILED: releases/${name} does not match a build of src/\n  committed: ${committed.length} bytes\n  rebuilt:   ${rebuilt.length} bytes\n  first difference at byte ${i}\n  committed: ${hex(committed)}\n  rebuilt:   ${hex(rebuilt)}`);
+  process.exit(1);
+}
+
 await selfTest();
-const out = args.includes("--out") ? path.resolve(args[args.indexOf("--out") + 1])
+const out = args.includes("--out") ? path.resolve(argVal("--out"))
           : args.includes("--release") ? nextRelease()
           : path.join(root, "dist", "stream-visualizer.html");
-const version = (path.basename(out).match(/^stream-visualizer_(v\d+)\.html$/) || [, "dev"])[1];     // stamped into the page so it can tell when a newer release is published
-const html = assemble().replace("__APP_VERSION__", version);
+const version = args.includes("--version") ? "v" + String(argVal("--version")).padStart(3, "0")
+              : (path.basename(out).match(/^stream-visualizer_(v\d+)\.html$/) || [, "dev"])[1];     // stamped into the page so it can tell when a newer release is published
+const html = stamp(assemble(), version);
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, html);
+if (args.includes("--release") && fs.existsSync(releaseDir))      // only the newest release stays in git; the new file is written first, so a failure never leaves releases/ empty
+  for (const f of fs.readdirSync(releaseDir)) if (/^stream-visualizer_v\d+\.html$/.test(f) && f !== path.basename(out)) fs.unlinkSync(path.join(releaseDir, f));
 console.log(`\nwrote ${out} (${(Buffer.byteLength(html) / 1024).toFixed(1)} KB)`);

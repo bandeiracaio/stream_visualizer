@@ -1,2 +1,6 @@
 # The pre-commit hook runs under sh: CRLF would break it.
 hooks/* text eol=lf
+# The build and --verify depend on exact bytes (CRLF/LF are mixed on purpose): never convert line endings on any checkout.
+src/** -text
+releases/** -text
+build.mjs -text

@@ -45,7 +45,7 @@ Stream Visualizer tries to do both jobs honestly:
 
 ## Quick start
 
-1. Open **https://bandeiracaio.github.io/stream_visualizer/** in Chrome, Edge, Firefox or Safari, on a PC or a phone. (Or download the newest `stream-visualizer_vNNN.html` from the repository root, highest number wins, and open the file.)
+1. Open **https://bandeiracaio.github.io/stream_visualizer/** in Chrome, Edge, Firefox or Safari, on a PC or a phone. (Or download a `stream-visualizer_vNNN.html` from the [Releases page](https://github.com/bandeiracaio/stream_visualizer/releases), highest number wins, and open the file.)
 2. Press **Connect**. The header shows how many sockets are up (`2/2 sockets`) and a green `streaming N/s` chip once data flows.
 3. Open the **Reader** tab and let it run. It calibrates for about two minutes before it detects anything.
 
@@ -109,7 +109,8 @@ The rule that holds the whole design together: **the register, drift and proposa
 node fold.mjs --check      # preview what the next fold would change
 node fold.mjs              # rewrite the matching defaults, mark files "Folded: yes"
 node build.mjs             # self-test + dev build
-node build.mjs --release   # next releases/stream-visualizer_vNNN.html
+node build.mjs --release   # next releases/stream-visualizer_vNNN.html (replaces the previous file)
+node build.mjs --verify    # the newest release file must equal a build of src/ (what CI checks)
 ```
 
 `fold.mjs` refuses a revision file that does not fit the current defaults. See [docs/revisions/README.md](docs/revisions/README.md) and [ADR 0003](docs/adr/0003-approved-thresholds-are-overrides-then-folded-by-script.md).
@@ -144,7 +145,7 @@ Bypass it for one commit with `git commit --no-verify`. `.gitattributes` keeps t
 
 ## Publishing
 
-The repository is public and serves GitHub Pages. `.github/workflows/pages.yml` runs on every push to `main` and publishes the **newest** `releases/stream-visualizer_vNNN.html` as the site, plus a `version.json` the page reads to offer updates. So the flow is: `node build.mjs --release`, commit, push. Unreleased work in `src/` never goes live. GitHub caches the page for about ten minutes, so a phone may need a reload.
+The repository is public and serves GitHub Pages. `.github/workflows/pages.yml` runs on every push to `main`: it runs the self-test, rebuilds the newest `releases/stream-visualizer_vNNN.html` from `src/` and compares it byte for byte with the committed file. Only if they match is that file published as the site (plus a `version.json` the page reads to offer updates) and attached to a GitHub Release tagged `vNNN`; otherwise the run fails and the site keeps the previous page. So the flow is: `node build.mjs --release`, `node build.mjs --verify`, commit, push. Unreleased work in `src/` never goes live. `releases/` holds only the newest file; every older version is a GitHub Release asset. GitHub caches the page for about ten minutes, so a phone may need a reload. GitHub caches the page for about ten minutes, so a phone may need a reload.
 
 ## Testing
 
@@ -175,7 +176,7 @@ src/
     status-core.js      pure header status chips and the version comparison
     status-bar.js       its view: chips next to Connect/Pause, the "newer version" bar
     reader-selftest.js  simulator scenarios (run by the build)
-.github/workflows/     Pages deploy (newest release becomes the site)
+.github/workflows/     test, verify release == src/, Pages deploy, GitHub Release
 build.mjs               self-test + single-file assembler
 fold.mjs                folds approved revisions into the defaults
 docs/adr/               architecture decision records

@@ -1,42 +1,108 @@
-# Publishes the newest release file (releases/stream-visualizer_vNNN.html) as the GitHub Pages site.
-# Runs on every push to main, so after `node build.mjs --release` + push the link serves the new version.
+# Release gate. A page reaches the Pages site only if CI itself ran the self-test and proved that the newest
+# release file (releases/stream-visualizer_vNNN.html) is byte-identical to a build of src/ (`node build.mjs --verify`).
+#   test                 every push to main and every pull request: `node build.mjs` (self-test + syntax check).
+#   verify-and-deploy    pushes to main: verify, then publish the committed file as index.html. A mismatch fails the job and the site keeps the previous page.
+#   release              attaches the deployed file to a GitHub Release tagged vNNN (older versions stay downloadable).
+# A push that changes src/ or build.mjs without touching releases/ is unreleased work: no verify, no deploy.
 name: Pages
 
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
-  cancel-in-progress: true
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  deploy:
+  test:
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node build.mjs
+
+  verify-and-deploy:
+    if: github.event_name != 'pull_request'
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      deploy: ${{ steps.plan.outputs.deploy }}
+      version: ${{ steps.plan.outputs.version }}
     steps:
       - uses: actions/checkout@v4
-      - name: Pick the newest release as index.html
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Decide what this push needs
+        id: plan
+        env:
+          BEFORE: ${{ github.event.before }}
+          EVENT: ${{ github.event_name }}
         run: |
           latest=$(ls releases/stream-visualizer_v*.html | sort | tail -1)
-          echo "Publishing $latest"
-          mkdir _site
-          cp "$latest" _site/index.html
-          # the page fetches this to learn whether a newer release exists
           v=${latest#releases/stream-visualizer_}; v=${v%.html}
-          echo "{\"version\":\"$v\"}" > _site/version.json
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          verify=true; deploy=true
+          if [ "$EVENT" = push ] && git fetch --no-tags --depth=1 origin "$BEFORE" 2>/dev/null; then
+            changed=$(git diff --name-only "$BEFORE" HEAD)
+            if ! echo "$changed" | grep -q '^releases/'; then
+              deploy=false                              # the site already serves this file
+              if echo "$changed" | grep -Eq '^(src/|build\.mjs)'; then
+                verify=false                            # unreleased src/ work: the newest release is expected to differ
+              fi
+            fi
+          fi   # first push, force push or manual run: verify and deploy
+          echo "verify=$verify deploy=$deploy version=$v"
+          echo "verify=$verify" >> "$GITHUB_OUTPUT"
+          echo "deploy=$deploy" >> "$GITHUB_OUTPUT"
+      - name: Verify the release file matches src/
+        if: steps.plan.outputs.verify == 'true'
+        run: node build.mjs --verify
+      - name: Pick the verified release as index.html
+        if: steps.plan.outputs.deploy == 'true'
+        run: |
+          mkdir _site
+          cp "releases/stream-visualizer_${{ steps.plan.outputs.version }}.html" _site/index.html
+          # the page fetches this to learn whether a newer release exists
+          echo "{\"version\":\"${{ steps.plan.outputs.version }}\"}" > _site/version.json
           touch _site/.nojekyll
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - if: steps.plan.outputs.deploy == 'true'
+        uses: actions/configure-pages@v5
+      - if: steps.plan.outputs.deploy == 'true'
+        uses: actions/upload-pages-artifact@v3
         with:
           path: _site
       - id: deployment
+        if: steps.plan.outputs.deploy == 'true'
         uses: actions/deploy-pages@v4
+
+  release:
+    if: needs.verify-and-deploy.outputs.deploy == 'true'
+    needs: verify-and-deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Attach the deployed file to a GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ needs.verify-and-deploy.outputs.version }}
+        run: |
+          if gh release view "$V" >/dev/null 2>&1; then echo "release $V already exists"; exit 0; fi
+          gh release create "$V" "releases/stream-visualizer_$V.html" --target "$GITHUB_SHA" --title "$V" --notes "Single-file build of $V, as deployed to GitHub Pages."
