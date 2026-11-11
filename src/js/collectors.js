@@ -55,8 +55,8 @@ setInterval(colSample, 10000);
 // ---- the always-on worker (collectors-worker.js): derivatives context and calendar tags. It runs whether or not auto-record is armed, in a worker so a hidden tab
 // does not slow it. Its records come here and go onto the tape; a record posted while the page is frozen is written when the page thaws.
 function colWorkerSync() {
-  const sym = cl$("sym").value.trim().toLowerCase(), wants = {derivs:colOn("derivs"), calendar:colOn("calendar"), venues:colOn("venues"), tradeVol:colOn("tradeVol"), book:colOn("book"), bookPerp:colOn("bookPerp"), perpFlow:colOn("perpFlow"), vol24:colOn("vol24"), wallets:colOn("wallets"), options:colOn("options")}, key = sym + "|" + wants.derivs + "|" + wants.calendar + "|" + wants.venues + "|" + wants.tradeVol + "|" + wants.book + "|" + wants.bookPerp + "|" + wants.vol24 + "|" + wants.wallets + "|" + wants.options;
-  const want = (wants.derivs || wants.calendar || wants.venues || wants.tradeVol || wants.book || wants.bookPerp || wants.perpFlow || wants.vol24 || wants.wallets || wants.options) && !!sym;
+  const sym = cl$("sym").value.trim().toLowerCase(), wants = {derivs:colOn("derivs"), calendar:colOn("calendar"), venues:colOn("venues"), book:colOn("book"), options:colOn("options")}, key = sym + "|" + wants.derivs + "|" + wants.calendar + "|" + wants.venues + "|" + wants.book + "|" + wants.options;
+  const want = (wants.derivs || wants.calendar || wants.venues || wants.book || wants.options) && !!sym;
   if (CL.worker && (!want || CL.workerKey !== key)) { try { CL.worker.postMessage({t:"stop"}); CL.worker.terminate(); } catch {} CL.worker = null; }
   if (!want || CL.worker) return;
   let w;
@@ -86,9 +86,6 @@ function colWhy(id) {
     case "telemetry": return connected || AR.on ? null : "waits for the app to be connected or armed";
     case "options": return !COLLECT.deribitCoin(cl$("sym").value.trim()) ? "Deribit lists BTC and ETH only" : CL.worker ? null : "worker not running";
     case "venues": return CL.worker ? (colWatching() ? null : "waits for a recording or auto-record armed") : "worker not running";
-    case "tradeVol": return CL.worker ? (colWatching() ? null : "waits for a recording or auto-record armed") : "worker not running";
-    case "bookPerp": return CL.worker ? (colWatching() ? null : "waits for a recording or auto-record armed") : "worker not running";
-    case "perpFlow": return CL.worker ? (colWatching() ? null : "waits for a recording or auto-record armed") : "worker not running";
     case "book": return CL.worker ? (RT.rec ? null : "waits for a recording") : "worker not running";
     default: return CL.worker ? null : "worker not running";
   }
@@ -111,39 +108,6 @@ function colRender() {
   colStatus();
 }
 setInterval(colStatus, 1000);
-// ---- venue volume readout (read-only): each venue's 24 h dollar volume and share from the newest "vol24" record, perp against spot, and, while a recording or armed
-// run is writing "tv", the share of what was actually traded over the last 5 minutes by the aggressor (buy / sell split). Redrawn only when its text changes.
-function colVolRender() {
-  const box = cl$("colVol"); if (!box) return;
-  const v24 = (CL.recent.vol24 || []).slice(-1)[0], d = v24 ? COLLECT.vol24Share(v24[3]) : null, now = Date.now(), tv = COLLECT.tradeShare(CL.recent.tv || [], now, 300000);
-  const U = COLLECT.usdText, pct = x => (x*100).toFixed(1) + "%", I = COLLECT.TRADE_IDS;
-  let html = "";
-  if (!d) html = `<div class="note">Venue volume: no 24 h reading yet (the vol24 collector asks each venue once a minute).</div>`;
-  else {
-    const rows = COLLECT.TRADE_ORDER.filter(id => d.by[id]).map(id => { const t = tv && tv.by[id], bs = t && t.usd > 0 ? Math.round(t.buy/t.usd*100) : null;
-      return `<tr><td>${I[id].label}</td><td style="text-align:right">${U(d.by[id].usd)}</td><td style="text-align:right">${pct(d.by[id].share)}</td><td style="text-align:right">${t ? pct(t.share) : "-"}</td><td style="text-align:right">${bs == null ? "-" : bs + " / " + (100 - bs)}</td></tr>`; }).join("");
-    html = `<div class="stat" style="margin-top:8px" title="24 h volume is each venue's own ticker, in dollars (USDT and USD treated as equal), read ${COLLECT.ageText(now - v24[2])} ago. 'Last 5 min' and buy / sell come from the trade buckets, only while a recording or armed run is writing them; buy / sell is by aggressor (the taker's side).">Venue volume, ${String(cl$("sym").value).toUpperCase()}: 24 h ${U(d.usd)} · perp ${pct(d.perp)} · spot ${pct(d.spot)}</div>
-      <table style="margin-top:4px"><thead><tr><th style="text-align:left">venue</th><th style="text-align:right">24 h</th><th style="text-align:right">share</th><th style="text-align:right">share 5 min</th><th style="text-align:right">buy / sell %</th></tr></thead><tbody>${rows}</tbody></table>`;
-  }
-  if (box.dataset.h !== html) { box.dataset.h = html; box.innerHTML = html; }
-}
-setInterval(colVolRender, 5000);
-// ---- perp book comparison (read-only): depth within 5 bps (coin and dollars), spread and bid share of the four perp books from their newest summary records (bookBn, bookHl and bookBy, bookOk, all from the worker; the first two write only while a recording is on, the other two while a recording or armed run is on). A venue whose book does not reach 5 bps, or that has no recent record, shows "-".
-function colBookRender() {
-  const box = cl$("colBook"); if (!box) return;
-  const now = Date.now(), recs = [].concat(CL.recent.bookBn || [], CL.recent.bookHl || [], CL.recent.bookBy || [], CL.recent.bookOk || []), rows = COLLECT.bookCompare(recs, now, 5), U = COLLECT.usdText;
-  let html = "";
-  if (!rows.some(r => r.ageMs != null && r.ageMs < 120000)) html = `<div class="note">Perp books: nothing recent (they are written only while a recording or an armed run is on).</div>`;
-  else {
-    const L = {bnF:"Binance perp", byF:"Bybit perp", okF:"OKX swap", hlF:"Hyperliquid perp"};
-    const body = rows.map(r => { const live = r.ageMs != null && r.ageMs < 120000;
-      return `<tr><td>${L[r.id]}</td><td style="text-align:right">${live && r.depthBtc != null ? r.depthBtc.toFixed(1) + " BTC" : "-"}</td><td style="text-align:right">${live && r.depthUsd != null ? U(r.depthUsd) : "-"}</td><td style="text-align:right">${live && r.spr != null ? r.spr.toFixed(2) + " bps" : "-"}</td><td style="text-align:right">${live && r.imb != null ? Math.round(r.imb*100) + " / " + (100 - Math.round(r.imb*100)) : "-"}</td><td style="text-align:right">${r.ageMs == null ? "-" : COLLECT.ageText(r.ageMs)}</td></tr>`; }).join("");
-    html = `<div class="stat" style="margin-top:8px" title="Resting size within 5 bps of the mid, both sides, from each venue's own order book (OKX sizes converted from contracts). Bid / ask % is the bid share of that depth. The books reach different distances (Bybit about 25, OKX about 7, Binance about 15, Hyperliquid about 24), so a reading beyond a venue's reach shows as '-'.">Perp books, depth within 5 bps</div>
-      <table style="margin-top:4px"><thead><tr><th style="text-align:left">venue</th><th style="text-align:right">depth</th><th style="text-align:right">dollars</th><th style="text-align:right">spread</th><th style="text-align:right">bid / ask %</th><th style="text-align:right">read</th></tr></thead><tbody>${body}</tbody></table>`;
-  }
-  if (box.dataset.h !== html) { box.dataset.h = html; box.innerHTML = html; }
-}
-setInterval(colBookRender, 5000);
 cl$("colList").onchange = e => { const id = e.target.dataset && e.target.dataset.col; if (!id) return; CL.cfg[id] = e.target.checked; store.set("col.cfg", CL.cfg); colWorkerSync(); if (AR.on && AR.worker) AR.worker.postMessage({t:"cfg", cfg:Object.assign({}, AR.cfg, {collectors:colWorkerCfg()})}); };
 cl$("colSave").onclick = async () => {
   const text = JSON.stringify({kind:"sv-tape", v:1, version:APP_VERSION, at:Date.now(), records:await colAll()});
@@ -152,8 +116,6 @@ cl$("colSave").onclick = async () => {
 cl$("colClear").onclick = async () => { try { await colReq("readwrite", st => st.clear()); CL.count = 0; CL.stat = {}; } catch {} colStatus(); };
 colAll().then(a => { CL.count = a.length; colTally(a); colStatus(); colPrune(); const cut = Date.now() - COL_RECENT_MS; for (const r of a) if (r[2] >= cut) colRemember(r); }, () => colStatus());
 colRender();
-colVolRender();
-colBookRender();
 colWorkerSync();
 
 // ---- collector context on an episode card (v067): what the collectors read when the episode was detected, as the feature's deviation from its own recent mean
@@ -165,21 +127,13 @@ function colContextFor(ep) {
   const recs = replay ? (ext || []) : [].concat(...Object.values(CL.recent)), c = COLLECT.context(recs, t, {coin:replay ? RT.session && RT.session.sym : cl$("sym").value});
   if (CL.ctx.size > 400) CL.ctx.clear(); CL.ctx.set(key, c); return c;
 }
-// who moved first (v079): one row under the context chips, venues against Binance spot over the 60 s before detection
-function epLeadBar(c) {
-  const l = c.lead; if (!l) return "";
-  const head = `<span class="stat" title="Each venue's own price change over the 60 s before detection: when it covered half of the move that the venues made, against Binance spot. The records come about once a second, so 'with it' means within 2 s. Prices are compared as changes, not levels.">who moved first (vs Binance spot)</span>`;
-  if (l.none) return `<div class="epctx">${head}<span class="stat">no reading: ${l.none}</span></div>`;
-  const chips = l.items.map(x => `<span class="chip" title="${x.label}: ${x.move >= 0 ? "+" : ""}${x.move} bps over the window">${COLLECT.leadText(x)}</span>`).join("");
-  return `<div class="epctx">${head}<span class="stat">Binance spot ${l.move >= 0 ? "+" : ""}${l.move} bps</span>${chips}</div>`;
-}
 // forced flow (v080): the liquidations of the 60 s before detection, by side, against the previous hour's pace; "liquidation-driven" only when the written rule in COLLECT.liqDriven holds
 function epLiqChip(c) {
   const l = c.liqx; if (!l || !l.usd && !l.other) return "";
   const U = COLLECT.usdText, what = !l.usd ? "no liquidations in this coin" : l.side === "sells" ? "forced sells " + U(l.sell) : l.side === "buys" ? "forced buys " + U(l.buy) : "forced sells " + U(l.sell) + " · buys " + U(l.buy);
   const pace = !l.usd ? "" : l.x != null ? ` · ${l.x}× the average minute of the previous ${l.histMin >= 60 ? "hour" : l.histMin + " min"}` : l.avg === 0 ? " · none in the hour before" : " · under 10 min of history";
   const venues = l.usd ? ` (Binance ${U(l.bn.sell + l.bn.buy)} · Hyperliquid ${U(l.hl.sell + l.hl.buy)})` : "", other = l.other ? ` · ${l.other} Hyperliquid fill${l.other > 1 ? "s" : ""} in other coins` : "";
-  const tip = `Forced orders in the 60 s before detection: Binance liquidations of this symbol plus the Hyperliquid liquidation fills of the followed wallets in this coin (the followed wallet is the counterparty: it bought when the liquidated trader was forced to sell). Tagged when at least $500k and at least 10 times the average minute of the previous hour.`;
+  const tip = `Forced orders in the 60 s before detection: Binance liquidations of this symbol (recordings from before v136 also hold Hyperliquid liquidation fills of followed wallets, which are counted when present). Tagged when at least $500k and at least 10 times the average minute of the previous hour.`;
   return `<span class="chip" title="${tip}"${l.tag ? ' style="font-weight:700"' : ""}>${l.tag ? "liquidation-driven: " : ""}${what}${venues}${pace}${other}</span>`;
 }
 // wall quality (v081, wall episodes only): the book depth summaries around the wall. They exist only for a recording (live: while recording; replay: the session's own `ext`).
@@ -232,73 +186,9 @@ function epEventChip(ep) {
   const e = colEventsFor(ep); if (!e.length) return "";
   return `<span class="chip" title="Scheduled events within 10 minutes of detection, by rule (funding, options expiry, US stock open and close). Macro releases (CPI, FOMC, jobs) are not known to the app.">${e.slice(0, 3).map(x => (Math.abs(x.off) < 60000 ? "at " : COLLECT.evSpan(x.off) + (x.off >= 0 ? " after " : " before ")) + x.label).join(" · ")}</span>`;
 }
-// ---- options lens (v084, rules in .scratch/collector-features/spec.md G): realized volatility against the volatility index, and the skew shift. Display only.
-// price points [[ms, price]]: live from the engine's history (only while connected); in a replay the auto-recording's `pre` (30 minutes of mark price before the trigger) followed by the replay's own
-function colPricePts(replay) {
-  if (replay) {
-    const eng = rdView.engine, h1 = eng.priceHistory("bn"), ph = h1.length ? h1 : eng.priceHistory("hl"), pre = RT.session && RT.session.pre && RT.session.pre.prices;
-    return (Array.isArray(pre) ? pre.map(p => [p[0]*1000, p[1]]).filter(p => !ph.length || p[0] < ph[0][0]) : []).concat(ph);
-  }
-  const h = READER.priceHistory("bn"); return h.length ? h : READER.priceHistory("hl");
-}
-function colLensLive() {      // recomputed every 10 s
-  const k = Math.floor(Date.now()/10000); if (CL.lensNow && CL.lensNow.k === k) return CL.lensNow.m;
-  const m = COLLECT.volLens([].concat(...Object.values(CL.recent)), colPricePts(false), Date.now(), {coin:cl$("sym").value}); CL.lensNow = {k, m}; return m;
-}
-function colLensFor(ep, c) {
-  const src = colStateSource(), key = (src.replay ? "r" + (RT.session ? RT.session.startedAt : 0) + ":" + src.recs.length : "l") + "|o|" + ep.id + "|" + ep.tDetected;
-  if (CL.ctx.has(key)) return CL.ctx.get(key);
-  const m = COLLECT.volLens(src.recs, colPricePts(src.replay), ep.tDetected, {ctx:c, coin:src.coin}); if (CL.ctx.size > 400) CL.ctx.clear(); CL.ctx.set(key, m); return m;
-}
-function colLensStrip(t0, t1) {
-  const src = colStateSource(), step = Math.max(30000, Math.round((t1 - t0)/60/1000)*1000), a = Math.floor(t0/step)*step, b = Math.floor(t1/step)*step;
-  const key = (src.replay ? "r" + (RT.session ? RT.session.startedAt : 0) + ":" + src.recs.length : "l") + "|" + step + "|" + a + "|" + b;
-  if (CL.lensStrip && CL.lensStrip.key === key) return CL.lensStrip;
-  CL.lensStrip = {key, step, rows:src.recs.length ? COLLECT.lensSeries(src.recs, colPricePts(src.replay), a, b, step) : []}; return CL.lensStrip;
-}
-// ---- followed wallets (v085, rules in .scratch/collector-features/spec.md F): the ten biggest Hyperliquid traders' position change against the crowd's taker flow. Display only.
-// The crowd's flow: in a replay from the session's inputs (a running total, built once), live from the app's own running Hyperliquid CVD kept in the Overview history.
-function colCrowdFn(replay) {
-  if (replay) {
-    const k = (RT.session ? RT.session.startedAt : 0) + ":" + (RT.session && RT.session.inputs ? RT.session.inputs.length : 0);
-    if (!CL.crowd || CL.crowd.key !== k) CL.crowd = {key:k, ix:COLLECT.crowdIndex(RT.session && RT.session.inputs || [], "hl")};
-    return (a, b) => COLLECT.crowdNetAt(CL.crowd.ix, a, b).net;
-  }
-  return (a, b) => {
-    const h = typeof OV !== "undefined" ? OV.hist : []; if (!h.length) return null;
-    const near = t => { let best = null, bd = 1e12; for (const x of h) { const d = Math.abs(x.t - t); if (d < bd) { bd = d; best = x; } } return bd <= 15000 ? best : null; };
-    const x0 = near(a), x1 = near(b); return x0 && x1 ? x1.ch - x0.ch : null;
-  };
-}
-function colWhaleBase(src) {      // the wallet series (built once per source), the price and the crowd function
-  const k = (src.replay ? "r" + (RT.session ? RT.session.startedAt : 0) : "l") + ":" + src.recs.length + ":" + (src.recs.length ? src.recs[src.recs.length - 1][2] : 0);
-  if (!CL.whaleSer || CL.whaleSer.key !== k) CL.whaleSer = {key:k, ser:COLLECT.walletSeries(src.recs)};
-  const pts = colPricePts(src.replay), px = pts.length ? pts[pts.length - 1][1] : null;
-  return {ser:CL.whaleSer.ser, px, crowd:colCrowdFn(src.replay)};
-}
-function colWhaleAt(t, src) {
-  src = src || colStateSource(); const b = colWhaleBase(src), c = b.crowd(t - 600000, t);
-  return COLLECT.whaleFlow(src.recs, t, {series:b.ser, px:b.px, crowdNet:c});
-}
-function colWhaleLive() {      // recomputed every 10 s
-  const k = Math.floor(Date.now()/10000); if (CL.whaleNow && CL.whaleNow.k === k) return CL.whaleNow.m;
-  const m = colWhaleAt(Date.now(), {replay:false, recs:[].concat(...Object.values(CL.recent)), coin:cl$("sym").value}); CL.whaleNow = {k, m}; return m;
-}
-function colWhaleFor(ep) {
-  const src = colStateSource(), key = (src.replay ? "r" + (RT.session ? RT.session.startedAt : 0) + ":" + src.recs.length : "l") + "|h|" + ep.id + "|" + ep.tDetected;
-  if (CL.ctx.has(key)) return CL.ctx.get(key);
-  const m = colWhaleAt(ep.tDetected); if (CL.ctx.size > 400) CL.ctx.clear(); CL.ctx.set(key, m); return m;
-}
-function colWhaleStrip(t0, t1) {
-  const src = colStateSource(), step = Math.max(30000, Math.round((t1 - t0)/60/1000)*1000), a = Math.floor(t0/step)*step, b = Math.floor(t1/step)*step;
-  const key = (src.replay ? "r" + (RT.session ? RT.session.startedAt : 0) + ":" + src.recs.length : "l") + "|" + step + "|" + a + "|" + b;
-  if (CL.whaleStrip && CL.whaleStrip.key === key) return CL.whaleStrip;
-  const base = colWhaleBase(src);
-  CL.whaleStrip = {key, step, rows:src.recs.length ? COLLECT.whaleSeries(src.recs, null, a, b, step, {px:base.px, crowdAt:base.crowd}) : []}; return CL.whaleStrip;
-}
 function epCtxBar(ep) {
   const c = colContextFor(ep); if (!c) return "";
-  const lead = epLeadBar(c) + epWallBar(ep);
+  const lead = epWallBar(ep);
   const head = `<span class="stat" title="Each reading against its own mean of the previous 30 minutes, in standard deviations; only the unusual ones (1.5 or more) are shown">collector context at detection</span>` + epStateChip(ep, c) + epEventChip(ep);
   if (!c.items.length) return `<div class="epctx">${head}<span class="stat">none at that time (the collectors were off, or the data does not reach back that far)</span></div>${lead}`;
   const chips = c.items.filter(x => x.unusual).slice(0, 6).map(x => `<span class="chip ${x.z > 0 ? "hi" : "lo"}" title="${x.label}: ${+x.x.toPrecision(6)} now, ${x.text} from its 30-minute mean (${x.z >= 99 ? "it had been constant" : x.z + " sd"})">${x.label} ${x.z > 0 ? "▲" : "▼"} ${x.text}</span>`).join("");

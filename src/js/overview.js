@@ -82,34 +82,6 @@ function renderOverview(){
     }
   }catch(e){ console.error("overview state", e); }
 
-  // Followed wallets (COLLECT.whaleFlow): the ten biggest Hyperliquid traders' position change against the crowd's taker flow; display only
-  try{
-    const W = typeof colWhaleLive === "function" ? colWhaleLive() : null, el = ov$("ovWhales");
-    if (W !== undefined && el){
-      const usd = v => v == null ? "–" : ovSigned(v, a=>"$"+fmtK(a)), coin = ov$("sym").value.trim().toUpperCase(), sz = v => ovSigned(v, a=>a.toFixed(1))+" "+coin;
-      const html = W ? `<div class="metrics">${item("followed net position", W.netUsd != null ? usd(W.netUsd) : sz(W.net), W.longs+" long · "+W.shorts+" short of "+W.n, ovCls(W.netUsd))}`
-        + `${item("their change (10 min)", W.deltaUsd != null ? usd(W.deltaUsd) : W.matched ? sz(W.delta) : "–", W.matched ? W.matched+" wallets matched"+(W.whales ? " · "+W.whales : "") : "needs two readings per wallet", ovCls(W.deltaUsd))}`
-        + `${item("crowd taker flow (10 min)", usd(W.crowdNet), W.crowd ? "crowd "+W.crowd : "needs the app connected", ovCls(W.crowdNet))}`
-        + `${item("whales vs crowd", W.relation || "–", "flat = under $1M")}</div>`
-        + `<div class="note">The followed wallets are the ten with the most traded notional (mostly market makers and bots): a changing position is often inventory, not a view. Rotates over time; only wallets read at both ends count in the change. Not a signal.</div>`
-        : `<div class="note" style="margin:0">No wallet data yet: the wallets collector runs while the app is connected or auto-record is armed.</div>`;
-      if (el.dataset.h !== html){ el.dataset.h = html; el.innerHTML = html; }
-    }
-  }catch(e){ console.error("overview wallets", e); }
-
-  // Options lens (COLLECT.volLens): realized volatility against the volatility index, and the skew; display only
-  try{
-    const L = typeof colLensLive === "function" ? colLensLive() : null;
-    if (L){
-      const sk = L.skew, html = `<div class="metrics">${item("implied vol (DVOL)", L.implied==null ? "–" : L.implied.toFixed(1)+"%", L.implied==null ? "no recent reading" : "30-day, annualized")}`
-        + `${item("realized vol (30 min)", L.realized==null ? "–" : L.realized.toFixed(1)+"%", L.realized==null ? "needs 20 minutes of price: connect" : L.n+" one-minute returns")}`
-        + `${item("realized / implied", L.ratio==null ? "–" : L.ratio.toFixed(2)+"×", L.word ? COLLECT.LENS_TEXT[L.word] : "")}`
-        + `${item("option skew (-5% / +5%)", sk ? ovSigned(sk.x, a=>a.toFixed(1))+" pts" : "–", sk ? sk.side+(sk.unusual ? " · shift "+sk.text : "") : "no reading")}</div>`
-        + `<div class="note">Implied vol usually sits above realized (it carries a risk premium), so "below" is the usual reading. Realized is from the last 30 minutes, implied is a 30-day measure. A label, not a signal.</div>`;
-      const el = ov$("ovLens"); if (el.dataset.h !== html){ el.dataset.h = html; el.innerHTML = html; }
-    }
-  }catch(e){ console.error("overview lens", e); }
-
   // Event clock: the next scheduled moments by rule (COLLECT.eventClock); display only
   try{
     if (typeof COLLECT === "undefined") throw new Error("collectors not loaded yet");      // the first frame can run before collectors-core.js

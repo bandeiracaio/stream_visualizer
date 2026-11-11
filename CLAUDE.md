@@ -54,17 +54,16 @@ After each finished step, so the user always has an up-to-date single file. Anot
 ## Pre-registered studies
 
 - A registered plan lives in `.scratch/<study>/plan.md`; a change to it is an amendment in that file.
-- `analyze-wallets.mjs` runs once on real sessions. `analyze-liquidations.mjs` runs its test once, at 60 clusters and 30 pairs. Details: `docs/agents/studies.md`.
+- The studies that were registered before v135 are archived and closed (`archive/README.md`); none is open.
 
 ## Where to look
 
 Reference that is read when you touch the area, not every session:
 
-- Reader engine, episodes, drift, scoreboard, label queue: `docs/agents/source-map.md` § Reader.
+- Reader engine, episodes, replay and timeline: `docs/agents/source-map.md` § Reader.
 - Navigation, account, order history, Overview, arm, restyle, headers and the Look: § App shell and views.
 - Recording, auto-record, collectors, worker, tape, session quality: § Recording and collectors.
-- Futures stack, liquidations readout: § Market views.
-- How `HOOKS`, `VIEWS`, `feeds.js`, `COLLECT.REGISTRY` and `reader-review.js` fit: § Seams.
-- Analysis scripts at the repo root (`analyze-*.mjs`, `compare-detections.mjs`, `reader-scoreboard.mjs`, `reader-robustness.mjs`): `docs/agents/studies.md`.
+- How `HOOKS`, `VIEWS`, `feeds.js` and `COLLECT.REGISTRY` fit: § Seams.
+- Scripts at the repo root (`compare-detections.mjs`, `design-harness.mjs`, `sample-designs.mjs`): `docs/agents/studies.md`. Closed studies and their scripts: `archive/README.md`.
 - Testing the UI in Chrome and at phone width: `docs/agents/testing-ui.md`.
 - Terms: `CONTEXT.md`. Decisions: `docs/adr/`. Specs: `.scratch/<feature>/spec.md`.
