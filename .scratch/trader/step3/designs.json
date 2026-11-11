@@ -1,0 +1,498 @@
+[
+ {
+  "id": "M00018",
+  "sampler": "C",
+  "ctx": "always-on",
+  "reg": "range-or-session-box",
+  "trig": "reader-episode-event",
+  "thes": "mean-reversion-overreaction",
+  "exit": "named-level-target",
+  "sz": "fixed-fraction-risk",
+  "stop": "sigma-multiple-stop",
+  "ev": "tail-or-failure-profile",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {
+    "windowSec": 489
+   },
+   "trig": {
+    "families": [
+     "absorption",
+     "burst",
+     "exhaustion"
+    ],
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 48,
+    "frac": 0.5
+   },
+   "stop": {
+    "k": 0.52
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00003",
+  "sampler": "B",
+  "trig": "reader-episode-event",
+  "thes": "continuation-momentum",
+  "reg": "none",
+  "ctx": "always-on",
+  "exit": "flow-episode-or-book-state-exit",
+  "stop": "sigma-multiple-stop",
+  "hor": "minutes",
+  "sz": "fixed-fraction-risk",
+  "ev": "cost-and-execution-stress",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "families": [
+     "burst"
+    ],
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 580,
+    "families": [
+     "burst"
+    ]
+   },
+   "stop": {
+    "k": 2.06
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00016",
+  "sampler": "D",
+  "trig": "price-move-or-distance-threshold",
+  "thes": "mean-reversion-overreaction",
+  "reg": "none",
+  "ctx": "always-on",
+  "exit": "elapsed-time-stop",
+  "stop": "sigma-multiple-stop",
+  "hor": "seconds",
+  "sz": "fixed-fraction-risk",
+  "ev": "random-or-placebo-baseline",
+  "_focal": "trig=price-move-or-distance-threshold",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "lookSec": 33,
+    "m": 1.76,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 14
+   },
+   "stop": {
+    "k": 0.9
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00031",
+  "sampler": "D",
+  "trig": "price-move-or-distance-threshold",
+  "thes": "mean-reversion-overreaction",
+  "reg": "none",
+  "ctx": "always-on",
+  "exit": "fixed-distance-target",
+  "stop": "sigma-multiple-stop",
+  "hor": "minutes",
+  "sz": "fixed-fraction-risk",
+  "ev": "cost-and-execution-stress",
+  "_focal": "exit=fixed-distance-target",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "lookSec": 31,
+    "m": 3.24,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 272,
+    "tpK": 0.87
+   },
+   "stop": {
+    "k": 1.35
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00097",
+  "sampler": "D",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "mean-reversion-overreaction",
+  "reg": "none",
+  "ctx": "always-on",
+  "exit": "indicator-normalization-exit",
+  "stop": "sigma-multiple-stop",
+  "hor": "seconds",
+  "sz": "fixed-fraction-risk",
+  "ev": "cost-and-execution-stress",
+  "_focal": "trig=cross-venue-or-asset-divergence",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 339,
+    "minBps": 1.42,
+    "coolSec": 20,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 13
+   },
+   "stop": {
+    "k": 1.17
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00188",
+  "sampler": "B",
+  "trig": "cross-venue-or-asset-divergence",
+  "thes": "continuation-momentum",
+  "reg": "none",
+  "ctx": "always-on",
+  "exit": "trailing-or-ratchet-stop",
+  "stop": "sigma-multiple-stop",
+  "hor": "minutes",
+  "sz": "fixed-fraction-risk",
+  "ev": "descriptive-or-no-comparison",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "baseSec": 418,
+    "minBps": 0.61,
+    "coolSec": 35,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 189,
+    "trailK": 0.76
+   },
+   "stop": {
+    "k": 2.76
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00025",
+  "sampler": "D",
+  "trig": "trade-flow-signal",
+  "thes": "mean-reversion-overreaction",
+  "reg": "none",
+  "ctx": "always-on",
+  "exit": "elapsed-time-stop",
+  "stop": "sigma-multiple-stop",
+  "hor": "seconds",
+  "sz": "fixed-fraction-risk",
+  "ev": "tail-or-failure-profile",
+  "_focal": "thes=mean-reversion-overreaction",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "lookSec": 35,
+    "share": 0.59,
+    "m": 4.55,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 51
+   },
+   "stop": {
+    "k": 0.73
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00005",
+  "sampler": "D",
+  "trig": "trade-flow-signal",
+  "thes": "continuation-momentum",
+  "reg": "none",
+  "ctx": "always-on",
+  "exit": "flow-episode-or-book-state-exit",
+  "stop": "sigma-multiple-stop",
+  "hor": "minutes",
+  "sz": "fixed-fraction-risk",
+  "ev": "variant-or-component-comparison",
+  "_focal": "reg=none",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "lookSec": 36,
+    "share": 0.52,
+    "m": 4.73,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 74,
+    "families": [
+     "absorption",
+     "exhaustion",
+     "wall"
+    ]
+   },
+   "stop": {
+    "k": 0.58
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00010",
+  "sampler": "D",
+  "trig": "book-depth-and-wall-event",
+  "thes": "mean-reversion-overreaction",
+  "reg": "none",
+  "ctx": "always-on",
+  "exit": "elapsed-time-stop",
+  "stop": "sigma-multiple-stop",
+  "hor": "seconds",
+  "sz": "fixed-fraction-risk",
+  "ev": "descriptive-or-no-comparison",
+  "_focal": "trig=book-depth-and-wall-event",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 5,
+    "thr": 0.38,
+    "sustainSec": 5,
+    "coolSec": 63,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 19
+   },
+   "stop": {
+    "k": 0.69
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00004",
+  "sampler": "B",
+  "trig": "book-depth-and-wall-event",
+  "thes": "mean-reversion-overreaction",
+  "reg": "none",
+  "ctx": "always-on",
+  "exit": "trailing-or-ratchet-stop",
+  "stop": "sigma-multiple-stop",
+  "hor": "minutes",
+  "sz": "fixed-fraction-risk",
+  "ev": "regime-or-subgroup-split",
+  "p": {
+   "ctx": {},
+   "reg": {},
+   "trig": {
+    "edge": 20,
+    "thr": 0.3,
+    "sustainSec": 10,
+    "coolSec": 88,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 92,
+    "trailK": 0.54
+   },
+   "stop": {
+    "k": 1.1
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00013",
+  "sampler": "D",
+  "trig": "level-or-range-break",
+  "thes": "continuation-momentum",
+  "reg": "range-or-session-box",
+  "ctx": "always-on",
+  "exit": "trailing-or-ratchet-stop",
+  "stop": "sigma-multiple-stop",
+  "hor": "seconds",
+  "sz": "fixed-fraction-risk",
+  "ev": "random-or-placebo-baseline",
+  "_focal": "trig=level-or-range-break",
+  "p": {
+   "ctx": {},
+   "reg": {
+    "windowSec": 1481
+   },
+   "trig": {
+    "brkBps": 0.94,
+    "coolSec": 108,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 16,
+    "trailK": 1.24
+   },
+   "stop": {
+    "k": 1.67
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00002",
+  "sampler": "B",
+  "trig": "level-or-range-break",
+  "thes": "continuation-momentum",
+  "reg": "range-or-session-box",
+  "ctx": "always-on",
+  "exit": "elapsed-time-stop",
+  "stop": "sigma-multiple-stop",
+  "hor": "minutes",
+  "sz": "fixed-fraction-risk",
+  "ev": "dose-response-or-calibration",
+  "p": {
+   "ctx": {},
+   "reg": {
+    "windowSec": 440
+   },
+   "trig": {
+    "brkBps": 0.87,
+    "coolSec": 22,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 70
+   },
+   "stop": {
+    "k": 2.56
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00048",
+  "sampler": "C",
+  "ctx": "always-on",
+  "reg": "range-or-session-box",
+  "trig": "level-rejection-bounce",
+  "thes": "mean-reversion-overreaction",
+  "exit": "elapsed-time-stop",
+  "sz": "fixed-fraction-risk",
+  "stop": "sigma-multiple-stop",
+  "ev": "statistical-test-on-effect",
+  "hor": "seconds",
+  "p": {
+   "ctx": {},
+   "reg": {
+    "windowSec": 468
+   },
+   "trig": {
+    "tolBps": 1.69,
+    "rejBps": 2.84,
+    "lookSec": 7,
+    "coolSec": 52,
+    "venue": "bn"
+   },
+   "thes": {
+    "sign": -1
+   },
+   "exit": {
+    "holdSec": 13
+   },
+   "stop": {
+    "k": 2.81
+   },
+   "sz": {}
+  }
+ },
+ {
+  "id": "M00007",
+  "sampler": "D",
+  "trig": "level-rejection-bounce",
+  "thes": "continuation-momentum",
+  "reg": "range-or-session-box",
+  "ctx": "always-on",
+  "exit": "fixed-distance-target",
+  "stop": "sigma-multiple-stop",
+  "hor": "minutes",
+  "sz": "fixed-fraction-risk",
+  "ev": "regime-or-subgroup-split",
+  "_focal": "reg=range-or-session-box",
+  "p": {
+   "ctx": {},
+   "reg": {
+    "windowSec": 1239
+   },
+   "trig": {
+    "tolBps": 0.69,
+    "rejBps": 2.01,
+    "lookSec": 5,
+    "coolSec": 97,
+    "venue": "hl"
+   },
+   "thes": {
+    "sign": 1
+   },
+   "exit": {
+    "holdSec": 214,
+    "tpK": 0.6
+   },
+   "stop": {
+    "k": 2.84
+   },
+   "sz": {}
+  }
+ }
+]
