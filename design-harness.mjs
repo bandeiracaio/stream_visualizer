@@ -282,7 +282,7 @@ export function summarize(trades, seed = 1, boots = 300) {
 }
 
 // ---------- sessions: facts from the Reader, cached ----------
-const engineHash = () => { const f = ["reader-drift", "reader-proposals", "reader-register", "reader-episodes", "reader-engine"]; return crypto.createHash("sha1").update(f.map(x => fs.readFileSync(path.join(HERE, "src/js", x + ".js"))).join("\n")).digest("hex").slice(0, 12); };
+const engineHash = () => { const f = ["reader-episodes", "reader-engine"]; return crypto.createHash("sha1").update(f.map(x => fs.readFileSync(path.join(HERE, "src/js", x + ".js"))).join("\n")).digest("hex").slice(0, 12); };
 export function loadSessionFacts(dir, { limit = Infinity } = {}) {
   const files = fs.readdirSync(dir).filter(f => /^session_.*\.json(\.gz)?$/.test(f)).sort().slice(0, limit), hash = engineHash(); let E = null;
   fs.mkdirSync(CACHE, { recursive: true }); const out = [];

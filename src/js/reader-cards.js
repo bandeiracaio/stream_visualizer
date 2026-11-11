@@ -1,6 +1,6 @@
 "use strict";
 // Reader episode cards and their filters (display only). Loaded BEFORE app.js, which owns renderReader, the startup restore of the saved filters
-// and the call to rdInit(); reader-tools.js, label-queue.js and collectors.js read epFilter / epOpen / epLast / rdView / RD at run time.
+// and the call to rdInit(); reader-tools.js and collectors.js read epFilter / epOpen / epLast / rdView / RD at run time.
 // ---------- market reader: tab ----------
 const rdFilter = {family:new Set(), venue:new Set(), min:0};
 const epFilter = {family:new Set(), horizon:new Set(), minWallMs:0}, epOpen = new Set(), epLast = {};
@@ -41,9 +41,9 @@ function epMembers(g){
 function epCard(ep, now, compact){
   const timing = ep.stage==="ended" ? `${hhmmss(ep.tStart).slice(0,8)} · lasted ${rdMs(ep.tEnd-ep.tStart)} · ${ep.outcome}${epResolution(ep)}`
     : `began ${rdMs(now-ep.tStart)} ago${ep.tDetected ? ` · detected ${rdMs(now-ep.tDetected)} ago` : " · not yet confirmed"}`;
-  return `<div class="ep ${ep.stage}" data-id="${ep.id}"><div class="eph"><b>${READER_EPISODES.FAMILY_LABEL[ep.family]}</b> ${(ep.venues||[ep.venue]).map(v=>`<span class="venue v-${v}">${v.toUpperCase()}</span>`).join("")}${(ep.horizons||[ep.horizon]).map(h=>`<span class="chip">${h}</span>`).join("")} <span class="stg">${ep.stage}</span>${typeof epLabelChip==="function" ? epLabelChip(ep) : ""}${ep.pulses>1 ? ` <span class="chip">${ep.pulses} pulses</span>` : ""} ${epWho(ep)}</div>`
+  return `<div class="ep ${ep.stage}" data-id="${ep.id}"><div class="eph"><b>${READER_EPISODES.FAMILY_LABEL[ep.family]}</b> ${(ep.venues||[ep.venue]).map(v=>`<span class="venue v-${v}">${v.toUpperCase()}</span>`).join("")}${(ep.horizons||[ep.horizon]).map(h=>`<span class="chip">${h}</span>`).join("")} <span class="stg">${ep.stage}</span>${ep.pulses>1 ? ` <span class="chip">${ep.pulses} pulses</span>` : ""} ${epWho(ep)}</div>`
     + (compact ? "" : `<div class="epbar"><i style="width:${Math.round(ep.intensity*100)}%"></i></div>`)
-    + `<div class="epread">${ep.stage==="ended" && ep.peakReading ? "At its peak: " + ep.peakReading : ep.reading}</div><div class="epmeta stat">${timing} · peak ${Math.round(ep.peak*100)}%</div>${epOpen.has(String(ep.id)) ? epEvidence(ep) + epMembers(ep) + (typeof epCtxBar==="function" ? epCtxBar(ep) : "") + (typeof epLabelBar==="function" ? epLabelBar(ep) : "") : ""}</div>`;
+    + `<div class="epread">${ep.stage==="ended" && ep.peakReading ? "At its peak: " + ep.peakReading : ep.reading}</div><div class="epmeta stat">${timing} · peak ${Math.round(ep.peak*100)}%</div>${epOpen.has(String(ep.id)) ? epEvidence(ep) + epMembers(ep) + (typeof epCtxBar==="function" ? epCtxBar(ep) : "") : ""}</div>`;
 }
 // Display only: a wall card is hidden until it has lasted minWallMs after detection (an ended one needs to have lasted that long). The Reader still detects and records every wall.
 const epShortWall = (e, now) => e.family==="wall" && epFilter.minWallMs > 0 && e.tDetected != null && ((e.tEnd != null ? e.tEnd : now) - e.tDetected) < epFilter.minWallMs;

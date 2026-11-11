@@ -39,16 +39,8 @@ After each finished step, so the user always has an up-to-date single file. Anot
 5. `node build.mjs --verify` exits 0 (the release file equals a build of `src/`; CI runs the same check).
 6. Commit and push to `main`. The repo is public and `.github/workflows/pages.yml` serves the newest release at https://bandeiracaio.github.io/stream_visualizer/ on every push to `main`; unreleased `src/` work never goes live. CI deploys only a release that passes the self-test and matches `src/`, and attaches it to a GitHub Release `vNNN`. A failed Actions run means the site was NOT updated: check `gh run list --limit 3`. Pages caches about 10 minutes, so a phone may need a reload.
 
-## Weekly review
-
-1. The user exports a review report and register from the Reader tab; approving or resetting a threshold downloads a revision file, and the user drops it into `docs/revisions/`.
-2. `node fold.mjs --check` passes (it refuses a file that does not fit the current defaults).
-3. `node fold.mjs` rewrites the matching defaults in `reader-engine.js` / `reader-episodes.js` and marks each file `Folded: yes`; review the diff.
-4. `node build.mjs`, then the Release steps.
-
 ## Reader rules
 
-- Self-revising Reader: the register / drift / proposal code never changes a detection by itself; only an approved threshold does (`docs/adr/0001`, `0003`). Language in `CONTEXT.md`, specs in `.scratch/self-revising-reader/`, sigma in `docs/adr/0004`. Register files from before v012 are on the wrong scale.
 - Before touching the episode layer's evidence cut-offs, run `node compare-detections.mjs --rev-a HEAD`: exit 0 means detections are byte-identical on the saved sessions, exit 1 lists every difference.
 - Participants are the aggressor / passive side (neutral language).
 

@@ -8,8 +8,6 @@ its floor. It is now the robust spread of overlapping returns over `sigmaLagMs` 
 stays at the floor until 60 samples exist. 15 seconds is long enough that returns are rarely zero, and the estimate stays robust
 to spikes (a standard deviation would not).
 
-Because a scale can be wrong from the start, which a drift check never sees, price progress carries a static expectation in the
-register: a typical |move| of 0.5 to 1.2 sigma and 5th/95th percentiles averaging 1.3 to 3.2 (the upper bounds were first 1.0 and 2.6, and were widened after measuring BTC, ETH and DOGE). The bands are settings logged when
-changed. A quantity whose shape is known in advance should get the same treatment.
+Removed 2026-11-10: the paragraph here described a static expectation on price progress kept in the assumption register (a typical |move| of 0.5 to 1.2 sigma). The register was removed with the self-revising Reader (ADR 0001 to 0003 are superseded), so the check no longer exists. The sigma definition above is unchanged.
 
 Consequence: changing how a quantity is measured changes what its references mean. Do it before data is collected, not after.

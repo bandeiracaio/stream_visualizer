@@ -1,6 +1,6 @@
 # 1. Baselines adopt automatically; detection thresholds need approval
 
-Status: accepted
+Status: superseded (2026-11-10, see .scratch/trader/spec.md)
 
 Baselines are descriptive measurements ("normal spread is X") and update automatically once the evidence bar is met.
 Detection thresholds change what the Reader flags and what the user labels, so they are only proposed, with evidence and a

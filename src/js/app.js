@@ -465,10 +465,7 @@ VIEWS.register({id:"market", label:"Market and tape", area:"now"});
 VIEWS.register({id:"micro", label:"Microstructure", area:"setups", minIntervalMs:250, render:()=>renderMicro()});
 VIEWS.register(Object.assign({id:"reader", label:"Episodes", area:"reader"}, READER_SLOT));
 VIEWS.register({id:"signals", label:"Signals", area:"reader", slot:"reader"});
-VIEWS.register({id:"replay", label:"Replay and labels", area:"review", slot:"reader"});
-VIEWS.register({id:"drift", label:"Drift", area:"review", slot:"reader"});
-VIEWS.register({id:"assumptions", label:"Assumptions", area:"review", slot:"reader"});
-VIEWS.register({id:"scoreboard", label:"Scoreboard", area:"review"});
+VIEWS.register({id:"replay", label:"Replay", area:"review", slot:"reader"});
 VIEWS.register({id:"record", label:"Recordings", area:"rec", slot:"reader"});   // Record, Saved, Health log and Collectors are blocks of this one view
 VIEWS.register({id:"trading", label:"Trading", area:"trade", minIntervalMs:400, render:()=>renderTrading()});
 VIEWS.register({id:"history", label:"History", area:"trade"});
@@ -695,7 +692,7 @@ document.addEventListener("keydown", e => { if (e.key==="Escape") sheet(false); 
 $("sym").addEventListener("input", () => { $("symLbl").textContent = $("sym").value.trim().toUpperCase() || "–"; });
 
 // ---------- remembered setup ----------
-for (const id of ["sym","route","bnSrc","ovWin","rdSens","rdMin","minNtl","swMin","tlWin","rtMissFam","rtMissSide"]){
+for (const id of ["sym","route","bnSrc","ovWin","rdSens","rdMin","minNtl","swMin","tlWin"]){
   const el = $(id); if (!el) continue;
   const v = store.get("v:"+id, null);
   if (v != null && (el.tagName!=="SELECT" || [...el.options].some(o=>o.value===v))) el.value = v;

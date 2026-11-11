@@ -181,7 +181,7 @@ section.collapsed > .pbody{height:0;overflow:hidden;visibility:hidden}
   .accpanel{right:4px;max-height:calc(100vh - var(--hh,95px) - 70px)}
   #arHdrMsg{position:absolute;top:100%;left:0;right:0;z-index:6;max-width:none;background:var(--panel2);border-bottom:1px solid var(--accent);padding:6px 10px}      /* the answer to Arm floats under the header instead of pushing the page down */
   input,select,button{min-height:44px}
-  .chip,#views button,.rm,.tt button,.eplab button{min-height:36px}      /* small controls inside panels */
+  .chip,#views button,.rm,.tt button{min-height:36px}      /* small controls inside panels */
   .pill{gap:2px;font-size:10.5px}
   .pill b{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}      /* the text stays for screen readers; the dot below is what is seen */
   .pill::after{content:"";width:10px;height:10px;border-radius:50%;flex:none;background:var(--warn)}
@@ -235,28 +235,10 @@ td.up{color:var(--buy)}td.dn{color:var(--sell)}
 .rd-det input[type=number]{width:84px;margin-left:auto}
 .rd-det label{justify-content:space-between}
 .epctx{margin-top:8px;font-size:11.5px;display:flex;flex-wrap:wrap;gap:5px;align-items:center}.epctx .chip{font-size:11px}.chip.hi{border-color:var(--warn);color:var(--warn)}.chip.lo{border-color:var(--accent);color:var(--accent)}
-.eplab{display:flex;gap:6px;align-items:center;margin-top:8px}.eplab button{padding:3px 12px;font-size:12px}
-.lqbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0 4px}.lqbar button{min-height:36px;padding:3px 12px;font-size:12px}.lqbar label{font-size:12px;display:flex;gap:4px;align-items:center}
-.eplab button.on{border-color:var(--accent);color:var(--accent);font-weight:600}
-.chip.lab-agree{border-color:var(--buy);color:var(--buy)}.chip.lab-disagree{border-color:var(--sell);color:var(--sell)}
 #tlDetail .ep{cursor:default;margin-top:8px}
 
-.rg{width:100%;border-collapse:collapse;font-size:12px}
-.rg th,.rg td{text-align:left;padding:3px 6px;border-bottom:1px solid var(--line);vertical-align:top}
-.rg th{color:var(--dim);font-weight:500}
-.rg-claims{margin:6px 0 0;padding-left:18px;font-size:12px}
-.badge{margin-left:6px;padding:0 6px;border-radius:var(--r);background:var(--sell);color:var(--ink);font-size:11px;font-weight:700}
-.rv-row{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:12px}
-.rv-row .grow{flex:1 1 220px}
-.rv-tbl{width:100%;border-collapse:collapse;font-size:12px}
-.rv-tbl td,.rv-tbl th{text-align:left;padding:3px 6px;border-bottom:1px solid var(--line);vertical-align:middle}
 @media(max-width:640px){                                   /* phone: the Reader review tables wrap instead of widening the page */
   .rd-det{overflow-x:auto}                              /* a wide data table scrolls inside its box, not the page */
-  .rv-tbl td,.rv-tbl th{white-space:normal;overflow-wrap:anywhere}
-  .rv-keys,.rv-keys tbody{display:block}
-  .rv-keys tr{display:grid;grid-template-columns:1fr auto;gap:2px 8px;padding:4px 0;border-bottom:1px solid var(--line)}
-  .rv-keys td{border:0;padding:1px 6px}
-  .rv-keys td:nth-child(3),.rv-keys td:nth-child(4){grid-column:1/-1}
 }
 
 /* Arm mode (Now): the leave-it-open screen. Colours are tokens only. */
@@ -274,5 +256,3 @@ td.up{color:var(--buy)}td.dn{color:var(--sell)}
 .am-sub{color:var(--dim);font-size:11.5px;margin:8px 0 3px}.am-chip{display:inline-block;margin:2px 10px 2px 0;font-size:12px;color:var(--text)}
 .am-ep{font-size:12px;padding:3px 0;color:var(--text);border-bottom:1px solid var(--line)}.am-ep b{color:var(--accent)}
 #stChips{display:flex;flex-wrap:wrap;gap:5px}
-.sbfam{margin-top:12px;padding-top:8px;border-top:1px solid var(--line)}.sbfam h3{margin:0 0 6px;font-size:13px;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
-.sbfam .tt{width:auto}.sbfam .tt th,.sbfam .tt td{text-align:left;padding-right:20px;white-space:nowrap}

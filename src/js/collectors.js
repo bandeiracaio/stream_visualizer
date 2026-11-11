@@ -157,8 +157,7 @@ colBookRender();
 colWorkerSync();
 
 // ---- collector context on an episode card (v067): what the collectors read when the episode was detected, as the feature's deviation from its own recent mean
-// While live the records come from the last 75 minutes in memory; in a replay from the session's own collector records (`ext`). Shown in the opened card, above "your call", and
-// copied into the label when you press agree or disagree (the tape is pruned after 24 hours, the label is not).
+// While live the records come from the last 75 minutes in memory; in a replay from the session's own collector records (`ext`). Shown in the opened card.
 function colContextFor(ep) {
   const t = ep.tDetected; if (!t) return null;
   const replay = !!rdView.engine, ext = replay ? RT.session && RT.session.ext : null, key = (replay ? "r" + (RT.session ? RT.session.startedAt : 0) + ":" + (ext ? ext.length : -1) : "l") + "|" + ep.id + "|" + t;
@@ -305,19 +304,4 @@ function epCtxBar(ep) {
   const chips = c.items.filter(x => x.unusual).slice(0, 6).map(x => `<span class="chip ${x.z > 0 ? "hi" : "lo"}" title="${x.label}: ${+x.x.toPrecision(6)} now, ${x.text} from its 30-minute mean (${x.z >= 99 ? "it had been constant" : x.z + " sd"})">${x.label} ${x.z > 0 ? "▲" : "▼"} ${x.text}</span>`).join("");
   const liq = epLiqChip(c);
   return `<div class="epctx">${head}${chips || `<span class="stat">nothing unusual (${c.items.length} readings within 1.5 sd)</span>`}${liq}</div>${lead}`;
-}
-// the compact snapshot stored with a label: {t, v:{feature:[value, deviation]}, liq:[binance, hyperliquid]}
-function colLabelCtx(ep) {
-  try {
-    const c = colContextFor(ep), wq = colWallFor(ep); if (!c) return undefined; const st = colStateFor(ep, c); if (!(st.s !== "unknown" || colEventsFor(ep).length || c.items.length || c.lead && !c.lead.none || c.liqx && (c.liqx.usd || c.liqx.other) || (wq && !wq.none))) return undefined;
-    const v = {}; for (const x of c.items) v[x.f] = [+x.x.toPrecision(7), +x.dev.toPrecision(5)];
-    const out = {t:c.t, v, liq:[c.liq.bn, c.liq.hl], st:{v:st.v, s:st.s, i:st.i}};      // st: the market state at detection (rules version, state, letters of the indicators that fired)
-    if (c.liqx && (c.liqx.usd || c.liqx.other)) { const q = c.liqx; out.lq = {bn:[q.bn.sell, q.bn.buy], hl:[q.hl.sell, q.hl.buy], x:q.x, other:q.other, tag:q.tag ? 1 : 0}; }      // dollars forced to sell / buy in the 60 s before, by venue
-    const wh = colWhaleFor(ep); if (wh && (wh.whales || wh.crowd)) out.wh = {w:wh.whales, c:wh.crowd, d:wh.deltaUsd};      // followed wallets' change over the last 10 minutes (words, dollars) and the crowd's taker-flow word
-    const ol = colLensFor(ep, c); if (ol.ratio != null || ol.skew) out.ol = {r:ol.ratio, w:ol.word, sk:ol.skew ? ol.skew.x : null};      // realized / implied volatility at detection, its word, the option skew (-5% minus +5%, points)
-    const ev = colEventsFor(ep); if (ev.length) out.ev = ev.slice(0, 3).map(x => [x.tag, Math.round(x.off/1000)]);      // scheduled events within 10 minutes: [tag, seconds after it (negative: before)]
-    if (wq && !wq.none) out.wq = {e:wq.edge, sh:wq.share, x:wq.x, ret:wq.end ? wq.end.ret : null, dist:wq.end ? wq.end.dist : null, v:wq.verdict || null};      // the wall's share of the depth within its edge, depth against usual, what the depth did by the end, the mid's distance from the wall
-    if (c.lead && !c.lead.none) { const lv = {}; for (const x of c.lead.items) lv[x.src] = x.lead == null ? [null, x.move] : [x.lead, x.move]; out.lead = {ref:c.lead.ref, move:c.lead.move, v:lv}; }      // v: venue -> [seconds it led the reference (negative: lagged; null: no timing), its move in bps]
-    return out;
-  } catch { return undefined; }
 }

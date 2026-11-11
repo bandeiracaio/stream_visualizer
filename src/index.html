@@ -214,41 +214,12 @@
     <h2>Timeline <span class="ctl"><label>window <select id="tlWin"><option value="300000">5 min</option><option value="900000" selected>15 min</option><option value="1800000">30 min</option><option value="0">all</option></select></label></span></h2>
     <canvas id="tlCv" class="chart" style="height:260px"></canvas>
     <div class="legend" id="tlLegend"></div>
-    <div class="lqbar" id="lqBar"><span class="stat" id="lqInfo"></span><button id="lqPrev" title="Previous unlabelled episode (key: left arrow or P)">&larr; prev</button><button id="lqNext" title="Next unlabelled episode (key: right arrow or N)">next &rarr;</button><label><input type="checkbox" id="lqAuto" checked> next after a label</label></div>
-    <div class="note" id="lqKeys">Going through episodes: tap a bar or use next, then agree / disagree. Keys on a computer: &rarr; or N next, &larr; or P previous, A agree, D disagree.</div>
     <div id="tlDetail"></div>
   </section>
 
   <section data-tab="reader" class="full">
     <h2>Finished episodes</h2>
     <div id="epDone" class="eplist"></div>
-  </section>
-
-  <section data-tab="drift" class="full">
-    <h2>Drift review</h2>
-    <div id="rvSummary" class="note" style="margin-top:0"></div>
-    <div id="rvNeeds"></div>
-    <div class="rt-h">Threshold proposals</div>
-    <div id="pxList"></div>
-    <div class="row" style="margin-top:8px"><button id="pxPick">Check against recordings</button><input id="pxFiles" type="file" multiple accept=".json,.gz,application/json,application/gzip" hidden><span id="pxStat" class="stat"></span></div>
-    <details><summary class="stat">All variables</summary><div id="rvAll"></div></details>
-    <details><summary class="stat">Settings: how sure it must be</summary><div id="rvSet" class="rd-det"></div></details>
-    <details><summary class="stat">History</summary><div id="rvHist"></div></details>
-    <div class="row" style="margin-top:8px"><button id="rvReport">Export review report</button></div>
-  </section>
-
-  <section data-tab="scoreboard" class="full">
-    <h2>Scoreboard <span class="ctl"><button id="sbGo" class="primary">Compute</button></span></h2>
-    <div id="sbStatus" class="stat"></div>
-    <div id="sbOut"></div>
-  </section>
-
-  <section data-tab="assumptions" class="full">
-    <h2>What the Reader assumes</h2>
-    <div class="note" style="margin-top:0">Measured from the live feed and kept on this device. For now it only watches: nothing here changes what the Reader detects.</div>
-    <div id="rgList" class="rd-det"></div>
-    <div class="row" style="margin-top:8px"><button id="rgExport">Export register</button><button id="rgImportBtn">Import register</button><input id="rgImport" type="file" accept=".json,application/json" hidden></div>
-    <div id="rgMsg" class="note"></div>
   </section>
 
   <section data-tab="record" class="full">
@@ -283,7 +254,7 @@
   <section data-tab="armmode"><h2>Market now</h2><div id="amMarket"></div></section>
   <section data-tab="armmode"><h2>Reader</h2><div id="amReader"></div></section>
   <section data-tab="armmode"><h2>Recordings this session</h2><div id="amRecs"></div></section>
-  <section data-tab="armmode" class="full"><h2>Last night <span class="ctl"><select id="onHours" title="How far back to look"><option value="12">12 h</option><option value="24" selected>24 h</option><option value="48">48 h</option></select><button id="onCount" title="Replay these recordings (current thresholds) and count the episodes you have not labelled yet">Count episodes to label</button></span></h2><div id="onStatus" class="stat"></div><div id="amMorning"></div></section>
+  <section data-tab="armmode" class="full"><h2>Last night <span class="ctl"><select id="onHours" title="How far back to look"><option value="12">12 h</option><option value="24" selected>24 h</option><option value="48">48 h</option></select></span></h2><div id="onStatus" class="stat"></div><div id="amMorning"></div></section>
   <section data-tab="armmode" class="full"><h2>Health log (latest)</h2><div id="amHealth"></div></section>
 
   <section data-tab="record" class="full">
@@ -315,7 +286,7 @@
   </section>
 
   <section data-tab="replay" class="full">
-    <h2>Replay and labels</h2>
+    <h2>Replay</h2>
     <div class="note">Load a session in Recordings (Record, Load session) or open one from Recordings (Saved recordings). Replay it here with the thresholds below to compare.</div>
     <div class="rt-h">Episode thresholds (used live and in replays)</div>
     <div id="rtTune" class="rd-det"></div>
@@ -323,15 +294,7 @@
       <button id="rtReplay" disabled>Replay with current settings</button><button id="rtLive" disabled>Back to live</button>
     </div>
     <div class="note rtmsg"></div>
-    <div class="rt-h">Your labels</div>
-    <div class="row">
-      <span class="stat">Saw something it missed?</span>
-      <select id="rtMissFam"><option value="absorption">absorption</option><option value="exhaustion">exhaustion</option><option value="burst">aggression burst</option><option value="wall">wall</option></select>
-      <select id="rtMissSide"><option value="">either side</option><option value="buy">buyers aggressive</option><option value="sell">sellers aggressive</option></select>
-      <button id="rtMiss">Mark last 30 s</button><button id="rtExport">Export labels</button><button id="rtClear">Clear labels</button>
-    </div>
-    <div id="rtScore" class="note"></div>
-    <div class="note">Record a session while connected, save it, then replay it with different thresholds to compare. Tap Agree or Disagree on an episode (open its card) to label it. Labels are matched by time, so they still apply when thresholds change. Everything stays on this device.</div>
+    <div class="note">Record a session while connected, save it, then replay it with different thresholds to compare. Everything stays on this device.</div>
   </section>
 
   <section data-tab="signals" class="full">
@@ -418,23 +381,11 @@
   </section>
 </main>
 
-<script id="reader-drift">
-<!--@include js/reader-drift.js-->
-</script>
-<script id="reader-proposals">
-<!--@include js/reader-proposals.js-->
-</script>
-<script id="reader-register">
-<!--@include js/reader-register.js-->
-</script>
 <script id="reader-episodes">
 <!--@include js/reader-episodes.js-->
 </script>
 <script id="reader-engine">
 <!--@include js/reader-engine.js-->
-</script>
-<script id="reader-review">
-<!--@include js/reader-review.js-->
 </script>
 <script id="auto-record-core">
 <!--@include js/auto-record-core.js-->
@@ -533,19 +484,7 @@
 <!--@include js/arm-memory-core.js-->
 </script>
 <script>
-<!--@include js/scoreboard-core.js-->
-</script>
-<script>
 <!--@include js/overnight-core.js-->
-</script>
-<script>
-<!--@include js/label-queue-core.js-->
-</script>
-<script>
-<!--@include js/label-queue.js-->
-</script>
-<script>
-<!--@include js/scoreboard-view.js-->
 </script>
 <script>
 <!--@include js/overnight-view.js-->

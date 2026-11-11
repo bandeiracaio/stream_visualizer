@@ -219,10 +219,9 @@ const READER_EPISODES = (() => {
       const c = E();
       for (const vn of ["bn","hl"]) for (const hz of c.horizons) for (const fam of ["absorption","exhaustion","burst"]){
         if (!c.families[fam] || (c.famHorizons[fam] && !c.famHorizons[fam].includes(hz))) continue;
-        for (const side of ["buy","sell"]){ const ev = EVAL[fam](vn, hz, side, t); if (ev && ctx.observe) ctx.observe(vn, hz, fam, ev.quants); step(fam, vn, hz, side, ev, t); }
+        for (const side of ["buy","sell"]){ const ev = EVAL[fam](vn, hz, side, t); step(fam, vn, hz, side, ev, t); }
       }
       for (const [k, ep] of walls) if (t-ep.tSeen > c.wallStaleMs) closeWall(k, ep, t, "left", null);
-      if (ctx.observe) for (const ep of walls.values()) ctx.observe(ep.venue, "book", "wall", {reposts:ep.wall.reposts});
       resolve(t);
     }
     // After the fact: what did price do in the aggressor's direction during the look-ahead after the episode faded? Never feeds back into a detection.

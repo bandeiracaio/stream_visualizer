@@ -1,6 +1,6 @@
 # 3. Approved thresholds are local overrides, recorded in dated files, folded into the defaults by a script
 
-Status: accepted
+Status: superseded (2026-11-10, see .scratch/trader/spec.md)
 
 Approving a proposal applies the value at once as a local override on that device and downloads a revision file
 (Markdown plus a fenced JSON block) that the user commits to `docs/revisions/`. Resetting an override downloads a revert file.

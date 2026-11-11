@@ -1,6 +1,6 @@
 # 2. Recordings keep a baseline snapshot as provenance; replay comparison switches threshold sets
 
-Status: accepted (amended 2026-10-15; the original wording assumed detectors read baselines)
+Status: superseded (2026-11-10, see .scratch/trader/spec.md) (was: accepted, amended 2026-10-15)
 
 Each recording embeds the baseline snapshot in effect when it was made. Detectors do NOT read baselines: they read explicit
 threshold numbers, and the register only informs how a threshold is proposed for revision (the same-percentile rule: a

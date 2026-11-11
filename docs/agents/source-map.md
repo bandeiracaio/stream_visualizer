@@ -2,7 +2,7 @@
 
 Reference, read when you touch that area. Specs are in `.scratch/<feature>/`, decisions in `docs/adr/`, terms in `CONTEXT.md`. The terms **pure** and **display only** are defined in `CLAUDE.md`.
 
-Pure files (checked: no DOM, storage or socket use): every `*-core.js`, `hooks.js`, `views.js`, `session-quality.js`, and the Reader engine files `reader-drift`, `reader-proposals`, `reader-register`, `reader-episodes`, `reader-engine`, `reader-landscape`, `reader-review`, `reader-selftest`, and `broker.js` (it fetches and signs only through injected functions). Every other file touches the page.
+Pure files (checked: no DOM, storage or socket use): every `*-core.js`, `hooks.js`, `views.js`, `session-quality.js`, and the Reader engine files `reader-episodes`, `reader-engine`, `reader-selftest`, and `broker.js` (it fetches and signs only through injected functions). Every other file touches the page.
 
 ## Seams
 
@@ -13,14 +13,7 @@ Pure files (checked: no DOM, storage or socket use): every `*-core.js`, `hooks.j
 
 - `src/js/reader-engine.js`: order-flow engine and the legacy one-off event detectors; drives the episode layer once a second. Recording is `startRecording({quoteMs})`; replay is `READER_ENGINE.replayEngine(inputs, cfg)`.
 - `src/js/reader-episodes.js`: episode state machines and evidence checklists for absorption / exhaustion / burst / wall. Tunables in `READER_EPISODES.DEFAULTS` (also `READER.cfg.ep` at runtime). Fast and mid readings of one event are separate episodes on purpose; the groups layer (`groupGapMs`) presents them as one.
-- Self-revising Reader (specs `.scratch/self-revising-reader/`; sigma (`sigmaBps`) in `docs/adr/0004` and `.scratch/self-revising-reader/04-sigma-scale.md`): the Reader measures its own assumptions, flags drift, proposes threshold changes, and the user approves them.
-  - `src/js/reader-drift.js` judges drift per variable from session summaries. `src/js/reader-proposals.js`: percentile maps, threshold proposals, replay verdict.
-  - `src/js/reader-register.js`: assumption register, baselines, sessions, drift history, proposals, approvals and overrides; fed by the engine. `LINKS` there maps each threshold to the quantity it is compared with.
-  - `src/js/reader-review.js` (`READER_REVIEW`): the weekly-review decisions (replay plan and config, label tally, verdicts, freshness, revision / revert file text, imported-override filter, apply / read a threshold). The revision-file text is the format `fold.mjs` reads (ADR 0003): do not change it casually.
-- `src/js/reader-tools.js` (loaded late, called from `renderReader`): record / save / load / replay, threshold tuning, timeline, agree / disagree / missed labels. It keeps the replay loop, timers, downloads, `localStorage` and rendering for `reader-review.js`.
-- Flow landscape: `src/js/reader-landscape.js` is the grid maths (3D surface, playhead = time); `src/js/reader-landscape-view.js` draws it and holds the controls (read-only, hooks `renderReader`, loaded last). Spec `.scratch/flow-landscape/`.
-- Label queue (spec `.scratch/label-queue/spec.md`): `src/js/label-queue-core.js` (`LABELQ`: oldest-first order of unlabelled groups, next / previous pick that wraps) and `src/js/label-queue.js` (prev / next unlabelled and "next after a label" above the Timeline detail; keys N / P / arrows / A / D). Navigation only: a label is made by the existing buttons in `reader-tools.js`, in the same format.
-- Scoreboard (spec `.scratch/scoreboard-view/spec.md`): `src/js/scoreboard-core.js` (`SCOREBOARD.sessionPart` replays one session, `SCOREBOARD.summarize` applies labels; label matching is injected) is loaded by both `reader-scoreboard.mjs` and `src/js/scoreboard-view.js`. The view (Review > Scoreboard) replays the Saved recordings with the current thresholds when you press Compute (results kept per file and settings); labels come from `RT.labels`. Display only.
+- `src/js/reader-tools.js` (loaded late, called from `renderReader`): record / save / load / replay (current or edited thresholds) and the timeline, a read-only picture of episodes over price. Sigma (`sigmaBps`) is in `docs/adr/0004`.
 - `src/js/reader-selftest.js`: simulator scenarios; the build runs them and fails if any fail. A new engine behaviour gets a scenario here.
 
 ## App shell

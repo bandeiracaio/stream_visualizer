@@ -21,8 +21,14 @@ function sourceOf(rev, f) {
   if (!rev) return fs.readFileSync(path.join(root, rel), "utf8");
   return execFileSync("git", ["show", rev + ":" + rel], { cwd:root, encoding:"utf8", maxBuffer:64*1024*1024 });
 }
+// a candidate file that does not exist at that revision (a later removal, or one added later) is skipped, so a revision from before a removal still loads
+function hasSource(rev, f) {
+  const rel = "src/js/" + f + ".js";
+  if (!rev) return fs.existsSync(path.join(root, rel));
+  try { execFileSync("git", ["cat-file", "-e", rev + ":" + rel], { cwd:root, stdio:"ignore" }); return true; } catch { return false; }
+}
 export function loadEngine(rev, extra = []) {
-  const files = ENGINE_FILES.concat(extra), src = files.map(f => sourceOf(rev, f)).join("\n");
+  const files = ENGINE_FILES.filter(f => hasSource(rev, f)).concat(extra), src = files.map(f => sourceOf(rev, f)).join("\n");
   return vm.runInNewContext(src + "\n;({E:READER_ENGINE" + (extra.length ? ",S:READER_SELFTEST" : "") + "})", {}, { timeout:300000 });
 }
 
