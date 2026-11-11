@@ -14,11 +14,7 @@ const READER_SELFTEST=(()=>{
   add("bid wall is eaten by sellers",E=>{const e=E.create(),a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:5,seed:11,params:()=>({vol:0,bidWalls:[{idx:12,size:6}]})}),px=b.mid-1.3;sim(e,{t0:b.t,mid0:b.mid,seconds:3,seed:12,params:sec=>({vol:0,trades:sec<.3?[{side:"sell",px,q:5,ntl:px*5}]:[]})});return result(has(e,"wall_eaten","bear")&&!has(e,"wall_pulled"),e,"wall_eaten:bear and no wall_pulled");});
   add("thin bid depth is flagged",E=>{const e=E.create(),a=calm(e);sim(e,{t0:a.t,mid0:a.mid,seconds:6,seed:13,params:()=>({bidMult:.3})});return result(has(e,"book_thin","bear"),e,"book_thin:bear");});
   add("book imbalance flips from bids to asks",E=>{const e=E.create(),a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:6,seed:14,params:()=>({bidMult:3})}),before=e.events.filter(x=>x.type==="imbalance_flip").length;sim(e,{t0:b.t,mid0:b.mid,seconds:6,seed:15,params:()=>({askMult:3})});return result(before===0&&has(e,"imbalance_flip","bear"),e,"imbalance_flip:bear");});
-  add("spoof-like walls are flagged",E=>{const e=E.create(),a=calm(e);sim(e,{t0:a.t,mid0:a.mid,seconds:6,seed:16,params:sec=>({vol:0,bidWalls:sec<1?[{idx:10,size:6}]:sec>=1.5&&sec<2.5?[{idx:14,size:6}]:sec>=3&&sec<4?[{idx:18,size:6}]:[]})});return result(has(e,"spoof_like")&&!has(e,"wall_appears"),e,"spoof_like and no confirmed wall");});
   add("malformed books are ignored",E=>{const e=E.create(),a=calm(e,130),before=e.events.length;try{e.onBook("bn",a.t+250,[],[[100,1]]);e.onBook("bn",a.t+500,[[101,1]],[[100,1]]);e.onBook("bn",a.t+750,[[100,0],[99,NaN],null],[[101,-1],"x"]);e.onBook("bn",a.t+1000,[[100,1],[99,50]],[[101,1],[102,1]]);e.onBook("zz",a.t+1250,[[100,1]],[[101,1]]);e.onBook("bn",a.t+1500,null,undefined);}catch(err){return{ok:false,detail:"threw: "+err.message};}return result(e.events.length===before&&e.debug().venues.bn.walls.size===0,e,"no events and no walls");});
-  add("capitulation, then selling exhausted",E=>{const e=E.create(),a=calm(e),b=sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:21,params:()=>({rate:200,buyP:.1,driftBps:-6,liqSell:3,sweepSell:2,bidMult:.4})});sim(e,{t0:b.t,mid0:b.mid,seconds:24,seed:22,params:()=>({driftBps:.2})});const i=e.events.findIndex(x=>x.type==="capitulation"&&x.dir==="bear"),j=e.events.findIndex(x=>x.type==="selling_exhausted"&&x.dir==="bull");return result(i>=0&&j>i,e,"capitulation:bear followed by selling_exhausted:bull");});
-  add("squeeze that stays inside the 5-minute range",E=>{const e=E.create(),a=sim(e,{seconds:150,seed:3,params:sec=>({driftBps:sec<50?1:sec<110?-.8:0})});sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:31,params:()=>({rate:200,buyP:.9,driftBps:3.5,liqBuy:3,sweepBuy:2,askMult:.4})});return result(has(e,"squeeze","bull")&&!has(e,"breakout"),e,"squeeze:bull and no breakout");});
-  add("breakout through the 5-minute high",E=>{const e=E.create(),a=calm(e);sim(e,{t0:a.t,mid0:a.mid,seconds:12,seed:32,params:()=>({rate:200,buyP:.9,driftBps:6,liqBuy:3,sweepBuy:2,askMult:.4})});return result(has(e,"breakout","bull")&&!has(e,"squeeze"),e,"breakout:bull and no squeeze");});
   add("quiet market produces no signals",E=>{const e=E.create();sim(e,{seconds:300,seed:5});return result(e.events.length===0,e,"no signals at all");});
   // ---- episodes: lifecycle (forming -> active -> fading -> ended, resumable), several variables, neutral language ----
   const eps=(e,family,pred)=>e.episodes.filter(x=>x.family===family&&(!pred||pred(x)));
@@ -610,43 +606,6 @@ const READER_SELFTEST=(()=>{
   });
   add("sigma: until there is enough history it stays at the floor instead of guessing",E=>{
     const e=E.create();jumpSim(e,{seconds:40});return{ok:e.debug().sigmaBps("bn")===.05,detail:String(e.debug().sigmaBps("bn"))};
-  });
-  // ---- raw signals (v019): silence, trade clustering, cross-venue lead/lag ----
-  const rawOf=(e,type)=>e.events.filter(x=>x.raw&&x.type===type);
-  add("raw: a venue that goes quiet gets silence_started, and silence_ended when trading resumes",E=>{
-    const e=E.create(),a=calm(e);let t=a.t;for(let i=0;i<6;i++){t+=1000;e.advance(t);}
-    const started=rawOf(e,"silence_started"),open=started.length===1&&started[0].venue==="bn"&&rawOf(e,"silence_ended").length===0;
-    e.onTrade({t:t+500,v:"bn",side:"buy",px:a.mid,q:.02,ntl:a.mid*.02});const ended=rawOf(e,"silence_ended");
-    return{ok:open&&ended.length===1&&ended[0].refs.gapMs>=3000,detail:JSON.stringify({started:started.length,open,ended:ended.length})};
-  });
-  add("raw: a few seconds of silence at a normal pace, or a quiet start, does not fire",E=>{
-    const e=E.create(),a=calm(e);let t=a.t;for(let i=0;i<2;i++){t+=1000;e.advance(t);}
-    const q=E.create();let u=T0;for(let i=0;i<5;i++){u+=1000;q.advance(u);}
-    return{ok:rawOf(e,"silence_started").length===0&&q.events.length===0,detail:String(e.events.length)};
-  });
-  add("raw: eight same-size same-side trades in a row make a trade_cluster; mixed sizes, a flip of side or too few do not",E=>{
-    const mk=(n,sizes,side)=>{const e=E.create(),a=calm(e);for(let i=0;i<n;i++)e.onTrade({t:a.t+100*(i+1),v:"bn",side:side?side(i):"buy",px:a.mid,q:sizes(i),ntl:a.mid*sizes(i)});return e;};
-    const yes=mk(9,()=>.04),mixed=mk(9,i=>.03+.02*(i%2)),few=mk(5,()=>.04),flip=mk(9,()=>.04,i=>i===4?"sell":"buy"),c=rawOf(yes,"trade_cluster");
-    return{ok:c.length===1&&c[0].refs.side==="buy"&&c[0].refs.count===8&&!rawOf(mixed,"trade_cluster").length&&!rawOf(few,"trade_cluster").length&&!rawOf(flip,"trade_cluster").length,detail:JSON.stringify({yes:c.length,mixed:rawOf(mixed,"trade_cluster").length,few:rawOf(few,"trade_cluster").length,flip:rawOf(flip,"trade_cluster").length})};
-  });
-  function twin(e,o){const rand=rng(o.seed||5),n=Math.round(o.seconds*4);let t=o.t0,bn=o.mid0,hl=o.hl0||o.mid0;
-    for(let i=0;i<n;i++){t+=250;const x=o.jump?o.jump((t-o.t0)/1000):{bn:0,hl:0};bn*=1+((rand()-.5)*.6+x.bn/4)/1e4;hl*=1+((rand()-.5)*.6+x.hl/4)/1e4;
-      e.onQuote("bn",t,bn-.05,bn+.05);e.onQuote("hl",t,hl-.05,hl+.05);
-      e.onTrade({t,v:"bn",side:rand()<.5?"buy":"sell",px:bn,q:.02,ntl:bn*.02});e.onTrade({t,v:"hl",side:rand()<.5?"buy":"sell",px:hl,q:.02,ntl:hl*.02});}
-    return{t,bn,hl};}
-  add("raw: one venue jumps and the other follows a second later gives lead_lag naming the leader",E=>{
-    const e=E.create(),a=twin(e,{t0:T0,mid0:82000,seconds:150}),b=twin(e,{t0:a.t,mid0:a.bn,hl0:a.hl,seconds:4,seed:6,jump:s=>s>=1&&s<2?{bn:6,hl:0}:s>=2&&s<3?{bn:0,hl:6}:{bn:0,hl:0}}),r=rawOf(e,"lead_lag");
-    return{ok:r.length>=1&&r[0].refs.leader==="bn"&&r[0].refs.follower==="hl"&&r[0].dir==="bull",detail:JSON.stringify(r.map(x=>x.refs))};
-  });
-  add("raw: both venues jumping together, or only one moving, is not lead_lag",E=>{
-    const e=E.create(),a=twin(e,{t0:T0,mid0:82000,seconds:150}),b=twin(e,{t0:a.t,mid0:a.bn,hl0:a.hl,seconds:4,seed:6,jump:s=>s>=1&&s<2?{bn:6,hl:6}:{bn:0,hl:0}});
-    const f=E.create(),c=twin(f,{t0:T0,mid0:82000,seconds:150}),d=twin(f,{t0:c.t,mid0:c.bn,hl0:c.hl,seconds:4,seed:6,jump:s=>s>=1&&s<2?{bn:6,hl:0}:{bn:0,hl:0}});
-    return{ok:!rawOf(e,"lead_lag").length&&!rawOf(f,"lead_lag").length,detail:JSON.stringify({both:rawOf(e,"lead_lag").length,one:rawOf(f,"lead_lag").length})};
-  });
-  add("raw: the new signals leave every older detection and episode exactly as it was, and never count toward the per-minute cap",E=>{
-    const run=(on)=>{const e=E.create({detectors:{silence_started:on,silence_ended:on,lead_lag:on,trade_cluster:on}}),a=calm(e);sim(e,{t0:a.t,mid0:a.mid,seconds:5,seed:11,params:()=>({vol:0,bidWalls:[{idx:12,size:6}]})});return e;};
-    const on=run(true),off=run(false),strip=x=>JSON.stringify(x.events.filter(y=>!y.raw),(k,v)=>k==="id"?undefined:v);
-    return{ok:strip(on)===strip(off)&&JSON.stringify(on.episodes)===JSON.stringify(off.episodes)&&off.events.every(x=>!x.raw),detail:"legacy signals or episodes differ with the raw events on"};
   });
   // ---- adaptive sigma (v021): a fast component so sigma follows a market that suddenly gets busier ----
   add("sigma: with the fast component a market that gets four times busier is measured against its new pace within minutes; a steady market is barely changed",E=>{

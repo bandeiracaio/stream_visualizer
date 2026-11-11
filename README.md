@@ -66,7 +66,7 @@ The Reader turns streams of trades and book updates into **episodes**: one marke
 
 Each episode reports when it was *detected*, a *back-dated start*, and a checklist of the evidence that did or did not hold, across fast and mid horizons and both venues.
 
-Alongside the episodes there is a layer of **signals**: one-off, point-in-time detections with no lifecycle. They include wall appears / pulled / eaten, thinning book, imbalance flip, spoof-like patterns, sweeps and liquidations, plus **silence** (a venue goes unusually quiet), **cross-venue lead/lag** (one venue moves first and the other follows within a second) and **trade clustering** (a run of same-size same-side prints). Signals are single timestamped facts that never alter episodes.
+Alongside the episodes there is a layer of **signals**: one-off, point-in-time detections with no lifecycle. They include wall appears / pulled / eaten, thinning book, imbalance flip, a refreshing level and a failed poke. Signals are single timestamped facts that never alter episodes.
 
 ### Sigma: the ruler everything is measured with
 

@@ -2,7 +2,7 @@
 
 **Episode**: one market phenomenon with a lifecycle (forming, active, fading, ended; resumable). Families: absorption, exhaustion, aggression burst, wall.
 
-**Signal**: a point-in-time detection with no lifecycle (for example silence, lead/lag, trade clustering, or a one-off burst). Signals and episodes are separate layers, detected independently. Replaces the word "event". Avoid: event.
+**Signal**: a point-in-time detection with no lifecycle (for example a wall appearing, a thin book or an imbalance flip). Signals and episodes are separate layers, detected independently. Replaces the word "event". Avoid: event.
 
 **Input**: one message from a feed (a trade, quote, book update or sweep) that the engine consumes and replay re-feeds. Avoid: event.
 
