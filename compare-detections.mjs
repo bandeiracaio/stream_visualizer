@@ -129,7 +129,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   else {
     const cfgOf = f => f ? JSON.parse(fs.readFileSync(f, "utf8")) : null, what = { groups:!args.includes("--signals-only"), signals:!args.includes("--groups-only") };
     const { E:EA } = loadEngine(val("--rev-a")), { E:EB } = loadEngine(val("--rev-b")), cfgA = cfgOf(val("--cfg-a")), cfgB = cfgOf(val("--cfg-b")), limit = Number(val("--limit")) || 5;
-    const results = files.map(f => { const s = readInput(f); if (s.kind !== "session") { console.error(f + ": not a session file"); process.exit(2); } return { file:f, cmp:compareSession(EA, EB, s.inputs, cfgA, cfgB, what) }; });
+    const results = files.map((f, i) => { console.error("[" + (i + 1) + "/" + files.length + "] " + f); const s = readInput(f); if (s.kind !== "session") { console.error(f + ": not a session file"); process.exit(2); } return { file:f, cmp:compareSession(EA, EB, s.inputs, cfgA, cfgB, what) }; });
     if (args.includes("--json")) { console.log(J(results.map(r => ({ file:r.file, identical:r.cmp.identical, nA:r.cmp.nA, nB:r.cmp.nB, groups:r.cmp.groups && { same:r.cmp.groups.same, onlyA:r.cmp.groups.onlyA.map(x => x.k), onlyB:r.cmp.groups.onlyB.map(x => x.k), changed:r.cmp.groups.changed }, signals:r.cmp.signals && { same:r.cmp.signals.same, onlyA:r.cmp.signals.onlyA.map(x => x.k), onlyB:r.cmp.signals.onlyB.map(x => x.k), changed:r.cmp.signals.changed } })), null, 1)); process.exit(results.every(r => r.cmp.identical) ? 0 : 1); }
     process.exit(print(results, limit) ? 1 : 0);
   }

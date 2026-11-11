@@ -114,6 +114,7 @@ function renderOverview(){
       + `<div class="metric"><span>unrealized PnL</span><b class="${ovCls(up)}">${ovSigned(up, a=>"$"+fmt(a,2))}</b></div></div>`
       + (pos.length ? `<table class="tt" style="margin-top:6px">${pos.map(p=>`<tr><td>${p.symbol}</td><td>${p.qty>0?"long":"short"} ${Math.abs(p.qty)}</td><td class="${ovCls(p.upnl)}">${ovSigned(p.upnl, a=>"$"+fmt(a,2))}</td></tr>`).join("")}</table>` : `<div class="note">No open positions.</div>`);
   }
+  HOOKS.emit("renderOverview");      // the paper systems table (runner.js) draws itself here
 }
 ov$("ovWin").onchange = () => { if (typeof visible==="function" && visible("overview")) renderOverview(); };
 ov$("ovOpenReader").onclick = () => setTab("reader");

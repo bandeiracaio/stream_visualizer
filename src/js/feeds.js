@@ -3,7 +3,15 @@
 // Moved verbatim out of app.js; behaviour unchanged.
 
 // ---------- market reader: instance and hooks ----------
-const READER = READER_ENGINE.create();
+// Trader step 4: every input goes through ONE facts accumulator (SYSTEM.facts), which hands it to the engine itself (once, first, unchanged) and makes the one-snapshot-a-second series the paper runner reads (runner.js sets trSink).
+// So READER is the engine with its input methods routed through the accumulator; every other method (state, episodes, cfg, recording, ...) is the engine's own.
+const READER_RAW = READER_ENGINE.create(), TFACTS = SYSTEM.facts({engine: READER_RAW});
+let trSink = null;
+const trFeed = a => { if (a.length && trSink) try{ trSink(a); }catch(e){ console.error("trader", e); } };
+const READER = Object.assign(Object.create(READER_RAW), {      // inherits the engine's own members, getters included (episodes, events)
+  onTrade: t => trFeed(TFACTS.trade(t)), onQuote: (v, t, b, a) => trFeed(TFACTS.quote(v, t, b, a)), onBook: (v, t, b, a) => trFeed(TFACTS.book(v, t, b, a)),
+  onSweep: (v, t, s, n, l) => trFeed(TFACTS.sweep(v, t, s, n, l)), advance: t => trFeed(TFACTS.advance(t)), reset: () => { TFACTS.reset(); },
+});
 READER.selfTest = () => READER_SELFTEST.run(READER_ENGINE);
 // Time spent inside the Reader engine per call, for Diagnostics: one bucket per second (last 60) and the last 2000 call times for a percentile.
 const rdPerf = {sec:[], durs:new Float32Array(2000), i:0, n:0, slow:0, SLOW_MS:8};

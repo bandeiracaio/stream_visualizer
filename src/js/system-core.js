@@ -4,7 +4,7 @@
 // Loaded by the page (live) and by design-harness.mjs (replay), so one file decides the trades. Spec: .scratch/trader/spec.md section 3, prompt .scratch/trader/prompts/03-system-core.md.
 const SYSTEM = (() => {
   "use strict";
-  const FACTS_VERSION = 1;      // bump when the snapshot a second changes shape or meaning (the harness caches snapshots under it)
+  const FACTS_VERSION = 2;      // bump when the snapshot a second changes shape or meaning (the harness caches snapshots under it)
   const V = ["bn", "hl"], EP_FAMILIES = ["absorption", "exhaustion", "burst", "wall"];
   const OPT = { latencyMs: 0, staleMs: 3000, maxGapMs: 30000, flowWindowSec: 1800, minFlowReadings: 30, minRoomBps: 0.2 };
   const sideDir = s => s === "buy" || s === "bid" ? 1 : s === "sell" || s === "ask" ? -1 : 0;
@@ -127,7 +127,7 @@ const SYSTEM = (() => {
   }
 
   // ---------- facts: the engine's inputs to one snapshot a second ----------
-  // A snapshot: {t, px:{bn,hl}, sigma:{bn,hl}, age:{bn,hl} (ms since that venue's last quote), calibrated, flow:{bn:{buy,sell,liqBuy,liqSell},hl:..} (taker notional in (t-1 s, t]),
+  // A snapshot: {t, px:{bn,hl}, sigma:{bn,hl}, age:{bn,hl} (ms since that venue's last quote), q:{bn,hl} (that quote as {bid, ask}, null when none; added in FACTS_VERSION 2, the runner fills at it), calibrated, flow:{bn:{buy,sell,liqBuy,liqSell},hl:..} (taker notional in (t-1 s, t]),
   //   imb:{bn:{5,20},hl:..} (book imbalance within 5 / 20 bps of the mid, -1..1, null when no book in the last 10 s), episodes:{new,ended,active}, state}.
   // episodes.new lists each Reader episode group in the first second it is seen, with the venue and side it has then (never revised); ended lists groups that ended; active those still going.
   // A second t is created when the engine first sees an input at or after t; price, sigma and the episode groups are taken from the engine at that moment. The taker flow, book and quote age of t are by the
@@ -174,9 +174,9 @@ const SYSTEM = (() => {
     }
     // the rest of second T by the inputs' own times: taker flow in (T-1 s, T], the newest book and quote at or before T
     function finish(f) {
-      const T = f.t, fl = pend.get(T); f.age = {}; f.flow = {}; f.imb = {};
+      const T = f.t, fl = pend.get(T); f.age = {}; f.q = {}; f.flow = {}; f.imb = {};
       for (const v of V) {
-        const q = upTo(quotes[v], T, x => x); f.age[v] = q == null ? null : T - q;
+        const q = upTo(quotes[v], T, x => x.t); f.age[v] = q == null ? null : T - q.t; f.q[v] = q == null ? null : { bid: q.bid, ask: q.ask };
         const w = fl && f.px[v] != null ? fl[v] : null; f.flow[v] = { buy: w ? w[0] : 0, sell: w ? w[1] : 0, liqBuy: w ? w[2] : 0, liqSell: w ? w[3] : 0 };
         const b = upTo(books[v], T, x => x.t); if (b && T - b.t <= 10000) { if (!b.i) b.i = { 5: imbalance(b.bids, b.asks, 5), 20: imbalance(b.bids, b.asks, 20) }; f.imb[v] = { 5: b.i[5], 20: b.i[20] }; } else f.imb[v] = { 5: null, 20: null };
       }
@@ -201,7 +201,7 @@ const SYSTEM = (() => {
           const f = bucket(T)[tr.v]; if (tr.liq) f[tr.side === "buy" ? 2 : 3] += tr.ntl; else f[tr.side === "buy" ? 0 : 1] += tr.ntl;      // same rule as the harness: any side but buy counts as sell
         });
       },
-      quote(vn, t, bid, ask) { return run(t, () => engine.onQuote(vn, t, bid, ask), () => { if (V.includes(vn) && bid > 0 && ask > 0 && ask >= bid && t > 0) ins(quotes[vn], t, x => x); }); },
+      quote(vn, t, bid, ask) { return run(t, () => engine.onQuote(vn, t, bid, ask), () => { if (V.includes(vn) && bid > 0 && ask > 0 && ask >= bid && t > 0) ins(quotes[vn], { t, bid, ask }, x => x.t); }); },
       book(vn, t, bids, asks) { return run(t, () => engine.onBook(vn, t, bids, asks), () => { if (V.includes(vn) && Array.isArray(bids) && Array.isArray(asks) && t > 0) ins(books[vn], { t, bids, asks, i: null }, x => x.t); }); },
       sweep(vn, t, side, ntl, levels) { return run(t, () => engine.onSweep(vn, t, side, ntl, levels)); },
       advance(t) { return run(t, () => engine.advance(t)); },
@@ -223,7 +223,7 @@ const SYSTEM = (() => {
   // ---------- one system running ----------
   function create(def, opt) {
     const bad = validate(def); if (bad.length) throw new Error("invalid system: " + bad.join("; "));
-    const O = Object.assign({}, OPT, opt || {}), forced = O.signals ? O.signals.slice().sort((a, b) => a.t - b.t) : null;
+    const O = Object.assign({}, OPT, opt || {}), forced = O.signals ? O.signals.slice().sort((a, b) => a.t - b.t) : O.forced ? [] : null;      // O.forced: forced signals are given at step time with force()
     const ctx = def.context, reg = def.region, trg = def.trigger, ex = def.exit, risk = def.risk, th = def.thesis, inv = (th.invalidation || { type: "none" }).type;
     const dirSign = th.dir === "fade" ? -1 : 1, anyVenue = def.venue === "any";
     const used = anyVenue ? V.slice() : trg.type === "premium" ? V.slice() : [def.venue];
@@ -433,6 +433,8 @@ const SYSTEM = (() => {
     }
     const api = {
       def, id: id(def), step,
+      // a forced (random-entry) signal for the next step, {t, side, venue?}; only an instance made with opt.forced or opt.signals takes it
+      force(sig) { if (forced) forced.push(sig); },
       // the caller's fill of the entry: price and time. May answer with an exit (a range-level target with no room left is void: the entry is closed at once).
       filled(px, t) {
         const p = position; if (!p || p.filled) return EMPTY; p.filled = true; p.p0 = px; p.tIn = t; p.tEnd = t + ex.holdSec * 1000;

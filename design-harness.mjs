@@ -5,6 +5,9 @@
 //
 //   node design-harness.mjs --selftest
 //   node design-harness.mjs [--sessions sessions] [--split dev|holdout] [--confirm-holdout] [--n 100] [--seed 1] [--out results.jsonl] [--legacy-facts]
+//   node design-harness.mjs --run-defaults [--sessions sessions] [--split dev] [--limit N] [--journal out.json]
+//       runs the page's runner (RUNNER) with the seven default systems over each session's snapshots and prints RUNNER.evaluate. Its only purpose is to test the code (page against harness, Trader step 4);
+//       the results are not evidence, and the hold-out and fresh splits are refused.
 //   --legacy-facts: the comparison mode of step 3: the core is fed the old batch harness's look-ahead facts (whole-session sigma, end-of-session episode groups, no calibration or staleness gate)
 //
 // Execution model, same for every design: the entry is filled one latency after the trigger's time at the price then (newest price at most 2 s old; none = no trade), one position at a time,
@@ -24,6 +27,8 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SNAPDIR = path.join(HERE, ".scratch", "trade-system", "cache-snap"), OLDCACHE = path.join(HERE, ".scratch", "trade-system", "cache");
 export const EXEC = { latencyMs: 1000, costBps: 8, maxGapMs: 30000, holdoutShare: 0.3 };
 export const SYSTEM = vm.runInNewContext(fs.readFileSync(path.join(HERE, "src/js/system-core.js"), "utf8") + "\n;SYSTEM", {});
+// the paper runner (Trader step 4) and the seven default systems: the same files the page includes, in one context with their own SYSTEM
+export const { RUNNER, SYSTEMS_DEFAULT } = vm.runInNewContext(["system-core", "systems-default", "runner-core"].map(f => fs.readFileSync(path.join(HERE, "src/js", f + ".js"), "utf8")).join("\n") + "\n;({ RUNNER, SYSTEMS_DEFAULT })", {});
 
 // ---------- price helpers (history = [[t_ms, price]], one point a second) ----------
 export function priceAt(h, t, within = 2000) {
@@ -295,6 +300,24 @@ function selftest() {
 const args = process.argv.slice(2), arg = (k, d) => { const i = args.indexOf("--" + k); return i < 0 ? d : args[i + 1]; };
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   if (args.includes("--selftest")) selftest();
+  else if (args.includes("--run-defaults")) {
+    const split = arg("split", "dev"); if (split !== "dev") { console.error("--run-defaults reads the dev split only (the hold-out and fresh data are never read here)"); process.exit(2); }
+    const dir = path.resolve(HERE, arg("sessions", "sessions")), all = listSessions(dir), lim = Number(arg("limit", Infinity)), sessions = splitSessions(all, "dev", false, holdoutCutoff(all)).slice(0, lim);
+    console.log("TEST OF THE CODE ONLY: the default systems on " + sessions.length + " saved dev sessions through the page's runner. These sessions were seen while the systems were designed; the numbers are not evidence and are not used for promotion.");
+    let journal = []; const t0 = Date.now();
+    for (const s of sessions) {
+      loadSnaps(s); if (!s.snaps.length) continue;
+      const r = RUNNER.create({ systems: SYSTEMS_DEFAULT, twins: 20, equity: 10000, feeBps: 5, riskCap: 0.02, seed: 1, journal });      // one runner a session (the page starts a new one after a gap); the journal and equity carry over
+      for (const x of s.snaps) r.step(x);
+      r.interrupt(s.snaps[s.snaps.length - 1].t); journal = r.rows(); s.snaps = null; s.hist = null; s.legacy = null;
+    }
+    const ev = RUNNER.evaluate(journal), f = (x, d = 2) => x == null ? "-" : x.toFixed(d);
+    console.error("runner done in " + ((Date.now() - t0) / 1000).toFixed(0) + " s, " + journal.length + " journal rows");
+    console.log("system".padEnd(22) + "trades  days  net bps       R  pos days  vs twins  interrupted  by reason");
+    for (const d of SYSTEMS_DEFAULT) { const e = ev[SYSTEM.id(d)] || { trades: 0, days: 0, byReason: {}, interrupted: 0 };
+      console.log(d.name.padEnd(22) + String(e.trades).padStart(6) + String(e.days).padStart(6) + f(e.meanNetBps).padStart(9) + f(e.meanR, 3).padStart(8) + (e.posDayShare == null ? "-" : (100 * e.posDayShare).toFixed(0) + "%").padStart(10) + (e.twinPercentile == null ? "too few" : "p" + e.twinPercentile.toFixed(0)).padStart(10) + String(e.interrupted).padStart(13) + "  " + JSON.stringify(e.byReason)); }
+    if (arg("journal", null)) fs.writeFileSync(arg("journal"), JSON.stringify(journal));
+  }
   else {
     const dir = path.resolve(HERE, arg("sessions", "sessions")), seed = Number(arg("seed", 1)), n = Number(arg("n", 100)), nullReps = Number(arg("null", 20));
     const costs = arg("costs", "0,2,4,8").split(",").map(Number), split = arg("split", "dev"), legacy = args.includes("--legacy-facts");

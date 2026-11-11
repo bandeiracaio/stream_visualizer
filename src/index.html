@@ -121,6 +121,12 @@
     <div id="ovReader"></div>
   </section>
 
+  <section data-tab="overview" class="full">
+    <h2>Paper systems <span class="ctl"><label class="ctl"><input type="checkbox" id="trOn"> run</label><button id="trExport">export journal</button><button id="trReset">reset</button></span></h2>
+    <div id="trStat" class="note" style="margin-top:0"></div>
+    <div id="trTable" style="overflow-x:auto"></div>
+  </section>
+
   <section data-tab="overview">
     <h2>Recording <span class="ctl"><button id="ovOpenRec">open</button></span></h2>
     <div id="ovRec"></div>
@@ -378,6 +384,12 @@
 <script id="system-core">
 <!--@include js/system-core.js-->
 </script>
+<script id="systems-default">
+<!--@include js/systems-default.js-->
+</script>
+<script id="runner-core">
+<!--@include js/runner-core.js-->
+</script>
 <script id="auto-record-core">
 <!--@include js/auto-record-core.js-->
 </script>
@@ -425,6 +437,9 @@
 </script>
 <script>
 <!--@include js/reader-tools.js-->
+</script>
+<script>
+<!--@include js/runner.js-->
 </script>
 <script>
 <!--@include js/account-info.js-->
