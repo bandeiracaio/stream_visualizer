@@ -302,12 +302,15 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   if (args.includes("--selftest")) selftest();
   else if (args.includes("--run-defaults")) {
     const split = arg("split", "dev"); if (split !== "dev") { console.error("--run-defaults reads the dev split only (the hold-out and fresh data are never read here)"); process.exit(2); }
-    const dir = path.resolve(HERE, arg("sessions", "sessions")), all = listSessions(dir), lim = Number(arg("limit", Infinity)), sessions = splitSessions(all, "dev", false, holdoutCutoff(all)).slice(0, lim);
+    const one = arg("file", null);      // --file one.json.gz: that one session only, whatever its split (a code-parity test of the page's runner against its own journal; read once, no results are used)
+    const dir = path.resolve(HERE, arg("sessions", "sessions")), lim = Number(arg("limit", Infinity));
+    const sessions = one ? [{ file: path.basename(one), dir: path.dirname(path.resolve(one)), size: fs.statSync(one).size }] : (a => splitSessions(a, "dev", false, holdoutCutoff(a)).slice(0, lim))(listSessions(dir));
     console.log("TEST OF THE CODE ONLY: the default systems on " + sessions.length + " saved dev sessions through the page's runner. These sessions were seen while the systems were designed; the numbers are not evidence and are not used for promotion.");
     let journal = []; const t0 = Date.now();
     for (const s of sessions) {
       loadSnaps(s); if (!s.snaps.length) continue;
       const r = RUNNER.create({ systems: SYSTEMS_DEFAULT, twins: 20, equity: 10000, feeBps: 5, riskCap: 0.02, seed: 1, journal });      // one runner a session (the page starts a new one after a gap); the journal and equity carry over
+      console.error("[" + (sessions.indexOf(s) + 1) + "/" + sessions.length + "] " + s.file + ": " + s.snaps.length + " snapshots");
       for (const x of s.snaps) r.step(x);
       r.interrupt(s.snaps[s.snaps.length - 1].t); journal = r.rows(); s.snaps = null; s.hist = null; s.legacy = null;
     }
