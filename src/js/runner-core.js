@@ -111,6 +111,41 @@ const RUNNER = (() => {
     return api;
   }
 
+  // What a journal leaves for the next runner, as a short list of rows: one per system and per twin with its summed result (equity carries over), and the enter rows still open (they come back as interrupted).
+  // create({journal: carryOf(rows)}) is the same as create({journal: rows}) in everything the runner does; a chunk file stores this list so a replay can begin where the page began.
+  function carryOf(rows) {
+    const usd = new Map(), tw = new Map(), openPos = new Map(), closedPid = new Set();
+    for (const r of rows) {
+      if (r.k === "trade") { closedPid.add(r.pid); if (!r.interrupted && typeof r.usd === "number") usd.set(r.sys, (usd.get(r.sys) || 0) + r.usd); }
+      else if (r.k === "twin" && typeof r.usd === "number") { let m = tw.get(r.sys); if (!m) tw.set(r.sys, m = new Map()); m.set(r.n, (m.get(r.n) || 0) + r.usd); }
+      else if (r.k === "enter") openPos.set(r.pid, r);
+    }
+    const out = [];
+    for (const [sys, v] of usd) out.push({ k: "trade", sys, pid: "carry:" + sys, usd: v });
+    for (const [sys, m] of tw) for (const [n, v] of m) out.push({ k: "twin", sys, n, usd: v });
+    for (const [pid, e] of openPos) if (!closedPid.has(pid)) out.push(e);
+    return out;
+  }
+  // The runner as the page and a replay both run it: one runner at a time, begun again after a data gap (more than gapMs between two snapshots: the rolling windows are stale), the equity carried over and
+  // what was open closed as interrupted. step(snap) and stop(t) return the journal rows they wrote; own() is every row written since the driver began. o: create()'s options plus gapMs (default 30000)
+  // and either journal (rows already written) or carry (a list from carryOf). The decision lives here only, so the page and the replay cannot differ.
+  function driver(o) {
+    const gapMs = o.gapMs == null ? 30000 : o.gapMs, base = o.carry ? o.carry.slice() : carryOf(o.journal || []), own = [];
+    let run = null, lastT = 0;
+    const take = (rows, out) => { for (const r of rows) { own.push(r); out.push(r); } };
+    return {
+      carry: base,
+      step(snap) {
+        const out = [];
+        if (run && lastT && snap.t - lastT > gapMs) { take(run.interrupt(lastT), out); run = null; }
+        if (!run) { run = create(Object.assign({}, o, { journal: base.concat(own) })); take(run.fresh(), out); }
+        take(run.step(snap), out); lastT = snap.t; return out;
+      },
+      stop(t) { const out = []; if (run) { take(run.interrupt(t == null ? lastT : t), out); run = null; } return out; },
+      own: () => own, runner: () => run, lastT: () => lastT,
+    };
+  }
+
   // per system: trades, days with a trade (UTC day of the entry), mean net bps and R, the share of days with a positive sum, counts by exit reason (invalidate apart from stop), interrupted positions (left out of every figure),
   // the last skip, and the system's mean net R as a percentile among its twins' means (null until the system and at least 15 twins have 20 trades each). It does not decide promotion (step 7).
   function evaluate(rows) {
@@ -194,6 +229,20 @@ const RUNNER = (() => {
       const r4 = runAll({ systems: [sys()], twins: 0 }, snaps.slice(0, 70)), cl = r4.interrupt(T0 + 70000); ok("stopping the runner closes what is open as interrupted", cl.length === 1 && cl[0].interrupted && r4.state()[0].open === null);
       const j2 = runAll({ systems: [sys()], twins: 0 }, snaps).rows(), eq = create({ systems: [sys()], twins: 0, journal: j2 }).state()[0].equity, want = 10000 + j2.filter(x => x.k === "trade").reduce((q, x) => q + x.usd, 0);
       ok("equity carries over a restart", Math.abs(eq - want) < 1e-9 && eq !== 10000, eq + " " + want); }
+    // ----- the driver: the gap rule and the carry-over live here
+    { const snaps = mkSnaps(400, jump), cfg = { systems: [sys()], twins: 0, equity: 10000 };
+      const one = (() => { const d = driver(cfg), rows = []; for (const s of snaps) for (const x of d.step(s)) rows.push(x); for (const x of d.stop()) rows.push(x); return rows; })();
+      const plain = runAll(cfg, snaps), pr = plain.rows().concat(plain.interrupt(snaps[snaps.length - 1].t));
+      ok("a driver with no gap writes the rows a plain runner writes", JSON.stringify(one) === JSON.stringify(pr) && one.length > 0, one.length + " " + pr.length);
+      // a gap of 40 s (30 s allowed) in the middle of an open position: it is closed as interrupted at the last snapshot before it, a new runner begins, the equity is carried
+      const gapped = snaps.filter((s, i) => i < 65 || i >= 105), d = driver(cfg), rows = []; for (const s of gapped) for (const x of d.step(s)) rows.push(x); const intr = rows.filter(x => x.interrupted);
+      ok("a gap of more than 30 s closes what is open as interrupted at the last snapshot before it and begins a new runner", intr.length === 1 && intr[0].t === T0 + 64000 && d.runner().state()[0].secs > 0 && d.own().length === rows.length, JSON.stringify(intr));
+      const small = snaps.filter((s, i) => i < 65 || i >= 90), d2 = driver(cfg), r2 = []; for (const s of small) for (const x of d2.step(s)) r2.push(x);
+      ok("a gap of 25 s does not restart it", !r2.some(x => x.interrupted));
+      // carry: a driver handed the carry list of a journal behaves as one handed the journal
+      const first = runAll(cfg, snaps.slice(0, 70)), jr = first.rows(), da = driver(Object.assign({}, cfg, { journal: jr })), db = driver(Object.assign({}, cfg, { carry: carryOf(jr) })), ra = [], rb = [];
+      for (const s of snaps.slice(70)) { for (const x of da.step(s)) ra.push(x); for (const x of db.step(s)) rb.push(x); }
+      ok("a driver given carryOf(journal) writes the same rows as one given the journal (equity and interrupted positions carried)", JSON.stringify(ra) === JSON.stringify(rb) && ra.length > 0 && carryOf(jr).some(x => x.k === "enter") && ra.some(x => x.interrupted), ra.length + " " + rb.length); }
     // ----- evaluate
     { const tr = (sys, d, net, reason, h) => ({ k: "trade", sys, t: 0, pid: sys + d + net + h, tIn: d * DAY + h * 3600000, netBps: net, R: net / 10, reason }), twin = (sys, n, R) => ({ k: "twin", sys, t: 0, n, tIn: 0, netBps: R * 10, R, reason: "time" });
       const rows = [tr("A", 1, 5, "time", 1), tr("A", 1, -2, "stop", 2), tr("A", 2, -4, "invalidate", 1), tr("A", 3, 6, "time", 5), { k: "skip", sys: "A", t: 5, reason: "risk cap" }, { k: "skip", sys: "A", t: 9, reason: "in position" }];
@@ -207,5 +256,5 @@ const RUNNER = (() => {
     return res;
   }
 
-  return { create, evaluate, selftest };
+  return { create, driver, carryOf, evaluate, selftest };
 })();

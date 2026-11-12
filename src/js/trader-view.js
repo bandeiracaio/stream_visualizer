@@ -168,7 +168,7 @@ function renderTrader(force){
     tvEval(rows);
     let interrupted = 0; for (const k in TV.ev) interrupted += TV.ev[k].interrupted;
     tv$("trOn").checked = TRN.on;
-    tv$("trStat").textContent = TRADER.status({loaded: TRN.loaded, on: TRN.on, connected, asset: trAsset(), running: !!run, ageSec: Math.max(0, Math.round((nowEx() - TRN.lastT) / 1000)), feeBps: TR_CFG.feeBps, openRisk: rk ? rk.open : 0, riskCap: TR_CFG.riskCap, interrupted, err: TRN.err});
+    tv$("trStat").textContent = (typeof rrShort === "function" ? rrShort() + " " : "") + TRADER.status({loaded: TRN.loaded, on: TRN.on, connected, asset: trAsset(), running: !!run, ageSec: Math.max(0, Math.round((nowEx() - TRN.lastT) / 1000)), feeBps: TR_CFG.feeBps, openRisk: rk ? rk.open : 0, riskCap: TR_CFG.riskCap, interrupted, err: TRN.err});
     // one card per system
     const t = nowEx(), html = TV_SYS.map(x => { const s = byId[x.id]; return tvSystemHtml(x, s, TRADER.cells({def: x.d, inst: s ? s.inst : null, led: s || null, ev: TV.ev[x.id] || null, twins: TV.tw[x.id] || [], t})); }).join("");
     if (html !== TV.rowsHtml){

@@ -3,14 +3,17 @@
 // Moved verbatim out of app.js; behaviour unchanged.
 
 // ---------- market reader: instance and hooks ----------
-// Trader step 4: every input goes through ONE facts accumulator (SYSTEM.facts), which hands it to the engine itself (once, first, unchanged) and makes the one-snapshot-a-second series the paper runner reads (runner.js sets trSink).
-// So READER is the engine with its input methods routed through the accumulator; every other method (state, episodes, cfg, recording, ...) is the engine's own.
-const READER_RAW = READER_ENGINE.create(), TFACTS = SYSTEM.facts({engine: READER_RAW});
+// Trader steps 4 and 6a: every input the page consumes goes through ONE pipeline (chunk-core.js). It thins quotes to one per 100 ms per venue, records what it lets through (the continuous recording, run-record.js),
+// and hands it to the facts accumulator (SYSTEM.facts), which hands it to the engine itself (once, first, unchanged) and makes the one-snapshot-a-second series the paper runner reads (runner.js sets trSink).
+// So READER is the engine with its input methods routed through the pipeline; every other method (state, episodes, cfg, ...) is the engine's own. The charts, the book and the tape do not read the engine and keep every quote.
+const READER_RAW = READER_ENGINE.create(), TF_LATE = 1000, TFACTS = SYSTEM.facts({engine: READER_RAW, lateMs: TF_LATE});
 let trSink = null;
+const PIPE = CHUNK.pipeline({facts: TFACTS, cfgNow: () => typeof rrCfgKey === "function" ? rrCfgKey() : "", onChunk: c => { if (typeof rrChunk === "function") rrChunk(c); }});
 const trFeed = a => { if (a.length && trSink) try{ trSink(a); }catch(e){ console.error("trader", e); } };
 const READER = Object.assign(Object.create(READER_RAW), {      // inherits the engine's own members, getters included (episodes, events)
-  onTrade: t => trFeed(TFACTS.trade(t)), onQuote: (v, t, b, a) => trFeed(TFACTS.quote(v, t, b, a)), onBook: (v, t, b, a) => trFeed(TFACTS.book(v, t, b, a)),
-  onSweep: (v, t, s, n, l) => trFeed(TFACTS.sweep(v, t, s, n, l)), advance: t => trFeed(TFACTS.advance(t)), reset: () => { TFACTS.reset(); },
+  onTrade: t => trFeed(PIPE.trade(t)), onQuote: (v, t, b, a) => trFeed(PIPE.quote(v, t, b, a)), onBook: (v, t, b, a) => trFeed(PIPE.book(v, t, b, a)),
+  onSweep: (v, t, s, n, l) => trFeed(PIPE.sweep(v, t, s, n, l)), advance: t => trFeed(PIPE.advance(t)),
+  reset: () => { if (typeof rrBeforeReset === "function") rrBeforeReset(); PIPE.reset(); if (typeof rrAfterReset === "function") rrAfterReset(); },      // a run ends and the next begins here (run-record.js)
 });
 READER.selfTest = () => READER_SELFTEST.run(READER_ENGINE);
 // Time spent inside the Reader engine per call, for Diagnostics: one bucket per second (last 60) and the last 2000 call times for a percentile.

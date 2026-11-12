@@ -20,7 +20,7 @@ const rcTx = (mode, fn) => rcOpen().then(db => new Promise((ok, no) => {
 // Keep a copy; resolves true if stored, false if the browser refused (private window, quota). Never throws: the download has already happened.
 async function rcKeep(name, blob, meta) {
   try {
-    await rcTx("readwrite", st => st.put({name, blob, size:blob.size, at:Date.now(), sym:(meta && meta.sym) || "", startedAt:(meta && meta.startedAt) || 0, quality:(meta && meta.quality) || null}));
+    await rcTx("readwrite", st => st.put({name, blob, size:blob.size, at:Date.now(), sym:(meta && meta.sym) || "", startedAt:(meta && meta.startedAt) || 0, quality:(meta && meta.quality) || null, run:(meta && meta.run) || null, seq:meta && meta.seq != null ? meta.seq : null, final:!!(meta && meta.final), why:(meta && meta.why) || "", rows:meta && meta.rows != null ? meta.rows : null, inputs:meta && meta.inputs != null ? meta.inputs : null}));
     try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch {}      // ask the browser not to evict it under storage pressure
     rcRender();
     return true;
@@ -55,12 +55,24 @@ async function rcRender() {
   const box = rc$("rcList"); if (!box) return;
   let rows;
   try { rows = RC.rows = await rcAll(); rcCoverage(); } catch { RC.rows = []; box.innerHTML = `<div class="note">This browser would not give the app storage, so recordings are only downloaded (private window?).</div>`; return; }
-  if (!rows.length) { box.innerHTML = `<div class="note">Nothing kept yet. A recording is kept here when you press Save session or when auto-record finishes.</div>`; return; }
-  box.innerHTML = rows.map(r => {
+  if (!rows.length) { box.innerHTML = `<div class="note">Nothing kept yet. Chunks of a continuous recording are kept here for 24 hours; a recording is also kept when you press Save session.</div>`; return; }
+  const rowHtml = r => {
     const when = new Date(r.at).toLocaleString(), can = !!rcShareable(r);
     return `<div class="rv-row" data-rc="${encodeURIComponent(r.name)}"><div class="grow"><b>${rcEsc(r.name)}</b><div class="stat">${rcSize(r.size)} · kept ${when}${r.quality ? ` · <span style="${SQ.clean(r.quality) ? "" : "color:var(--warn)"}">${rcEsc(SQ.line(r.quality))}</span>` : ""}</div></div>`
       + (can ? `<button data-rcact="share">Share</button>` : "") + `<button data-rcact="dl">Download</button><button data-rcact="open">Open</button><button data-rcact="del">Delete</button></div>`;
-  }).join("") + `<div class="note">${navigator.canShare ? "Share opens this device's share sheet (mail, Drive, Quick Share...)." : "This browser has no share sheet: use Download."} Recordings stay here until you delete them.</div>`;
+  };
+  // chunks are grouped by run (newest run first); a recording made by hand has no run and is listed alone
+  const runs = new Map(), singles = [];
+  for (const r of rows) { if (r.run) { if (!runs.has(r.run)) runs.set(r.run, []); runs.get(r.run).push(r); } else singles.push(r); }
+  const groups = [...runs.entries()].map(([id, a]) => { a.sort((x, y) => x.seq - y.seq); return {id, a, at:Math.max(...a.map(x => x.at))}; }).sort((x, y) => y.at - x.at);
+  let html = groups.map(g => {
+    const seqs = g.a.map(x => x.seq), holes = []; for (let i = seqs[0]; i <= seqs[seqs.length - 1]; i++) if (!seqs.includes(i)) holes.push(i);
+    const last = g.a[g.a.length - 1], size = g.a.reduce((n, x) => n + x.size, 0), inputs = g.a.reduce((n, x) => n + (x.inputs || 0), 0), cut = g.a.some(x => x.cutShort), startsLate = seqs[0] > 0;
+    const flags = [last.final ? "ended cleanly" : cut ? "cut short (the page closed or reloaded)" : "running or ended without a closing chunk", holes.length ? "missing here: chunk " + holes.join(", ") : "", startsLate ? "starts at chunk " + seqs[0] + " (earlier ones are older than 24 hours or deleted)" : ""].filter(Boolean);
+    return `<details class="rv-run" open><summary><b>Run ${rcEsc(g.id)}</b> · ${g.a.length} chunk${g.a.length === 1 ? "" : "s"} · ${inputs.toLocaleString()} inputs · ${rcSize(size)} · ${rcEsc(flags.join(" · "))}</summary>${g.a.map(rowHtml).join("")}</details>`;
+  }).join("");
+  html += singles.map(rowHtml).join("");
+  box.innerHTML = html + `<div class="note">${navigator.canShare ? "Share opens this device's share sheet (mail, Drive, Quick Share...)." : "This browser has no share sheet: use Download."} Chunks of a continuous recording are deleted from this browser after 24 hours (the save folder keeps all of them; without a folder, nothing older than 24 hours exists). Recordings saved by hand stay until you delete them.</div>`;
 }
 rc$("rcList").onclick = async e => {
   const b = e.target.closest("button[data-rcact]"); if (!b) return;

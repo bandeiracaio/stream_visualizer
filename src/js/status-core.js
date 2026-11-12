@@ -27,8 +27,10 @@ const STATUS = (() => {
       else out.push({id:"ar", text:"armed · waiting" + (a.runs ? " · " + a.runs + " recorded" : ""), tone:"info", title:"Auto-record is watching for a volatile stretch" + (a.runs ? "; recordings made since arming: " + a.runs : "")});
       if (a.wake === false) out.push({id:"wake", text:"screen may sleep", tone:"warn", title:"The screen wake lock is not held; a sleeping device ends the wait"});
     }
+    if (i.cr && i.cr.on) out.push({id:"cr", text:"REC run, chunk " + i.cr.seq, tone:"info", title:"Continuous recording: everything the Reader consumes is recorded in 30-minute chunks (Recordings)"});
+    if (i.cr && i.cr.fail > 0) out.push({id:"crfail", text:"chunk save failed", tone:"bad", title:"A chunk could not be saved (" + (i.cr.err || "unknown") + "). The run goes on; the next chunk says the previous one is missing. See the Health log."});
     const f = i.folder;
-    if (f && (a.on || (i.rec && i.rec.on))) {      // only while something is going to be saved: a lost folder means the file is downloaded instead, away from where the analysis looks
+    if (f && (a.on || (i.rec && i.rec.on) || (i.cr && i.cr.on))) {      // only while something is going to be saved: a lost folder means the file is downloaded instead, away from where the analysis looks
       if (f.state === "denied") out.push({id:"folder", text:"save folder needs OK", tone:"bad", title:"The browser took back write access to the save folder (usually after the page reloaded). Recordings are downloaded instead until you press Allow (Recordings, Saved recordings)."});
       else if (f.state === "failed") out.push({id:"folder", text:"last save failed", tone:"bad", title:"The last write into the save folder failed (" + (f.err || "unknown error") + "); that recording was downloaded instead (Recordings, Saved recordings)."});
       else if (f.state === "none") out.push({id:"folder", text:"no save folder", tone:"info", title:"No save folder is chosen: recordings are downloaded (Recordings, Saved recordings, Choose folder)."});

@@ -16,7 +16,8 @@ function sbSnapshot() {
   const rec = RT.rec ? {on:true, ms:now - RT.rec.t0, n:READER.recording().n} : {on:false};
   let folder = null;      // folder-save.js is loaded before this file; without it (or in a browser that cannot save into a folder) there is no folder chip
   if (typeof FS !== "undefined" && FS.supported) { const last = FS.log[0]; folder = !FS.dir ? {state:"none"} : FS.perm !== "granted" ? {state:"denied"} : last && !last.ok ? {state:"failed", err:last.err} : {state:"ok"}; }
-  return {connected, paused:false, online:navigator.onLine, venues, ar, rec, kept:typeof RC !== "undefined" ? RC.rows.length : 0, folder};
+  let cr = null; try { if (typeof rrState === "function") { const q = rrState(); cr = {on:q.on && q.running, seq:q.seq, ms:q.ms, fail:q.fail, err:q.err, failedNow:q.fail > 0 && Date.now() - RR.lastAt < 7200000}; } } catch {}      // continuous recording (run-record.js)
+  return {connected, paused:false, online:navigator.onLine, venues, ar, rec, cr, kept:typeof RC !== "undefined" ? RC.rows.length : 0, folder};
 }
 // phone header: a venue pill shows a coloured dot instead of its long text (styles.css); the state is classified here, the full text stays in the title
 function sbPills() {

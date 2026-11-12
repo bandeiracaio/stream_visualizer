@@ -231,6 +231,13 @@
   </section>
 
   <section data-tab="record" class="full">
+    <h2>Continuous recording</h2>
+    <label class="row"><input type="checkbox" id="rrOn"> Record everything the Reader consumes while connected, in 30-minute chunks</label>
+    <div id="rrStat" class="stat"></div>
+    <div class="note">Each chunk is a session file with the paper runner's journal rows of that stretch, so a replay can be checked against what the page did. Chunks go into the save folder if one is chosen (all of them) and into this browser's storage for 24 hours: older browser copies are deleted. Without a save folder, nothing older than 24 hours exists. Turning the switch off ends the run; turning it on starts the Reader again (a new run).</div>
+  </section>
+
+  <section data-tab="record" class="full">
     <h2>Record</h2>
     <div class="row"><button id="rtRec">Record</button><span id="rtStat" class="stat">not recording</span></div>
     <div class="rt-h">Auto-record when the market gets volatile</div>
@@ -402,6 +409,9 @@
 <script id="runner-core">
 <!--@include js/runner-core.js-->
 </script>
+<script>
+<!--@include js/chunk-core.js-->
+</script>
 <script id="trader-core">
 <!--@include js/trader-core.js-->
 </script>
@@ -497,6 +507,9 @@
 </script>
 <script>
 <!--@include js/collectors.js-->
+</script>
+<script>
+<!--@include js/run-record.js-->
 </script>
 <script>
 <!--@include js/arm-mode.js-->

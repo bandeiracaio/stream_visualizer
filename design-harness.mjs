@@ -17,6 +17,7 @@ import fs from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
 import crypto from "node:crypto";
+import zlib from "node:zlib";
 import { fileURLToPath } from "node:url";
 import { loadEngine } from "./compare-detections.mjs";
 import { readInput } from "./lib/session-io.mjs";
@@ -296,10 +297,54 @@ function selftest() {
   console.log(fail ? fail + " FAILED" : "all passed"); process.exit(fail ? 1 : 0);
 }
 
+// ---------- continuous recording: replay a run's chunks and compare the journal (Trader step 6a) ----------
+// node design-harness.mjs --replay-run <chunk files or folders>: groups the chunks by run, checks the numbers, replays each run from its first chunk through the engine, the facts accumulator (with the page's own lateness)
+// and the runner driver, and compares the journal rows with the rows stored in the chunks (equal = every row equal as JSON). Prints per run: chunks, rows, equal or the first row that differs. Exit 1 on any difference.
+// A run whose first chunk is missing is "not checkable", not a failure; a run with a missing chunk in the middle is compared up to the hole.
+export const CHUNK = vm.runInNewContext(fs.readFileSync(path.join(HERE, "src/js/chunk-core.js"), "utf8") + "\n;CHUNK", {});
+export function readChunk(file) {
+  let buf = fs.readFileSync(file); if (buf[0] === 0x1f && buf[1] === 0x8b) buf = zlib.gunzipSync(buf);
+  const j = JSON.parse(buf.toString("utf8")); return j && j.kind === "sv-session" && j.run != null && Number.isInteger(j.seq) ? j : null;
+}
+export function replayRuns(paths, log = console.error) {
+  const files = []; for (const p of paths) { if (fs.statSync(p).isDirectory()) { for (const f of fs.readdirSync(p).sort()) if (/^session_.*\.json(\.gz)?$/.test(f)) files.push(path.join(p, f)); } else files.push(p); }
+  const runs = new Map(); let k = 0;
+  for (const f of files) {
+    k++; const c = readChunk(f);
+    log("[" + k + "/" + files.length + "] " + path.basename(f) + (c ? ": run " + c.run + " chunk " + c.seq + ", " + c.inputs.length + " inputs, " + c.rows.length + " rows" : ": not a chunk file, skipped"));
+    if (!c) continue; c.file = path.basename(f); if (!runs.has(c.run)) runs.set(c.run, []); runs.get(c.run).push(c);
+  }
+  ENGINE ||= loadEngine(null).E; const out = [];
+  for (const [id, cs] of [...runs.entries()].sort((a, b) => String(a[0]).localeCompare(String(b[0])))) {
+    cs.sort((a, b) => a.seq - b.seq); const chk = CHUNK.check(cs), r = { run: id, chunks: cs.length, rows: cs.reduce((n, c) => n + c.rows.length, 0), inputs: cs.reduce((n, c) => n + c.inputs.length, 0), status: "equal", note: "", diff: null };
+    if (!chk.startsAtZero) { r.status = "not checkable"; r.note = "its first chunk is missing (the first one here is " + chk.first + ")"; out.push(r); continue; }
+    let use = cs; if (chk.holes.length) { use = cs.filter(c => c.seq < chk.holes[0]); r.note = "chunk " + chk.holes.join(", ") + " missing: compared up to chunk " + (chk.holes[0] - 1); }
+    const ids = SYSTEMS_DEFAULT.map(d => SYSTEM.id(d)), want = use[0].runner && use[0].runner.ids;
+    if (use[0].runner && use[0].runner.on && JSON.stringify(want) !== JSON.stringify(ids)) { r.status = "not checkable"; r.note = "the systems in the run are not the ones in systems-default.js now"; out.push(r); continue; }
+    log("replaying run " + id + ": " + use.length + " chunks, " + use.reduce((n, c) => n + c.inputs.length, 0) + " inputs");
+    const rp = CHUNK.replay(use, { ENGINE, SYSTEM, RUNNER, SYSTEMS: SYSTEMS_DEFAULT });
+    for (let i = 0; i < rp.upto; i++) { const d = CHUNK.firstDiff(use[i].rows, rp.rows[i]); if (d) { r.status = "DIFFERENT"; r.diff = Object.assign({ chunk: use[i].seq, file: use[i].file }, d); break; } }
+    if (rp.upto < use.length) r.note += (r.note ? "; " : "") + "followed " + rp.upto + " of " + use.length + " chunks: settings moved inside chunk " + use[rp.upto - 1].seq;
+    r.rows = use.slice(0, rp.upto).reduce((n, c) => n + c.rows.length, 0); r.final = !!use[use.length - 1].final; out.push(r);
+  }
+  return out;
+}
+
 // ---------- cli ----------
 const args = process.argv.slice(2), arg = (k, d) => { const i = args.indexOf("--" + k); return i < 0 ? d : args[i + 1]; };
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   if (args.includes("--selftest")) selftest();
+  else if (args.includes("--replay-run")) {
+    const i = args.indexOf("--replay-run"), paths = []; for (let j = i + 1; j < args.length && !args[j].startsWith("--"); j++) paths.push(path.resolve(args[j]));
+    if (!paths.length) { console.error("--replay-run needs chunk files or a folder"); process.exit(2); }
+    const res = replayRuns(paths); let bad = 0;
+    for (const r of res) {
+      console.log("run " + r.run + ": " + r.chunks + " chunk" + (r.chunks === 1 ? "" : "s") + ", " + r.inputs + " inputs, " + r.rows + " journal rows: " + r.status + (r.note ? " (" + r.note + ")" : "") + (r.status === "equal" ? (r.final ? " [ended cleanly]" : " [no closing chunk: cut short or running]") : ""));
+      if (r.diff) { bad++; console.log("  first difference: chunk " + r.diff.chunk + " (" + r.diff.file + "), row " + r.diff.i + "\n    page:   " + r.diff.stored + "\n    replay: " + r.diff.replay); }
+    }
+    console.log(res.length + " run(s): " + res.filter(r => r.status === "equal").length + " equal, " + bad + " different, " + res.filter(r => r.status === "not checkable").length + " not checkable");
+    process.exit(bad ? 1 : 0);
+  }
   else if (args.includes("--run-defaults")) {
     const split = arg("split", "dev"); if (split !== "dev") { console.error("--run-defaults reads the dev split only (the hold-out and fresh data are never read here)"); process.exit(2); }
     const one = arg("file", null);      // --file one.json.gz: that one session only, whatever its split (a code-parity test of the page's runner against its own journal; read once, no results are used)

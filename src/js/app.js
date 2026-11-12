@@ -659,6 +659,7 @@ let lastFast = 0;
 // ---------- controls ----------
 $("go").onclick = () => {
   if (connected){
+    if (typeof rrDisconnect === "function") rrDisconnect();      // the run ends: the runner stops, the last chunk is closed (run-record.js)
     connected=false; bnDisconnect(); hlDisconnect(); clearInterval(clockTimer); rdStopHeartbeat();
     $("go").textContent="Connect"; $("go").classList.add("primary"); renderSlow(); return;
   }
@@ -669,6 +670,7 @@ $("go").onclick = () => {
   READER.reset(); rdLastBook.bn = rdLastBook.hl = 0;
   syncClock(); clockTimer = setInterval(syncClock, 60000);
   bnConnect(); hlConnect(); rdStartHeartbeat();
+  if (typeof rrConnected === "function") rrConnected();
   $("go").textContent="Disconnect"; $("go").classList.remove("primary");
 };
 $("route").onchange = () => scheduleReconnect("bn");
