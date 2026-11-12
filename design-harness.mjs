@@ -29,7 +29,7 @@ const SNAPDIR = path.join(HERE, ".scratch", "trade-system", "cache-snap"), OLDCA
 export const EXEC = { latencyMs: 1000, costBps: 8, maxGapMs: 30000, holdoutShare: 0.3 };
 export const SYSTEM = vm.runInNewContext(fs.readFileSync(path.join(HERE, "src/js/system-core.js"), "utf8") + "\n;SYSTEM", {});
 // the paper runner (Trader step 4) and the seven default systems: the same files the page includes, in one context with their own SYSTEM
-export const { RUNNER, SYSTEMS_DEFAULT } = vm.runInNewContext(["system-core", "systems-default", "runner-core"].map(f => fs.readFileSync(path.join(HERE, "src/js", f + ".js"), "utf8")).join("\n") + "\n;({ RUNNER, SYSTEMS_DEFAULT })", {});
+export const { RUNNER, SYSTEMS_DEFAULT, PROMO } = vm.runInNewContext(["system-core", "systems-default", "runner-core", "promotion-core"].map(f => fs.readFileSync(path.join(HERE, "src/js", f + ".js"), "utf8")).join("\n") + "\n;({ RUNNER, SYSTEMS_DEFAULT, PROMO })", {});
 
 // ---------- price helpers (history = [[t_ms, price]], one point a second) ----------
 export function priceAt(h, t, within = 2000) {
@@ -364,6 +364,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.log("system".padEnd(22) + "trades  days  net bps       R  pos days  vs twins  interrupted  by reason");
     for (const d of SYSTEMS_DEFAULT) { const e = ev[SYSTEM.id(d)] || { trades: 0, days: 0, byReason: {}, interrupted: 0 };
       console.log(d.name.padEnd(22) + String(e.trades).padStart(6) + String(e.days).padStart(6) + f(e.meanNetBps).padStart(9) + f(e.meanR, 3).padStart(8) + (e.posDayShare == null ? "-" : (100 * e.posDayShare).toFixed(0) + "%").padStart(10) + (e.twinPercentile == null ? "too few" : "p" + e.twinPercentile.toFixed(0)).padStart(10) + String(e.interrupted).padStart(13) + "  " + JSON.stringify(e.byReason)); }
+    // the standing against the promotion rule (Trader step 7), on the same journal: a test of the code only. Saved sessions never count toward a real promotion; only rows the page wrote live do.
+    console.log("\nPromotion rule (PROMO.eligibility) on the same journal. TEST OF THE CODE ONLY: these rows come from saved sessions, not from the page running live, so none of this counts toward a promotion.");
+    for (const d of SYSTEMS_DEFAULT) { const el = PROMO.eligibility(journal, [], SYSTEM.id(d), d.stage); console.log(d.name.padEnd(22) + (el.eligible ? "ELIGIBLE  " : "not eligible  ") + el.criteria.map(c => (c.met ? "[x] " : "[ ] ") + c.text).join(" | ")); }
     if (arg("journal", null)) fs.writeFileSync(arg("journal"), JSON.stringify(journal));
   }
   else {

@@ -3,7 +3,8 @@
 // and hands it to the facts accumulator (SYSTEM.facts), which hands it to the engine. The recording is exactly what the engine consumed.
 // A run: from an engine reset (connect, asset change, page load) to the next reset or the disconnect. A chunk: a cut of one run's stream, made when an input's OWN time is 30 minutes after the chunk's first
 // input, or at 600,000 inputs, never by a timer. A chunk file is a session file (kind "sv-session", `inputs` as always) plus: run, seq, final, runner (configuration, carry-over, on), engineCfg, lateMs, thinMs, rows
-// (the journal rows the page wrote during the chunk), changed (settings that moved during the chunk, which a replay cannot follow) and prevMissing.
+// (the journal rows the page wrote during the chunk), moves (step 7: the stage moves applied to the runner during the chunk, [{sys, to, at}] with `at` the snapshot time they took effect; they are user actions, so a replay is handed them),
+// changed (settings that moved during the chunk, which a replay cannot follow) and prevMissing. runner.stages (chunk 0) is {system id: stage} at the start of the run.
 const CHUNK = (() => {
   "use strict";
   const MAX_MS = 1800000, MAX_N = 600000, THIN_MS = 100, KIND = "sv-session", EMPTY = [];
@@ -23,13 +24,13 @@ const CHUNK = (() => {
   function pipeline(o) {
     const F = o.facts, maxMs = o.maxMs || MAX_MS, maxN = o.maxN || MAX_N, thin = thinner(o.thinMs == null ? THIN_MS : o.thinMs), cfgNow = o.cfgNow || (() => "");
     let run = null;
-    const startChunk = () => { run.rec = []; run.rows = []; run.t0 = null; run.t1 = null; run.changed = []; run.cfg0 = cfgNow(); };
+    const startChunk = () => { run.rec = []; run.rows = []; run.moves = []; run.t0 = null; run.t1 = null; run.changed = []; run.cfg0 = cfgNow(); };
     function emit(final, why) {
       const r = run; if (!r) return;
       if (cfgNow() !== r.cfg0 && !r.changed.includes("engine settings")) r.changed.push("engine settings");
-      if (r.rec.length || r.rows.length) {
+      if (r.rec.length || r.rows.length || r.moves.length) {
         const c = { kind: KIND, v: 1, sym: r.meta.sym, startedAt: r.t0 || r.meta.startedAt, run: r.meta.id, seq: r.seq, final: !!final, why: why || "cut", prevMissing: false, changed: r.changed.slice(),
-          runner: r.seq === 0 ? r.meta.runner : Object.assign({}, r.meta.runner, { carry: undefined }), engineCfg: r.meta.engineCfg, lateMs: r.meta.lateMs, thinMs: r.thinMs, t0: r.t0, t1: r.t1, rows: r.rows, inputs: r.rec };
+          runner: r.seq === 0 ? r.meta.runner : Object.assign({}, r.meta.runner, { carry: undefined, stages: undefined }), engineCfg: r.meta.engineCfg, lateMs: r.meta.lateMs, thinMs: r.thinMs, t0: r.t0, t1: r.t1, rows: r.rows, moves: r.moves, inputs: r.rec };
         r.seq++; startChunk(); o.onChunk(c);
       } else startChunk();
     }
@@ -53,6 +54,7 @@ const CHUNK = (() => {
       // final: the caller stopped its runner (its closing rows are already in addRows), so a replay stops its own runner too. why: "disconnect" | "reset" | "switch" | ...
       end(final, why) { if (run) { emit(final, why || "end"); run = null; } },
       addRows(rows) { if (run && rows.length) for (const r of rows) run.rows.push(r); },
+      addMoves(moves) { if (run && moves.length) for (const m of moves) run.moves.push(m); },      // [{sys, to, at}] from RUNNER.driver().drain()
       touch(what) { if (run && !run.changed.includes(what)) run.changed.push(what); },
       running: () => !!run, state: () => run ? { id: run.meta.id, seq: run.seq, n: run.rec.length, t0: run.t0, t1: run.t1, rows: run.rows.length } : null,
     };
@@ -62,12 +64,12 @@ const CHUNK = (() => {
   // Returns {rows: [rows per chunk], stoppedAt} ; a chunk marked `changed` ends what can be followed: the replay stops before it (upto = number of chunks followed).
   function replay(chunks, deps) {
     const c0 = chunks[0], rn = c0.runner || {}, E = deps.ENGINE.create(c0.engineCfg || undefined), F = deps.SYSTEM.facts({ engine: E, lateMs: c0.lateMs == null ? 1000 : c0.lateMs });
-    const drv = rn.on ? deps.RUNNER.driver(Object.assign({ systems: deps.SYSTEMS }, rn.cfg, { carry: rn.carry || [] })) : null;
+    const drv = rn.on ? deps.RUNNER.driver(Object.assign({ systems: deps.SYSTEMS }, rn.cfg, { carry: rn.carry || [], stages: rn.stages || {} })) : null;
     const out = []; let upto = 0;
     for (const c of chunks) {
       if (c.changed && c.changed.length && c !== c0) break;      // settings moved inside this chunk (or an earlier one): the replay cannot follow from here
-      const rows = [];
-      for (const r of c.inputs) { const snaps = F.feed(r); if (drv) for (const s of snaps) for (const x of drv.step(s)) rows.push(x); }
+      const rows = [], mv = (c.moves || []).slice().sort((a, b) => a.at - b.at); let mi = 0;      // a move is handed back just before the snapshot whose time it took effect at
+      for (const r of c.inputs) { const snaps = F.feed(r); if (drv) for (const s of snaps) { while (mi < mv.length && mv[mi].at <= s.t) drv.move(mv[mi++]); for (const x of drv.step(s)) rows.push(x); } }
       if (c.final && drv) for (const x of drv.stop()) rows.push(x);
       out.push(rows); upto++;
       if (c.changed && c.changed.length) break;
@@ -81,9 +83,11 @@ const CHUNK = (() => {
     return { first: seqs[0], last: seqs[seqs.length - 1], startsAtZero: seqs[0] === 0, holes };
   }
   // the first difference between the rows a chunk stored and the rows the replay made, as JSON; null when equal
+  // Rows a chunk stored before step 7 have no stage and fill on their enter and trade rows; they read as paper / paper (the page wrote paper fills under stage paper then), so an old chunk still replays equal.
+  const legacy = r => r && (r.k === "enter" || r.k === "trade") && r.stage === undefined && r.fill === undefined ? Object.assign({}, r, { stage: "paper", fill: "paper" }) : r;
   function firstDiff(stored, made) {
     const n = Math.max(stored.length, made.length);
-    for (let i = 0; i < n; i++) { const a = i < stored.length ? JSON.stringify(stored[i]) : undefined, b = i < made.length ? JSON.stringify(made[i]) : undefined; if (a !== b) return { i, stored: a, replay: b }; }
+    for (let i = 0; i < n; i++) { const a = i < stored.length ? JSON.stringify(legacy(stored[i])) : undefined, b = i < made.length ? JSON.stringify(made[i]) : undefined; if (a !== b) return { i, stored: a, replay: b }; }
     return null;
   }
   // chunk file name: session_<SYM>_<minute of the first input>_run<id>-c<seq>; it still matches the old session_*.json.gz pattern
@@ -156,17 +160,22 @@ const CHUNK = (() => {
       if (D) {
         const s = stream(900), cfg = { twins: 3, equity: 10000, feeBps: 5, riskCap: 0.02, seed: 1, gapMs: 30000 }, got = [];
         const { F } = mkFacts(), drv = RUNNER.driver(Object.assign({ systems: D, journal: [] }, cfg)), p = pipeline({ facts: F, maxMs: 300000, onChunk: c => got.push(c) });
-        p.reset(); p.begin({ id: "r2", sym: "BTC", startedAt: T0, runner: { on: true, cfg, ids: D.map(d => SYSTEM.id(d)), carry: drv.carry }, engineCfg: null, lateMs: 1000 });
-        const live = []; for (const r of s) for (const sn of apply(p, r)) { const rows = drv.step(sn); p.addRows(rows); for (const x of rows) live.push(x); }
+        p.reset(); p.begin({ id: "r2", sym: "BTC", startedAt: T0, runner: { on: true, cfg, ids: D.map(d => SYSTEM.id(d)), carry: drv.carry, stages: drv.stages() }, engineCfg: null, lateMs: 1000 });
+        const live = []; let moved = 0; for (const r of s) for (const sn of apply(p, r)) { if (!moved && sn.t >= T0 + 400000) { moved = 1; for (const d of D.slice(0, 3)) drv.move({ sys: SYSTEM.id(d), to: "demo" }); }      // the user moves three systems to demo 400 s in
+          const rows = drv.step(sn); p.addRows(rows); p.addMoves(drv.drain()); for (const x of rows) live.push(x); }
         { const rows = drv.stop(); p.addRows(rows); for (const x of rows) live.push(x); } p.end(true, "disconnect");
         const stored = JSON.parse(JSON.stringify(got)), rp = replay(stored, { ENGINE: READER_ENGINE, SYSTEM, RUNNER, SYSTEMS: D });
         const flat = [].concat(...rp.rows), eq = JSON.stringify(flat) === JSON.stringify(live) && stored.every((c, i) => !CHUNK.firstDiff(c.rows, rp.rows[i]));
         ok("a simulated run recorded in three chunks and replayed (through JSON) gives the same journal as the run itself, chunk by chunk", got.length === 3 && eq && live.length > 0, got.length + " chunks, " + live.length + " live rows, " + flat.length + " replay rows " + JSON.stringify(CHUNK.firstDiff(live, flat)));
+        { const mvs = [].concat(...stored.map(c => c.moves || [])), after = live.filter(x => x.k === "enter" && x.t >= T0 + 400000 && D.slice(0, 3).some(d => SYSTEM.id(d) === x.sys)), noMoves = replay(stored.map(c => Object.assign({}, c, { moves: [] })), { ENGINE: READER_ENGINE, SYSTEM, RUNNER, SYSTEMS: D });
+          ok("stage moves: recorded in the chunk where they took effect (three, one snapshot time), the replay handed them gives the same journal with the stages in it, and without them it does not", mvs.length === 3 && new Set(mvs.map(m => m.at)).size === 1 && mvs.every(m => m.to === "demo") && after.length > 0 && after.every(x => x.stage === "demo") && eq && JSON.stringify([].concat(...noMoves.rows)) !== JSON.stringify(live), mvs.length + " moves, " + after.length + " entries after"); }
         ok("a chunk carries the run, its number, the rows of its own stretch and the runner's configuration", got.every((c, i) => c.run === "r2" && c.seq === i && Array.isArray(c.rows)) && got[0].runner.on === true && got[0].runner.carry && got[1].runner.carry === undefined && got.reduce((a, c) => a + c.rows.length, 0) === live.length);
       } else ok("a simulated run recorded in three chunks (needs the default systems)", false, "SYSTEMS_DEFAULT missing"); }
     // ----- holes and checks
     { const c = (seq) => ({ seq }); const k = check([c(0), c(1), c(3), c(4)]), z = check([c(2), c(3)]); ok("check: a hole is named, and a run whose first chunk is missing is not startsAtZero", k.holes.join() === "2" && k.startsAtZero && !z.startsAtZero && z.first === 2); }
     { const d = firstDiff([{ a: 1 }, { a: 2 }], [{ a: 1 }, { a: 3 }]), e = firstDiff([{ a: 1 }], [{ a: 1 }, { a: 2 }]); ok("firstDiff: the first differing row with both versions, a missing row too, null when equal", d.i === 1 && d.stored === '{"a":2}' && d.replay === '{"a":3}' && e.i === 1 && e.stored === undefined && firstDiff([{ a: 1 }], [{ a: 1 }]) === null); }
+    { const old = [{ k: "enter", sys: "A", px: 1 }, { k: "trade", sys: "A", usd: 2, thesis: "x" }, { k: "skip", sys: "A" }], neu = [{ k: "enter", sys: "A", px: 1, stage: "paper", fill: "paper" }, { k: "trade", sys: "A", usd: 2, thesis: "x", stage: "paper", fill: "paper" }, { k: "skip", sys: "A" }];
+      ok("firstDiff: a chunk stored before step 7 (no stage, fill) equals the same rows read as paper / paper; a different stage is a difference", firstDiff(old, neu) === null && firstDiff(old, neu.map((r, i) => i === 1 ? Object.assign({}, r, { stage: "demo" }) : r)).i === 1 && firstDiff(neu, old) !== null); }
     { const name = fileName({ sym: "BTC", startedAt: Date.UTC(2026, 10, 11, 15, 30), run: "20261111153000", seq: 3 }, true); ok("file names keep the session_*.json.gz shape, with run and chunk number", /^session_BTC_202611111530_run20261111153000-c003\.json\.gz$/.test(name), name); }
     // ----- a settings change during a chunk is noted, and the replay does not follow past it
     { const { F } = mkFacts(), got = []; let cfg = "a"; const p = pipeline({ facts: F, maxMs: 1e9, cfgNow: () => cfg, onChunk: c => got.push(c) }); p.reset(); p.begin({ id: "r3", sym: "BTC", startedAt: T0, runner: { on: false }, engineCfg: null, lateMs: 1000 });

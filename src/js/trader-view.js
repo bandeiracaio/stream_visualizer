@@ -2,7 +2,7 @@
 // Trader home (Trader step 5a, page side, thin): draws what trader-core.js (TRADER) works out, in the first view ("overview", shown as "Trader"): the status line, one card per system with its seven parts,
 // the detail of the selected system, the price chart with the trades and skipped triggers, and the journal. Display only: it reads the runner (runner.js) and the engine's price history and changes nothing in them.
 // Cheap: the view model is rebuilt at most twice a second and only while the view is open (VIEWS.tick calls renderTrader only then); the chart redraws only when its data changed.
-const TV = {sel: store.get("trSel", null), win: +store.get("trWin", 30) || 30, at: 0, evLen: -1, evAt: 0, ev: {}, tw: {}, drawKey: "", hits: [], jSys: store.get("trJSys", ""), jHtml: "", rowsHtml: "", detHtml: "", tipDefault: "Hover or tap a mark for its reason. Triangles are entries (up long, down short), squares are exits with their reason, diamonds are invalidations, ticks along the bottom are skipped triggers."};
+const TV = {el: {}, elLog: -1, elRows: -1, promoHtml: "", conf: null, sel: store.get("trSel", null), win: +store.get("trWin", 30) || 30, at: 0, evLen: -1, evAt: 0, ev: {}, tw: {}, drawKey: "", hits: [], jSys: store.get("trJSys", ""), jHtml: "", rowsHtml: "", detHtml: "", tipDefault: "Hover or tap a mark for its reason. Triangles are entries (up long, down short), squares are exits with their reason, diamonds are invalidations, ticks along the bottom are skipped triggers."};
 const TV_SYS = SYSTEMS_DEFAULT.map(d => ({d, id: SYSTEM.id(d)})), TV_NAMES = Object.fromEntries(TV_SYS.map(x => [x.id, x.d.name]));
 const tv$ = id => document.getElementById(id);
 const tvEsc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -16,6 +16,16 @@ tv$("trWin").value = String(TV.win);
 function tvEval(rows){
   const now = performance.now();
   if (rows.length < TV.evLen || (rows.length !== TV.evLen && now - TV.evAt > 2000)){ TV.ev = RUNNER.evaluate(rows); TV.tw = TRADER.twinMeans(rows); TV.evLen = rows.length; TV.evAt = now; }
+  // the standing against the promotion rule, from the same rows (recomputed when they changed as far as the figures above did, or when a move was made)
+  if (TV.elLog !== TRN.stageLog.length || TV.elRows !== TV.evLen){ TV.el = {}; for (const x of TV_SYS) TV.el[x.id] = PROMO.eligibility(rows, TRN.stageLog, x.id, x.d.stage); TV.elLog = TRN.stageLog.length; TV.elRows = TV.evLen; }
+}
+const tvStageLabel = s => s === "paper" ? "paper" : s + " (paper fills)";      // demo and live execution are steps 8 and 9: until then a system in either stage still fills on paper, and the badge says so
+const tvTouchOnly = () => { try{ return !window.matchMedia("(any-pointer: fine)").matches; }catch{ return false; } };      // no mouse or trackpad on this device: demo and live need the PC (spec section 9, decision 4)
+function tvProg(el, stage){
+  if (!el || el.stage !== stage) return "";
+  if (stage === "paper") return el.eligible ? "eligible for demo" : `${el.criteria[0].now} / ${el.criteria[0].need} trades, day ${el.criteria[1].now} / ${el.criteria[1].need}`;
+  if (stage === "demo") return el.waiting || (el.eligible ? "eligible for live" : `${el.criteria[0].now} / ${el.criteria[0].need} demo trades, day ${el.criteria[1].now} / ${el.criteria[1].need}`);
+  return "";
 }
 function tvTime(t, full){
   const d = new Date(t), p = n => String(n).padStart(2, "0"), hm = p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds());
@@ -31,15 +41,15 @@ function tvTwinSvg(c){
   const label = `${tw.length} twin${tw.length === 1 ? "" : "s"} with ${TRADER.MIN_TRADES} trades: mean R from ${TRADER.fx(Math.min(...tw), 3)} to ${TRADER.fx(Math.max(...tw), 3)}` + (c.system != null ? `; the system ${TRADER.fx(c.system, 3)}` : "");
   return `<svg class="twsvg" viewBox="0 0 200 24" role="img" aria-label="${tvEsc(label)}"><title>${tvEsc(label)}</title><line class="twb" x1="2" x2="198" y1="12.5" y2="12.5"/><line class="tw0" x1="${X(0)}" x2="${X(0)}" y1="3" y2="22"/>${ticks}${mk}</svg><span class="twcap">ticks: its ${tw.length} twins' mean R${c.system != null ? " · ▼ the system" : ""} · dashed: zero</span>`;
 }
-function tvCellHtml(c){
+function tvCellHtml(c, prog){
   let body;
   if (c.key === "evaluation" && c.ready) body = `${c.trades} trades · ${c.days} day${c.days === 1 ? "" : "s"} · mean <span class="${c.cls}">${TRADER.fx(c.meanNetBps, 2)} bps</span> · mean R <span class="${c.cls}">${TRADER.fx(c.meanR, 3)}</span> · ${tvEsc(c.place)}`;
   else body = tvEsc(c.text);
-  return `<div class="trcell st-${c.st}" data-k="${c.key}"><span class="trlab">${c.label}</span><span class="trbody"><b class="sg">${TV_GLYPH[c.st]} ${TV_WORD[c.st]}</b> ${body}${c.key === "evaluation" ? tvTwinSvg(c) : ""}</span></div>`;
+  return `<div class="trcell st-${c.st}" data-k="${c.key}"><span class="trlab">${c.label}</span><span class="trbody"><b class="sg">${TV_GLYPH[c.st]} ${TV_WORD[c.st]}</b> ${body}${c.key === "evaluation" ? tvTwinSvg(c) + (prog ? `<span class="trprog">${tvEsc(prog)}</span>` : "") : ""}</span></div>`;
 }
 function tvSystemHtml(x, st, cells){
-  const sel = TV.sel === x.id, o = st && st.open, pos = o ? (o.exiting ? "closing" : (o.dir > 0 ? "long" : "short") + " @ " + TRADER.pxs(o.px)) : "flat";
-  return `<article class="trsys${sel ? " sel" : ""}" data-sys="${x.id}"><div class="trhead"><button class="trname" data-sys="${x.id}" aria-pressed="${sel}" title="Show this system on the chart and its detail">${tvEsc(x.d.name)}</button><span class="trbadge" title="stage">${tvEsc(x.d.stage)}</span><span class="trpos">${pos}</span></div><div class="trcells">${cells.map(tvCellHtml).join("")}</div></article>`;
+  const sel = TV.sel === x.id, stage = trStage(x.id), prog = tvProg(TV.el[x.id], stage), o = st && st.open, pos = o ? (o.exiting ? "closing" : (o.dir > 0 ? "long" : "short") + " @ " + TRADER.pxs(o.px)) : "flat";
+  return `<article class="trsys${sel ? " sel" : ""}" data-sys="${x.id}"><div class="trhead"><button class="trname" data-sys="${x.id}" aria-pressed="${sel}" title="Show this system on the chart and its detail">${tvEsc(x.d.name)}</button><span class="trbadge" title="stage">${tvEsc(tvStageLabel(stage))}</span><span class="trpos">${pos}</span></div><div class="trcells">${cells.map(c => tvCellHtml(c, prog)).join("")}</div></article>`;
 }
 
 // ----- the detail of the selected system
@@ -56,11 +66,62 @@ function tvDetailHtml(x, ev, rows){
   const chips = reasons.map(k => `<span>${tvEsc(k)} ${by[k]}</span>`).join("") + (e && e.interrupted ? `<span>interrupted ${e.interrupted} (not counted)</span>` : "");
   const sk = TRADER.skipSummary(rows, x.id), now = nowEx();
   return `<h3><span>${tvEsc(x.d.name)}: detail</span><button data-close="1" aria-label="Close the detail">✕</button></h3>`
-    + `<dl class="trdl">${d.lines.map(l => `<dt>${l[0]}</dt><dd>${tvEsc(l[1])}</dd>`).join("")}<dt>Venue</dt><dd>${tvEsc(d.venue)}, stage ${tvEsc(d.stage)}</dd></dl>`
+    + `<dl class="trdl">${d.lines.map(l => `<dt>${l[0]}</dt><dd>${tvEsc(l[1])}</dd>`).join("")}<dt>Venue</dt><dd>${tvEsc(d.venue)}, stage ${tvEsc(tvStageLabel(trStage(x.id)))}</dd></dl>`
     + `<div class="note" style="margin-top:0">Closed trades by how they ended (an invalidation is counted apart from a stop)</div><div class="trchips">${chips || "<span>no closed trades yet</span>"}</div>`
     + `<div class="note" style="margin-top:0">Net result per day (bps, UTC day of the entry)${e && e.trades < TRADER.MIN_TRADES ? ": no colour until 20 trades" : ""}</div>${tvBars(TRADER.dayBars(rows, x.id), !!(e && e.trades >= TRADER.MIN_TRADES))}`
     + `<div class="note" style="margin-top:0">Skipped triggers, latest first</div>` + (sk.length ? `<table class="tt"><tr><th>reason</th><th>count</th><th>last</th><th>what it means</th></tr>${sk.map(s => `<tr><td>${tvEsc(s.reason)}</td><td>${s.n}</td><td>${TRADER.dur((now - s.last) / 1000)} ago</td><td style="white-space:normal">${tvEsc(s.words)}</td></tr>`).join("")}</table>` : `<div class="note">No trigger has been skipped yet.</div>`);
 }
+
+// ----- promotion (step 7): the rule's checklist, the buttons, the stage log, and the confirmation panel (promotion-core.js decides; here it is only shown and a move is asked for)
+const TV_LUCK = "With seven systems looked at every day, the chance that at least one of them passes criterion 4 (ahead of its twins) by luck alone is about 30%; the other criteria and the demo stage are there for that reason.";
+const TV_TOUCH_WHY = "Promotion to demo and live is done on a PC: a phone can sleep or lose its connection while real orders rest on the exchange. Moving a system down works here.";
+function tvChecklist(el){
+  return `<ul class="trck">${el.criteria.map(c => `<li class="${c.met ? "met" : "no"}"><span class="mk" aria-hidden="true">${c.met ? "✓" : "✗"}</span><span>${tvEsc(c.text)}<span class="sr"> (${c.met ? "met" : "not met"})</span></span></li>`).join("")}</ul>`;
+}
+function tvLogHtml(id){
+  const log = TRN.stageLog.filter(e => e.sys === id).slice().reverse();
+  if (!log.length) return `<div class="note" style="margin-top:0">Stage log: no move yet, the system is at its starting stage (paper).</div>`;
+  return `<div class="note" style="margin-top:0">Stage log (newest first)</div><div style="overflow-x:auto"><table class="tt"><tr><th>time</th><th>move</th><th>by</th><th>why</th></tr>${log.map(e => `<tr><td>${tvTime(e.t, true)}</td><td>${tvEsc(e.from)} → ${tvEsc(e.to)}</td><td>${tvEsc(e.by)}</td><td style="white-space:normal">${tvEsc(e.reason || (e.by === "user" && e.to === "paper" ? "moved down by hand" : e.by === "user" ? "all criteria met, promoted by hand" : ""))}${e.cap != null ? " · cap $" + tvEsc(e.cap) : ""}</td></tr>`).join("")}</table></div>`;
+}
+function tvPromoHtml(x, el){
+  const stage = trStage(x.id), touch = tvTouchOnly();
+  let h = `<h3>Promotion: ${tvEsc(x.d.name)} · stage ${tvEsc(tvStageLabel(stage))}</h3>`;
+  if (stage === "live") h += `<div class="note" style="margin-top:0">Live (paper fills until step 9): nothing further to promote to. It returns to paper by itself if it loses 3 times its risk per trade, or its cap, in one UTC day.</div>`;
+  else if (el){
+    h += `<div class="note" style="margin-top:0">${stage === "paper" ? "Paper to demo" : "Demo to live"}: all of these, counted on ${stage === "paper" ? "paper-filled" : "demo-filled"} trades made live by this page ${el.since != null ? "since " + tvTime(el.since, true) + " (the last move into " + stage + ")" : "since the journal began"}; interrupted positions never count.</div>`
+      + tvChecklist(el) + `<div class="trstat${el.eligible ? " el" : ""}">${el.waiting ? tvEsc(el.waiting) : el.eligible ? "eligible" : "not eligible"}</div>`;
+    if (stage === "demo") h += `<div class="note" style="margin-top:0">Demo execution is built in step 8: until then this system's demo stage keeps filling on paper and nothing is sent to any exchange.</div>`;
+  }
+  const canUp = stage !== "live" && el && el.eligible && !touch, why = stage === "live" ? "" : touch ? TV_TOUCH_WHY : !el || !el.eligible ? "Not eligible: the checklist shows what is still missing." : "";
+  h += `<div class="trbtns">` + (stage === "live" ? "" : `<button class="primary" data-act="promote" ${canUp ? "" : "disabled"}>Promote to ${tvEsc(el ? el.next : "demo")}</button>`) + (stage !== "paper" ? `<button data-act="down">Move to paper</button>` : "") + `</div>`
+    + (why ? `<div class="note trwhy" style="margin-top:0">${tvEsc(why)}</div>` : "")
+    + tvLogHtml(x.id) + `<div class="note">${tvEsc(TV_LUCK)}</div>`;
+  return h;
+}
+const tvToday = {demo: "Demo: from the next second this system's new trades are marked stage demo. Demo execution does not exist yet (step 8), so it keeps filling on paper and nothing is sent to any exchange. The count for demo to live starts now and needs demo-filled trades.",
+  live: "Live: from the next second this system's new trades are marked stage live. Live execution does not exist yet (step 9), so it keeps filling on paper and nothing is sent to any exchange. It returns to paper by itself if it loses 3 times its risk per trade, or the cap, in one UTC day.",
+  paper: "Paper: the count for the next promotion starts again from now; the trades so far stay in the journal but no longer count. A position open at this moment finishes under the stage it was entered in. The move takes effect at the next snapshot."};
+function tvCloseConfirm(){ TV.conf = null; const c = tv$("trConfirm"); c.hidden = true; c.innerHTML = ""; }
+function tvOpenConfirm(kind){
+  const x = TV_SYS.find(q => q.id === TV.sel), el = x && TV.el[x.id]; if (!x || !el) return;
+  const stage = trStage(x.id), to = kind === "down" ? "paper" : el.next; if (!to || (kind !== "down" && (!el.eligible || tvTouchOnly()))) return;
+  TV.conf = {sys: x.id, to, from: stage};
+  tv$("trConfirm").innerHTML = `<h3>${kind === "down" ? "Move" : "Promote"} ${tvEsc(x.d.name)} ${kind === "down" ? "to" : "from " + tvEsc(stage) + " to"} ${tvEsc(to)}?</h3>`
+    + (kind === "down" ? `<div class="note" style="margin-top:0">Its figures now (they are copied into the stage log):</div>` : `<div class="note" style="margin-top:0">The figures behind this promotion (they are copied into the stage log):</div>`) + tvChecklist(el)
+    + `<div class="note">${tvEsc(tvToday[to])}</div>`
+    + (to === "live" ? `<div class="capln"><label for="trCap">Dollar cap for this system</label><input id="trCap" type="number" min="1" step="any" inputmode="decimal" placeholder="e.g. 200"></div>` : "")
+    + `<div class="err" id="trConfErr" role="alert"></div><div class="trbtns"><button class="primary" data-act="confirm">${kind === "down" ? "Move to paper" : "Promote to " + tvEsc(to)}</button><button data-act="cancel">Cancel</button></div>`;
+  tv$("trConfirm").hidden = false; const f = tv$("trCap") || tv$("trConfirm").querySelector('[data-act="cancel"]'); if (f) f.focus();
+}
+function tvConfirm(){
+  const c = TV.conf; if (!c) return;
+  const cap = c.to === "live" ? parseFloat(tv$("trCap").value) : undefined, r = trMove({sys: c.sys, to: c.to, by: "user", cap});
+  if (!r.ok){ tv$("trConfErr").textContent = "Not done: " + r.reason; return; }
+  tvCloseConfirm(); TV.elLog = -1; renderTrader(true);
+}
+tv$("trPromo").addEventListener("click", e => { const b = e.target.closest("button[data-act]"); if (!b || b.disabled) return; tvOpenConfirm(b.dataset.act === "down" ? "down" : "up"); });
+tv$("trConfirm").addEventListener("click", e => { const b = e.target.closest("button[data-act]"); if (!b) return; if (b.dataset.act === "confirm") tvConfirm(); else tvCloseConfirm(); });
+tv$("trConfirm").addEventListener("keydown", e => { if (e.key === "Escape") tvCloseConfirm(); else if (e.key === "Enter" && e.target.id === "trCap") tvConfirm(); });
 
 // ----- the journal
 function tvJournalHtml(rows){
@@ -179,6 +240,11 @@ function renderTrader(force){
     const det = tv$("trDetail"), x = TV.sel ? TV_SYS.find(q => q.id === TV.sel) : null;
     if (!x){ det.hidden = true; TV.detHtml = ""; }
     else { const dh = tvDetailHtml(x, TV.ev, rows); if (dh !== TV.detHtml){ TV.detHtml = dh; det.innerHTML = dh; } det.hidden = false; }
+    // the Promotion block of the selected system (its own element: the confirmation panel below it keeps what was typed while this redraws)
+    const pr = tv$("trPromo");
+    if (!x){ pr.hidden = true; TV.promoHtml = ""; }
+    else { const ph = tvPromoHtml(x, TV.el[x.id]); if (ph !== TV.promoHtml){ TV.promoHtml = ph; pr.innerHTML = ph; } pr.hidden = false; }
+    if (TV.conf && (!x || x.id !== TV.conf.sys || trStage(TV.conf.sys) !== TV.conf.from)) tvCloseConfirm();      // another system chosen, or the stage moved underneath (an automatic move): the question no longer applies
     // the chart: redraws only when its data changed
     tv$("trChartFor").textContent = x ? x.d.name : "all seven systems";
     const m = tvChartData(rows, st), cv = tv$("trChart"), p = m.pos, key = [TV.sel, TV.win, m.t1, rows.length, cv.clientWidth, cv.clientHeight, p ? p.entryPx + ":" + p.stopPx + ":" + p.targetPx : "", TH.canvas].join("|");
@@ -192,7 +258,7 @@ function renderTrader(force){
 }
 
 // ----- controls
-function tvSelect(id){ TV.sel = id; store.set("trSel", id); TV.drawKey = ""; renderTrader(true); }
+function tvSelect(id){ if (id !== TV.sel) tvCloseConfirm(); TV.sel = id; store.set("trSel", id); TV.drawKey = ""; renderTrader(true); }
 tv$("trRows").addEventListener("click", e => { const a = e.target.closest(".trsys"); if (!a) return; tvSelect(a.dataset.sys === TV.sel ? null : a.dataset.sys); });
 tv$("trDetail").addEventListener("click", e => { if (e.target.closest("[data-close]")) tvSelect(null); });
 tv$("trWin").onchange = () => { TV.win = +tv$("trWin").value; store.set("trWin", TV.win); TV.drawKey = ""; renderTrader(true); };
@@ -200,5 +266,5 @@ tv$("trJSys").onchange = () => { TV.jSys = tv$("trJSys").value; store.set("trJSy
 tv$("trJSkips").onchange = () => renderTrader(true);
 tv$("trOn").onchange = () => { trSetOn(tv$("trOn").checked); renderTrader(true); };
 tv$("trExport").onclick = trExportJournal;
-tv$("trReset").onclick = async () => { if (await trResetJournal()){ TV.evLen = -1; renderTrader(true); } };
+tv$("trReset").onclick = async () => { if (await trResetJournal()){ TV.evLen = -1; TV.elLog = -1; TV.evAt = 0; tvCloseConfirm(); renderTrader(true); } };
 VIEWS.onOpen("overview", () => { TV.drawKey = ""; renderTrader(true); });

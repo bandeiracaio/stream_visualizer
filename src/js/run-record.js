@@ -20,7 +20,7 @@ function rrBegin() {
   if (!RR.on) { RR.id = null; rrRender(); return; }
   RR.id = rrStamp(new Date(now)); RR.sym = sym; RR.seqSaved = -1; RR.prevFailed = false;
   PIPE.begin({id: RR.id, sym: rt$("sym").value.trim().toUpperCase(), startedAt: now, lateMs: TF_LATE, engineCfg: (() => { try { return rtCfg(); } catch { return null; } })(),
-    runner: {on: runner, cfg: TR_CFG, ids: SYSTEMS_DEFAULT.map(d => SYSTEM.id(d)), carry: TRN.driver ? TRN.driver.carry : []}});
+    runner: {on: runner, cfg: TR_CFG, ids: SYSTEMS_DEFAULT.map(d => SYSTEM.id(d)), carry: TRN.driver ? TRN.driver.carry : [], stages: TRN.driver ? TRN.driver.stages() : {}}});
   store.set("rr.last", {id: RR.id, seq: -1, final: false, at: now, cut: false}); rrRender();
 }
 function rrDisconnect() { rrEnd(true, "disconnect"); store.set("rr.was", false); rrRelease(); setTimeout(() => { if (typeof colRelay === "function") colRelay(); }, 0); }      // called by the Connect button before it disconnects

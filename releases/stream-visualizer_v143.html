@@ -271,6 +271,21 @@ td.up{color:var(--buy)}td.dn{color:var(--sell)}
 .trchips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}.trchips span{border:1px solid var(--edge);border-radius:var(--r);padding:1px 7px;font-size:11.5px}
 .trbars{display:block;width:100%;max-width:640px;height:auto;margin-bottom:8px}.trbars text{fill:var(--text);font:10px var(--mono)}.trbars .dimt{fill:var(--dim)}.trbars line{stroke:var(--edge)}
 .trbars .bp{fill:var(--buy)}.trbars .bn{fill:var(--sell)}.trbars .b0{fill:var(--dim)}
+/* Promotion block (step 7): the rule's checklist, the buttons, the stage log; the confirmation is a panel, never a browser dialog */
+#trPromo{margin-top:8px;border-top:1px solid var(--line);padding-top:8px}
+#trPromo h3,#trConfirm h3{font-size:12px;margin:0 0 6px;color:var(--accent)}
+.trck{list-style:none;margin:0 0 6px;padding:0}.trck li{display:grid;grid-template-columns:20px minmax(0,1fr);gap:4px;padding:1px 0}
+.trck .mk{font-weight:700;color:var(--text)}.trck .met .mk{color:var(--buy)}
+.trck .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.trstat{font-weight:700;margin:2px 0 6px}.trstat.el{color:var(--buy)}
+.trbtns{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 4px}
+#trPromo button:disabled,#trConfirm button:disabled{opacity:.75}
+.trwhy{margin:0 0 8px}
+.trprog{display:block;color:var(--dim);font-size:11px;margin-top:2px}
+#trConfirm{margin-top:8px;background:var(--panel2);border:1px solid var(--accent);border-radius:var(--r);padding:8px}
+#trConfirm[hidden]{display:none}
+#trConfirm .capln{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:6px 0}#trConfirm input[type=number]{width:120px}
+#trConfirm .err{color:var(--sell);font-weight:600;margin:4px 0}
 canvas.trchart{width:100%;height:280px;display:block;background:var(--canvas);border-radius:var(--r);touch-action:pan-y}
 @media(max-width:700px){canvas.trchart{height:230px}.jx{display:none}.trdl{grid-template-columns:76px minmax(0,1fr)}}
 .trj{width:100%}.trj td,.trj th{white-space:nowrap}.trj td.rs{white-space:normal}
@@ -367,6 +382,8 @@ canvas.trchart{width:100%;height:280px;display:block;background:var(--canvas);bo
     <div id="trStat" class="note" style="margin-top:0"></div>
     <div id="trRows"></div>
     <div id="trDetail" hidden></div>
+    <div id="trPromo" hidden></div>
+    <div id="trConfirm" role="dialog" aria-label="Confirm a stage move" hidden></div>
   </section>
 
   <section data-tab="overview" class="full">
@@ -1713,8 +1730,10 @@ const SYSTEMS_DEFAULT = [
 // Fills: an entry or exit is filled at the far side of the Binance quote in the snapshot (buy at the ask, sell at the bid), whatever venue the trigger reads. No quote, or one older than the core's staleMs: the entry
 // is cancelled (a skip row "no quote"); an exit waits for the next quote. Each fill pays feeBps of its notional.
 // Journal rows (all carry sys = the system id and t = snapshot time):
-//   {k:"enter", pid, dir, px, qty, notional, stopBps, thesis, trigger, tSig}    {k:"exit"|"invalidate", pid, reason, why?}    {k:"skip", reason}
-//   {k:"trade", pid, tIn, tOut, dir, qty, notional, entryPx, exitPx, grossBps, feesBps, netBps, R, usd, stopBps, reason, thesis}   a closed trade; reason "interrupted" = open when the page closed (no figures)
+//   {k:"enter", pid, dir, px, qty, notional, stopBps, thesis, trigger, tSig, stage, fill}    {k:"exit"|"invalidate", pid, reason, why?}    {k:"skip", reason}
+//   {k:"trade", pid, tIn, tOut, dir, qty, notional, entryPx, exitPx, grossBps, feesBps, netBps, R, usd, stopBps, reason, thesis, stage, fill}   a closed trade; reason "interrupted" = open when the page closed (no figures)
+//   stage = the system's stage (paper / demo / live) when the trade was ENTERED, fill = where it was filled (always "paper" until step 8); rows written before step 7 have neither and read as paper / paper (promotion-core.js).
+//   A system's stage comes from o.stages ({system id: stage}, read from the stage log by the page), else from its definition; a move (move()) takes effect at the next snapshot, an open position finishes under the stage it was entered in.
 //   {k:"twin", n, tIn, netBps, R, usd, reason}                                                                              a closed twin trade (twins write nothing else)
 const RUNNER = (() => {
   "use strict";
@@ -1725,7 +1744,7 @@ const RUNNER = (() => {
   // equity: the start plus the closed results of the rows already in the journal
   function create(o) {
     const defs = o.systems, N = o.twins == null ? 20 : o.twins, eq0 = o.equity == null ? 10000 : o.equity, fee = o.feeBps == null ? 5 : o.feeBps, cap = o.riskCap == null ? 0.02 : o.riskCap, seed = o.seed == null ? 1 : o.seed;
-    const staleMs = SYSTEM.OPTIONS.staleMs, rows = (o.journal || []).slice(), fresh = [];
+    const staleMs = SYSTEM.OPTIONS.staleMs, rows = (o.journal || []).slice(), fresh = [], stagesIn = o.stages || {};
     // what the journal already says: results per system and per twin, and the positions that were open when it ended
     const usd = new Map(), openPos = new Map(), closedPid = new Set();
     for (const r of rows) {
@@ -1734,11 +1753,11 @@ const RUNNER = (() => {
       else if (r.k === "enter") openPos.set(r.pid, r);
     }
     // a position open when the page closed cannot be filled honestly: it is closed as interrupted and left out of every figure
-    for (const [pid, e] of openPos) if (!closedPid.has(pid)) { const r = { k: "trade", sys: e.sys, t: e.t, pid, tIn: e.t, tOut: null, dir: e.dir, entryPx: e.px, reason: "interrupted", interrupted: true, thesis: e.thesis }; rows.push(r); fresh.push(r); }
+    for (const [pid, e] of openPos) if (!closedPid.has(pid)) { const r = { k: "trade", sys: e.sys, t: e.t, pid, tIn: e.t, tOut: null, dir: e.dir, entryPx: e.px, reason: "interrupted", interrupted: true, thesis: e.thesis, stage: e.stage || "paper", fill: e.fill || "paper" }; rows.push(r); fresh.push(r); }
 
     const S = defs.map(def => {
       const inst = SYSTEM.create(def), id = inst.id;
-      return { def, id, inst, led: { eq: eq0 + (usd.get(id) || 0), pos: null, pend: null }, trig: 0, secs: 0, t0: null,
+      return { def, id, inst, stage: stagesIn[id] || def.stage, led: { eq: eq0 + (usd.get(id) || 0), pos: null, pend: null }, trig: 0, secs: 0, t0: null,
         twins: Array.from({ length: N }, (_, n) => ({ n, inst: SYSTEM.create(def, { forced: true }), led: { eq: eq0 + (usd.get(id + "#" + n) || 0), pos: null, pend: null }, rng: null, forced: 0 })) };
     });
     if (new Set(S.map(s => s.id)).size !== S.length) throw new Error("two systems have the same id");
@@ -1751,7 +1770,7 @@ const RUNNER = (() => {
       const netBps = usdNet / p.notional * 1e4, feesBps = (p.feeIn + feeOut) / p.notional * 1e4, R = netBps / p.stopBps;
       L.eq += usdNet; L.pos = null; const reason = L.pend; L.pend = null;
       const row = isTwin ? { k: "twin", sys: s.id, t: snap.t, n: e.n, tIn: p.tIn, netBps, R, usd: usdNet, reason }
-        : { k: "trade", sys: s.id, t: snap.t, pid: p.pid, tIn: p.tIn, tOut: snap.t, dir: p.dir, qty: p.qty, notional: p.notional, entryPx: p.px, exitPx: px, grossBps, feesBps, netBps, R, usd: usdNet, stopBps: p.stopBps, reason, thesis: p.thesis };
+        : { k: "trade", sys: s.id, t: snap.t, pid: p.pid, tIn: p.tIn, tOut: snap.t, dir: p.dir, qty: p.qty, notional: p.notional, entryPx: p.px, exitPx: px, grossBps, feesBps, netBps, R, usd: usdNet, stopBps: p.stopBps, reason, thesis: p.thesis, stage: p.stage, fill: p.fill };
       out.push(row);
     }
     // the open risk of the systems (not the twins)
@@ -1769,9 +1788,9 @@ const RUNNER = (() => {
           const px = it.dir > 0 ? q.ask : q.bid, sz = SYSTEM.size(L.eq, rf, it.stopBps, px);
           if (!(sz.qty > 0)) { refuse("no size"); continue; }
           if (e.inst.filled(px, snap.t).length) { if (!isTwin) out.push({ k: "skip", sys: s.id, t: snap.t, reason: "no room", tSig: it.tSig }); continue; }      // a level exit with no room behind the fill: void, nothing was bought
-          const p = { pid: s.id + ":" + snap.t, dir: it.dir, px, qty: sz.qty, notional: sz.notional, tIn: snap.t, stopBps: it.stopBps, thesis: it.thesis, feeIn: fee / 1e4 * sz.notional };
+          const p = { pid: s.id + ":" + snap.t, dir: it.dir, px, qty: sz.qty, notional: sz.notional, tIn: snap.t, stopBps: it.stopBps, thesis: it.thesis, feeIn: fee / 1e4 * sz.notional, stage: s.stage, fill: "paper" };
           L.pos = p; L.pend = null;
-          if (!isTwin) out.push({ k: "enter", sys: s.id, t: snap.t, pid: p.pid, dir: p.dir, px, qty: p.qty, notional: p.notional, stopBps: p.stopBps, thesis: p.thesis, trigger: s.def.trigger.type, tSig: it.tSig });
+          if (!isTwin) out.push({ k: "enter", sys: s.id, t: snap.t, pid: p.pid, dir: p.dir, px, qty: p.qty, notional: p.notional, stopBps: p.stopBps, thesis: p.thesis, trigger: s.def.trigger.type, tSig: it.tSig, stage: p.stage, fill: p.fill });
         } else if (it.type === "skip") {
           if (!isTwin) { s.trig++; out.push({ k: "skip", sys: s.id, t: snap.t, reason: it.reason, tSig: it.tSig }); }
         } else if (it.type === "exit" || it.type === "invalidate") {
@@ -1808,11 +1827,13 @@ const RUNNER = (() => {
       // the page is stopping (disconnect): what is open stays unfinished, so it is closed as interrupted, as at a reload
       interrupt(t) {
         const out = [];
-        for (const s of S) if (s.led.pos) { const p = s.led.pos; s.led.pos = null; s.led.pend = null; out.push({ k: "trade", sys: s.id, t, pid: p.pid, tIn: p.tIn, tOut: null, dir: p.dir, entryPx: p.px, reason: "interrupted", interrupted: true, thesis: p.thesis }); }
+        for (const s of S) if (s.led.pos) { const p = s.led.pos; s.led.pos = null; s.led.pend = null; out.push({ k: "trade", sys: s.id, t, pid: p.pid, tIn: p.tIn, tOut: null, dir: p.dir, entryPx: p.px, reason: "interrupted", interrupted: true, thesis: p.thesis, stage: p.stage, fill: p.fill }); }
         for (const r of out) rows.push(r);
         return out;
       },
-      state: () => S.map(s => ({ id: s.id, name: s.def.name, equity: s.led.eq, triggers: s.trig, secs: s.secs, twinForced: s.twins.length ? s.twins.reduce((a, w) => a + w.forced, 0) / s.twins.length : 0,
+      // a system's stage changes: new entries are stamped with it from the next snapshot on (the driver calls this just before it hands over that snapshot); a position already open keeps the stage it was entered in
+      move(id, to) { const s = S.find(q => q.id === id); if (!s) return false; s.stage = to; return true; },
+      state: () => S.map(s => ({ id: s.id, name: s.def.name, stage: s.stage, equity: s.led.eq, triggers: s.trig, secs: s.secs, twinForced: s.twins.length ? s.twins.reduce((a, w) => a + w.forced, 0) / s.twins.length : 0,
         open: s.led.pos ? { dir: s.led.pos.dir, px: s.led.pos.px, tIn: s.led.pos.tIn, notional: s.led.pos.notional, exiting: s.led.pend } : null,
         inst: s.inst.state() })),      // the instance's own state (context, region, trigger reading, thesis, position with stop and target): read-only, for the Trader home; twins are not included
       // the open risk of the systems against the cap (twins not counted), as fractions of equity
@@ -1839,8 +1860,10 @@ const RUNNER = (() => {
   // The runner as the page and a replay both run it: one runner at a time, begun again after a data gap (more than gapMs between two snapshots: the rolling windows are stale), the equity carried over and
   // what was open closed as interrupted. step(snap) and stop(t) return the journal rows they wrote; own() is every row written since the driver began. o: create()'s options plus gapMs (default 30000)
   // and either journal (rows already written) or carry (a list from carryOf). The decision lives here only, so the page and the replay cannot differ.
+  // Stages (step 7): o.stages is {system id: stage} at the start; move({sys, to}) queues a move, which is applied just before the next snapshot is handed to the runner (so it takes effect at that snapshot's time, `at`), and drain() returns
+  // the moves applied since the last call as [{sys, to, at}] (the page writes them into the chunk; a replay hands the same moves back with move() before the snapshot whose time is `at`). The driver remembers the stages across a gap restart.
   function driver(o) {
-    const gapMs = o.gapMs == null ? 30000 : o.gapMs, base = o.carry ? o.carry.slice() : carryOf(o.journal || []), own = [];
+    const gapMs = o.gapMs == null ? 30000 : o.gapMs, base = o.carry ? o.carry.slice() : carryOf(o.journal || []), own = [], stages = Object.assign({}, o.stages), pending = [], moved = [];
     let run = null, lastT = 0;
     const take = (rows, out) => { for (const r of rows) { own.push(r); out.push(r); } };
     return {
@@ -1848,16 +1871,20 @@ const RUNNER = (() => {
       step(snap) {
         const out = [];
         if (run && lastT && snap.t - lastT > gapMs) { take(run.interrupt(lastT), out); run = null; }
-        if (!run) { run = create(Object.assign({}, o, { journal: base.concat(own) })); take(run.fresh(), out); }
+        if (!run) { run = create(Object.assign({}, o, { journal: base.concat(own), stages: Object.assign({}, stages) })); take(run.fresh(), out); }
+        for (const m of pending.splice(0)) { stages[m.sys] = m.to; run.move(m.sys, m.to); moved.push({ sys: m.sys, to: m.to, at: snap.t }); }
         take(run.step(snap), out); lastT = snap.t; return out;
       },
       stop(t) { const out = []; if (run) { take(run.interrupt(t == null ? lastT : t), out); run = null; } return out; },
+      move(m) { pending.push({ sys: m.sys, to: m.to }); },
+      drain: () => moved.splice(0),
+      stages: () => Object.assign({}, stages),
       own: () => own, runner: () => run, lastT: () => lastT,
     };
   }
 
   // per system: trades, days with a trade (UTC day of the entry), mean net bps and R, the share of days with a positive sum, counts by exit reason (invalidate apart from stop), interrupted positions (left out of every figure),
-  // the last skip, and the system's mean net R as a percentile among its twins' means (null until the system and at least 15 twins have 20 trades each). It does not decide promotion (step 7).
+  // the last skip, and the system's mean net R as a percentile among its twins' means (null until the system and at least 15 twins have 20 trades each). It does not decide promotion: promotion-core.js (PROMO) does, from the same rows.
   function evaluate(rows) {
     const by = new Map(), get = id => { let s = by.get(id); if (!s) { s = { tr: [], interrupted: 0, lastSkip: null, tw: new Map() }; by.set(id, s); } return s; };
     for (const r of rows) {
@@ -1953,6 +1980,34 @@ const RUNNER = (() => {
       const first = runAll(cfg, snaps.slice(0, 70)), jr = first.rows(), da = driver(Object.assign({}, cfg, { journal: jr })), db = driver(Object.assign({}, cfg, { carry: carryOf(jr) })), ra = [], rb = [];
       for (const s of snaps.slice(70)) { for (const x of da.step(s)) ra.push(x); for (const x of db.step(s)) rb.push(x); }
       ok("a driver given carryOf(journal) writes the same rows as one given the journal (equity and interrupted positions carried)", JSON.stringify(ra) === JSON.stringify(rb) && ra.length > 0 && carryOf(jr).some(x => x.k === "enter") && ra.some(x => x.interrupted), ra.length + " " + rb.length); }
+    // ----- stages (step 7): every enter and trade row says the stage it was entered under and where it was filled
+    { const snaps = mkSnaps(1200, saw), plain = runAll({ systems: [fast], twins: 3, riskCap: 1 }, snaps), id = plain.state()[0].id, rr = plain.rows().filter(x => x.k === "enter" || (x.k === "trade" && !x.interrupted));
+      ok("enter and trade rows carry stage and fill, paper / paper by default", rr.length > 20 && rr.every(x => x.stage === "paper" && x.fill === "paper") && plain.state()[0].stage === "paper", JSON.stringify(rr[0]));
+      const demo = runAll({ systems: [fast], twins: 3, riskCap: 1, stages: { [id]: "demo" } }, snaps), dr = demo.rows();
+      ok("o.stages sets a system's stage from the start: the rows say demo, the fill is still paper, and nothing else about the rows changes", demo.state()[0].stage === "demo" && dr.filter(x => x.k === "enter" || x.k === "trade").every(x => x.stage === "demo" && x.fill === "paper") && JSON.stringify(dr.map(x => Object.assign({}, x, { stage: undefined }))) === JSON.stringify(plain.rows().map(x => Object.assign({}, x, { stage: undefined }))));
+      // a move at second 600 takes effect at the next snapshot; the position open then finishes under the stage it was entered in
+      const r = create({ systems: [fast], twins: 3, riskCap: 1 }); let open = null, tMove = null;
+      for (let i = 0; i < snaps.length; i++) { if (i === 600) { open = r.state()[0].open; r.move(id, "demo"); tMove = snaps[i].t; } r.step(snaps[i]); }
+      const en = r.rows().filter(x => x.k === "enter"), tr = r.rows().filter(x => x.k === "trade" && !x.interrupted);
+      ok("a move: entries before it are stamped paper, entries from the next snapshot on demo, and a trade has the stage of its entry (not of its exit)", en.some(x => x.stage === "paper") && en.some(x => x.stage === "demo") && en.every(x => x.stage === (x.t < tMove ? "paper" : "demo")) && tr.every(x => x.stage === (x.tIn < tMove ? "paper" : "demo")) && r.state()[0].stage === "demo", JSON.stringify(en.map(x => x.t - T0 + ":" + x.stage).slice(0, 4)));
+      ok("a move does not change what the system decides: with the stage fields taken out the journal is the same as without the move", JSON.stringify(r.rows().map(x => Object.assign({}, x, { stage: undefined }))) === JSON.stringify(plain.rows().map(x => Object.assign({}, x, { stage: undefined }))));
+      ok("moving a system that does not exist changes nothing and says so", r.move("nope", "demo") === false);
+      // a position open at the move keeps its stage: build the case on purpose (a long hold, the move comes during it)
+      const slow = sys({ exit: { type: "timed", holdSec: 60 } }), s2 = mkSnaps(300, jump), id2 = SYSTEM.id(slow), q = create({ systems: [slow], twins: 0 });
+      for (let i = 0; i < s2.length; i++) { if (i === 75) q.move(id2, "live"); q.step(s2[i]); }
+      const e2 = q.rows().find(x => x.k === "enter"), t2 = q.rows().find(x => x.k === "trade");
+      ok("a position open when the stage moves keeps the stage it was entered in (entered at 60 s under paper, moved at 75 s, closed at 120 s: the trade says paper)", e2 && t2 && e2.t < T0 + 75000 && t2.tOut > T0 + 75000 && e2.stage === "paper" && t2.stage === "paper" && q.state()[0].stage === "live", JSON.stringify([e2 && e2.t - T0, t2 && t2.tOut - T0, t2 && t2.stage])); }
+    // an interrupted row says its stage too
+    { const snaps = mkSnaps(200, jump), r1 = runAll({ systems: [sys()], twins: 0 }, snaps.slice(0, 70)), id = r1.state()[0].id, j = r1.rows(), r2 = create({ systems: [sys()], twins: 0, journal: j, stages: { [id]: "demo" } }), f = r2.fresh();
+      ok("a position interrupted by a restart keeps the stage it was entered in (paper), whatever the stage is now", f.length === 1 && f[0].stage === "paper" && f[0].fill === "paper" && r2.state()[0].stage === "demo", JSON.stringify(f)); }
+    { const snaps = mkSnaps(400, jump), cfg = { systems: [sys()], twins: 0 }, id = SYSTEM.id(sys()), d = driver(cfg), got = [];
+      for (let i = 0; i < 40; i++) d.step(snaps[i]);
+      d.move({ sys: id, to: "demo" }); ok("a move queued in the driver is not applied until the next snapshot", d.drain().length === 0 && d.stages()[id] === undefined);
+      d.step(snaps[40]); const mv = d.drain(); ok("the next snapshot applies it and the driver says when (at = that snapshot's time); draining empties the list", mv.length === 1 && mv[0].sys === id && mv[0].to === "demo" && mv[0].at === snaps[40].t && d.drain().length === 0 && d.stages()[id] === "demo" && d.runner().state()[0].stage === "demo");
+      // across a gap restart the driver builds the new runner with the stage the system had
+      const rows = []; for (let i = 41; i < 400; i++) { if (i === 100) i = 140; for (const x of d.step(snaps[i])) rows.push(x); }
+      ok("a gap restart keeps the stage (the new runner is built with it) and the rows after it say demo", d.runner().state()[0].stage === "demo" && rows.some(x => x.k === "enter") && rows.filter(x => x.k === "enter").every(x => x.stage === "demo"), JSON.stringify(rows.filter(x => x.k === "enter").map(x => x.stage)));
+      const d2 = driver(Object.assign({ stages: { [id]: "live" } }, cfg)); d2.step(snaps[0]); ok("a driver given stages begins its runner with them", d2.runner().state()[0].stage === "live"); }
     // ----- evaluate
     { const tr = (sys, d, net, reason, h) => ({ k: "trade", sys, t: 0, pid: sys + d + net + h, tIn: d * DAY + h * 3600000, netBps: net, R: net / 10, reason }), twin = (sys, n, R) => ({ k: "twin", sys, t: 0, n, tIn: 0, netBps: R * 10, R, reason: "time" });
       const rows = [tr("A", 1, 5, "time", 1), tr("A", 1, -2, "stop", 2), tr("A", 2, -4, "invalidate", 1), tr("A", 3, 6, "time", 5), { k: "skip", sys: "A", t: 5, reason: "risk cap" }, { k: "skip", sys: "A", t: 9, reason: "in position" }];
@@ -1976,7 +2031,8 @@ const RUNNER = (() => {
 // and hands it to the facts accumulator (SYSTEM.facts), which hands it to the engine. The recording is exactly what the engine consumed.
 // A run: from an engine reset (connect, asset change, page load) to the next reset or the disconnect. A chunk: a cut of one run's stream, made when an input's OWN time is 30 minutes after the chunk's first
 // input, or at 600,000 inputs, never by a timer. A chunk file is a session file (kind "sv-session", `inputs` as always) plus: run, seq, final, runner (configuration, carry-over, on), engineCfg, lateMs, thinMs, rows
-// (the journal rows the page wrote during the chunk), changed (settings that moved during the chunk, which a replay cannot follow) and prevMissing.
+// (the journal rows the page wrote during the chunk), moves (step 7: the stage moves applied to the runner during the chunk, [{sys, to, at}] with `at` the snapshot time they took effect; they are user actions, so a replay is handed them),
+// changed (settings that moved during the chunk, which a replay cannot follow) and prevMissing. runner.stages (chunk 0) is {system id: stage} at the start of the run.
 const CHUNK = (() => {
   "use strict";
   const MAX_MS = 1800000, MAX_N = 600000, THIN_MS = 100, KIND = "sv-session", EMPTY = [];
@@ -1996,13 +2052,13 @@ const CHUNK = (() => {
   function pipeline(o) {
     const F = o.facts, maxMs = o.maxMs || MAX_MS, maxN = o.maxN || MAX_N, thin = thinner(o.thinMs == null ? THIN_MS : o.thinMs), cfgNow = o.cfgNow || (() => "");
     let run = null;
-    const startChunk = () => { run.rec = []; run.rows = []; run.t0 = null; run.t1 = null; run.changed = []; run.cfg0 = cfgNow(); };
+    const startChunk = () => { run.rec = []; run.rows = []; run.moves = []; run.t0 = null; run.t1 = null; run.changed = []; run.cfg0 = cfgNow(); };
     function emit(final, why) {
       const r = run; if (!r) return;
       if (cfgNow() !== r.cfg0 && !r.changed.includes("engine settings")) r.changed.push("engine settings");
-      if (r.rec.length || r.rows.length) {
+      if (r.rec.length || r.rows.length || r.moves.length) {
         const c = { kind: KIND, v: 1, sym: r.meta.sym, startedAt: r.t0 || r.meta.startedAt, run: r.meta.id, seq: r.seq, final: !!final, why: why || "cut", prevMissing: false, changed: r.changed.slice(),
-          runner: r.seq === 0 ? r.meta.runner : Object.assign({}, r.meta.runner, { carry: undefined }), engineCfg: r.meta.engineCfg, lateMs: r.meta.lateMs, thinMs: r.thinMs, t0: r.t0, t1: r.t1, rows: r.rows, inputs: r.rec };
+          runner: r.seq === 0 ? r.meta.runner : Object.assign({}, r.meta.runner, { carry: undefined, stages: undefined }), engineCfg: r.meta.engineCfg, lateMs: r.meta.lateMs, thinMs: r.thinMs, t0: r.t0, t1: r.t1, rows: r.rows, moves: r.moves, inputs: r.rec };
         r.seq++; startChunk(); o.onChunk(c);
       } else startChunk();
     }
@@ -2026,6 +2082,7 @@ const CHUNK = (() => {
       // final: the caller stopped its runner (its closing rows are already in addRows), so a replay stops its own runner too. why: "disconnect" | "reset" | "switch" | ...
       end(final, why) { if (run) { emit(final, why || "end"); run = null; } },
       addRows(rows) { if (run && rows.length) for (const r of rows) run.rows.push(r); },
+      addMoves(moves) { if (run && moves.length) for (const m of moves) run.moves.push(m); },      // [{sys, to, at}] from RUNNER.driver().drain()
       touch(what) { if (run && !run.changed.includes(what)) run.changed.push(what); },
       running: () => !!run, state: () => run ? { id: run.meta.id, seq: run.seq, n: run.rec.length, t0: run.t0, t1: run.t1, rows: run.rows.length } : null,
     };
@@ -2035,12 +2092,12 @@ const CHUNK = (() => {
   // Returns {rows: [rows per chunk], stoppedAt} ; a chunk marked `changed` ends what can be followed: the replay stops before it (upto = number of chunks followed).
   function replay(chunks, deps) {
     const c0 = chunks[0], rn = c0.runner || {}, E = deps.ENGINE.create(c0.engineCfg || undefined), F = deps.SYSTEM.facts({ engine: E, lateMs: c0.lateMs == null ? 1000 : c0.lateMs });
-    const drv = rn.on ? deps.RUNNER.driver(Object.assign({ systems: deps.SYSTEMS }, rn.cfg, { carry: rn.carry || [] })) : null;
+    const drv = rn.on ? deps.RUNNER.driver(Object.assign({ systems: deps.SYSTEMS }, rn.cfg, { carry: rn.carry || [], stages: rn.stages || {} })) : null;
     const out = []; let upto = 0;
     for (const c of chunks) {
       if (c.changed && c.changed.length && c !== c0) break;      // settings moved inside this chunk (or an earlier one): the replay cannot follow from here
-      const rows = [];
-      for (const r of c.inputs) { const snaps = F.feed(r); if (drv) for (const s of snaps) for (const x of drv.step(s)) rows.push(x); }
+      const rows = [], mv = (c.moves || []).slice().sort((a, b) => a.at - b.at); let mi = 0;      // a move is handed back just before the snapshot whose time it took effect at
+      for (const r of c.inputs) { const snaps = F.feed(r); if (drv) for (const s of snaps) { while (mi < mv.length && mv[mi].at <= s.t) drv.move(mv[mi++]); for (const x of drv.step(s)) rows.push(x); } }
       if (c.final && drv) for (const x of drv.stop()) rows.push(x);
       out.push(rows); upto++;
       if (c.changed && c.changed.length) break;
@@ -2054,9 +2111,11 @@ const CHUNK = (() => {
     return { first: seqs[0], last: seqs[seqs.length - 1], startsAtZero: seqs[0] === 0, holes };
   }
   // the first difference between the rows a chunk stored and the rows the replay made, as JSON; null when equal
+  // Rows a chunk stored before step 7 have no stage and fill on their enter and trade rows; they read as paper / paper (the page wrote paper fills under stage paper then), so an old chunk still replays equal.
+  const legacy = r => r && (r.k === "enter" || r.k === "trade") && r.stage === undefined && r.fill === undefined ? Object.assign({}, r, { stage: "paper", fill: "paper" }) : r;
   function firstDiff(stored, made) {
     const n = Math.max(stored.length, made.length);
-    for (let i = 0; i < n; i++) { const a = i < stored.length ? JSON.stringify(stored[i]) : undefined, b = i < made.length ? JSON.stringify(made[i]) : undefined; if (a !== b) return { i, stored: a, replay: b }; }
+    for (let i = 0; i < n; i++) { const a = i < stored.length ? JSON.stringify(legacy(stored[i])) : undefined, b = i < made.length ? JSON.stringify(made[i]) : undefined; if (a !== b) return { i, stored: a, replay: b }; }
     return null;
   }
   // chunk file name: session_<SYM>_<minute of the first input>_run<id>-c<seq>; it still matches the old session_*.json.gz pattern
@@ -2129,17 +2188,22 @@ const CHUNK = (() => {
       if (D) {
         const s = stream(900), cfg = { twins: 3, equity: 10000, feeBps: 5, riskCap: 0.02, seed: 1, gapMs: 30000 }, got = [];
         const { F } = mkFacts(), drv = RUNNER.driver(Object.assign({ systems: D, journal: [] }, cfg)), p = pipeline({ facts: F, maxMs: 300000, onChunk: c => got.push(c) });
-        p.reset(); p.begin({ id: "r2", sym: "BTC", startedAt: T0, runner: { on: true, cfg, ids: D.map(d => SYSTEM.id(d)), carry: drv.carry }, engineCfg: null, lateMs: 1000 });
-        const live = []; for (const r of s) for (const sn of apply(p, r)) { const rows = drv.step(sn); p.addRows(rows); for (const x of rows) live.push(x); }
+        p.reset(); p.begin({ id: "r2", sym: "BTC", startedAt: T0, runner: { on: true, cfg, ids: D.map(d => SYSTEM.id(d)), carry: drv.carry, stages: drv.stages() }, engineCfg: null, lateMs: 1000 });
+        const live = []; let moved = 0; for (const r of s) for (const sn of apply(p, r)) { if (!moved && sn.t >= T0 + 400000) { moved = 1; for (const d of D.slice(0, 3)) drv.move({ sys: SYSTEM.id(d), to: "demo" }); }      // the user moves three systems to demo 400 s in
+          const rows = drv.step(sn); p.addRows(rows); p.addMoves(drv.drain()); for (const x of rows) live.push(x); }
         { const rows = drv.stop(); p.addRows(rows); for (const x of rows) live.push(x); } p.end(true, "disconnect");
         const stored = JSON.parse(JSON.stringify(got)), rp = replay(stored, { ENGINE: READER_ENGINE, SYSTEM, RUNNER, SYSTEMS: D });
         const flat = [].concat(...rp.rows), eq = JSON.stringify(flat) === JSON.stringify(live) && stored.every((c, i) => !CHUNK.firstDiff(c.rows, rp.rows[i]));
         ok("a simulated run recorded in three chunks and replayed (through JSON) gives the same journal as the run itself, chunk by chunk", got.length === 3 && eq && live.length > 0, got.length + " chunks, " + live.length + " live rows, " + flat.length + " replay rows " + JSON.stringify(CHUNK.firstDiff(live, flat)));
+        { const mvs = [].concat(...stored.map(c => c.moves || [])), after = live.filter(x => x.k === "enter" && x.t >= T0 + 400000 && D.slice(0, 3).some(d => SYSTEM.id(d) === x.sys)), noMoves = replay(stored.map(c => Object.assign({}, c, { moves: [] })), { ENGINE: READER_ENGINE, SYSTEM, RUNNER, SYSTEMS: D });
+          ok("stage moves: recorded in the chunk where they took effect (three, one snapshot time), the replay handed them gives the same journal with the stages in it, and without them it does not", mvs.length === 3 && new Set(mvs.map(m => m.at)).size === 1 && mvs.every(m => m.to === "demo") && after.length > 0 && after.every(x => x.stage === "demo") && eq && JSON.stringify([].concat(...noMoves.rows)) !== JSON.stringify(live), mvs.length + " moves, " + after.length + " entries after"); }
         ok("a chunk carries the run, its number, the rows of its own stretch and the runner's configuration", got.every((c, i) => c.run === "r2" && c.seq === i && Array.isArray(c.rows)) && got[0].runner.on === true && got[0].runner.carry && got[1].runner.carry === undefined && got.reduce((a, c) => a + c.rows.length, 0) === live.length);
       } else ok("a simulated run recorded in three chunks (needs the default systems)", false, "SYSTEMS_DEFAULT missing"); }
     // ----- holes and checks
     { const c = (seq) => ({ seq }); const k = check([c(0), c(1), c(3), c(4)]), z = check([c(2), c(3)]); ok("check: a hole is named, and a run whose first chunk is missing is not startsAtZero", k.holes.join() === "2" && k.startsAtZero && !z.startsAtZero && z.first === 2); }
     { const d = firstDiff([{ a: 1 }, { a: 2 }], [{ a: 1 }, { a: 3 }]), e = firstDiff([{ a: 1 }], [{ a: 1 }, { a: 2 }]); ok("firstDiff: the first differing row with both versions, a missing row too, null when equal", d.i === 1 && d.stored === '{"a":2}' && d.replay === '{"a":3}' && e.i === 1 && e.stored === undefined && firstDiff([{ a: 1 }], [{ a: 1 }]) === null); }
+    { const old = [{ k: "enter", sys: "A", px: 1 }, { k: "trade", sys: "A", usd: 2, thesis: "x" }, { k: "skip", sys: "A" }], neu = [{ k: "enter", sys: "A", px: 1, stage: "paper", fill: "paper" }, { k: "trade", sys: "A", usd: 2, thesis: "x", stage: "paper", fill: "paper" }, { k: "skip", sys: "A" }];
+      ok("firstDiff: a chunk stored before step 7 (no stage, fill) equals the same rows read as paper / paper; a different stage is a difference", firstDiff(old, neu) === null && firstDiff(old, neu.map((r, i) => i === 1 ? Object.assign({}, r, { stage: "demo" }) : r)).i === 1 && firstDiff(neu, old) !== null); }
     { const name = fileName({ sym: "BTC", startedAt: Date.UTC(2026, 10, 11, 15, 30), run: "20261111153000", seq: 3 }, true); ok("file names keep the session_*.json.gz shape, with run and chunk number", /^session_BTC_202611111530_run20261111153000-c003\.json\.gz$/.test(name), name); }
     // ----- a settings change during a chunk is noted, and the replay does not follow past it
     { const { F } = mkFacts(), got = []; let cfg = "a"; const p = pipeline({ facts: F, maxMs: 1e9, cfgNow: () => cfg, onChunk: c => got.push(c) }); p.reset(); p.begin({ id: "r3", sym: "BTC", startedAt: T0, runner: { on: false }, engineCfg: null, lateMs: 1000 });
@@ -2154,6 +2218,203 @@ const CHUNK = (() => {
   }
 
   return { MAX_MS, MAX_N, THIN_MS, timeOf, thinner, pipeline, replay, check, firstDiff, fileName, leftRunning, selftest };
+})();
+
+</script>
+<script id="promotion-core">
+// Promotion core (Trader step 7): the rule that decides when a system may move from paper to demo and from demo to live (spec section 4.7), the stage log, and the automatic move down. Pure: no DOM, timers, storage or clock;
+// everything it needs is handed in. It changes nothing in the runner's decisions; it only reads journal rows and the stage log. No order is sent anywhere: until step 8 a demo system still fills on paper.
+// The rule, fixed before any system ran (do not tune it here; a change is an amendment in .scratch/trader/spec.md):
+//   paper to demo, counted on paper-filled trades made live by the page since the system's last move into paper (interrupted positions never count):
+//     1. at least 300 trades; 2. on at least 10 different UTC days (the day of the entry); 3. mean net bps per trade above 0 (fees included);
+//     4. mean net R above at least 19 of its 20 twins, where at least 19 twins have 100 trades or more (twins counted over the same stretch); 5. the day's net sum positive on at least 60% of the days that have a trade.
+//   demo to live, counted on demo-filled trades since the last move into demo: at least 100, on at least 5 days, and the mean demo fill worse than the paper fill of the same trades by no more than half the paper edge
+//   (the paper edge = the mean net bps that earned the promotion, stored in the stage log at that moment). A demo row carries both: netBps (the demo fill) and paperNetBps (what the paper fill gave).
+//   Never automatic upward. Promotion to live also needs a cap above 0 (dollars). A move down goes to paper and has no condition. A live system goes to paper by itself when its net loss in one UTC day reaches 3 times its risk per trade or its cap.
+// Rows read: {k:"trade", sys, tIn, t, netBps, R, usd, reason, interrupted?, stage?, fill?, paperNetBps?} and {k:"twin", sys, n, tIn, R}. A row without stage and fill is paper / paper (rows written before step 7).
+// Stage log entries (append-only, one per move): {sys, from, to, t, by: "user"|"auto", reason?, cap?, figures: {criteria: [{id, now, need, met}], edge?}}.
+const PROMO = (() => {
+  "use strict";
+  const DAY = 86400000, STAGES = ["paper", "demo", "live"];
+  const RULE = { paper: { trades: 300, days: 10, posDayShare: 0.6, twinsAhead: 19, twinsEnough: 19, twinTrades: 100, twinsTotal: 20 }, demo: { trades: 100, days: 5, halfEdge: 0.5 }, lossRisks: 3 };
+  const mean = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
+  const f1 = x => x == null ? "–" : (Math.round(x * 10) / 10).toFixed(1);
+
+  const lastEntry = (log, id) => { for (let i = (log || []).length - 1; i >= 0; i--) if (log[i].sys === id) return log[i]; return null; };
+  // the stage of a system: the `to` of its last move, else `start` (the stage in systems-default.js)
+  const stageOf = (log, id, start) => { const e = lastEntry(log, id); return e ? e.to : (start || "paper"); };
+  // {sys id: stage} for the systems that have moved at least once
+  function stages(log) { const m = {}; for (const e of log || []) m[e.sys] = e.to; return m; }
+  // time of the last move of the system into `to`; -Infinity when there is none (the count then begins with the journal)
+  function since(log, id, to) { let t = -Infinity; for (const e of log || []) if (e.sys === id && e.to === to) t = e.t; return t; }
+  const edgeOf = (log, id) => { let v = null; for (const e of log || []) if (e.sys === id && e.to === "demo" && e.figures && typeof e.figures.edge === "number") v = e.figures.edge; return v; };
+  const capOf = (log, id) => { let v = null; for (const e of log || []) if (e.sys === id && e.to === "live") v = typeof e.cap === "number" ? e.cap : null; return v; };
+
+  function crit(id, label, now, need, met, text, needText) { return { id, label, now, need, met: !!met, text, needText }; }
+  const daysOf = tr => { const d = new Map(); for (const r of tr) { const k = Math.floor(r.tIn / DAY); d.set(k, (d.get(k) || 0) + r.netBps); } return d; };
+
+  // The standing of one system against the rule for its next stage. start: its stage when the log has no move for it (default "paper").
+  // Returns {sys, stage, next, since, criteria: [{id, label, now, need, met, text, needText}], eligible, trades, meanNetBps, edge, waiting}; `waiting` is a short reason when nothing can be judged yet ("needs demo trades").
+  function eligibility(rows, stageLog, systemId, start) {
+    const stage = stageOf(stageLog, systemId, start), out = { sys: systemId, stage, next: null, since: null, criteria: [], eligible: false, trades: 0, meanNetBps: null, edge: null, waiting: "" };
+    if (stage === "live") return out;
+    out.next = stage === "paper" ? "demo" : "live";
+    const t0 = since(stageLog, systemId, stage), fill = stage;      // paper counts paper fills made under stage paper; demo counts demo fills made under stage demo
+    out.since = isFinite(t0) ? t0 : null;
+    const tr = [], tw = new Map();
+    for (const r of rows) {
+      if (r.sys !== systemId) continue;
+      if (r.k === "trade") { if (r.interrupted || !(r.tIn >= t0) || (r.stage || "paper") !== stage || (r.fill || "paper") !== fill || typeof r.netBps !== "number") continue; tr.push(r); }
+      else if (stage === "paper" && r.k === "twin" && r.tIn >= t0 && typeof r.R === "number") { let a = tw.get(r.n); if (!a) tw.set(r.n, a = []); a.push(r.R); }
+    }
+    const n = tr.length, days = daysOf(tr), nd = days.size, mNet = mean(tr.map(r => r.netBps)), mR = mean(tr.map(r => r.R));
+    out.trades = n; out.meanNetBps = mNet;
+    if (stage === "paper") {
+      const K = RULE.paper, pos = Array.from(days.values()).filter(x => x > 0).length, twinMeans = []; for (const a of tw.values()) if (a.length >= K.twinTrades) twinMeans.push(mean(a));
+      const ahead = mR == null ? 0 : twinMeans.filter(m => m < mR).length, enough = twinMeans.length;
+      out.criteria = [
+        crit("trades", "Trades", n, K.trades, n >= K.trades, `trades ${n} / ${K.trades}`, String(K.trades)),
+        crit("days", "Different UTC days", nd, K.days, nd >= K.days, `days ${nd} / ${K.days}`, String(K.days)),
+        crit("mean", "Mean net result per trade, fees included", mNet, 0, mNet != null && mNet > 0, `mean net ${f1(mNet)} bps / above 0`, "above 0"),
+        crit("twins", "Mean net R above its twins", ahead, K.twinsAhead, n > 0 && enough >= K.twinsEnough && ahead >= K.twinsAhead, `ahead of ${ahead} of ${K.twinsTotal} twins / ${K.twinsAhead}` + (enough < K.twinsEnough ? `, only ${enough} twins have ${K.twinTrades} trades (need ${K.twinsEnough})` : ""), String(K.twinsAhead)),
+        crit("posdays", "Days with a positive net sum", nd ? pos / nd : null, K.posDayShare, nd > 0 && pos * 5 >= nd * 3, `positive days ${nd ? Math.floor(100 * pos / nd + 1e-9) : 0}% / ${Math.round(K.posDayShare * 100)}%`, Math.round(K.posDayShare * 100) + "%"),
+      ];
+      out.edge = mNet;
+    } else {
+      const K = RULE.demo, edge = edgeOf(stageLog, systemId), costs = tr.filter(r => typeof r.paperNetBps === "number").map(r => r.paperNetBps - r.netBps), worse = mean(costs), half = edge == null ? null : K.halfEdge * edge;
+      out.edge = edge;
+      out.criteria = [
+        crit("trades", "Demo trades", n, K.trades, n >= K.trades, `demo trades ${n} / ${K.trades}`, String(K.trades)),
+        crit("days", "Different UTC days", nd, K.days, nd >= K.days, `days ${nd} / ${K.days}`, String(K.days)),
+        crit("cost", "Demo fill worse than the paper fill, at most half the paper edge", worse, half, worse != null && half != null && worse <= half, `demo fill worse by ${f1(worse)} bps / at most ${f1(half)}` + (edge == null ? " (no stored paper edge)" : ""), "at most half the paper edge"),
+      ];
+      if (n === 0) out.waiting = "needs demo trades";
+    }
+    out.eligible = out.criteria.every(c => c.met);
+    return out;
+  }
+
+  // The automatic move down. system: {id, riskFrac, equity0}; cap: dollars or null; day: UTC day number (Math.floor(ms / 86400000)). Trades entered under stage live and closed that day count (by their closing time, row.t).
+  // Risk per trade = riskFrac times the equity at the start of that day (equity0 plus every closed result before it). hit when the day's net loss reaches 3 times that, or the cap if the cap is lower.
+  function lossLimit(rows, system, cap, day) {
+    let before = 0, today = 0;
+    for (const r of rows) {
+      if (r.k !== "trade" || r.sys !== system.id || r.interrupted || typeof r.usd !== "number") continue;
+      const d = Math.floor(r.t / DAY);
+      if (d < day) before += r.usd; else if (d === day && r.stage === "live") today += r.usd;
+    }
+    const risk = (system.equity0 + before) * system.riskFrac;
+    let limit = RULE.lossRisks * risk, which = "risk"; if (typeof cap === "number" && cap > 0 && cap < limit) { limit = cap; which = "cap"; }
+    const loss = today < 0 ? -today : 0;
+    return { hit: loss > 0 && loss >= limit * (1 - 1e-12), loss, limit, which, riskUsd: risk, day };
+  }
+
+  // Validates one move and returns {ok: true, log: the new log (the old one is not changed), entry} or {ok: false, reason}. move: {sys, to, t, by: "user"|"auto", reason?, cap?, start?}.
+  // rows are the journal (the criteria are read from it). Up: one stage at a time, only when eligible, live needs cap > 0. Down: to paper only, always allowed. Auto: only a move down.
+  function apply(stageLog, move, rows) {
+    const log = stageLog || [], bad = reason => ({ ok: false, reason });
+    if (!move || typeof move.sys !== "string" || !move.sys) return bad("no system named");
+    if (!STAGES.includes(move.to)) return bad("unknown stage " + move.to);
+    if (move.by !== "user" && move.by !== "auto") return bad("a move is made by the user or automatically");
+    if (typeof move.t !== "number" || !isFinite(move.t)) return bad("a move needs its time");
+    const from = stageOf(log, move.sys, move.start), up = STAGES.indexOf(move.to) - STAGES.indexOf(from);
+    if (up === 0) return bad("already at stage " + from);
+    const el = eligibility(rows || [], log, move.sys, move.start), figures = { criteria: el.criteria.map(c => ({ id: c.id, now: c.now, need: c.need, met: c.met })) };
+    if (up > 0) {
+      if (move.by === "auto") return bad("an automatic move only goes down");
+      if (up > 1) return bad("a system moves up one stage at a time");
+      if (!el.eligible) return bad("not eligible for " + move.to + ": " + (el.waiting || el.criteria.filter(c => !c.met).map(c => c.text).join("; ")));
+      if (move.to === "live" && !(typeof move.cap === "number" && isFinite(move.cap) && move.cap > 0)) return bad("live needs a dollar cap above 0");
+      if (move.to === "demo" && el.meanNetBps != null) figures.edge = el.meanNetBps;
+    } else if (move.to !== "paper") return bad("a move down goes to paper");
+    const entry = { sys: move.sys, from, to: move.to, t: move.t, by: move.by, figures };
+    if (move.reason) entry.reason = String(move.reason);
+    if (move.to === "live") entry.cap = move.cap;
+    return { ok: true, log: log.concat([entry]), entry };
+  }
+
+  // ---------- self-test: scenarios named promo:* ----------
+  function selftest() {
+    const res = [], ok = (name, c, detail) => res.push({ name: "promo:" + name, ok: !!c, detail: c ? "" : String(detail || "") });
+    const D0 = 20000 * DAY;      // a day number far from zero
+    // trades: count per day given by `perDay` (array of net bps lists); R = bps / 10; entries one minute apart on day d0 + k
+    const trades = (sys, perDay, o) => { const out = []; perDay.forEach((list, k) => list.forEach((b, i) => out.push(Object.assign({ k: "trade", sys, t: D0 + k * DAY + (i + 1) * 60000 + 30000, tIn: D0 + k * DAY + (i + 1) * 60000, netBps: b, R: b / 10, usd: b, reason: "time" }, o)))); return out; };
+    const twins = (sys, nTw, perTwin, R, t0) => { const out = []; for (let n = 0; n < nTw; n++) for (let i = 0; i < perTwin; i++) out.push({ k: "twin", sys, n, tIn: (t0 == null ? D0 : t0) + i * 1000, R: R(n), usd: 0, reason: "time" }); return out; };
+    const days = (nDays, perDay, net) => Array.from({ length: nDays }, () => Array.from({ length: perDay }, () => net));
+    const get = (el, id) => el.criteria.find(c => c.id === id);
+    // all five at the boundary: 300 trades on 10 days, net mean 1 bps, 60% positive days, ahead of 19 twins with 100 trades
+    const good = (extra) => trades("A", [].concat(days(6, 30, 3), days(4, 30, -1.5)), extra).concat(twins("A", 20, 100, n => n === 19 ? 0.5 : -0.1 + n * 0.001));
+    { const el = eligibility(good(), [], "A");
+      ok("the five criteria at their boundaries together make a system eligible", el.eligible && el.stage === "paper" && el.next === "demo" && el.criteria.length === 5 && el.criteria.every(c => c.met), JSON.stringify(el.criteria.map(c => c.id + ":" + c.now + ":" + c.met))); }
+    { const el299 = eligibility(trades("A", days(10, 30, 2)).slice(0, 299), [], "A"), el300 = eligibility(trades("A", days(10, 30, 2)), [], "A");
+      ok("trades: 299 do not meet it and 300 do", !get(el299, "trades").met && get(el299, "trades").now === 299 && get(el300, "trades").met && get(el300, "trades").now === 300); }
+    { const e9 = eligibility(trades("A", days(9, 40, 2)), [], "A"), e10 = eligibility(trades("A", days(10, 40, 2)), [], "A");
+      ok("days: 9 different days do not meet it and 10 do", !get(e9, "days").met && get(e9, "days").now === 9 && get(e10, "days").met); }
+    { const a = eligibility(trades("A", days(10, 30, 0)), [], "A"), b = eligibility(trades("A", [[0.001].concat(Array(29).fill(0))].concat(days(9, 30, 0))), [], "A"), c = eligibility(trades("A", days(10, 30, -0.001)), [], "A");
+      ok("mean net: exactly 0 does not meet it, a hair above does, below does not", !get(a, "mean").met && get(b, "mean").met && !get(c, "mean").met, JSON.stringify([get(a, "mean").now, get(b, "mean").now])); }
+    { const mk = k => trades("A", days(10, 30, 2)).concat(twins("A", 20, 100, n => n < k ? -1 : 5));      // the system's mean R is 0.2; k twins are below it
+      const e18 = eligibility(mk(18), [], "A"), e19 = eligibility(mk(19), [], "A"), e20 = eligibility(mk(20), [], "A");
+      ok("twins: ahead of 18 does not meet it, ahead of 19 and of 20 do", !get(e18, "twins").met && get(e18, "twins").now === 18 && get(e19, "twins").met && get(e19, "twins").now === 19 && get(e20, "twins").met && get(e20, "twins").now === 20, JSON.stringify([18, 19, 20].map(k => get(eligibility(mk(k), [], "A"), "twins").now))); }
+    { const sysRows = trades("A", days(10, 30, 2)), few = n => twins("A", n, 100, () => -1), e18 = eligibility(sysRows.concat(few(18)), [], "A"), e19 = eligibility(sysRows.concat(few(19)), [], "A"), thin = eligibility(sysRows.concat(few(19).filter(r => r.n < 18 || r.tIn < D0 + 99000)), [], "A");
+      ok("twins: ahead of all 18 with enough trades is not enough (19 must have 100 trades); 19 are enough; a twin with 99 trades does not count", !get(e18, "twins").met && /only 18 twins/.test(get(e18, "twins").text) && get(e19, "twins").met && !get(thin, "twins").met, get(thin, "twins").text); }
+    { const six = (nPos, nDays) => trades("A", Array.from({ length: nDays }, (_, k) => k < nPos ? [3, 3, 3] : [-3, -3, -3])), p = k => get(eligibility(six(k, 10), [], "A"), "posdays"), q = k => get(eligibility(six(k, 100), [], "A"), "posdays");
+      ok("positive days: 5 of 10 and 59 of 100 do not meet it, 6 of 10 and 60 of 100 do", !p(5).met && p(6).met && !q(59).met && q(60).met && /59%/.test(q(59).text) && /60%/.test(q(60).text) && /^positive days 60% \/ 60%$/.test(q(60).text), q(59).text + " | " + q(60).text); }
+    { const m = trades("A", [[10, -4]]); const dayNet = eligibility(m, [], "A"); ok("a day's net sum decides: +10 and -4 on one day is a positive day", get(dayNet, "posdays").now === 1); }
+    // interrupted, stage, fill
+    { const base = trades("A", days(10, 30, 2)), withInt = base.concat(trades("A", [[5, 5, 5]], { interrupted: true, reason: "interrupted" }).map(r => Object.assign(r, { netBps: undefined, R: undefined, usd: undefined })));
+      ok("interrupted rows are ignored", eligibility(withInt, [], "A").trades === 300); }
+    { const base = trades("A", days(10, 30, 2)), mix = base.concat(trades("A", [[9, 9]], { stage: "demo", fill: "paper" })).concat(trades("A", [[9]], { stage: "paper", fill: "demo" })), el = eligibility(mix, [], "A");
+      ok("only trades made under stage paper with a paper fill count for paper to demo", el.trades === 300); }
+    { const old = trades("A", days(10, 30, 2)), tagged = old.map(r => Object.assign({}, r, { stage: "paper", fill: "paper" }));
+      ok("rows without stage and fill read as paper / paper (same figures as tagged rows)", JSON.stringify(eligibility(old, [], "A")) === JSON.stringify(eligibility(tagged, [], "A")) && eligibility(old, [], "A").trades === 300); }
+    { const other = trades("B", days(10, 30, 2)); ok("another system's rows are not counted", eligibility(other, [], "A").trades === 0 && get(eligibility(other, [], "A"), "mean").met === false); }
+    { const el = eligibility([], [], "A"); ok("an empty journal: nothing met, not eligible, no errors", !el.eligible && el.criteria.length === 5 && el.criteria.every(c => !c.met) && el.trades === 0 && el.meanNetBps === null); }
+    // the count restarts after a move down
+    { const rows = good(), log = [{ sys: "A", from: "paper", to: "demo", t: D0 + 50 * DAY, by: "user", figures: { criteria: [], edge: 1 } }, { sys: "A", from: "demo", to: "paper", t: D0 + 60 * DAY, by: "user", figures: { criteria: [] } }];
+      const el = eligibility(rows, log, "A"), after = eligibility(rows.concat(trades("A", [[4]], { t: D0 + 61 * DAY, tIn: D0 + 61 * DAY + 5 })), log, "A");
+      ok("after a move down the count starts again from that moment: earlier trades are not counted, a later one is", el.stage === "paper" && el.trades === 0 && el.since === D0 + 60 * DAY && after.trades === 1, JSON.stringify([el.trades, after.trades])); }
+    { const old = eligibility(good(), [{ sys: "A", from: "live", to: "paper", t: D0 + 5 * DAY, by: "auto", figures: { criteria: [] } }], "A");
+      ok("the count begins at the LAST move into paper (here day 5: trades before it are out)", old.trades < 300 && old.trades > 0 && old.since === D0 + 5 * DAY, old.trades); }
+    // demo to live
+    const demoLog = (edge) => [{ sys: "A", from: "paper", to: "demo", t: D0 - DAY, by: "user", figures: { criteria: [], edge } }];
+    const demoRows = (n, nDays, net, paper) => { const out = []; for (let i = 0; i < n; i++) out.push({ k: "trade", sys: "A", t: D0 + (i % nDays) * DAY + 100, tIn: D0 + (i % nDays) * DAY + 50 + i, netBps: net, paperNetBps: paper, R: net / 10, usd: net, reason: "time", stage: "demo", fill: "demo" }); return out; };
+    { const ok100 = eligibility(demoRows(100, 5, 2, 3), demoLog(4), "A"), n99 = eligibility(demoRows(99, 5, 2, 3), demoLog(4), "A"), d4 = eligibility(demoRows(100, 4, 2, 3), demoLog(4), "A");
+      ok("demo to live: 100 trades on 5 days meet the first two criteria; 99 trades or 4 days do not", ok100.stage === "demo" && ok100.next === "live" && get(ok100, "trades").met && get(ok100, "days").met && !get(n99, "trades").met && !get(d4, "days").met); }
+    { const at = x => get(eligibility(demoRows(100, 5, 2, 2 + x), demoLog(4), "A"), "cost");      // half the paper edge is 2 bps: the demo fill is worse by x
+      ok("demo to live: worse by exactly half the paper edge passes, a hair more fails, better than paper passes", at(2).met && !at(2.01).met && at(0).met && at(-1).met && at(2).now === 2, JSON.stringify([at(2), at(2.01)].map(c => c.now + ":" + c.met))); }
+    { const e = eligibility(demoRows(100, 5, 2, 3), demoLog(null), "A"); ok("demo to live with no stored paper edge: the cost criterion is not met, and says why", !get(e, "cost").met && /no stored paper edge/.test(get(e, "cost").text)); }
+    { const e = eligibility(demoRows(100, 5, 2, 3).concat(demoRows(50, 5, 9, 9).map(r => Object.assign(r, { fill: "paper" }))), demoLog(4), "A"), none = eligibility([], demoLog(4), "A");
+      ok("demo to live counts demo fills only; with none it says it needs demo trades", e.trades === 100 && none.waiting === "needs demo trades" && !none.eligible); }
+    { const e = eligibility(demoRows(100, 5, 2, 3), demoLog(4), "A").eligible, e2 = eligibility(demoRows(100, 5, 2, 3), demoLog(4).concat([{ sys: "A", from: "demo", to: "live", t: D0 + 9 * DAY, by: "user", cap: 100, figures: { criteria: [] } }]), "A");
+      ok("a live system has no next stage", e === true && e2.stage === "live" && e2.next === null && e2.criteria.length === 0 && !e2.eligible); }
+    // loss limit
+    { const sys = { id: "A", riskFrac: 0.005, equity0: 10000 }, day = D0 / DAY, lose = (usd, stage) => ({ k: "trade", sys: "A", t: D0 + 3600000, tIn: D0, usd, netBps: -1, R: -1, reason: "stop", stage: stage || "live", fill: "live" });
+      ok("loss limit: 3 times the risk per trade (3 x $50 = $150) is a hit, a cent under is not", lossLimit([lose(-150)], sys, null, day).hit && !lossLimit([lose(-149.99)], sys, null, day).hit && lossLimit([lose(-149.99)], sys, null, day).limit === 150, JSON.stringify(lossLimit([lose(-149.99)], sys, null, day)));
+      ok("loss limit: a cap lower than 3 risks is the limit (cap $80: -80 hits, -79.99 does not); a higher cap changes nothing", lossLimit([lose(-80)], sys, 80, day).hit && lossLimit([lose(-80)], sys, 80, day).which === "cap" && !lossLimit([lose(-79.99)], sys, 80, day).hit && lossLimit([lose(-149.99)], sys, 500, day).limit === 150 && !lossLimit([lose(-149.99)], sys, 500, day).hit);
+      ok("loss limit: several trades add up; wins in the day offset losses; another day and a paper-stage trade do not count", lossLimit([lose(-100), lose(-60)], sys, null, day).hit && !lossLimit([lose(-100), lose(60), lose(-60)], sys, null, day).hit && !lossLimit([lose(-200)], sys, null, day + 1).hit && !lossLimit([lose(-200, "paper")], sys, null, day).hit);
+      const before = { k: "trade", sys: "A", t: D0 - 3600000, tIn: D0 - 7200000, usd: -5000, netBps: -1, R: -1, reason: "stop", stage: "paper", fill: "paper" };
+      ok("loss limit: risk per trade follows the equity at the start of the day (equity down to $5000: 3 x $25 = $75)", lossLimit([before, lose(-75)], sys, null, day).hit && !lossLimit([before, lose(-74)], sys, null, day).hit && lossLimit([before], sys, null, day).riskUsd === 25);
+      ok("loss limit: nothing today is no hit", !lossLimit([], sys, null, day).hit && lossLimit([], sys, null, day).loss === 0); }
+    // apply
+    { const rows = good(), up = apply([], { sys: "A", to: "demo", t: 5, by: "user" }, rows), bad = apply([], { sys: "A", to: "demo", t: 5, by: "user" }, rows.slice(0, 100));
+      ok("apply: an eligible system moves to demo; the entry holds from, to, time, by and a copy of the criteria with the paper edge", up.ok && up.entry.from === "paper" && up.entry.to === "demo" && up.entry.by === "user" && up.entry.t === 5 && up.entry.figures.criteria.length === 5 && up.entry.figures.criteria.every(c => c.met) && Math.abs(up.entry.figures.edge - eligibility(rows, [], "A").meanNetBps) < 1e-12 && up.log.length === 1, JSON.stringify(up));
+      ok("apply: an upward move that is not eligible is refused with the reason, and the old log is not changed", !bad.ok && /not eligible/.test(bad.reason) && /trades/.test(bad.reason)); }
+    { const log = [], r = apply(log, { sys: "A", to: "demo", t: 1, by: "user" }, good()); ok("apply does not change the log it was given", r.ok && log.length === 0 && r.log !== log); }
+    { const rows = good(), l1 = apply([], { sys: "A", to: "demo", t: 1, by: "user" }, rows).log, demo = demoRows(100, 5, 2, 2.5), noCap = apply(l1, { sys: "A", to: "live", t: 2, by: "user" }, demo), zero = apply(l1, { sys: "A", to: "live", t: 2, by: "user", cap: 0 }, demo), neg = apply(l1, { sys: "A", to: "live", t: 2, by: "user", cap: -5 }, demo), withCap = apply(l1, { sys: "A", to: "live", t: 2, by: "user", cap: 250 }, demo);
+      ok("apply: live without a cap, with 0 or a negative cap is refused; with a cap above 0 it moves and the entry keeps the cap", !noCap.ok && /cap/.test(noCap.reason) && !zero.ok && !neg.ok && withCap.ok && withCap.entry.cap === 250 && withCap.entry.to === "live" && withCap.entry.from === "demo", JSON.stringify([noCap, withCap.entry]));
+      const notYet = apply(l1, { sys: "A", to: "live", t: 2, by: "user", cap: 250 }, demoRows(99, 5, 2, 2.5)); ok("apply: demo to live is refused until its criteria are met", !notYet.ok && /not eligible/.test(notYet.reason));
+      const skip = apply([], { sys: "A", to: "live", t: 2, by: "user", cap: 250 }, rows); ok("apply: paper straight to live is refused", !skip.ok && /one stage at a time/.test(skip.reason)); }
+    { const l = [{ sys: "A", from: "paper", to: "demo", t: 1, by: "user", figures: { criteria: [], edge: 1 } }], down = apply(l, { sys: "A", to: "paper", t: 9, by: "user" }, []), same = apply(l, { sys: "A", to: "demo", t: 9, by: "user" }, []);
+      ok("apply: a move down to paper is always allowed (no condition), and the criteria figures are copied", down.ok && down.entry.from === "demo" && down.entry.to === "paper" && down.entry.figures.criteria.length === 3 && !same.ok && /already/.test(same.reason)); }
+    { const l = [{ sys: "A", from: "demo", to: "live", t: 1, by: "user", cap: 10, figures: { criteria: [] } }], auto = apply(l, { sys: "A", to: "paper", t: 9, by: "auto", reason: "loss limit: $150 in one day" }, []), toDemo = apply(l, { sys: "A", to: "demo", t: 9, by: "user" }, []), autoUp = apply([], { sys: "A", to: "demo", t: 9, by: "auto" }, good());
+      ok("apply: live goes to paper by hand or automatically (the reason is kept); live to demo is refused; an automatic move never goes up", auto.ok && auto.entry.by === "auto" && /loss limit/.test(auto.entry.reason) && !toDemo.ok && /to paper/.test(toDemo.reason) && !autoUp.ok); }
+    { const refuse = m => !apply([], m, []).ok; ok("apply: a missing system, an unknown stage, a missing time and a missing author are refused", refuse({ to: "demo", t: 1, by: "user" }) && refuse({ sys: "A", to: "gold", t: 1, by: "user" }) && refuse({ sys: "A", to: "demo", by: "user" }) && refuse({ sys: "A", to: "demo", t: 1 })); }
+    { const l = [{ sys: "A", from: "paper", to: "demo", t: 1, by: "user", figures: {} }, { sys: "B", from: "paper", to: "demo", t: 2, by: "user", figures: {} }, { sys: "A", from: "demo", to: "paper", t: 3, by: "user", figures: {} }];
+      ok("stageOf, stages and since read the log; a system with no move keeps its starting stage", stageOf(l, "A") === "paper" && stageOf(l, "B") === "demo" && stageOf(l, "C") === "paper" && stageOf(l, "C", "demo") === "demo" && stages(l).A === "paper" && stages(l).B === "demo" && since(l, "A", "paper") === 3 && since(l, "A", "demo") === 1 && since(l, "C", "paper") === -Infinity); }
+    return res;
+  }
+
+  return { RULE, DAY, STAGES, stageOf, stages, since, edgeOf, capOf, eligibility, lossLimit, apply, selftest };
 })();
 
 </script>
@@ -4987,19 +5248,20 @@ function rdToolsRender(s){
 <script>
 "use strict";
 // Paper runner (Trader step 4, page side, thin): feeds the one-snapshot-a-second series from feeds.js (trSink) to RUNNER (runner-core.js), keeps the journal in its own IndexedDB database (sv-trader),
-// and exposes what the Trader home (trader-view.js) draws. Nothing here sends an order anywhere: the brokers, placeOrder, the Trading view and the hand-operated paper account (SIM) are not touched.
+// and the stage log (step 7: one entry per move of a system between paper / demo / live, in the same database), and exposes what the Trader home (trader-view.js) draws. Nothing here sends an order anywhere: the brokers, placeOrder, the Trading view and the hand-operated paper account (SIM) are not touched.
 // Decisions come only from snapshots (made from input times), never from a timer here, so a hidden tab that delivers late gives the same rows. Runs while the page is connected and the asset is BTC.
-const TRN = {on: store.get("trOn", true) !== false, driver: null, journal: [], loaded: false, db: null, lastT: 0, err: "", ev: null, evAt: 0, saved: 0, ready: null};      // ev, evAt: unused since step 5 (the view keeps its own cache)
+const TRN = {on: store.get("trOn", true) !== false, driver: null, journal: [], stageLog: [], loaded: false, db: null, lastT: 0, err: "", ev: null, evAt: 0, saved: 0, ready: null};      // ev, evAt: unused since step 5 (the view keeps its own cache)
 Object.defineProperty(TRN, "runner", {get: () => TRN.driver ? TRN.driver.runner() : null});      // the runner now running (the Trader home reads its state and risk), null between runs and after a gap until the next snapshot
+const TR_DEF = Object.fromEntries(SYSTEMS_DEFAULT.map(d => [SYSTEM.id(d), d]));
 const TR_CFG = {twins: 20, equity: 10000, feeBps: 5, riskCap: 0.02, seed: 1, gapMs: 30000};
 const tr$ = id => document.getElementById(id);
 
-// ----- storage: one object store, a journal row each
+// ----- storage: one object store of journal rows and one of stage-log entries (version 2 added the second)
 function trDb(){
   return new Promise((res, rej) => {
     try{
-      const q = indexedDB.open("sv-trader", 1);
-      q.onupgradeneeded = () => { if (!q.result.objectStoreNames.contains("rows")) q.result.createObjectStore("rows", {autoIncrement:true}); };
+      const q = indexedDB.open("sv-trader", 2);
+      q.onupgradeneeded = () => { for (const n of ["rows", "stages"]) if (!q.result.objectStoreNames.contains(n)) q.result.createObjectStore(n, {autoIncrement:true}); };
       q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error);
     }catch(e){ rej(e); }
   });
@@ -5009,6 +5271,7 @@ async function trLoad(){
   try{
     TRN.db = await trDb();
     TRN.journal = await trReq(TRN.db.transaction("rows").objectStore("rows").getAll());
+    TRN.stageLog = await trReq(TRN.db.transaction("stages").objectStore("stages").getAll());
   }catch(e){ TRN.err = "journal storage unavailable, rows are kept in memory only"; TRN.db = null; console.error("trader", e); }
   TRN.loaded = true;
 }
@@ -5027,12 +5290,13 @@ function trPersist(rows){
 // run's start (switch on, journal loaded, asset BTC), and written into the recording, so a replay begins the same way. The gap rule (over 30 s without a snapshot: stop and begin again) is in RUNNER.driver (runner-core.js).
 const trAsset = () => (typeof bnSym === "function" ? bnSym() : "").replace(/usdt$/, "").toUpperCase();
 function trBegin(sym){      // at the start of a run; returns whether a runner is running
-  TRN.driver = TRN.on && TRN.loaded && sym === "BTC" ? RUNNER.driver(Object.assign({systems: SYSTEMS_DEFAULT, journal: TRN.journal}, TR_CFG)) : null; TRN.lastT = 0;
+  TRN.driver = TRN.on && TRN.loaded && sym === "BTC" ? RUNNER.driver(Object.assign({systems: SYSTEMS_DEFAULT, journal: TRN.journal, stages: PROMO.stages(TRN.stageLog)}, TR_CFG)) : null; TRN.lastT = 0;
   return !!TRN.driver;
 }
 function trEmit(rows){      // rows the runner wrote: to the journal's storage, to the page's list and to the chunk being recorded
   if (!rows.length) return;
   trPersist(rows); for (const r of rows) TRN.journal.push(r); PIPE.addRows(rows);
+  for (const r of rows) if (r.k === "trade" && r.stage === "live" && !r.interrupted) trLossCheck(r.sys, r.t);
 }
 function trStop(){      // what is open cannot go on: it is closed as interrupted, the journal is kept and the next run begins again from it
   if (!TRN.driver) return;
@@ -5041,6 +5305,7 @@ function trStop(){      // what is open cannot go on: it is closed as interrupte
 trSink = snaps => {
   if (!TRN.driver) return;
   for (const s of snaps){ trEmit(TRN.driver.step(s)); TRN.lastT = s.t; }
+  if (TRN.driver){ const mv = TRN.driver.drain(); if (mv.length) PIPE.addMoves(mv); }      // the moves that took effect at these snapshots go into the chunk being recorded (a replay is handed them)
 };
 TRN.ready = trLoad();      // the journal is read before a run can begin (the page waits for this before it reconnects after a reload)
 
@@ -5052,15 +5317,37 @@ function trSetOn(on){
 }
 function trExportJournal(){
   const rows = trRows();
-  const blob = new Blob([JSON.stringify({exported: new Date().toISOString(), config: TR_CFG, systems: SYSTEMS_DEFAULT.map(d => Object.assign({id: SYSTEM.id(d)}, d)), rows})], {type:"application/json"});
+  const blob = new Blob([JSON.stringify({exported: new Date().toISOString(), config: TR_CFG, systems: SYSTEMS_DEFAULT.map(d => Object.assign({id: SYSTEM.id(d)}, d)), stageLog: TRN.stageLog, rows})], {type:"application/json"});
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "trader-journal_" + new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-") + ".json";
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
 async function trResetJournal(){
-  if (!confirm("Delete the whole paper-systems journal (every trade, skip and twin trade) on this device? This cannot be undone.")) return false;
-  PIPE.touch("journal reset"); TRN.driver = null; TRN.journal = []; TRN.ev = null; TRN.saved = 0;
-  try{ if (TRN.db) await trReq(TRN.db.transaction("rows", "readwrite").objectStore("rows").clear()); }catch(e){ TRN.err = "reset failed"; console.error("trader", e); }
+  if (!confirm("Delete the whole paper-systems journal (every trade, skip and twin trade) AND the stage log (every move between paper, demo and live, so every system goes back to its starting stage) on this device? This cannot be undone.")) return false;
+  PIPE.touch("journal reset"); TRN.driver = null; TRN.journal = []; TRN.stageLog = []; TRN.ev = null; TRN.saved = 0;
+  try{ if (TRN.db){ const tx = TRN.db.transaction(["rows", "stages"], "readwrite"); tx.objectStore("rows").clear(); tx.objectStore("stages").clear(); await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); } }catch(e){ TRN.err = "reset failed"; console.error("trader", e); }
   return true;
+}
+
+// ----- stages (step 7): the stage log and the moves. The rule is in promotion-core.js (PROMO); here a move is written to the log, stored, and handed to the running runner, which applies it at its next snapshot.
+const trStage = id => PROMO.stageOf(TRN.stageLog, id, TR_DEF[id] ? TR_DEF[id].stage : "paper");      // the stage of a system now (the stage in systems-default.js is only the starting value)
+function trAppendStage(e){      // one entry into the log, then to the runner; a replay is handed the move by the chunk (PIPE.addMoves, in trSink, once it has taken effect)
+  TRN.stageLog.push(e);
+  if (TRN.db){
+    try{ const tx = TRN.db.transaction("stages", "readwrite"); tx.objectStore("stages").add(e); tx.onerror = () => { TRN.err = "stage log write failed"; }; }
+    catch(err){ TRN.err = "stage log write failed"; console.error("trader", err); }
+  }
+  if (TRN.driver) TRN.driver.move({sys: e.sys, to: e.to});
+}
+// m: {sys, to, by: "user"|"auto", reason?, cap?}. Returns {ok, entry} or {ok: false, reason}; nothing is written when it is refused.
+function trMove(m){
+  const t = TRN.lastT || (typeof nowEx === "function" ? nowEx() : Date.now()), r = PROMO.apply(TRN.stageLog, Object.assign({t, start: TR_DEF[m.sys] ? TR_DEF[m.sys].stage : "paper"}, m), TRN.journal);
+  if (!r.ok) return r;
+  trAppendStage(r.entry); return r;
+}
+function trLossCheck(id, t){      // a live system that lost its limit in one UTC day goes back to paper by itself
+  if (trStage(id) !== "live" || !TR_DEF[id]) return;
+  const l = PROMO.lossLimit(TRN.journal, {id, riskFrac: TR_DEF[id].risk.riskFrac, equity0: TR_CFG.equity}, PROMO.capOf(TRN.stageLog, id), Math.floor((t || TRN.lastT || Date.now()) / PROMO.DAY));
+  if (l.hit) trMove({sys: id, to: "paper", by: "auto", reason: "loss limit: $" + l.loss.toFixed(2) + " lost today, limit $" + l.limit.toFixed(2) + (l.which === "cap" ? " (its cap)" : " (3 times its risk per trade)")});
 }
 
 </script>
@@ -5069,7 +5356,7 @@ async function trResetJournal(){
 // Trader home (Trader step 5a, page side, thin): draws what trader-core.js (TRADER) works out, in the first view ("overview", shown as "Trader"): the status line, one card per system with its seven parts,
 // the detail of the selected system, the price chart with the trades and skipped triggers, and the journal. Display only: it reads the runner (runner.js) and the engine's price history and changes nothing in them.
 // Cheap: the view model is rebuilt at most twice a second and only while the view is open (VIEWS.tick calls renderTrader only then); the chart redraws only when its data changed.
-const TV = {sel: store.get("trSel", null), win: +store.get("trWin", 30) || 30, at: 0, evLen: -1, evAt: 0, ev: {}, tw: {}, drawKey: "", hits: [], jSys: store.get("trJSys", ""), jHtml: "", rowsHtml: "", detHtml: "", tipDefault: "Hover or tap a mark for its reason. Triangles are entries (up long, down short), squares are exits with their reason, diamonds are invalidations, ticks along the bottom are skipped triggers."};
+const TV = {el: {}, elLog: -1, elRows: -1, promoHtml: "", conf: null, sel: store.get("trSel", null), win: +store.get("trWin", 30) || 30, at: 0, evLen: -1, evAt: 0, ev: {}, tw: {}, drawKey: "", hits: [], jSys: store.get("trJSys", ""), jHtml: "", rowsHtml: "", detHtml: "", tipDefault: "Hover or tap a mark for its reason. Triangles are entries (up long, down short), squares are exits with their reason, diamonds are invalidations, ticks along the bottom are skipped triggers."};
 const TV_SYS = SYSTEMS_DEFAULT.map(d => ({d, id: SYSTEM.id(d)})), TV_NAMES = Object.fromEntries(TV_SYS.map(x => [x.id, x.d.name]));
 const tv$ = id => document.getElementById(id);
 const tvEsc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -5083,6 +5370,16 @@ tv$("trWin").value = String(TV.win);
 function tvEval(rows){
   const now = performance.now();
   if (rows.length < TV.evLen || (rows.length !== TV.evLen && now - TV.evAt > 2000)){ TV.ev = RUNNER.evaluate(rows); TV.tw = TRADER.twinMeans(rows); TV.evLen = rows.length; TV.evAt = now; }
+  // the standing against the promotion rule, from the same rows (recomputed when they changed as far as the figures above did, or when a move was made)
+  if (TV.elLog !== TRN.stageLog.length || TV.elRows !== TV.evLen){ TV.el = {}; for (const x of TV_SYS) TV.el[x.id] = PROMO.eligibility(rows, TRN.stageLog, x.id, x.d.stage); TV.elLog = TRN.stageLog.length; TV.elRows = TV.evLen; }
+}
+const tvStageLabel = s => s === "paper" ? "paper" : s + " (paper fills)";      // demo and live execution are steps 8 and 9: until then a system in either stage still fills on paper, and the badge says so
+const tvTouchOnly = () => { try{ return !window.matchMedia("(any-pointer: fine)").matches; }catch{ return false; } };      // no mouse or trackpad on this device: demo and live need the PC (spec section 9, decision 4)
+function tvProg(el, stage){
+  if (!el || el.stage !== stage) return "";
+  if (stage === "paper") return el.eligible ? "eligible for demo" : `${el.criteria[0].now} / ${el.criteria[0].need} trades, day ${el.criteria[1].now} / ${el.criteria[1].need}`;
+  if (stage === "demo") return el.waiting || (el.eligible ? "eligible for live" : `${el.criteria[0].now} / ${el.criteria[0].need} demo trades, day ${el.criteria[1].now} / ${el.criteria[1].need}`);
+  return "";
 }
 function tvTime(t, full){
   const d = new Date(t), p = n => String(n).padStart(2, "0"), hm = p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds());
@@ -5098,15 +5395,15 @@ function tvTwinSvg(c){
   const label = `${tw.length} twin${tw.length === 1 ? "" : "s"} with ${TRADER.MIN_TRADES} trades: mean R from ${TRADER.fx(Math.min(...tw), 3)} to ${TRADER.fx(Math.max(...tw), 3)}` + (c.system != null ? `; the system ${TRADER.fx(c.system, 3)}` : "");
   return `<svg class="twsvg" viewBox="0 0 200 24" role="img" aria-label="${tvEsc(label)}"><title>${tvEsc(label)}</title><line class="twb" x1="2" x2="198" y1="12.5" y2="12.5"/><line class="tw0" x1="${X(0)}" x2="${X(0)}" y1="3" y2="22"/>${ticks}${mk}</svg><span class="twcap">ticks: its ${tw.length} twins' mean R${c.system != null ? " · ▼ the system" : ""} · dashed: zero</span>`;
 }
-function tvCellHtml(c){
+function tvCellHtml(c, prog){
   let body;
   if (c.key === "evaluation" && c.ready) body = `${c.trades} trades · ${c.days} day${c.days === 1 ? "" : "s"} · mean <span class="${c.cls}">${TRADER.fx(c.meanNetBps, 2)} bps</span> · mean R <span class="${c.cls}">${TRADER.fx(c.meanR, 3)}</span> · ${tvEsc(c.place)}`;
   else body = tvEsc(c.text);
-  return `<div class="trcell st-${c.st}" data-k="${c.key}"><span class="trlab">${c.label}</span><span class="trbody"><b class="sg">${TV_GLYPH[c.st]} ${TV_WORD[c.st]}</b> ${body}${c.key === "evaluation" ? tvTwinSvg(c) : ""}</span></div>`;
+  return `<div class="trcell st-${c.st}" data-k="${c.key}"><span class="trlab">${c.label}</span><span class="trbody"><b class="sg">${TV_GLYPH[c.st]} ${TV_WORD[c.st]}</b> ${body}${c.key === "evaluation" ? tvTwinSvg(c) + (prog ? `<span class="trprog">${tvEsc(prog)}</span>` : "") : ""}</span></div>`;
 }
 function tvSystemHtml(x, st, cells){
-  const sel = TV.sel === x.id, o = st && st.open, pos = o ? (o.exiting ? "closing" : (o.dir > 0 ? "long" : "short") + " @ " + TRADER.pxs(o.px)) : "flat";
-  return `<article class="trsys${sel ? " sel" : ""}" data-sys="${x.id}"><div class="trhead"><button class="trname" data-sys="${x.id}" aria-pressed="${sel}" title="Show this system on the chart and its detail">${tvEsc(x.d.name)}</button><span class="trbadge" title="stage">${tvEsc(x.d.stage)}</span><span class="trpos">${pos}</span></div><div class="trcells">${cells.map(tvCellHtml).join("")}</div></article>`;
+  const sel = TV.sel === x.id, stage = trStage(x.id), prog = tvProg(TV.el[x.id], stage), o = st && st.open, pos = o ? (o.exiting ? "closing" : (o.dir > 0 ? "long" : "short") + " @ " + TRADER.pxs(o.px)) : "flat";
+  return `<article class="trsys${sel ? " sel" : ""}" data-sys="${x.id}"><div class="trhead"><button class="trname" data-sys="${x.id}" aria-pressed="${sel}" title="Show this system on the chart and its detail">${tvEsc(x.d.name)}</button><span class="trbadge" title="stage">${tvEsc(tvStageLabel(stage))}</span><span class="trpos">${pos}</span></div><div class="trcells">${cells.map(c => tvCellHtml(c, prog)).join("")}</div></article>`;
 }
 
 // ----- the detail of the selected system
@@ -5123,11 +5420,62 @@ function tvDetailHtml(x, ev, rows){
   const chips = reasons.map(k => `<span>${tvEsc(k)} ${by[k]}</span>`).join("") + (e && e.interrupted ? `<span>interrupted ${e.interrupted} (not counted)</span>` : "");
   const sk = TRADER.skipSummary(rows, x.id), now = nowEx();
   return `<h3><span>${tvEsc(x.d.name)}: detail</span><button data-close="1" aria-label="Close the detail">✕</button></h3>`
-    + `<dl class="trdl">${d.lines.map(l => `<dt>${l[0]}</dt><dd>${tvEsc(l[1])}</dd>`).join("")}<dt>Venue</dt><dd>${tvEsc(d.venue)}, stage ${tvEsc(d.stage)}</dd></dl>`
+    + `<dl class="trdl">${d.lines.map(l => `<dt>${l[0]}</dt><dd>${tvEsc(l[1])}</dd>`).join("")}<dt>Venue</dt><dd>${tvEsc(d.venue)}, stage ${tvEsc(tvStageLabel(trStage(x.id)))}</dd></dl>`
     + `<div class="note" style="margin-top:0">Closed trades by how they ended (an invalidation is counted apart from a stop)</div><div class="trchips">${chips || "<span>no closed trades yet</span>"}</div>`
     + `<div class="note" style="margin-top:0">Net result per day (bps, UTC day of the entry)${e && e.trades < TRADER.MIN_TRADES ? ": no colour until 20 trades" : ""}</div>${tvBars(TRADER.dayBars(rows, x.id), !!(e && e.trades >= TRADER.MIN_TRADES))}`
     + `<div class="note" style="margin-top:0">Skipped triggers, latest first</div>` + (sk.length ? `<table class="tt"><tr><th>reason</th><th>count</th><th>last</th><th>what it means</th></tr>${sk.map(s => `<tr><td>${tvEsc(s.reason)}</td><td>${s.n}</td><td>${TRADER.dur((now - s.last) / 1000)} ago</td><td style="white-space:normal">${tvEsc(s.words)}</td></tr>`).join("")}</table>` : `<div class="note">No trigger has been skipped yet.</div>`);
 }
+
+// ----- promotion (step 7): the rule's checklist, the buttons, the stage log, and the confirmation panel (promotion-core.js decides; here it is only shown and a move is asked for)
+const TV_LUCK = "With seven systems looked at every day, the chance that at least one of them passes criterion 4 (ahead of its twins) by luck alone is about 30%; the other criteria and the demo stage are there for that reason.";
+const TV_TOUCH_WHY = "Promotion to demo and live is done on a PC: a phone can sleep or lose its connection while real orders rest on the exchange. Moving a system down works here.";
+function tvChecklist(el){
+  return `<ul class="trck">${el.criteria.map(c => `<li class="${c.met ? "met" : "no"}"><span class="mk" aria-hidden="true">${c.met ? "✓" : "✗"}</span><span>${tvEsc(c.text)}<span class="sr"> (${c.met ? "met" : "not met"})</span></span></li>`).join("")}</ul>`;
+}
+function tvLogHtml(id){
+  const log = TRN.stageLog.filter(e => e.sys === id).slice().reverse();
+  if (!log.length) return `<div class="note" style="margin-top:0">Stage log: no move yet, the system is at its starting stage (paper).</div>`;
+  return `<div class="note" style="margin-top:0">Stage log (newest first)</div><div style="overflow-x:auto"><table class="tt"><tr><th>time</th><th>move</th><th>by</th><th>why</th></tr>${log.map(e => `<tr><td>${tvTime(e.t, true)}</td><td>${tvEsc(e.from)} → ${tvEsc(e.to)}</td><td>${tvEsc(e.by)}</td><td style="white-space:normal">${tvEsc(e.reason || (e.by === "user" && e.to === "paper" ? "moved down by hand" : e.by === "user" ? "all criteria met, promoted by hand" : ""))}${e.cap != null ? " · cap $" + tvEsc(e.cap) : ""}</td></tr>`).join("")}</table></div>`;
+}
+function tvPromoHtml(x, el){
+  const stage = trStage(x.id), touch = tvTouchOnly();
+  let h = `<h3>Promotion: ${tvEsc(x.d.name)} · stage ${tvEsc(tvStageLabel(stage))}</h3>`;
+  if (stage === "live") h += `<div class="note" style="margin-top:0">Live (paper fills until step 9): nothing further to promote to. It returns to paper by itself if it loses 3 times its risk per trade, or its cap, in one UTC day.</div>`;
+  else if (el){
+    h += `<div class="note" style="margin-top:0">${stage === "paper" ? "Paper to demo" : "Demo to live"}: all of these, counted on ${stage === "paper" ? "paper-filled" : "demo-filled"} trades made live by this page ${el.since != null ? "since " + tvTime(el.since, true) + " (the last move into " + stage + ")" : "since the journal began"}; interrupted positions never count.</div>`
+      + tvChecklist(el) + `<div class="trstat${el.eligible ? " el" : ""}">${el.waiting ? tvEsc(el.waiting) : el.eligible ? "eligible" : "not eligible"}</div>`;
+    if (stage === "demo") h += `<div class="note" style="margin-top:0">Demo execution is built in step 8: until then this system's demo stage keeps filling on paper and nothing is sent to any exchange.</div>`;
+  }
+  const canUp = stage !== "live" && el && el.eligible && !touch, why = stage === "live" ? "" : touch ? TV_TOUCH_WHY : !el || !el.eligible ? "Not eligible: the checklist shows what is still missing." : "";
+  h += `<div class="trbtns">` + (stage === "live" ? "" : `<button class="primary" data-act="promote" ${canUp ? "" : "disabled"}>Promote to ${tvEsc(el ? el.next : "demo")}</button>`) + (stage !== "paper" ? `<button data-act="down">Move to paper</button>` : "") + `</div>`
+    + (why ? `<div class="note trwhy" style="margin-top:0">${tvEsc(why)}</div>` : "")
+    + tvLogHtml(x.id) + `<div class="note">${tvEsc(TV_LUCK)}</div>`;
+  return h;
+}
+const tvToday = {demo: "Demo: from the next second this system's new trades are marked stage demo. Demo execution does not exist yet (step 8), so it keeps filling on paper and nothing is sent to any exchange. The count for demo to live starts now and needs demo-filled trades.",
+  live: "Live: from the next second this system's new trades are marked stage live. Live execution does not exist yet (step 9), so it keeps filling on paper and nothing is sent to any exchange. It returns to paper by itself if it loses 3 times its risk per trade, or the cap, in one UTC day.",
+  paper: "Paper: the count for the next promotion starts again from now; the trades so far stay in the journal but no longer count. A position open at this moment finishes under the stage it was entered in. The move takes effect at the next snapshot."};
+function tvCloseConfirm(){ TV.conf = null; const c = tv$("trConfirm"); c.hidden = true; c.innerHTML = ""; }
+function tvOpenConfirm(kind){
+  const x = TV_SYS.find(q => q.id === TV.sel), el = x && TV.el[x.id]; if (!x || !el) return;
+  const stage = trStage(x.id), to = kind === "down" ? "paper" : el.next; if (!to || (kind !== "down" && (!el.eligible || tvTouchOnly()))) return;
+  TV.conf = {sys: x.id, to, from: stage};
+  tv$("trConfirm").innerHTML = `<h3>${kind === "down" ? "Move" : "Promote"} ${tvEsc(x.d.name)} ${kind === "down" ? "to" : "from " + tvEsc(stage) + " to"} ${tvEsc(to)}?</h3>`
+    + (kind === "down" ? `<div class="note" style="margin-top:0">Its figures now (they are copied into the stage log):</div>` : `<div class="note" style="margin-top:0">The figures behind this promotion (they are copied into the stage log):</div>`) + tvChecklist(el)
+    + `<div class="note">${tvEsc(tvToday[to])}</div>`
+    + (to === "live" ? `<div class="capln"><label for="trCap">Dollar cap for this system</label><input id="trCap" type="number" min="1" step="any" inputmode="decimal" placeholder="e.g. 200"></div>` : "")
+    + `<div class="err" id="trConfErr" role="alert"></div><div class="trbtns"><button class="primary" data-act="confirm">${kind === "down" ? "Move to paper" : "Promote to " + tvEsc(to)}</button><button data-act="cancel">Cancel</button></div>`;
+  tv$("trConfirm").hidden = false; const f = tv$("trCap") || tv$("trConfirm").querySelector('[data-act="cancel"]'); if (f) f.focus();
+}
+function tvConfirm(){
+  const c = TV.conf; if (!c) return;
+  const cap = c.to === "live" ? parseFloat(tv$("trCap").value) : undefined, r = trMove({sys: c.sys, to: c.to, by: "user", cap});
+  if (!r.ok){ tv$("trConfErr").textContent = "Not done: " + r.reason; return; }
+  tvCloseConfirm(); TV.elLog = -1; renderTrader(true);
+}
+tv$("trPromo").addEventListener("click", e => { const b = e.target.closest("button[data-act]"); if (!b || b.disabled) return; tvOpenConfirm(b.dataset.act === "down" ? "down" : "up"); });
+tv$("trConfirm").addEventListener("click", e => { const b = e.target.closest("button[data-act]"); if (!b) return; if (b.dataset.act === "confirm") tvConfirm(); else tvCloseConfirm(); });
+tv$("trConfirm").addEventListener("keydown", e => { if (e.key === "Escape") tvCloseConfirm(); else if (e.key === "Enter" && e.target.id === "trCap") tvConfirm(); });
 
 // ----- the journal
 function tvJournalHtml(rows){
@@ -5246,6 +5594,11 @@ function renderTrader(force){
     const det = tv$("trDetail"), x = TV.sel ? TV_SYS.find(q => q.id === TV.sel) : null;
     if (!x){ det.hidden = true; TV.detHtml = ""; }
     else { const dh = tvDetailHtml(x, TV.ev, rows); if (dh !== TV.detHtml){ TV.detHtml = dh; det.innerHTML = dh; } det.hidden = false; }
+    // the Promotion block of the selected system (its own element: the confirmation panel below it keeps what was typed while this redraws)
+    const pr = tv$("trPromo");
+    if (!x){ pr.hidden = true; TV.promoHtml = ""; }
+    else { const ph = tvPromoHtml(x, TV.el[x.id]); if (ph !== TV.promoHtml){ TV.promoHtml = ph; pr.innerHTML = ph; } pr.hidden = false; }
+    if (TV.conf && (!x || x.id !== TV.conf.sys || trStage(TV.conf.sys) !== TV.conf.from)) tvCloseConfirm();      // another system chosen, or the stage moved underneath (an automatic move): the question no longer applies
     // the chart: redraws only when its data changed
     tv$("trChartFor").textContent = x ? x.d.name : "all seven systems";
     const m = tvChartData(rows, st), cv = tv$("trChart"), p = m.pos, key = [TV.sel, TV.win, m.t1, rows.length, cv.clientWidth, cv.clientHeight, p ? p.entryPx + ":" + p.stopPx + ":" + p.targetPx : "", TH.canvas].join("|");
@@ -5259,7 +5612,7 @@ function renderTrader(force){
 }
 
 // ----- controls
-function tvSelect(id){ TV.sel = id; store.set("trSel", id); TV.drawKey = ""; renderTrader(true); }
+function tvSelect(id){ if (id !== TV.sel) tvCloseConfirm(); TV.sel = id; store.set("trSel", id); TV.drawKey = ""; renderTrader(true); }
 tv$("trRows").addEventListener("click", e => { const a = e.target.closest(".trsys"); if (!a) return; tvSelect(a.dataset.sys === TV.sel ? null : a.dataset.sys); });
 tv$("trDetail").addEventListener("click", e => { if (e.target.closest("[data-close]")) tvSelect(null); });
 tv$("trWin").onchange = () => { TV.win = +tv$("trWin").value; store.set("trWin", TV.win); TV.drawKey = ""; renderTrader(true); };
@@ -5267,7 +5620,7 @@ tv$("trJSys").onchange = () => { TV.jSys = tv$("trJSys").value; store.set("trJSy
 tv$("trJSkips").onchange = () => renderTrader(true);
 tv$("trOn").onchange = () => { trSetOn(tv$("trOn").checked); renderTrader(true); };
 tv$("trExport").onclick = trExportJournal;
-tv$("trReset").onclick = async () => { if (await trResetJournal()){ TV.evLen = -1; renderTrader(true); } };
+tv$("trReset").onclick = async () => { if (await trResetJournal()){ TV.evLen = -1; TV.elLog = -1; TV.evAt = 0; tvCloseConfirm(); renderTrader(true); } };
 VIEWS.onOpen("overview", () => { TV.drawKey = ""; renderTrader(true); });
 
 </script>
@@ -6473,7 +6826,7 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden && FS
 "use strict";
 // Header status (view): live chips next to Connect/Pause and the BN/HL pills (STATUS.chips, status-core.js), and the "newer version" bar.
 // Read-only: it only looks at the app's state once a second and never changes a feed, a recording or a detection. Loaded last.
-const APP_VERSION = "v142";            // "vNNN" in a release build, "dev" otherwise (build.mjs stamps it)
+const APP_VERSION = "v143";            // "vNNN" in a release build, "dev" otherwise (build.mjs stamps it)
 const SB = {latest:null, sure:false, timer:null};
 const sb$ = id => document.getElementById(id);
 sb$("ver").textContent = APP_VERSION;           // tiny version tag next to the title
@@ -7390,7 +7743,7 @@ function rrBegin() {
   if (!RR.on) { RR.id = null; rrRender(); return; }
   RR.id = rrStamp(new Date(now)); RR.sym = sym; RR.seqSaved = -1; RR.prevFailed = false;
   PIPE.begin({id: RR.id, sym: rt$("sym").value.trim().toUpperCase(), startedAt: now, lateMs: TF_LATE, engineCfg: (() => { try { return rtCfg(); } catch { return null; } })(),
-    runner: {on: runner, cfg: TR_CFG, ids: SYSTEMS_DEFAULT.map(d => SYSTEM.id(d)), carry: TRN.driver ? TRN.driver.carry : []}});
+    runner: {on: runner, cfg: TR_CFG, ids: SYSTEMS_DEFAULT.map(d => SYSTEM.id(d)), carry: TRN.driver ? TRN.driver.carry : [], stages: TRN.driver ? TRN.driver.stages() : {}}});
   store.set("rr.last", {id: RR.id, seq: -1, final: false, at: now, cut: false}); rrRender();
 }
 function rrDisconnect() { rrEnd(true, "disconnect"); store.set("rr.was", false); rrRelease(); setTimeout(() => { if (typeof colRelay === "function") colRelay(); }, 0); }      // called by the Connect button before it disconnects

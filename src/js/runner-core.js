@@ -3,8 +3,10 @@
 // Fills: an entry or exit is filled at the far side of the Binance quote in the snapshot (buy at the ask, sell at the bid), whatever venue the trigger reads. No quote, or one older than the core's staleMs: the entry
 // is cancelled (a skip row "no quote"); an exit waits for the next quote. Each fill pays feeBps of its notional.
 // Journal rows (all carry sys = the system id and t = snapshot time):
-//   {k:"enter", pid, dir, px, qty, notional, stopBps, thesis, trigger, tSig}    {k:"exit"|"invalidate", pid, reason, why?}    {k:"skip", reason}
-//   {k:"trade", pid, tIn, tOut, dir, qty, notional, entryPx, exitPx, grossBps, feesBps, netBps, R, usd, stopBps, reason, thesis}   a closed trade; reason "interrupted" = open when the page closed (no figures)
+//   {k:"enter", pid, dir, px, qty, notional, stopBps, thesis, trigger, tSig, stage, fill}    {k:"exit"|"invalidate", pid, reason, why?}    {k:"skip", reason}
+//   {k:"trade", pid, tIn, tOut, dir, qty, notional, entryPx, exitPx, grossBps, feesBps, netBps, R, usd, stopBps, reason, thesis, stage, fill}   a closed trade; reason "interrupted" = open when the page closed (no figures)
+//   stage = the system's stage (paper / demo / live) when the trade was ENTERED, fill = where it was filled (always "paper" until step 8); rows written before step 7 have neither and read as paper / paper (promotion-core.js).
+//   A system's stage comes from o.stages ({system id: stage}, read from the stage log by the page), else from its definition; a move (move()) takes effect at the next snapshot, an open position finishes under the stage it was entered in.
 //   {k:"twin", n, tIn, netBps, R, usd, reason}                                                                              a closed twin trade (twins write nothing else)
 const RUNNER = (() => {
   "use strict";
@@ -15,7 +17,7 @@ const RUNNER = (() => {
   // equity: the start plus the closed results of the rows already in the journal
   function create(o) {
     const defs = o.systems, N = o.twins == null ? 20 : o.twins, eq0 = o.equity == null ? 10000 : o.equity, fee = o.feeBps == null ? 5 : o.feeBps, cap = o.riskCap == null ? 0.02 : o.riskCap, seed = o.seed == null ? 1 : o.seed;
-    const staleMs = SYSTEM.OPTIONS.staleMs, rows = (o.journal || []).slice(), fresh = [];
+    const staleMs = SYSTEM.OPTIONS.staleMs, rows = (o.journal || []).slice(), fresh = [], stagesIn = o.stages || {};
     // what the journal already says: results per system and per twin, and the positions that were open when it ended
     const usd = new Map(), openPos = new Map(), closedPid = new Set();
     for (const r of rows) {
@@ -24,11 +26,11 @@ const RUNNER = (() => {
       else if (r.k === "enter") openPos.set(r.pid, r);
     }
     // a position open when the page closed cannot be filled honestly: it is closed as interrupted and left out of every figure
-    for (const [pid, e] of openPos) if (!closedPid.has(pid)) { const r = { k: "trade", sys: e.sys, t: e.t, pid, tIn: e.t, tOut: null, dir: e.dir, entryPx: e.px, reason: "interrupted", interrupted: true, thesis: e.thesis }; rows.push(r); fresh.push(r); }
+    for (const [pid, e] of openPos) if (!closedPid.has(pid)) { const r = { k: "trade", sys: e.sys, t: e.t, pid, tIn: e.t, tOut: null, dir: e.dir, entryPx: e.px, reason: "interrupted", interrupted: true, thesis: e.thesis, stage: e.stage || "paper", fill: e.fill || "paper" }; rows.push(r); fresh.push(r); }
 
     const S = defs.map(def => {
       const inst = SYSTEM.create(def), id = inst.id;
-      return { def, id, inst, led: { eq: eq0 + (usd.get(id) || 0), pos: null, pend: null }, trig: 0, secs: 0, t0: null,
+      return { def, id, inst, stage: stagesIn[id] || def.stage, led: { eq: eq0 + (usd.get(id) || 0), pos: null, pend: null }, trig: 0, secs: 0, t0: null,
         twins: Array.from({ length: N }, (_, n) => ({ n, inst: SYSTEM.create(def, { forced: true }), led: { eq: eq0 + (usd.get(id + "#" + n) || 0), pos: null, pend: null }, rng: null, forced: 0 })) };
     });
     if (new Set(S.map(s => s.id)).size !== S.length) throw new Error("two systems have the same id");
@@ -41,7 +43,7 @@ const RUNNER = (() => {
       const netBps = usdNet / p.notional * 1e4, feesBps = (p.feeIn + feeOut) / p.notional * 1e4, R = netBps / p.stopBps;
       L.eq += usdNet; L.pos = null; const reason = L.pend; L.pend = null;
       const row = isTwin ? { k: "twin", sys: s.id, t: snap.t, n: e.n, tIn: p.tIn, netBps, R, usd: usdNet, reason }
-        : { k: "trade", sys: s.id, t: snap.t, pid: p.pid, tIn: p.tIn, tOut: snap.t, dir: p.dir, qty: p.qty, notional: p.notional, entryPx: p.px, exitPx: px, grossBps, feesBps, netBps, R, usd: usdNet, stopBps: p.stopBps, reason, thesis: p.thesis };
+        : { k: "trade", sys: s.id, t: snap.t, pid: p.pid, tIn: p.tIn, tOut: snap.t, dir: p.dir, qty: p.qty, notional: p.notional, entryPx: p.px, exitPx: px, grossBps, feesBps, netBps, R, usd: usdNet, stopBps: p.stopBps, reason, thesis: p.thesis, stage: p.stage, fill: p.fill };
       out.push(row);
     }
     // the open risk of the systems (not the twins)
@@ -59,9 +61,9 @@ const RUNNER = (() => {
           const px = it.dir > 0 ? q.ask : q.bid, sz = SYSTEM.size(L.eq, rf, it.stopBps, px);
           if (!(sz.qty > 0)) { refuse("no size"); continue; }
           if (e.inst.filled(px, snap.t).length) { if (!isTwin) out.push({ k: "skip", sys: s.id, t: snap.t, reason: "no room", tSig: it.tSig }); continue; }      // a level exit with no room behind the fill: void, nothing was bought
-          const p = { pid: s.id + ":" + snap.t, dir: it.dir, px, qty: sz.qty, notional: sz.notional, tIn: snap.t, stopBps: it.stopBps, thesis: it.thesis, feeIn: fee / 1e4 * sz.notional };
+          const p = { pid: s.id + ":" + snap.t, dir: it.dir, px, qty: sz.qty, notional: sz.notional, tIn: snap.t, stopBps: it.stopBps, thesis: it.thesis, feeIn: fee / 1e4 * sz.notional, stage: s.stage, fill: "paper" };
           L.pos = p; L.pend = null;
-          if (!isTwin) out.push({ k: "enter", sys: s.id, t: snap.t, pid: p.pid, dir: p.dir, px, qty: p.qty, notional: p.notional, stopBps: p.stopBps, thesis: p.thesis, trigger: s.def.trigger.type, tSig: it.tSig });
+          if (!isTwin) out.push({ k: "enter", sys: s.id, t: snap.t, pid: p.pid, dir: p.dir, px, qty: p.qty, notional: p.notional, stopBps: p.stopBps, thesis: p.thesis, trigger: s.def.trigger.type, tSig: it.tSig, stage: p.stage, fill: p.fill });
         } else if (it.type === "skip") {
           if (!isTwin) { s.trig++; out.push({ k: "skip", sys: s.id, t: snap.t, reason: it.reason, tSig: it.tSig }); }
         } else if (it.type === "exit" || it.type === "invalidate") {
@@ -98,11 +100,13 @@ const RUNNER = (() => {
       // the page is stopping (disconnect): what is open stays unfinished, so it is closed as interrupted, as at a reload
       interrupt(t) {
         const out = [];
-        for (const s of S) if (s.led.pos) { const p = s.led.pos; s.led.pos = null; s.led.pend = null; out.push({ k: "trade", sys: s.id, t, pid: p.pid, tIn: p.tIn, tOut: null, dir: p.dir, entryPx: p.px, reason: "interrupted", interrupted: true, thesis: p.thesis }); }
+        for (const s of S) if (s.led.pos) { const p = s.led.pos; s.led.pos = null; s.led.pend = null; out.push({ k: "trade", sys: s.id, t, pid: p.pid, tIn: p.tIn, tOut: null, dir: p.dir, entryPx: p.px, reason: "interrupted", interrupted: true, thesis: p.thesis, stage: p.stage, fill: p.fill }); }
         for (const r of out) rows.push(r);
         return out;
       },
-      state: () => S.map(s => ({ id: s.id, name: s.def.name, equity: s.led.eq, triggers: s.trig, secs: s.secs, twinForced: s.twins.length ? s.twins.reduce((a, w) => a + w.forced, 0) / s.twins.length : 0,
+      // a system's stage changes: new entries are stamped with it from the next snapshot on (the driver calls this just before it hands over that snapshot); a position already open keeps the stage it was entered in
+      move(id, to) { const s = S.find(q => q.id === id); if (!s) return false; s.stage = to; return true; },
+      state: () => S.map(s => ({ id: s.id, name: s.def.name, stage: s.stage, equity: s.led.eq, triggers: s.trig, secs: s.secs, twinForced: s.twins.length ? s.twins.reduce((a, w) => a + w.forced, 0) / s.twins.length : 0,
         open: s.led.pos ? { dir: s.led.pos.dir, px: s.led.pos.px, tIn: s.led.pos.tIn, notional: s.led.pos.notional, exiting: s.led.pend } : null,
         inst: s.inst.state() })),      // the instance's own state (context, region, trigger reading, thesis, position with stop and target): read-only, for the Trader home; twins are not included
       // the open risk of the systems against the cap (twins not counted), as fractions of equity
@@ -129,8 +133,10 @@ const RUNNER = (() => {
   // The runner as the page and a replay both run it: one runner at a time, begun again after a data gap (more than gapMs between two snapshots: the rolling windows are stale), the equity carried over and
   // what was open closed as interrupted. step(snap) and stop(t) return the journal rows they wrote; own() is every row written since the driver began. o: create()'s options plus gapMs (default 30000)
   // and either journal (rows already written) or carry (a list from carryOf). The decision lives here only, so the page and the replay cannot differ.
+  // Stages (step 7): o.stages is {system id: stage} at the start; move({sys, to}) queues a move, which is applied just before the next snapshot is handed to the runner (so it takes effect at that snapshot's time, `at`), and drain() returns
+  // the moves applied since the last call as [{sys, to, at}] (the page writes them into the chunk; a replay hands the same moves back with move() before the snapshot whose time is `at`). The driver remembers the stages across a gap restart.
   function driver(o) {
-    const gapMs = o.gapMs == null ? 30000 : o.gapMs, base = o.carry ? o.carry.slice() : carryOf(o.journal || []), own = [];
+    const gapMs = o.gapMs == null ? 30000 : o.gapMs, base = o.carry ? o.carry.slice() : carryOf(o.journal || []), own = [], stages = Object.assign({}, o.stages), pending = [], moved = [];
     let run = null, lastT = 0;
     const take = (rows, out) => { for (const r of rows) { own.push(r); out.push(r); } };
     return {
@@ -138,16 +144,20 @@ const RUNNER = (() => {
       step(snap) {
         const out = [];
         if (run && lastT && snap.t - lastT > gapMs) { take(run.interrupt(lastT), out); run = null; }
-        if (!run) { run = create(Object.assign({}, o, { journal: base.concat(own) })); take(run.fresh(), out); }
+        if (!run) { run = create(Object.assign({}, o, { journal: base.concat(own), stages: Object.assign({}, stages) })); take(run.fresh(), out); }
+        for (const m of pending.splice(0)) { stages[m.sys] = m.to; run.move(m.sys, m.to); moved.push({ sys: m.sys, to: m.to, at: snap.t }); }
         take(run.step(snap), out); lastT = snap.t; return out;
       },
       stop(t) { const out = []; if (run) { take(run.interrupt(t == null ? lastT : t), out); run = null; } return out; },
+      move(m) { pending.push({ sys: m.sys, to: m.to }); },
+      drain: () => moved.splice(0),
+      stages: () => Object.assign({}, stages),
       own: () => own, runner: () => run, lastT: () => lastT,
     };
   }
 
   // per system: trades, days with a trade (UTC day of the entry), mean net bps and R, the share of days with a positive sum, counts by exit reason (invalidate apart from stop), interrupted positions (left out of every figure),
-  // the last skip, and the system's mean net R as a percentile among its twins' means (null until the system and at least 15 twins have 20 trades each). It does not decide promotion (step 7).
+  // the last skip, and the system's mean net R as a percentile among its twins' means (null until the system and at least 15 twins have 20 trades each). It does not decide promotion: promotion-core.js (PROMO) does, from the same rows.
   function evaluate(rows) {
     const by = new Map(), get = id => { let s = by.get(id); if (!s) { s = { tr: [], interrupted: 0, lastSkip: null, tw: new Map() }; by.set(id, s); } return s; };
     for (const r of rows) {
@@ -243,6 +253,34 @@ const RUNNER = (() => {
       const first = runAll(cfg, snaps.slice(0, 70)), jr = first.rows(), da = driver(Object.assign({}, cfg, { journal: jr })), db = driver(Object.assign({}, cfg, { carry: carryOf(jr) })), ra = [], rb = [];
       for (const s of snaps.slice(70)) { for (const x of da.step(s)) ra.push(x); for (const x of db.step(s)) rb.push(x); }
       ok("a driver given carryOf(journal) writes the same rows as one given the journal (equity and interrupted positions carried)", JSON.stringify(ra) === JSON.stringify(rb) && ra.length > 0 && carryOf(jr).some(x => x.k === "enter") && ra.some(x => x.interrupted), ra.length + " " + rb.length); }
+    // ----- stages (step 7): every enter and trade row says the stage it was entered under and where it was filled
+    { const snaps = mkSnaps(1200, saw), plain = runAll({ systems: [fast], twins: 3, riskCap: 1 }, snaps), id = plain.state()[0].id, rr = plain.rows().filter(x => x.k === "enter" || (x.k === "trade" && !x.interrupted));
+      ok("enter and trade rows carry stage and fill, paper / paper by default", rr.length > 20 && rr.every(x => x.stage === "paper" && x.fill === "paper") && plain.state()[0].stage === "paper", JSON.stringify(rr[0]));
+      const demo = runAll({ systems: [fast], twins: 3, riskCap: 1, stages: { [id]: "demo" } }, snaps), dr = demo.rows();
+      ok("o.stages sets a system's stage from the start: the rows say demo, the fill is still paper, and nothing else about the rows changes", demo.state()[0].stage === "demo" && dr.filter(x => x.k === "enter" || x.k === "trade").every(x => x.stage === "demo" && x.fill === "paper") && JSON.stringify(dr.map(x => Object.assign({}, x, { stage: undefined }))) === JSON.stringify(plain.rows().map(x => Object.assign({}, x, { stage: undefined }))));
+      // a move at second 600 takes effect at the next snapshot; the position open then finishes under the stage it was entered in
+      const r = create({ systems: [fast], twins: 3, riskCap: 1 }); let open = null, tMove = null;
+      for (let i = 0; i < snaps.length; i++) { if (i === 600) { open = r.state()[0].open; r.move(id, "demo"); tMove = snaps[i].t; } r.step(snaps[i]); }
+      const en = r.rows().filter(x => x.k === "enter"), tr = r.rows().filter(x => x.k === "trade" && !x.interrupted);
+      ok("a move: entries before it are stamped paper, entries from the next snapshot on demo, and a trade has the stage of its entry (not of its exit)", en.some(x => x.stage === "paper") && en.some(x => x.stage === "demo") && en.every(x => x.stage === (x.t < tMove ? "paper" : "demo")) && tr.every(x => x.stage === (x.tIn < tMove ? "paper" : "demo")) && r.state()[0].stage === "demo", JSON.stringify(en.map(x => x.t - T0 + ":" + x.stage).slice(0, 4)));
+      ok("a move does not change what the system decides: with the stage fields taken out the journal is the same as without the move", JSON.stringify(r.rows().map(x => Object.assign({}, x, { stage: undefined }))) === JSON.stringify(plain.rows().map(x => Object.assign({}, x, { stage: undefined }))));
+      ok("moving a system that does not exist changes nothing and says so", r.move("nope", "demo") === false);
+      // a position open at the move keeps its stage: build the case on purpose (a long hold, the move comes during it)
+      const slow = sys({ exit: { type: "timed", holdSec: 60 } }), s2 = mkSnaps(300, jump), id2 = SYSTEM.id(slow), q = create({ systems: [slow], twins: 0 });
+      for (let i = 0; i < s2.length; i++) { if (i === 75) q.move(id2, "live"); q.step(s2[i]); }
+      const e2 = q.rows().find(x => x.k === "enter"), t2 = q.rows().find(x => x.k === "trade");
+      ok("a position open when the stage moves keeps the stage it was entered in (entered at 60 s under paper, moved at 75 s, closed at 120 s: the trade says paper)", e2 && t2 && e2.t < T0 + 75000 && t2.tOut > T0 + 75000 && e2.stage === "paper" && t2.stage === "paper" && q.state()[0].stage === "live", JSON.stringify([e2 && e2.t - T0, t2 && t2.tOut - T0, t2 && t2.stage])); }
+    // an interrupted row says its stage too
+    { const snaps = mkSnaps(200, jump), r1 = runAll({ systems: [sys()], twins: 0 }, snaps.slice(0, 70)), id = r1.state()[0].id, j = r1.rows(), r2 = create({ systems: [sys()], twins: 0, journal: j, stages: { [id]: "demo" } }), f = r2.fresh();
+      ok("a position interrupted by a restart keeps the stage it was entered in (paper), whatever the stage is now", f.length === 1 && f[0].stage === "paper" && f[0].fill === "paper" && r2.state()[0].stage === "demo", JSON.stringify(f)); }
+    { const snaps = mkSnaps(400, jump), cfg = { systems: [sys()], twins: 0 }, id = SYSTEM.id(sys()), d = driver(cfg), got = [];
+      for (let i = 0; i < 40; i++) d.step(snaps[i]);
+      d.move({ sys: id, to: "demo" }); ok("a move queued in the driver is not applied until the next snapshot", d.drain().length === 0 && d.stages()[id] === undefined);
+      d.step(snaps[40]); const mv = d.drain(); ok("the next snapshot applies it and the driver says when (at = that snapshot's time); draining empties the list", mv.length === 1 && mv[0].sys === id && mv[0].to === "demo" && mv[0].at === snaps[40].t && d.drain().length === 0 && d.stages()[id] === "demo" && d.runner().state()[0].stage === "demo");
+      // across a gap restart the driver builds the new runner with the stage the system had
+      const rows = []; for (let i = 41; i < 400; i++) { if (i === 100) i = 140; for (const x of d.step(snaps[i])) rows.push(x); }
+      ok("a gap restart keeps the stage (the new runner is built with it) and the rows after it say demo", d.runner().state()[0].stage === "demo" && rows.some(x => x.k === "enter") && rows.filter(x => x.k === "enter").every(x => x.stage === "demo"), JSON.stringify(rows.filter(x => x.k === "enter").map(x => x.stage)));
+      const d2 = driver(Object.assign({ stages: { [id]: "live" } }, cfg)); d2.step(snaps[0]); ok("a driver given stages begins its runner with them", d2.runner().state()[0].stage === "live"); }
     // ----- evaluate
     { const tr = (sys, d, net, reason, h) => ({ k: "trade", sys, t: 0, pid: sys + d + net + h, tIn: d * DAY + h * 3600000, netBps: net, R: net / 10, reason }), twin = (sys, n, R) => ({ k: "twin", sys, t: 0, n, tIn: 0, netBps: R * 10, R, reason: "time" });
       const rows = [tr("A", 1, 5, "time", 1), tr("A", 1, -2, "stop", 2), tr("A", 2, -4, "invalidate", 1), tr("A", 3, 6, "time", 5), { k: "skip", sys: "A", t: 5, reason: "risk cap" }, { k: "skip", sys: "A", t: 9, reason: "in position" }];

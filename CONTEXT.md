@@ -28,3 +28,9 @@
 **Run**: what lies between two resets of the engine (a connect, a change of asset, a page load) or ends at a disconnect. At the start of a run the engine, the facts accumulator and the paper runner are all new, so replaying the run's chunks gives the page's journal row for row. A page that closes without a disconnect leaves a run cut short.
 
 **Chunk**: one cut of a run's input stream, made when an input's own time is 30 minutes after the chunk's first input, or at 600,000 inputs (never by a timer, so a hidden tab cuts in the same place). It is a session file with the run's id, its number in the run, the runner's configuration and the journal rows written during the chunk. No input is lost or repeated between two chunks of a run.
+
+**Stage**: where a trade system stands: paper, demo or live. Every trade row records the stage the system had when the trade was entered and where it was filled (`fill`, paper until demo execution exists). Moves between stages are kept in the stage log.
+
+**Promotion**: a move up one stage, by the user and never automatic, allowed only when the system meets the fixed rule (spec 4.7) counted on trades the page made live since its last move into the stage; live also needs a dollar cap. A move down to paper is always allowed and restarts the count; a live system is moved down by itself on a one-day loss limit.
+
+**Twin**: a random-entry copy of a system (same context, region, exit, stop and sizing; entries at random times and directions at the system's own trigger rate), paper only, 20 per system. A system's result is read against its twins' results.

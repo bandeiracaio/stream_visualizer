@@ -263,6 +263,21 @@ td.up{color:var(--buy)}td.dn{color:var(--sell)}
 .trchips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}.trchips span{border:1px solid var(--edge);border-radius:var(--r);padding:1px 7px;font-size:11.5px}
 .trbars{display:block;width:100%;max-width:640px;height:auto;margin-bottom:8px}.trbars text{fill:var(--text);font:10px var(--mono)}.trbars .dimt{fill:var(--dim)}.trbars line{stroke:var(--edge)}
 .trbars .bp{fill:var(--buy)}.trbars .bn{fill:var(--sell)}.trbars .b0{fill:var(--dim)}
+/* Promotion block (step 7): the rule's checklist, the buttons, the stage log; the confirmation is a panel, never a browser dialog */
+#trPromo{margin-top:8px;border-top:1px solid var(--line);padding-top:8px}
+#trPromo h3,#trConfirm h3{font-size:12px;margin:0 0 6px;color:var(--accent)}
+.trck{list-style:none;margin:0 0 6px;padding:0}.trck li{display:grid;grid-template-columns:20px minmax(0,1fr);gap:4px;padding:1px 0}
+.trck .mk{font-weight:700;color:var(--text)}.trck .met .mk{color:var(--buy)}
+.trck .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.trstat{font-weight:700;margin:2px 0 6px}.trstat.el{color:var(--buy)}
+.trbtns{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 4px}
+#trPromo button:disabled,#trConfirm button:disabled{opacity:.75}
+.trwhy{margin:0 0 8px}
+.trprog{display:block;color:var(--dim);font-size:11px;margin-top:2px}
+#trConfirm{margin-top:8px;background:var(--panel2);border:1px solid var(--accent);border-radius:var(--r);padding:8px}
+#trConfirm[hidden]{display:none}
+#trConfirm .capln{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:6px 0}#trConfirm input[type=number]{width:120px}
+#trConfirm .err{color:var(--sell);font-weight:600;margin:4px 0}
 canvas.trchart{width:100%;height:280px;display:block;background:var(--canvas);border-radius:var(--r);touch-action:pan-y}
 @media(max-width:700px){canvas.trchart{height:230px}.jx{display:none}.trdl{grid-template-columns:76px minmax(0,1fr)}}
 .trj{width:100%}.trj td,.trj th{white-space:nowrap}.trj td.rs{white-space:normal}
