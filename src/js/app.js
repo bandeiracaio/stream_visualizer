@@ -455,24 +455,24 @@ $("swMin").oninput = renderSweeps;
 
 
 // ---------- tabs ----------
-// Seven areas by what you are doing; an area with several views shows them as a sub-row. Every view is one VIEWS.register (views.js): its place in
+// Five areas by what you are doing (Trader, Market, Recordings, Account, Diagnostics); an area with several views shows them as a sub-row. Every view is one VIEWS.register (views.js): its place in
 // the navigation, and (render + minIntervalMs) how the frame loop draws it. Views of one slot (reader) share one render and one throttle.
-for (const [id, l, icon] of [["now","Now","M3 12h4l3-8 4 16 3-8h4"],["setups","Setups","M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"],["reader","Reader","M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 9a3 3 0 100 6 3 3 0 000-6z"],["review","Review","M4 6l2 2 3-3M4 14l2 2 3-3M13 7h8M13 15h8"],["rec","Recordings","M12 4a8 8 0 100 16 8 8 0 000-16zM12 9a3 3 0 100 6 3 3 0 000-6z"],["trade","Trade","M7 4v16M7 4L4 7M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3"],["system","System","M4 7h8M18 7h2M4 17h2M10 17h10M14 4v6M8 14v6"]]) VIEWS.area(id, l, icon);
+for (const [id, l, icon] of [["trader","Trader","M3 12h4l3-8 4 16 3-8h4"],["market","Market","M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"],["rec","Recordings","M12 4a8 8 0 100 16 8 8 0 000-16zM12 9a3 3 0 100 6 3 3 0 000-6z"],["account","Account","M7 4v16M7 4L4 7M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3"],["diag","Diagnostics","M4 7h8M18 7h2M4 17h2M10 17h10M14 4v6M8 14v6"]]) VIEWS.area(id, l, icon);
 const READER_SLOT = {slot:"reader", render:()=>renderReader(), minIntervalMs:250};   // renderReader draws all of these views
-VIEWS.register({id:"overview", label:"Trader", area:"now", minIntervalMs:250, render:()=>{ if (typeof renderTrader==="function") renderTrader(); try{ renderOverview(); }catch(e){ console.error("overview", e); } }});
-VIEWS.register({id:"armmode", label:"Arm mode", area:"now"});
-VIEWS.register({id:"market", label:"Market and tape", area:"now"});
-VIEWS.register({id:"micro", label:"Microstructure", area:"setups", minIntervalMs:250, render:()=>renderMicro()});
-VIEWS.register(Object.assign({id:"reader", label:"Episodes", area:"reader"}, READER_SLOT));
-VIEWS.register({id:"signals", label:"Signals", area:"reader", slot:"reader"});
-VIEWS.register({id:"replay", label:"Replay", area:"review", slot:"reader"});
+VIEWS.register({id:"overview", label:"Trader", area:"trader", minIntervalMs:250, render:()=>{ if (typeof renderTrader==="function") renderTrader(); try{ renderOverview(); }catch(e){ console.error("overview", e); } }});
+VIEWS.register({id:"micro", label:"Microstructure", area:"market", minIntervalMs:250, render:()=>renderMicro()});
+VIEWS.register({id:"market", label:"Market and tape", area:"market"});
+VIEWS.register(Object.assign({id:"reader", label:"Episodes", area:"market"}, READER_SLOT));
 VIEWS.register({id:"record", label:"Recordings", area:"rec", slot:"reader"});   // Record, Saved, Health log and Collectors are blocks of this one view
-VIEWS.register({id:"trading", label:"Trading", area:"trade", minIntervalMs:400, render:()=>renderTrading()});
-VIEWS.register({id:"history", label:"History", area:"trade"});
-VIEWS.register({id:"streams", label:"Streams", area:"system"});
-VIEWS.register({id:"health", label:"Feed health", area:"system"});
-VIEWS.register({id:"raw", label:"Raw", area:"system"});
-VIEWS.register({id:"engine", label:"Engine", area:"system", slot:"reader"});
+VIEWS.register({id:"replay", label:"Replay", area:"rec", slot:"reader"});
+VIEWS.register({id:"armmode", label:"Arm mode", area:"rec"});   // stays until step 6 replaces auto-record
+VIEWS.register({id:"trading", label:"Trading", area:"account", minIntervalMs:400, render:()=>renderTrading()});
+VIEWS.register({id:"history", label:"History", area:"account"});
+VIEWS.register({id:"health", label:"Feed health", area:"diag"});
+VIEWS.register({id:"streams", label:"Streams", area:"diag"});
+VIEWS.register({id:"raw", label:"Raw", area:"diag"});
+VIEWS.register({id:"engine", label:"Engine", area:"diag", slot:"reader"});
+VIEWS.register({id:"signals", label:"Signals", area:"diag", slot:"reader"});
 const TABS = VIEWS.tabs(), GROUPS = VIEWS.groups();
 const GICON = VIEWS.icons();
 const groupOf = v => GROUPS.find(g=>g[2].includes(v)) || GROUPS[0];

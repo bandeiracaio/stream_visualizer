@@ -1,5 +1,5 @@
 "use strict";
-// Arm mode (view, Now > Arm mode): one screen to leave open while the app collects. Top: what the app is doing right now and anything that needs attention;
+// Arm mode (view, Recordings > Arm mode): one screen to leave open while the app collects. Top: what the app is doing right now and anything that needs attention;
 // below: quality of the data coming in, the market now, the Reader, recordings made this session and the Health log. Read-only: it looks at state owned by
 // other files once a second (only while the view is open) and never changes a feed, a recording or a detection; the one button is the header's Arm.
 // Loaded last, after the files whose state it reads (typeof guards keep it harmless if one is missing).

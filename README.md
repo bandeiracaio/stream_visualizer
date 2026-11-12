@@ -26,7 +26,7 @@ Stream Visualizer tries to do both jobs honestly:
 |---|---|
 | **One file** | `stream-visualizer_vNNN.html`, self-contained. Open the hosted copy, or copy the file to any device. |
 | **Two venues at once** | Binance USD-M futures and Hyperliquid, trades, books, liquidations, open interest, basis. |
-| **Five areas** | Live (overview, charts, microstructure, tape), Reader, Trade, Market, Diagnostics. |
+| **Five areas** | Trader (the seven parts of each paper system, the price chart with its trades, the journal), Market (microstructure, market and tape, episodes), Recordings (recordings, replay, arm mode), Account (trading, history), Diagnostics (feed health, streams, raw, engine, signals). |
 | **Episode-based Reader** | Phenomena have a lifecycle (forming, active, fading, ended, resumable) with a back-dated start and a multi-variable evidence checklist. |
 | **Record and replay** | Save a live session to a file, load it on any device and replay it with different thresholds. |
 | **Auto-record** | Arm it and the app waits on a single price stream, then connects and records by itself when the market gets volatile (relative to its last hour, or above a fixed sigma), and saves the file when it calms down or hits a time limit. |
@@ -124,7 +124,9 @@ src/
   styles.css
   js/
     app.js              feeds, charts, navigation, Reader cards
-    overview.js         Overview (home) view
+    trader-core.js      Trader home: cells, chart markers, journal lines (pure)
+    trader-view.js      Trader home view
+    overview.js         market / account / recording cards under the Trader home
     reader-engine.js    pure order-flow engine + one-off detectors (replayable)
     reader-episodes.js  pure episode state machines and evidence checklists
     reader-tools.js     record / save / load / replay, timeline

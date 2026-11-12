@@ -1,5 +1,5 @@
 "use strict";
-// Overview (home): one phone-sized read of the market. Reads state owned by app.js; owns only its own 5 s history,
+// Overview cards (below the Trader sections of the first view, trader-view.js): a phone-sized read of the market, account and recording. Reads state owned by app.js; owns only its own 5 s history,
 // because app.js prunes its histories to 5 minutes and the overview shows up to 15.
 const OV = {hist:[], sym:null};
 const OV_WINS = {"1m":60000, "5m":300000, "15m":900000};

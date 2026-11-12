@@ -1,5 +1,5 @@
 "use strict";
-// Overnight run (view, Now > Arm mode): "Ready to arm?" (a checklist before you leave) and "Last night" (what the saved recordings of the last hours look like).
+// Overnight run (view, Recordings > Arm mode): "Ready to arm?" (a checklist before you leave) and "Last night" (what the saved recordings of the last hours look like).
 // The decisions are in overnight-core.js (pure, self-tested). Read-only: it looks at state owned by other files (like arm-mode.js, which it extends) and changes nothing
 // except by the button Open (loads a recording into the replay).
 // Loaded after arm-mode.js. Spec: .scratch/overnight/spec.md.
