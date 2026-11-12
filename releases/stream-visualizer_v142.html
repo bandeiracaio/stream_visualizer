@@ -31,8 +31,6 @@ option{background:var(--panel2);color:var(--text)}
 button{cursor:pointer}button.primary{background:var(--accent);color:var(--ink);border-color:var(--accent);font-weight:600}button.primary:hover:not(:disabled){color:var(--ink);opacity:.9}
 button.on{border-color:var(--accent);color:var(--accent)}
 #catLock.on{border-color:var(--warn);color:var(--warn)}
-/* joined buttons (Record | Arm) */
-.seg{display:inline-flex}.seg button{border-radius:0}.seg button+button{margin-left:-1px}.seg button:first-child{border-top-left-radius:var(--r);border-bottom-left-radius:var(--r)}.seg button:last-child{border-top-right-radius:var(--r);border-bottom-right-radius:var(--r)}.seg button:hover,.seg button.on{position:relative;z-index:1}
 /* status button: one dot per venue, the words are in its panel */
 #stBtn{display:inline-flex;align-items:center;gap:9px}#stBtn .sd{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--dim)}
 #stBtn .sd::after{content:"";width:9px;height:9px;border-radius:50%;flex:none;background:var(--warn)}
@@ -40,7 +38,6 @@ button.on{border-color:var(--accent);color:var(--accent)}
 #stBtn[data-alert=warn]{border-color:var(--warn)}#stBtn[data-alert=bad]{border-color:var(--sell)}#stBtn[data-n]:not([data-n=""])::before{content:attr(data-n);font-size:10.5px;font-weight:700;padding:0 5px;border-radius:var(--r);background:var(--warn);color:var(--ink)}#stBtn[data-alert=bad]::before{background:var(--sell)}
 #stPanel{width:min(340px,calc(100vw - 16px))}#stPanel .pill{display:flex;gap:8px;font-size:12px;margin:2px 0}#stPanel .pill b{position:static;width:auto;height:auto;clip:auto;overflow:visible}#stPanel .pill::after{display:none}
 
-#arHdr.on,#recHdr.on{border-color:var(--warn);color:var(--warn)}#arHdrMsg{max-width:100%}#arHdrMsg:empty{display:none}
 .stat{font-family:var(--mono);color:var(--dim);font-size:12px}.stat b{color:var(--text);font-weight:600}#hlList .stat{overflow-wrap:anywhere}
 nav{display:flex;gap:4px;overflow-x:auto;width:100%;padding-top:2px;scrollbar-width:none}
 nav button{flex:none;padding:4px 10px;font-size:12px}
@@ -187,7 +184,6 @@ section.collapsed > .pbody{height:0;overflow:hidden;visibility:hidden}
   #stBtn{gap:6px;padding:4px 6px}#stBtn .sd{font-size:0}      /* phone: two dots (BN, HL in that order), the words are in the panel */
   #accPnl{display:none}                  /* the phone keeps the header at two rows: mode only, the number is in the panel */
   .accpanel{right:4px;max-height:calc(100vh - var(--hh,95px) - 70px)}
-  #arHdrMsg{position:absolute;top:100%;left:0;right:0;z-index:6;max-width:none;background:var(--panel2);border-bottom:1px solid var(--accent);padding:6px 10px}      /* the answer to Arm floats under the header instead of pushing the page down */
   input,select,button{min-height:44px}
   .chip,#views button,.rm,.tt button{min-height:36px}      /* small controls inside panels */
   .pill{gap:2px;font-size:10.5px}
@@ -249,20 +245,6 @@ td.up{color:var(--buy)}td.dn{color:var(--sell)}
   .rd-det{overflow-x:auto}                              /* a wide data table scrolls inside its box, not the page */
 }
 
-/* Arm mode (Now): the leave-it-open screen. Colours are tokens only. */
-.am-hero{display:flex;flex-wrap:wrap;gap:10px 24px;justify-content:space-between;align-items:center;border-left:6px solid var(--edge);padding:6px 0 6px 14px}
-.am-h-ok{border-color:var(--buy)}.am-h-warn{border-color:var(--warn)}.am-h-rec{border-color:var(--sell)}.am-h-info{border-color:var(--accent)}
-.am-big{font-size:26px;font-weight:700;color:var(--hi);letter-spacing:.5px}.am-h-rec .am-big{color:var(--sell)}.am-h-ok .am-big{color:var(--buy)}.am-h-warn .am-big{color:var(--warn)}
-.am-subline{color:var(--text);font-size:13px;margin-top:4px}
-.am-side{text-align:right}.am-clock{font-size:22px;color:var(--hi)}.am-side button{margin-top:6px}
-.am-alert{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px;color:var(--text)}
-.am-a-bad{color:var(--sell)}.am-a-warn{color:var(--warn)}.am-a-ok{color:var(--buy)}
-.am-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;flex:none;background:var(--dim)}
-.am-ok{background:var(--buy)}.am-warn{background:var(--warn)}.am-bad{background:var(--sell)}.am-info{background:var(--accent)}.am-off{background:var(--dim)}
-.am-kv{display:flex;justify-content:space-between;gap:12px;padding:4px 0;border-bottom:1px solid var(--line);font-size:12.5px}.am-kv span{color:var(--dim)}.am-kv b{color:var(--hi);text-align:right;font-weight:600}
-.am-t-ok,.am-t-up{color:var(--buy)!important}.am-t-warn{color:var(--warn)!important}.am-t-bad,.am-t-dn,.am-t-rec{color:var(--sell)!important}
-.am-sub{color:var(--dim);font-size:11.5px;margin:8px 0 3px}.am-chip{display:inline-block;margin:2px 10px 2px 0;font-size:12px;color:var(--text)}
-.am-ep{font-size:12px;padding:3px 0;color:var(--text);border-bottom:1px solid var(--line)}.am-ep b{color:var(--accent)}
 #stChips{display:flex;flex-wrap:wrap;gap:5px}
 /* Trader home (view "overview"): a card per system, the seven parts as labelled lines; seven columns on a wide screen */
 .up{color:var(--buy)}.dn{color:var(--sell)}
@@ -299,11 +281,9 @@ canvas.trchart{width:100%;height:280px;display:block;background:var(--canvas);bo
 </head>
 <body>
 <header>
-  <div id="armBar" hidden><span id="armText"></span><button id="armBtn" class="primary">Re-arm now</button><button id="armClose" title="Forget that it was armed">Dismiss</button></div>
   <div id="updBar" hidden><span id="updText"></span><button id="updBtn" class="primary">Reload</button><button id="updClose" title="Hide until the next check">✕</button></div>
   <h1>Live Stream Visualizer <small id="ver"></small></h1>
   <button id="go" class="primary">Connect</button>
-  <span class="seg"><button id="recHdr" title="Record the raw inputs now (same as Record in the Recordings tab)">Record</button><button id="arHdr" title="Auto-record: watch the price and record when the market gets volatile (settings: Recordings tab)">Arm</button></span><span id="arHdrMsg" class="stat"></span>
   <button id="stBtn" title="Feeds status (Binance, Hyperliquid) and cat mode" aria-expanded="false"><span class="sd" id="stBn" data-st="off">BN</span><span class="sd" id="stHl" data-st="off">HL</span></button>
   <button id="catLock" aria-pressed="false">🐱</button>
   <span id="accSplit" class="split"><button id="accMain" title="Account info (or connect an account)"><span class="dot"></span><b id="accLbl">Account</b><span id="accPnl"></span></button><button id="accCaret" title="Switch or connect an account" aria-label="Switch or connect an account" aria-expanded="false">▾</button></span>
@@ -526,39 +506,19 @@ canvas.trchart{width:100%;height:280px;display:block;background:var(--canvas);bo
   </section>
 
   <section data-tab="record" class="full">
-    <h2>Record</h2>
-    <div class="row"><button id="rtRec">Record</button><span id="rtStat" class="stat">not recording</span></div>
-    <div class="rt-h">Auto-record when the market gets volatile</div>
-    <div class="rd-det" id="arCfg">
-      <label title="Start when the last 5 minutes are this many times as volatile as the last hour">start at x of the hour <input id="arTrigRatio" type="number" step="0.1" min="1"></label>
-      <label title="Or start when the last 5 minutes are above this sigma (bps per root second; BTC is about 0.5 on a normal day)">or sigma above <input id="arTrigSigma" type="number" step="0.1" min="0"></label>
-      <label title="Calm again when below this many times the hour's volatility">calm below x of the hour <input id="arExitRatio" type="number" step="0.1" min="1"></label>
-      <label title="and below this sigma">and sigma below <input id="arExitSigma" type="number" step="0.1" min="0"></label>
-      <label title="Stop after it has been calm this long">stop after calm (min) <input id="arCalmMin" type="number" step="1" min="1"></label>
-      <label title="Never record longer than this">at most (min) <input id="arMaxMin" type="number" step="5" min="5"></label>
-      <label title="After a recording is saved, stay armed and watch for the next volatile stretch (up to 8 recordings per arming)">keep watching after a recording <input id="arRearm" type="checkbox"></label>
-      <label title="Also start when the Reader sees an absorption, exhaustion or burst episode (no big price move needed); a recording then stays open while one is active or fading">also start on a Reader episode <input id="arEpTrig" type="checkbox"></label>
-      <label title="Also start when the collectors read forced flow (liquidations of at least $500k in a minute and 10x the usual) or a stressed market (two of: volatility index up, forced flow, venue price gap). Funding and open interest are slow and do not trigger">also start on forced flow or a stressed market <input id="arColTrig" type="checkbox"></label>
-      <label title="Minutes of the real inputs (trades, book) kept while it waits, so a recording starts with what led up to the trigger">lead-in kept (min) <input id="arPreMin" type="number" step="1" min="1" max="30"></label>
-      <label title="Minutes after a recording during which it will not start another (none after a stop at the time limit)">cooldown after one (min) <input id="arCooldown" type="number" step="1" min="1"></label>
-    </div>
-    <div class="row" style="margin-top:6px"><button id="arArm">Arm</button><span id="arStat" class="stat">off</span></div>
-    <div id="arMsg" class="note">While armed the app connects the feeds itself, runs the Reader and keeps the last minutes of the real inputs; when the market turns volatile it starts recording with that lead-in, then saves the file when it calms down. It costs more CPU and battery than the old light wait: use a PC or a charging phone, and keep this tab open and the screen on (it is the page that records).</div>
+    <h2>Replay a file</h2>
+    <div class="note">Recordings are made by the continuous recording above. Here you load a file (a chunk or a session saved earlier) to replay it under Review, Replay and labels.</div>
     <div class="row" style="margin-top:8px">
       <button id="rtSave" disabled>Save session</button><button id="rtLoadBtn">Load session</button><input id="rtLoad" type="file" accept=".json,.gz,application/json,application/gzip" hidden>
     </div>
     <div class="note rtmsg"></div>
   </section>
 
-  <section data-tab="armmode" class="full ovhero"><div id="amHero"></div></section>
-  <section data-tab="armmode" class="full"><h2>Ready to arm?</h2><div id="amPre"></div></section>
-  <section data-tab="armmode" class="full"><h2>Needs attention</h2><div id="amAlerts"></div></section>
-  <section data-tab="armmode"><h2>Data quality</h2><div id="amQuality"></div></section>
-  <section data-tab="armmode"><h2>Market now</h2><div id="amMarket"></div></section>
-  <section data-tab="armmode"><h2>Reader</h2><div id="amReader"></div></section>
-  <section data-tab="armmode"><h2>Recordings this session</h2><div id="amRecs"></div></section>
-  <section data-tab="armmode" class="full"><h2>Last night <span class="ctl"><select id="onHours" title="How far back to look"><option value="12">12 h</option><option value="24" selected>24 h</option><option value="48">48 h</option></select></span></h2><div id="onStatus" class="stat"></div><div id="amMorning"></div></section>
-  <section data-tab="armmode" class="full"><h2>Health log (latest)</h2><div id="amHealth"></div></section>
+  <section data-tab="record" class="full">
+    <h2>Left running</h2>
+    <div class="note">What to check when the page is left open for hours.</div>
+    <div id="lrList"></div>
+  </section>
 
   <section data-tab="record" class="full">
     <h2>Saved recordings</h2>
@@ -588,14 +548,14 @@ canvas.trchart{width:100%;height:280px;display:block;background:var(--canvas);bo
 
   <section data-tab="replay" class="full">
     <h2>Replay</h2>
-    <div class="note">Load a session in Recordings (Record, Load session) or open one from Recordings (Saved recordings). Replay it here with the thresholds below to compare.</div>
+    <div class="note">Load a session in Recordings (Load session) or open one from Recordings (Saved recordings). Replay it here with the thresholds below to compare.</div>
     <div class="rt-h">Episode thresholds (used live and in replays)</div>
     <div id="rtTune" class="rd-det"></div>
     <div class="row" style="margin-top:8px">
       <button id="rtReplay" disabled>Replay with current settings</button><button id="rtLive" disabled>Back to live</button>
     </div>
     <div class="note rtmsg"></div>
-    <div class="note">Record a session while connected, save it, then replay it with different thresholds to compare. Everything stays on this device.</div>
+    <div class="note">Connect (it records by itself), then load a saved chunk and replay it with different thresholds to compare. Everything stays on this device.</div>
   </section>
 
   <section data-tab="signals" class="full">
@@ -2105,6 +2065,30 @@ const CHUNK = (() => {
     return "session_" + (String(c.sym || "X").replace(/[^A-Za-z0-9_-]/g, "") || "X") + "_" + stamp + "_run" + c.run + "-c" + String(c.seq).padStart(3, "0") + (gz ? ".json.gz" : ".json");
   }
 
+  // The checks that still matter for a page left running for hours (they were the Arm mode checklist). env: {connected, recOn, folder:{supported, state:"ok"|"none"|"denied"|"failed", name}|null, disk:{tone, text}|null,
+  // battery:{charging, level 0..1}|null, wakeApi, wake (lock held), newer (a newer version string or null), hidden, persisted}. Items {id, tone:"ok"|"warn"|"bad"|"info", text, fix}; fix is empty when ok.
+  function leftRunning(env) {
+    const out = [], add = (id, tone, text, fix) => out.push({ id, tone, text, fix: tone === "ok" ? "" : fix || "" });
+    if (!env.recOn) add("rec", "bad", "Recording is off", "Turn the switch on (Continuous recording): nothing is being kept.");
+    else if (!env.connected) add("rec", "warn", "Not connected", "Press Connect: a run is recorded from connect to disconnect.");
+    else add("rec", "ok", "Connected and recording");
+    const f = env.folder;
+    if (f && f.supported) {
+      if (f.state === "ok") add("folder", "ok", "Save folder: " + (f.name || "chosen"));
+      else if (f.state === "none") add("folder", "warn", "No save folder: chunks are kept in this browser for 24 hours only", "Choose a folder (Saved recordings, Choose folder).");
+      else if (f.state === "denied") add("folder", "bad", "The browser took back access to the save folder", "Press Allow (Saved recordings).");
+      else add("folder", "bad", "The last save into the folder failed", "Check the folder and the disk.");
+    }
+    if (env.disk) add("disk", env.disk.tone === "ok" ? "ok" : env.disk.tone, "Disk room: " + env.disk.text, "Free some space or choose another folder.");
+    if (env.persisted === false) add("persist", "warn", "The browser may evict stored chunks", "Allow persistent storage for this site.");
+    if (env.battery) add("power", env.battery.charging ? "ok" : env.battery.level < 0.5 ? "bad" : "warn", env.battery.charging ? "Power: charging" : "Power: on battery, " + Math.round(env.battery.level * 100) + "%", "Plug in the device.");
+    if (env.connected && env.wakeApi === false) add("wake", "warn", "No screen wake lock in this browser: the device may sleep", "Turn off sleep in the system settings.");
+    else if (env.connected && env.wakeApi && !env.wake) add("wake", "warn", "The screen wake lock is not held: the device may sleep", "Keep the tab visible; the lock is asked for again when it is.");
+    else if (env.connected) add("wake", "ok", "Screen wake lock held");
+    if (env.newer) add("version", "warn", "A newer version (" + env.newer + ") is out", "Reload when you can stop the run: the chunk being recorded is lost on a reload.");
+    return { items: out, bad: out.filter(x => x.tone === "bad").length, warn: out.filter(x => x.tone === "warn").length };
+  }
+
   // ---------- self-test: scenarios named chunk:* ----------
   function selftest() {
     const res = [], ok = (name, c, detail) => res.push({ name: "chunk:" + name, ok: !!c, detail: c ? "" : String(detail || "") });
@@ -2161,10 +2145,15 @@ const CHUNK = (() => {
     { const { F } = mkFacts(), got = []; let cfg = "a"; const p = pipeline({ facts: F, maxMs: 1e9, cfgNow: () => cfg, onChunk: c => got.push(c) }); p.reset(); p.begin({ id: "r3", sym: "BTC", startedAt: T0, runner: { on: false }, engineCfg: null, lateMs: 1000 });
       const s = stream(20); for (let i = 0; i < s.length; i++) { if (i === 200) cfg = "b"; apply(p, s[i]); } p.end(false, "switch");
       ok("settings that changed during a chunk are noted on it", got.length === 1 && got[0].changed.join() === "engine settings" && got[0].final === false && got[0].why === "switch"); }
+    { const good = { connected: true, recOn: true, folder: { supported: true, state: "ok", name: "sessions" }, disk: { tone: "ok", text: "40 GB" }, battery: { charging: true, level: 1 }, wakeApi: true, wake: true, newer: null, persisted: true };
+      const r = leftRunning(good), t = (env, id) => leftRunning(Object.assign({}, good, env)).items.find(x => x.id === id);
+      ok("left running: everything fine has no warning and no fix text", r.bad === 0 && r.warn === 0 && r.items.every(x => x.tone === "ok" && x.fix === ""));
+      ok("left running: recording off is bad, not connected warns, a missing folder warns, a denied one is bad", t({ recOn: false }, "rec").tone === "bad" && t({ connected: false }, "rec").tone === "warn" && t({ folder: { supported: true, state: "none" } }, "folder").tone === "warn" && t({ folder: { supported: true, state: "denied" } }, "folder").tone === "bad" && !t({ folder: { supported: false } }, "folder"));
+      ok("left running: disk tone passes on, battery under 50% is bad, a lost wake lock and a newer version warn", t({ disk: { tone: "bad", text: "1 GB" } }, "disk").tone === "bad" && t({ battery: { charging: false, level: 0.3 } }, "power").tone === "bad" && t({ battery: { charging: false, level: 0.8 } }, "power").tone === "warn" && t({ wake: false }, "wake").tone === "warn" && /v200/.test(t({ newer: "v200" }, "version").text)); }
     return res;
   }
 
-  return { MAX_MS, MAX_N, THIN_MS, timeOf, thinner, pipeline, replay, check, firstDiff, fileName, selftest };
+  return { MAX_MS, MAX_N, THIN_MS, timeOf, thinner, pipeline, replay, check, firstDiff, fileName, leftRunning, selftest };
 })();
 
 </script>
@@ -2446,69 +2435,6 @@ const TRADER = (() => {
 })();
 
 </script>
-<script id="auto-record-core">
-"use strict";
-// Auto-record on volatility (pure, no DOM, no timers): how volatile the market is now against its own last hour, and when a recording should
-// start and stop. Prices arrive once a second (Binance mark price); everything here only reads them.
-// Volatility is the same scale the Reader uses for sigma: the robust spread of overlapping 15 s returns (75th percentile of the absolute
-// deviation from the median, over 1.1503), divided by the square root of the lag, so it reads in bps per root second.
-const AUTOREC = (() => {
-  const DEFAULTS = {
-    fastSec:300, slowSec:3600, lagSec:15, minFast:200, minSlow:900,       // 5 min against the last hour; needs 15 min of history before it can judge
-    trigRatio:1.8, trigSigma:1.2, trigFloor:.4,                                          // start when the 5 min sigma is 1.8x the hour's, or above 1.2 bps/root s (either; the ratio only counts above trigFloor, so a dead-calm market cannot trigger it)
-    exitRatio:1.3, exitSigma:.8, calmMin:5, maxMin:60, staleSec:10,                     // stop after 5 minutes below both exit levels, or after 60 minutes
-    rearm:true, cooldownMin:3, maxRuns:100, preMin:10, epTrig:true, colTrig:true,                                              // after a recording keep watching (no new start for 3 minutes, none at all after a stop at the time limit), at most 100 recordings per arming (8 until v097: a night of collecting hit the cap)
-  };
-  const SIZE = 4096, SD_PER_Q75 = 1.1503, Q75 = .75;     // the 75th percentile of the absolute deviation over 1.1503 is the standard deviation of a normal; the same constants as the engine's sigma
-  function createHistory() { return {px:new Float64Array(SIZE), sec:new Float64Array(SIZE).fill(-1), last:-1}; }
-  function push(h, tMs, p) {
-    if (!(p > 0)) return;
-    const s = Math.floor(tMs/1000), i = s % SIZE;
-    h.px[i] = p; h.sec[i] = s; if (s > h.last) h.last = s;
-  }
-  // the price at second s, or the latest one within 3 s before it (a missed second does not break a return)
-  function priceAt(h, s) { for (let k = 0; k <= 3; k++){ const i = (s-k) % SIZE; if (h.sec[i] === s-k) return h.px[i]; } return null; }
-  // the last secs seconds of prices as [second, price] pairs (a missed second is left out): the trace kept with a recording
-  function dump(h, nowMs, secs) { const out = [], end = Math.floor(nowMs/1000); for (let s = end - secs + 1; s <= end; s++){ const i = s % SIZE; if (h.sec[i] === s) out.push([s, h.px[i]]); } return out; }
-  // robust sigma over the last winSec seconds: {sigma, n}
-  function sigma(h, winSec, lagSec) {
-    const r = [];
-    for (let s = h.last - winSec + 1; s <= h.last; s++){ const a = priceAt(h, s), b = priceAt(h, s - lagSec); if (a && b) r.push((a/b - 1)*1e4); }
-    if (r.length < 30) return {sigma:0, n:r.length};
-    const s = Float64Array.from(r).sort(), med = s[s.length >> 1], d = Float64Array.from(s, x => Math.abs(x - med)).sort();
-    return {sigma:d[Math.floor(d.length*Q75)]/SD_PER_Q75/Math.sqrt(lagSec), n:r.length};
-  }
-  // nowMs (the clock the prices were stamped with): when the newest price is older than staleSec the stream has stalled, and the last window is not judged
-  function vol(h, cfg, nowMs) {
-    const c = Object.assign({}, DEFAULTS, cfg), f = sigma(h, c.fastSec, c.lagSec), sl = sigma(h, c.slowSec, c.lagSec);
-    return {fast:f.sigma, slow:sl.sigma, ratio:sl.sigma > 0 ? f.sigma/sl.sigma : 0, nFast:f.n, nSlow:sl.n, ready:f.n >= c.minFast && sl.n >= c.minSlow && !(nowMs != null && nowMs/1000 - h.last > c.staleSec)};
-  }
-  // One decision per check. st: {mode:"waiting"|"recording", since, calmSince}; returns the new state and an action ("start" | "stop" | null) with the reason.
-  // ep (optional): what the Reader sees right now, {active, live}: episodes (not walls) that are active, and active or fading. With epTrig an active one also starts a recording
-  // (the Reader's own detection, which needs no big price move: absorption, exhaustion, a burst), and a recording is not calm while one is live.
-  // ep.col (with colTrig): the collectors read forced flow (liquidations) or a stressed market; that also starts a recording (why "collectors") and keeps it from counting as calm.
-  function step(st, v, tMs, cfg, ep) {
-    const c = Object.assign({}, DEFAULTS, cfg), o = Object.assign({}, st);
-    if (o.mode === "waiting"){
-      if (o.until != null && tMs < o.until) return {st:o, action:null, why:"cooldown"};     // just recorded: a long volatile stretch must not become a string of short files
-      if (v.ready && ((v.ratio >= c.trigRatio && v.fast >= c.trigFloor) || v.fast >= c.trigSigma)){ o.mode = "recording"; o.since = tMs; o.calmSince = null; return {st:o, action:"start", why:v.ratio >= c.trigRatio && v.fast >= c.trigFloor ? "ratio" : "sigma"}; }
-      const byEp = c.epTrig && ep && ep.active > 0, byCol = c.colTrig && ep && ep.col;
-      if (v.ready && (byEp || byCol)){ o.mode = "recording"; o.since = tMs; o.calmSince = null; return {st:o, action:"start", why:byEp ? "episode" : "collectors"}; }
-      return {st:o, action:null, why:""};
-    }
-    const calm = v.ready && v.ratio < c.exitRatio && v.fast < c.exitSigma && !(c.epTrig && ep && ep.live > 0) && !(c.colTrig && ep && ep.col);
-    if (!calm) o.calmSince = null; else if (o.calmSince == null) o.calmSince = tMs;
-    if (tMs - o.since >= c.maxMin*60000) return {st:o, action:"stop", why:"max"};
-    if (o.calmSince != null && tMs - o.calmSince >= c.calmMin*60000) return {st:o, action:"stop", why:"calm"};
-    return {st:o, action:null, why:""};
-  }
-  // the state to carry on with after a recording was saved, when auto-record stays armed
-  // why: how the recording ended. A stop at the time limit means the market may still be wild, so there is no cooldown; after a calm stop (5 quiet minutes) a short one keeps a flickering trigger from making a string of tiny files.
-  const afterStop = (tMs, cfg, why) => ({mode:"waiting", until:why === "max" ? tMs : tMs + Object.assign({}, DEFAULTS, cfg).cooldownMin*60000});
-  return {DEFAULTS, createHistory, push, dump, sigma, vol, step, afterStop};
-})();
-
-</script>
 <script>
 "use strict";
 // Live status chips for the header (pure, no DOM, no timers): turns a snapshot of the app's state into a short list of chips
@@ -2516,7 +2442,7 @@ const AUTOREC = (() => {
 const STATUS = (() => {
   const STALL_MS = 5000;                                   // a connected venue with no message for this long is called silent
   const dur = ms => { const s = Math.max(0, Math.floor(ms / 1000)), m = Math.floor(s / 60); return m >= 60 ? Math.floor(m / 60) + " h " + (m % 60) + " min" : m ? m + ":" + String(s % 60).padStart(2, "0") : s + " s"; };
-  // i = {connected, paused, online, venues:{bn:{on, ageMs, rate}, hl:{...}}, ar:{on, ready, learnMin, mode, since, wake}, rec:{on, ms, n, auto}, kept, folder}
+  // i = {connected, paused, online, venues:{bn:{on, ageMs, rate}, hl:{...}}, cr:{on, seq, fail, err, wake}, kept, folder}
   // folder (optional): the save folder as the app sees it, {state:"ok" | "none" | "denied" | "failed", err}; "none" = a browser that can save into a folder has none chosen, "denied" = it lost the browser's permission, "failed" = the last write failed
   // ageMs: ms since that venue's last message (null = none yet); rate: messages per second over the last few seconds.
   function chips(i) {
@@ -2531,23 +2457,17 @@ const STATUS = (() => {
         else out.push({id:"data", text:"streaming " + Math.round(rate) + "/s", tone:"ok", title:"Messages per second across the connected feeds"});
       }
     }
-    const a = i.ar || {};
-    if (a.on) {
-      if (a.mode === "recording") out.push({id:"ar", text:"auto REC " + dur(i.rec && i.rec.on ? i.rec.ms : 0), tone:"bad", title:"Auto-record started a recording"});
-      else if (!a.ready) out.push({id:"ar", text:"armed · learning " + Math.min(15, a.learnMin || 0) + "/15 min", tone:"warn", title:"Auto-record needs 15 minutes of prices before it can judge the market"});
-      else if (a.cooldownMin > 0) out.push({id:"ar", text:"armed · cooldown " + a.cooldownMin + " min", tone:"info", title:"A recording was just saved; auto-record can start again after the cooldown"});
-      else out.push({id:"ar", text:"armed · waiting" + (a.runs ? " · " + a.runs + " recorded" : ""), tone:"info", title:"Auto-record is watching for a volatile stretch" + (a.runs ? "; recordings made since arming: " + a.runs : "")});
-      if (a.wake === false) out.push({id:"wake", text:"screen may sleep", tone:"warn", title:"The screen wake lock is not held; a sleeping device ends the wait"});
+    if (i.cr && i.cr.on) {
+      out.push({id:"cr", text:"REC run, chunk " + i.cr.seq, tone:"info", title:"Continuous recording: everything the Reader consumes is recorded in 30-minute chunks (Recordings)"});
+      if (i.cr.wake === false) out.push({id:"wake", text:"screen may sleep", tone:"warn", title:"The screen wake lock is not held; a sleeping device ends the recording"});
     }
-    if (i.cr && i.cr.on) out.push({id:"cr", text:"REC run, chunk " + i.cr.seq, tone:"info", title:"Continuous recording: everything the Reader consumes is recorded in 30-minute chunks (Recordings)"});
     if (i.cr && i.cr.fail > 0) out.push({id:"crfail", text:"chunk save failed", tone:"bad", title:"A chunk could not be saved (" + (i.cr.err || "unknown") + "). The run goes on; the next chunk says the previous one is missing. See the Health log."});
     const f = i.folder;
-    if (f && (a.on || (i.rec && i.rec.on) || (i.cr && i.cr.on))) {      // only while something is going to be saved: a lost folder means the file is downloaded instead, away from where the analysis looks
-      if (f.state === "denied") out.push({id:"folder", text:"save folder needs OK", tone:"bad", title:"The browser took back write access to the save folder (usually after the page reloaded). Recordings are downloaded instead until you press Allow (Recordings, Saved recordings)."});
-      else if (f.state === "failed") out.push({id:"folder", text:"last save failed", tone:"bad", title:"The last write into the save folder failed (" + (f.err || "unknown error") + "); that recording was downloaded instead (Recordings, Saved recordings)."});
-      else if (f.state === "none") out.push({id:"folder", text:"no save folder", tone:"info", title:"No save folder is chosen: recordings are downloaded (Recordings, Saved recordings, Choose folder)."});
+    if (f && i.cr && i.cr.on) {      // only while something is going to be saved: a lost folder means chunks stay in the browser's storage only (24 hours)
+      if (f.state === "denied") out.push({id:"folder", text:"save folder needs OK", tone:"bad", title:"The browser took back write access to the save folder (usually after the page reloaded). Chunks are kept in this browser for 24 hours only until you press Allow (Recordings, Saved recordings)."});
+      else if (f.state === "failed") out.push({id:"folder", text:"last save failed", tone:"bad", title:"The last write into the save folder failed (" + (f.err || "unknown error") + "); that chunk is only in this browser's storage."});
+      else if (f.state === "none") out.push({id:"folder", text:"no save folder", tone:"info", title:"No save folder is chosen: chunks are kept only in this browser for 24 hours (Recordings, Saved recordings, Choose folder)."});
     }
-    if (i.rec && i.rec.on && !(a.on && a.mode === "recording")) out.push({id:"rec", text:"REC " + dur(i.rec.ms) + " · " + (i.rec.n || 0).toLocaleString() + " inputs", tone:"bad", title:"A recording is running"});
     if (i.kept > 0) out.push({id:"kept", text:i.kept + " saved", tone:"info", title:"Recordings kept on this device (Recordings, Saved recordings)"});
     return out;
   }
@@ -2684,11 +2604,6 @@ const READER_SELFTEST=(()=>{
     const make=(minutes,skip)=>{const out=[];for(let s=0;s<minutes*60;s++){const m=Math.floor(s/60);if(skip&&skip(m))continue;for(let k=0;k<4;k++)out.push(["a",T0+s*1000+k*250]);for(let k=0;k<5;k++)out.push(k<3?["q","bn",T0+s*1000+k*200,100,101]:["t",{t:T0+s*1000+k*200,v:"bn",side:"buy",px:100,q:1,ntl:100}]);}return out;};
     const ok=SQ.of(make(5)),holes=SQ.of(make(6,m=>m===2)),hollow=SQ.of(make(6,m=>m!==0&&m!==5)),none=SQ.of([]);
     return{ok:ok.verdict==="complete"&&ok.dataMinutes===ok.minutes&&holes.verdict==="holes"&&holes.longestGapSec>=60&&hollow.verdict==="hollow"&&none.verdict==="empty"&&/silence/.test(SQ.line(holes))&&SQ.line(ok)===`${ok.minutes} of ${ok.minutes} min with data`,detail:JSON.stringify({ok,holes,hollow})};
-  });
-  add("autorec: dump returns the last seconds of prices as pairs, leaving out missed seconds",E=>{
-    const A=AUTOREC,h=A.createHistory();let t=T0;for(let i=0;i<300;i++){t+=1000;if(i>=100&&i<120)continue;A.push(h,t,82000+i);}
-    const d=A.dump(h,t,200),all=A.dump(h,t,4000);
-    return{ok:d.length===180&&d[d.length-1][1]===82299&&d.every((p,i)=>i===0||p[0]>d[i-1][0])&&all.length===280&&A.dump(A.createHistory(),t,50).length===0,detail:JSON.stringify({n:d.length,all:all.length,last:d[d.length-1]})};
   });
   add("wallet: one order split into many fills at one instant is not a wallet that keeps hitting; fills over several seconds are",E=>{
     const run=(spread)=>{const e=E.create(),a=calm(e);for(let i=0;i<12;i++)e.onTrade({t:a.t+(spread?i*700:50),v:"hl",side:"sell",px:a.mid,q:1,ntl:a.mid,users:["0xbuyer"+i,"0xsellerAAAAAA"]});return e.debug().walletEvidence("hl","sell",a.t-1000);};
@@ -3046,31 +2961,6 @@ const READER_SELFTEST=(()=>{
     return{ok:E.DEFAULTS.sigmaFastN===0&&mk({})===mk({sigmaFastN:0,sigmaFastW:.9}),detail:String(E.DEFAULTS.sigmaFastN)};
   });
   // ---- auto-record (v031): when to start and stop recording, from a one-second price series ----
-  add("autorec: sigma of a random walk matches its true scale, on the same footing as the engine's sigma",E=>{
-    const r=rng(11),h=AUTOREC.createHistory();let px=82000,t=T0;for(let i=0;i<3700;i++){px*=1+(r()-.5)*2*.6/1e4;t+=1000;AUTOREC.push(h,t,px);}
-    const g=AUTOREC.sigma(h,3600,15),want=.6/Math.sqrt(3);
-    return{ok:Math.abs(g.sigma/want-1)<.15&&g.n>3500,detail:JSON.stringify({got:+g.sigma.toFixed(3),want:+want.toFixed(3),n:g.n})};
-  });
-  add("autorec: it learns an hour first, ignores a calm market, starts soon after a jump, stays while it lasts, and stops after the calm minutes",E=>{
-    const A=AUTOREC,r=rng(5),h=A.createHistory(),cfg={};let px=82000,t=T0,st={mode:"waiting"};const ev=[];
-    const run=(secs,vol)=>{for(let i=0;i<secs;i++){px*=1+(r()-.5)*2*vol/1e4;t+=1000;A.push(h,t,px);if(i%5===4&&!ev.some(x=>x.a==="stop")){const v=A.vol(h,cfg),o=A.step(st,v,t,cfg);st=o.st;if(o.action)ev.push({a:o.action,why:o.why,t});}}};   // the view disarms after a stop, so nothing is asked after it
-    run(600,.3);const notReady=ev.length===0;run(1800,.3);const quiet=ev.length===0,jumpAt=t;run(900,1.2);const jumpEnd=t;run(2400,.3);
-    const start=ev.find(x=>x.a==="start"),stop=ev.find(x=>x.a==="stop");
-    return{ok:notReady&&quiet&&!!start&&start.t>jumpAt&&start.t-jumpAt<=300000&&!!stop&&stop.why==="calm"&&stop.t>jumpEnd&&ev.length===2,detail:JSON.stringify({notReady,quiet,start:start&&(start.t-jumpAt)/1000,why:start&&start.why,stop:stop&&(stop.t-jumpEnd)/1000,n:ev.length})};
-  });
-  add("autorec: a recording ends at its time limit even if the market stays wild, and either trigger alone is enough to start",E=>{
-    const A=AUTOREC,calm={fast:.5,slow:.5,ratio:1,ready:true},wild={fast:2,slow:1,ratio:2,ready:true},T=1e6;
-    const byRatio=A.step({mode:"waiting"},{fast:.9,slow:.4,ratio:2.2,ready:true},T,{}),bySigma=A.step({mode:"waiting"},{fast:1.5,slow:1.4,ratio:1.07,ready:true},T,{}),no=A.step({mode:"waiting"},{fast:1.1,slow:.7,ratio:1.57,ready:true},T,{}),notReady=A.step({mode:"waiting"},{fast:3,slow:.4,ratio:7,ready:false},T,{}),deadCalm=A.step({mode:"waiting"},{fast:.2,slow:.08,ratio:2.5,ready:true},T,{});
-    const st={mode:"recording",since:T,calmSince:null},o=A.step(st,wild,T+59*60000,{maxMin:60}),o2=A.step(st,wild,T+60*60000,{maxMin:60});
-    const dip=A.step({mode:"recording",since:T,calmSince:T+60000},wild,T+400000,{}),keep=A.step({mode:"recording",since:T,calmSince:T+60000},calm,T+240000,{calmMin:5});
-    return{ok:byRatio.action==="start"&&byRatio.why==="ratio"&&bySigma.action==="start"&&bySigma.why==="sigma"&&no.action===null&&notReady.action===null&&deadCalm.action===null&&o.action===null&&o2.action==="stop"&&o2.why==="max"&&dip.action===null&&dip.st.calmSince===null&&keep.action===null,
-      detail:JSON.stringify({byRatio:byRatio.why,bySigma:bySigma.why,no:no.action,o:o.action,o2:o2.why,dip:dip.action,keep:keep.action})};
-  });
-  add("autorec: a price stream that has gone quiet is not judged: the last window is stale, so nothing starts and nothing counts as calm",E=>{
-    const A=AUTOREC,r=rng(3),h=A.createHistory();let px=82000,t=T0;for(let i=0;i<3700;i++){px*=1+(r()-.5)*2*1.5/1e4;t+=1000;A.push(h,t,px);}
-    const live=A.vol(h,{},t+2000),stale=A.vol(h,{},t+60000),a=A.step({mode:"waiting"},stale,t+60000,{});
-    return{ok:live.ready&&!stale.ready&&a.action===null,detail:JSON.stringify({live:live.ready,stale:stale.ready,action:a.action})};
-  });
   add("replay: an empty recording and one with unknown record types replay to a quiet engine without throwing",E=>{
     const a=E.replayEngine([]),b=E.replayEngine([["zz",1],["a",T0],["x"],["a",T0+1000]]);
     return{ok:a.events.length===0&&a.episodes.length===0&&b.events.length===0&&b.episodes.length===0,detail:`empty ${a.events.length}/${a.episodes.length}, unknown ${b.events.length}/${b.episodes.length}`};
@@ -3085,13 +2975,6 @@ const READER_SELFTEST=(()=>{
     const silent=STATUS.chips(base)[0],never=STATUS.chips(Object.assign({},base,{venues:{bn:v(200,40),hl:v(null,0)}}))[0],off=STATUS.chips(Object.assign({},base,{venues:{bn:v(200,40),hl:v(null,0,false)}}))[0];
     const net=STATUS.chips(Object.assign({},base,{online:false}))[0],pz=STATUS.chips(Object.assign({},base,{paused:true}))[0];
     return{ok:silent.tone==="bad"&&silent.text==="HL silent 12 s"&&never.text==="HL silent"&&off.tone==="ok"&&net.id==="net"&&pz.text==="paused",detail:JSON.stringify({silent,never,off,net,pz})};
-  });
-  add("status: auto-record shows learning, waiting and recording; a lost wake lock and a manual recording are shown too",E=>{
-    const base={connected:false,paused:false,online:true,venues:{},rec:{on:false},kept:2};
-    const learn=STATUS.chips(Object.assign({},base,{ar:{on:true,ready:false,learnMin:4,wake:true}})),wait=STATUS.chips(Object.assign({},base,{ar:{on:true,ready:true,mode:"waiting",wake:false}}));
-    const rec=STATUS.chips(Object.assign({},base,{ar:{on:true,ready:true,mode:"recording",wake:true},rec:{on:true,ms:192000,n:5}})),man=STATUS.chips(Object.assign({},base,{rec:{on:true,ms:65000,n:12345}}));
-    const t=l=>l.map(c=>c.text).join(" | ");
-    return{ok:t(learn)==="armed · learning 4/15 min | 2 saved"&&t(wait)==="armed · waiting | screen may sleep | 2 saved"&&t(rec)==="auto REC 3:12 | 2 saved"&&/^REC 1:05 · 12[.,  ]?345 inputs/.test(t(man)),detail:[t(learn),t(wait),t(rec),t(man)].join(" // ")};
   });
   add("session quality: each collector's records, minutes and longest silence over the recording; none / holes / ok; slow writers and the lead-in are not judged; the list line names the problem",E=>{
     const J=JSON.stringify,T0=1792800000000,MIN=60000,to=T0+10*MIN;
@@ -3111,13 +2994,13 @@ const READER_SELFTEST=(()=>{
       &&SQ.line(q)==="10 of 10 min with data; collectors: book silent 5 min, options no data"&&SQ.line(Object.assign({},old,{collectors:{a:{state:"holes",gapSec:90},b:{state:"ok"}}}))==="10 of 10 min with data; collectors: a silent 90 s"
       &&withIn.t0===T0&&withIn.t1===T0+MIN,detail:J({c,none,short,line:SQ.line(q)})};
   });
-  add("status: a lost, failing or missing save folder is shown while armed or recording, and only then",E=>{
-    const base={connected:false,paused:false,online:true,venues:{},rec:{on:false},kept:0},arm={on:true,ready:true,mode:"waiting",wake:true};
-    const t=l=>l.map(c=>c.text).join(" | "),f=(st,extra)=>Object.assign({},base,{ar:arm,folder:Object.assign({state:st},extra)});
+  add("status: a lost, failing or missing save folder is shown while the page records, and only then; a failed chunk save and a lost wake lock are shown",E=>{
+    const base={connected:false,paused:false,online:true,venues:{},kept:0},on={on:true,seq:3,fail:0,wake:true};
+    const t=l=>l.map(c=>c.text).join(" | "),f=(st,extra)=>Object.assign({},base,{cr:on,folder:Object.assign({state:st},extra)});
     const den=STATUS.chips(f("denied")),fail=STATUS.chips(f("failed",{err:"disk full"})),none=STATUS.chips(f("none")),ok=STATUS.chips(f("ok"));
-    const idle=STATUS.chips(Object.assign({},base,{folder:{state:"denied"}})),man=STATUS.chips(Object.assign({},base,{rec:{on:true,ms:1000,n:1},folder:{state:"denied"}})),absent=STATUS.chips(Object.assign({},base,{ar:arm}));
-    return{ok:t(den)==="armed · waiting | save folder needs OK"&&den[1].tone==="bad"&&/Allow/.test(den[1].title)&&t(fail)==="armed · waiting | last save failed"&&/disk full/.test(fail[1].title)&&t(none)==="armed · waiting | no save folder"&&none[1].tone==="info"
-      &&t(ok)==="armed · waiting"&&idle.length===0&&/save folder needs OK/.test(t(man))&&t(absent)==="armed · waiting",detail:[t(den),t(fail),t(none),t(ok),t(idle),t(man),t(absent)].join(" // ")};
+    const idle=STATUS.chips(Object.assign({},base,{cr:{on:false},folder:{state:"denied"}})),absent=STATUS.chips(Object.assign({},base)),sav=STATUS.chips(Object.assign({},base,{cr:Object.assign({},on,{fail:1,err:"quota",wake:false})}));
+    return{ok:t(den)==="REC run, chunk 3 | save folder needs OK"&&den[1].tone==="bad"&&/Allow/.test(den[1].title)&&t(fail)==="REC run, chunk 3 | last save failed"&&/disk full/.test(fail[1].title)&&t(none)==="REC run, chunk 3 | no save folder"&&none[1].tone==="info"
+      &&t(ok)==="REC run, chunk 3"&&idle.length===0&&absent.length===0&&t(sav)==="REC run, chunk 3 | screen may sleep | chunk save failed"&&sav[2].tone==="bad"&&/quota/.test(sav[2].title),detail:[t(den),t(fail),t(none),t(ok),t(idle),t(absent),t(sav)].join(" // ")};
   });
   add("status: only a higher release number counts as a newer version; a dev build never asks to update",E=>{
     const n=STATUS.newer;
@@ -3183,34 +3066,6 @@ const READER_SELFTEST=(()=>{
   add("history: the simulated log keeps only the newest rows once it is over its cap",E=>{
     const a=[];for(let k=0;k<HIST.LOG_CAP+25;k++)HIST.push(a,{k});
     return{ok:a.length===HIST.LOG_CAP&&a[0].k===25&&a[a.length-1].k===HIST.LOG_CAP+24,detail:`${a.length} rows, first ${a[0].k}`};
-  });
-  add("autorec: an active Reader episode starts a recording in a calm market, only when the setting is on and the baseline is ready; walls are not counted; a live episode keeps it from counting as calm",E=>{
-    const A=AUTOREC,calm={ready:true,ratio:1,fast:.3},ep1={active:1,live:1},T=T0;
-    const on=A.step({mode:"waiting"},calm,T,{},ep1),off=A.step({mode:"waiting"},calm,T,{epTrig:false},ep1),none=A.step({mode:"waiting"},calm,T,{},{active:0,live:0}),cold=A.step({mode:"waiting"},{ready:false,ratio:0,fast:0},T,{},ep1),cool=A.step({mode:"waiting",until:T+60000},calm,T,{},ep1);
-    let st=on.st,stop=null;for(let m=0;m<=20&&!stop;m++){const o=A.step(st,calm,T+m*60000,{},m<8?ep1:{active:0,live:0});st=o.st;if(o.action==="stop")stop=m;}
-    const old=A.step({mode:"waiting"},calm,T,{},undefined).action;
-    return{ok:on.action==="start"&&on.why==="episode"&&off.action==null&&none.action==null&&cold.action==null&&cool.why==="cooldown"&&old==null&&stop===13,detail:`stop after minute ${stop}`};
-  });
-  add("autorec: forced flow or a stressed market (ep.col) starts a recording in a calm market, only with colTrig on, and keeps it from counting as calm; an episode takes the reason when both hold",E=>{
-    const A=AUTOREC,calm={ready:true,ratio:1,fast:.3},T=T0,col={active:0,live:0,col:true};
-    const on=A.step({mode:"waiting"},calm,T,{},col),off=A.step({mode:"waiting"},calm,T,{colTrig:false},col),both=A.step({mode:"waiting"},calm,T,{},{active:1,live:1,col:true}),cold=A.step({mode:"waiting"},{ready:false,ratio:0,fast:0},T,{},col);
-    let st=on.st,stop=null;for(let m=0;m<=20&&!stop;m++){const o=A.step(st,calm,T+m*60000,{},{active:0,live:0,col:m<6});st=o.st;if(o.action==="stop")stop=m;}
-    return{ok:on.action==="start"&&on.why==="collectors"&&off.action==null&&both.why==="episode"&&cold.action==null&&stop===11,detail:`stop after minute ${stop}`};
-  });
-  add("autorec: after a recording it stays armed but waits out the cooldown, then starts again on the next jump",E=>{
-    const A=AUTOREC,r=rng(9),h=A.createHistory(),cfg={cooldownMin:10};let px=82000,t=T0,st={mode:"waiting"};const ev=[];
-    const run=(secs,vol)=>{for(let i=0;i<secs;i++){px*=1+(r()-.5)*2*vol/1e4;t+=1000;A.push(h,t,px);if(i%5===4){const v=A.vol(h,cfg),o=A.step(st,v,t,cfg);st=o.st;if(o.action){ev.push({a:o.action,why:o.why,t});if(o.action==="stop")st=A.afterStop(t,cfg);}}}};
-    run(2400,.3);run(900,1.2);for(let g=0;g<1000&&!ev.some(x=>x.a==="stop");g++)run(5,.3);      // learn, a jump, calm until the recording stops: then the view stays armed
-    const stop=ev.find(x=>x.a==="stop"),n1=ev.length;
-    run(180,2.5);const v=A.vol(h,cfg),wouldTrigger=v.fast>=cfg.trigSigma||v.ratio>=1.8&&v.fast>=.4,blocked=ev.length===n1&&st.mode==="waiting";   // wild again 3 minutes later, inside the cooldown
-    run(600,2.5);const second=ev.filter(x=>x.a==="start")[1];                  // still wild once the cooldown is over
-    const none=A.step({mode:"waiting"},{ready:true,ratio:3,fast:2},T0,cfg).action==="start";   // a state with no cooldown starts at once
-    return{ok:!!stop&&n1===2&&wouldTrigger&&blocked&&!!second&&second.t>=stop.t+600000&&none&&A.afterStop(T0,{}).until===T0+180000&&A.afterStop(T0,{},"calm").until===T0+180000&&A.afterStop(T0,{},"max").until===T0&&A.step(A.afterStop(T0,{},"max"),{ready:true,ratio:3,fast:2},T0,{}).action==="start"&&A.step(A.afterStop(T0,{},"calm"),{ready:true,ratio:3,fast:2},T0+60000,{}).why==="cooldown",detail:JSON.stringify({n1,wouldTrigger,blocked,second:second&&(second.t-stop.t)/1000,none})};
-  });
-  add("status: auto-record shows the cooldown after a recording and how many it has made",E=>{
-    const base={connected:false,paused:false,online:true,venues:{},rec:{on:false},kept:0},t=l=>l.map(c=>c.text).join(" | ");
-    const cd=STATUS.chips(Object.assign({},base,{ar:{on:true,ready:true,mode:"waiting",wake:true,runs:1,cooldownMin:7}})),after=STATUS.chips(Object.assign({},base,{ar:{on:true,ready:true,mode:"waiting",wake:true,runs:2,cooldownMin:0}}));
-    return{ok:t(cd)==="armed · cooldown 7 min"&&t(after)==="armed · waiting · 2 recorded",detail:t(cd)+" // "+t(after)};
   });
   add("hooks: subscribers run in subscription order with the emitted arguments, a throwing one is contained, an unknown name is a no-op",E=>{
     const log=[],H=HOOKS,n="selftest-"+Math.random(),err=console.error;
@@ -3321,7 +3176,7 @@ function renderOverview(){
     const m = typeof colStateLive === "function" ? colStateLive() : null, el = ov$("ovState");
     if (m){
       const word = {stressed:"stressed", crowded:"crowded", unsettled:"unsettled", calm:"calm", unknown:"unknown"}[m.s], names = {V:"volatility up", L:"forced flow", F:"venues disagree", C:"crowded"};
-      const sub = m.s === "unknown" ? m.n+" of 4 indicators have a reading: start the collectors (connect, or arm auto-record)" : m.i ? m.i.split("").map(k=>names[k]).join(" · ") : "none of the four indicators fired";
+      const sub = m.s === "unknown" ? m.n+" of 4 indicators have a reading: start the collectors (connect)" : m.i ? m.i.split("").map(k=>names[k]).join(" · ") : "none of the four indicators fired";
       const chip = k => `<span class="chip" title="${typeof ST_IND !== "undefined" ? ST_IND[k] : names[k]}">${names[k]}: ${m.ind[k]===true ? "yes" : m.ind[k]===false ? "no" : "no reading"}</span>`;
       const html = `<div class="metrics"><div class="metric"><span>market now (rules v${m.v})</span><b>${word}</b><small>${sub}</small></div></div><div class="epctx">${["V","L","F","C"].map(chip).join("")}</div><div class="note">Each indicator compares the market with its own previous 30 minutes. A label, not a signal.</div>`;
       if (el.dataset.h !== html){ el.dataset.h = html; el.innerHTML = html; }
@@ -3345,9 +3200,9 @@ function renderOverview(){
   ov$("ovReader").innerHTML = act.length ? act.map(e=>`<div class="ovev ${e.stage}"><span class="stat">${ovSpan(Math.max(0,rs.now-e.tStart))}</span> <b>${READER_EPISODES.FAMILY_LABEL[e.family]}</b> <span class="venue v-${e.venue}">${e.venue.toUpperCase()}</span> <span class="chip">${e.horizon}</span> <span class="stg">${e.stage}</span><div class="ovevd">${e.reading}</div></div>`).join("")
     : `<div class="note" style="margin:0">${!connected ? "Not connected." : !rs.calibrated ? "Calibrating: detectors arm after about two minutes of data." : "Quiet: no active episodes."}${lastEnded ? ` Last: ${READER_EPISODES.FAMILY_LABEL[lastEnded.family].toLowerCase()} (${lastEnded.venue.toUpperCase()}) ended ${ovSpan(Math.max(0,rs.now-lastEnded.tEnd))} ago.` : ""}</div>`;
 
-  // Recording: what auto-record and a manual recording are doing, and how many are kept (read from the Recordings views' own text)
+  // Recording: what the continuous recording is doing, and how many chunks are kept
   const rcN = typeof RC !== "undefined" ? RC.rows.length : 0, mtile = (k, v) => `<div class="metric"><span>${k}</span><b>${v}</b></div>`;
-  ov$("ovRec").innerHTML = `<div class="metrics">${mtile("auto-record", ov$("arStat").textContent || "off")}${mtile("recording", ov$("rtStat").textContent || "not recording")}${mtile("saved on this device", rcN)}</div>`;
+  ov$("ovRec").innerHTML = `<div class="metrics">${mtile("recording", typeof rrShort === "function" ? rrShort().replace(/^Recording: /, "") : "off")}${mtile("saved on this device", rcN)}</div>`;
 
   // Account
   if (ACC.mode==="sim") ACC.data = simSnapshot();
@@ -4586,7 +4441,6 @@ VIEWS.register({id:"market", label:"Market and tape", area:"market"});
 VIEWS.register(Object.assign({id:"reader", label:"Episodes", area:"market"}, READER_SLOT));
 VIEWS.register({id:"record", label:"Recordings", area:"rec", slot:"reader"});   // Record, Saved, Health log and Collectors are blocks of this one view
 VIEWS.register({id:"replay", label:"Replay", area:"rec", slot:"reader"});
-VIEWS.register({id:"armmode", label:"Arm mode", area:"rec"});   // stays until step 6 replaces auto-record
 VIEWS.register({id:"trading", label:"Trading", area:"account", minIntervalMs:400, render:()=>renderTrading()});
 VIEWS.register({id:"history", label:"History", area:"account"});
 VIEWS.register({id:"health", label:"Feed health", area:"diag"});
@@ -4926,7 +4780,39 @@ const SQ = (() => {
     return `${q.dataMinutes} of ${q.minutes} min with data` + (q.verdict === "complete" ? "" : `, longest silence ${q.longestGapSec} s`) + (q.clock < 80 ? `, clock at ${q.clock}%` : "")
       + (bad.length ? "; collectors: " + bad.map(b => b.state === "none" ? `${b.id} no data` : `${b.id} silent ${span(b.gapSec)}`).join(", ") : "");
   }
-  return {of, line, collectors, colProblems, clean};
+  // Hours recorded: one cell per hour (local clock; offMs = local offset from UTC), one row of 24 per day, the last row is today (cells still to come stay empty).
+  // A recording covers [t0, t1] of its quality (files from before v111: [kept time - span, kept time]); overlaps count once. frac = share of the hour covered. last24 = hours recorded in the 24 hours before `now`.
+  const HOUR = 3600000, DAY = 24 * HOUR;
+  function coverage(rows, now, days, offMs) {
+    const iv = [];
+    for (const r of rows) {
+      const q = r.quality; if (!q) continue;
+      const a = q.t0 && q.t1 ? q.t0 : q.spanMin ? r.at - q.spanMin * 60000 : 0, b = q.t0 && q.t1 ? q.t1 : r.at;
+      if (a && b > a) iv.push([a, b]);
+    }
+    iv.sort((x, y) => x[0] - y[0]);
+    const un = []; for (const [a, b] of iv) { const l = un[un.length - 1]; if (l && a <= l[1]) l[1] = Math.max(l[1], b); else un.push([a, b]); }
+    const within = (s, e) => { let cov = 0; for (const [a, b] of un) { if (b <= s) continue; if (a >= e) break; cov += Math.min(b, e) - Math.max(a, s); } return cov; };
+    const first = Math.floor((now + offMs) / DAY) * DAY - offMs - (days - 1) * DAY, slots = [];
+    let total = 0;
+    for (let i = 0; i < days * 24; i++) { const s = first + i * HOUR, cov = within(s, s + HOUR); total += cov; slots.push({start:s, frac:Math.min(1, cov / HOUR)}); }
+    return {slots, hours:total / HOUR, last24:within(now - DAY, now) / HOUR, days};
+  }
+  function selftest() {
+    const out = [], ok = (name, pass) => out.push({name:"coverage: " + name, ok:!!pass, detail:""});
+    { const H = HOUR, now = 100 * H + 30 * 60000, rows = [      // 100 h = day 4 at 04:00 UTC, so today's cells run from 96 h
+        {at:90 * H, quality:{t0:88 * H, t1:90 * H}}, {at:90 * H, quality:{t0:89 * H, t1:91 * H}},
+        {at:99 * H, quality:{spanMin:60}}, {at:50 * H, quality:null}, {at:100 * H, quality:{t0:100 * H, t1:100 * H + 30 * 60000}}];
+      const c = coverage(rows, now, 2, 0), at = h => c.slots.find(x => x.start === h * H);
+      ok("rows of 24 hourly cells, the last day starts at local midnight", c.slots.length === 48 && c.slots[24].start === 96 * H && c.slots[0].start === 72 * H);
+      ok("overlapping recordings count once", [88, 89, 90].every(h => at(h).frac === 1) && at(87).frac === 0 && at(91).frac === 0);
+      ok("older files use kept time minus span; no quality is skipped", at(98).frac === 1 && at(99).frac === 0 && c.hours === 3 + 1 + .5);
+      ok("the current hour counts only what has happened; later cells are empty", at(100).frac === .5 && at(101).frac === 0);
+      ok("last 24 h counts the window before now", c.last24 === 4.5 && coverage(rows, 125 * H, 2, 0).last24 === 0);
+      ok("a local offset moves midnight", coverage(rows, now, 1, 2 * H).slots[0].start === 94 * H); }
+    return out;
+  }
+  return {of, line, collectors, colProblems, clean, coverage, selftest};
 })();
 
 </script>
@@ -4935,7 +4821,7 @@ const SQ = (() => {
 // Reader tools: record a session, replay it with different settings, tune the episode thresholds, see episodes on a
 // timeline. Reads the live engine (READER) or a
 // replayed one (rdView.engine) through RD(). Loaded after app.js, which owns the engine and the episode cards.
-const RT = {session:null, rec:null, recTimer:null, sel:null, hits:[], last:{}};
+const RT = {session:null, sel:null, hits:[], last:{}};
 const rt$ = id => document.getElementById(id);
 const RT_COLORS = {absorption:"#7aa2f7", exhaustion:"#d9a43b", burst:"#c792ea", wall:"#7fb7a8"};
 const RT_SHORT = {absorption:"absorb", exhaustion:"exhaust", burst:"burst", wall:"wall"};
@@ -4973,24 +4859,6 @@ function rtSetSession(s){
   rtMsg(span ? `Session ready: ${s.sym || "?"}, ${rtDur(span.t1-span.t0)}, ${s.inputs.length.toLocaleString()} inputs.${span.t1-span.t0 < 150000 ? " It is shorter than the 2-minute warm-up, so a replay will find nothing." : ""}` : "That session has no usable data.");
   rtButtons();
 }
-function rtRecTick(){
-  const r = READER.recording(), ms = Date.now()-RT.rec.t0;
-  rt$("rtStat").textContent = `recording ${rtDur(ms)} · ${r.n.toLocaleString()} inputs`;
-  const lim = RT.recLimit || {n:600000, ms:1800000}; if (r.n > lim.n || ms > lim.ms) rtRecStop();
-}
-function rtRecStop(){
-  clearInterval(RT.recTimer); const inputs = READER.stopRecording(), meta = RT.rec; RT.rec = null; RT.recLimit = null; if (typeof colRelay === "function") colRelay();
-  rt$("rtRec").textContent = "Record"; rt$("rtStat").textContent = "not recording";
-  rtSetSession({inputs, sym:meta.sym, startedAt:meta.t0});
-}
-rt$("rtRec").onclick = () => {
-  if (RT.rec) return rtRecStop();
-  if (!connected){ rtMsg("Connect first, then record."); return; }
-  READER.startRecording({quoteMs:100});       // quotes are decimated to one per 100 ms per venue; the live engine still sees every one
-  RT.rec = {t0:Date.now(), sym:rt$("sym").value.trim().toUpperCase()}; if (typeof colRelay === "function") colRelay();
-  rt$("rtRec").textContent = "Stop recording"; RT.recTimer = setInterval(rtRecTick, 1000); rtRecTick();
-  rtMsg("Recording the raw inputs. It stops by itself after 30 minutes. The engine needs 2 minutes of data before it can detect anything, so record at least 3.");
-};
 function rtDownload(blob, name){
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
@@ -4999,10 +4867,9 @@ rt$("rtSave").onclick = async () => {
   const s = RT.session; if (!s) return;
   const stamp = new Date(s.startedAt || Date.now()).toISOString().slice(0,16).replace(/[-:T]/g, ""), base = `session_${String(s.sym || "X").replace(/[^A-Za-z0-9_-]/g, "") || "X"}_${stamp}`;
   const quality = SQ.of(s.inputs), health = typeof HL !== "undefined" ? HL.ev.filter(e => e.t >= (s.startedAt || 0) - 60000).slice(-60) : null;      // how complete it is, and what the page noted meanwhile
-  const pre = typeof AR !== "undefined" && AR.pre && AR.pre.at >= (s.startedAt || 0) - 120000 && AR.pre.at <= (s.startedAt || 0) + 120000 ? AR.pre : null;      // auto-record's 30 minutes of mark price before the trigger
-  const ext = await colSlice(s.startedAt, pre ? 1800000 : 60000);      // collector records (collectors.js); the engine never sees them. An auto-recording takes 30 minutes before the trigger, like its `pre` prices
+  const ext = await colSlice(s.startedAt, 60000);      // collector records (collectors.js); the engine never sees them
   if (typeof colExpected === "function") { const c = SQ.collectors(ext, s.startedAt || 0, quality.t1, colExpected()); if (c) quality.collectors = c; }      // which collectors wrote during the recording and how long each was silent
-  const text = JSON.stringify({kind:"sv-session", v:1, sym:s.sym, startedAt:s.startedAt, quality, health, pre, ext, inputs:s.inputs});
+  const text = JSON.stringify({kind:"sv-session", v:1, sym:s.sym, startedAt:s.startedAt, quality, health, ext, inputs:s.inputs});
   const gz = typeof CompressionStream !== "undefined", name = base + (gz ? ".json.gz" : ".json");
   const blob = gz ? await new Response(new Blob([text]).stream().pipeThrough(new CompressionStream("gzip"))).blob() : new Blob([text], {type:"application/json"});
   const inFolder = typeof fsSave === "function" ? await fsSave(name, blob) : false;      // the chosen save folder (folder-save.js); if there is none, or it failed, download as before
@@ -5113,7 +4980,6 @@ rt$("tlLegend").innerHTML = Object.keys(RT_COLORS).map(f => `<span><i style="bac
 function rdToolsRender(s){
   rtTimeline(s);
   if (rdView.engine) rt$("rdStatus").textContent = "REPLAY of a recorded session";
-  const rec = rt$("rtRec"); if (rec && !RT.rec && rec.textContent !== "Record") rec.textContent = "Record";
   rtButtons();
 }
 
@@ -5633,659 +5499,6 @@ hs$("hsCsv").onclick = hsCsv;
 VIEWS.onOpen("history", () => hsLoad());
 HOOKS.on("logout", () => { HS.cache = {}; HS.found = []; HS.sym = null; hsRender(); });      // another account must never show this one's rows      // open the view: load only what is not loaded yet for this choice
 hsRender();
-
-</script>
-<script type="text/plain" id="arWorkerSrc">
-"use strict";
-// Auto-record on volatility (pure, no DOM, no timers): how volatile the market is now against its own last hour, and when a recording should
-// start and stop. Prices arrive once a second (Binance mark price); everything here only reads them.
-// Volatility is the same scale the Reader uses for sigma: the robust spread of overlapping 15 s returns (75th percentile of the absolute
-// deviation from the median, over 1.1503), divided by the square root of the lag, so it reads in bps per root second.
-const AUTOREC = (() => {
-  const DEFAULTS = {
-    fastSec:300, slowSec:3600, lagSec:15, minFast:200, minSlow:900,       // 5 min against the last hour; needs 15 min of history before it can judge
-    trigRatio:1.8, trigSigma:1.2, trigFloor:.4,                                          // start when the 5 min sigma is 1.8x the hour's, or above 1.2 bps/root s (either; the ratio only counts above trigFloor, so a dead-calm market cannot trigger it)
-    exitRatio:1.3, exitSigma:.8, calmMin:5, maxMin:60, staleSec:10,                     // stop after 5 minutes below both exit levels, or after 60 minutes
-    rearm:true, cooldownMin:3, maxRuns:100, preMin:10, epTrig:true, colTrig:true,                                              // after a recording keep watching (no new start for 3 minutes, none at all after a stop at the time limit), at most 100 recordings per arming (8 until v097: a night of collecting hit the cap)
-  };
-  const SIZE = 4096, SD_PER_Q75 = 1.1503, Q75 = .75;     // the 75th percentile of the absolute deviation over 1.1503 is the standard deviation of a normal; the same constants as the engine's sigma
-  function createHistory() { return {px:new Float64Array(SIZE), sec:new Float64Array(SIZE).fill(-1), last:-1}; }
-  function push(h, tMs, p) {
-    if (!(p > 0)) return;
-    const s = Math.floor(tMs/1000), i = s % SIZE;
-    h.px[i] = p; h.sec[i] = s; if (s > h.last) h.last = s;
-  }
-  // the price at second s, or the latest one within 3 s before it (a missed second does not break a return)
-  function priceAt(h, s) { for (let k = 0; k <= 3; k++){ const i = (s-k) % SIZE; if (h.sec[i] === s-k) return h.px[i]; } return null; }
-  // the last secs seconds of prices as [second, price] pairs (a missed second is left out): the trace kept with a recording
-  function dump(h, nowMs, secs) { const out = [], end = Math.floor(nowMs/1000); for (let s = end - secs + 1; s <= end; s++){ const i = s % SIZE; if (h.sec[i] === s) out.push([s, h.px[i]]); } return out; }
-  // robust sigma over the last winSec seconds: {sigma, n}
-  function sigma(h, winSec, lagSec) {
-    const r = [];
-    for (let s = h.last - winSec + 1; s <= h.last; s++){ const a = priceAt(h, s), b = priceAt(h, s - lagSec); if (a && b) r.push((a/b - 1)*1e4); }
-    if (r.length < 30) return {sigma:0, n:r.length};
-    const s = Float64Array.from(r).sort(), med = s[s.length >> 1], d = Float64Array.from(s, x => Math.abs(x - med)).sort();
-    return {sigma:d[Math.floor(d.length*Q75)]/SD_PER_Q75/Math.sqrt(lagSec), n:r.length};
-  }
-  // nowMs (the clock the prices were stamped with): when the newest price is older than staleSec the stream has stalled, and the last window is not judged
-  function vol(h, cfg, nowMs) {
-    const c = Object.assign({}, DEFAULTS, cfg), f = sigma(h, c.fastSec, c.lagSec), sl = sigma(h, c.slowSec, c.lagSec);
-    return {fast:f.sigma, slow:sl.sigma, ratio:sl.sigma > 0 ? f.sigma/sl.sigma : 0, nFast:f.n, nSlow:sl.n, ready:f.n >= c.minFast && sl.n >= c.minSlow && !(nowMs != null && nowMs/1000 - h.last > c.staleSec)};
-  }
-  // One decision per check. st: {mode:"waiting"|"recording", since, calmSince}; returns the new state and an action ("start" | "stop" | null) with the reason.
-  // ep (optional): what the Reader sees right now, {active, live}: episodes (not walls) that are active, and active or fading. With epTrig an active one also starts a recording
-  // (the Reader's own detection, which needs no big price move: absorption, exhaustion, a burst), and a recording is not calm while one is live.
-  // ep.col (with colTrig): the collectors read forced flow (liquidations) or a stressed market; that also starts a recording (why "collectors") and keeps it from counting as calm.
-  function step(st, v, tMs, cfg, ep) {
-    const c = Object.assign({}, DEFAULTS, cfg), o = Object.assign({}, st);
-    if (o.mode === "waiting"){
-      if (o.until != null && tMs < o.until) return {st:o, action:null, why:"cooldown"};     // just recorded: a long volatile stretch must not become a string of short files
-      if (v.ready && ((v.ratio >= c.trigRatio && v.fast >= c.trigFloor) || v.fast >= c.trigSigma)){ o.mode = "recording"; o.since = tMs; o.calmSince = null; return {st:o, action:"start", why:v.ratio >= c.trigRatio && v.fast >= c.trigFloor ? "ratio" : "sigma"}; }
-      const byEp = c.epTrig && ep && ep.active > 0, byCol = c.colTrig && ep && ep.col;
-      if (v.ready && (byEp || byCol)){ o.mode = "recording"; o.since = tMs; o.calmSince = null; return {st:o, action:"start", why:byEp ? "episode" : "collectors"}; }
-      return {st:o, action:null, why:""};
-    }
-    const calm = v.ready && v.ratio < c.exitRatio && v.fast < c.exitSigma && !(c.epTrig && ep && ep.live > 0) && !(c.colTrig && ep && ep.col);
-    if (!calm) o.calmSince = null; else if (o.calmSince == null) o.calmSince = tMs;
-    if (tMs - o.since >= c.maxMin*60000) return {st:o, action:"stop", why:"max"};
-    if (o.calmSince != null && tMs - o.calmSince >= c.calmMin*60000) return {st:o, action:"stop", why:"calm"};
-    return {st:o, action:null, why:""};
-  }
-  // the state to carry on with after a recording was saved, when auto-record stays armed
-  // why: how the recording ended. A stop at the time limit means the market may still be wild, so there is no cooldown; after a calm stop (5 quiet minutes) a short one keeps a flickering trigger from making a string of tiny files.
-  const afterStop = (tMs, cfg, why) => ({mode:"waiting", until:why === "max" ? tMs : tMs + Object.assign({}, DEFAULTS, cfg).cooldownMin*60000});
-  return {DEFAULTS, createHistory, push, dump, sigma, vol, step, afterStop};
-})();
-
-"use strict";
-// Collectors (pure, no DOM, no timers): data worth keeping that no detector uses yet. Each collector writes records
-// ["c", name, t, payload] (t in ms). They are kept on a rolling tape on the device and attached to a saved session as `ext`, beside `inputs`;
-// the Reader engine never sees them (its replay ignores them), so they cannot change a detection. Spec: .scratch/collectors/01-collectors.md.
-// (The record type letter is "c": "x" is already the engine's reset marker.)
-const COLLECT = (() => {
-  // The collector registry: ONE declaration per collector. OWNER, EXPECT_MS, FEATURES, FEATURE_INFO, the status list and the analysis scripts are all derived from it.
-  //   id        name of the collector (what ownerOf() answers)       label / speed / on   shown in the list; "fast" ones write only while recording, "slow" ones always; default switch
-  //   owner     where it runs: "worker" (collectors-worker.js) or "page" (collectors.js)      expectMs   how often it writes while working (three times that late is "slow")
-  //   records   the record names it writes
-  //   features  {feature name: [record name, fn(payload) -> number | null]}  and  info  {feature name: card display info}: added below, after the helpers they use
-  // A new collector is one entry here (plus its own worker or page code); consumers iterate REGISTRY instead of naming collectors.
-  const REGISTRY = [
-    {id:"telemetry", label:"Self-telemetry: feed latency, message rates, gaps, clock offset", speed:"slow", on:true, owner:"worker", expectMs:30000, records:["feeds", "markPrice"]},
-    {id:"derivs", label:"Derivatives context: mark, funding, open interest, basis and liquidations (Binance, Hyperliquid)", speed:"slow", on:true, owner:"worker", expectMs:60000, records:["bnDerivs", "hlCtx", "basis", "liq"]},
-    {id:"calendar", label:"Calendar tags: funding times, 15m / 1h / 4h / daily / weekly / monthly closes, US open and close, options expiry (rules, no network)", speed:"slow", on:true, owner:"worker", expectMs:900000, records:["cal"]},
-    {id:"book", label:"Book depth (while recording): depth within 1 / 5 / 10 / 20 bps, spread, touch size, size added and removed per side (Binance, Hyperliquid; the worker keeps its own books)", speed:"fast", on:true, owner:"worker", expectMs:10000, records:["bookBn", "bookHl"]},
-    {id:"venues", label:"Venue prices (while recording or armed): Coinbase and Bybit perp quotes and Binance spot, for the market state's venue-gap reading", speed:"fast", on:true, owner:"worker", expectMs:10000, records:["venues"]},
-    {id:"options", label:"Volatility index (Deribit, BTC and ETH): the index, for the market state", speed:"slow", on:true, owner:"worker", expectMs:60000, records:["dvol"]},
-  ];
-  const TAPE_MS = 24*3600*1000, FILE_BUDGET = 8*1024*1024;      // the rolling tape keeps 24 h; one session file takes at most about 8 MB of them (5 MB until v058: book depth and the extra venues fill about 2 MB an hour each while recording)
-  const round = (x, d) => Math.round(x*Math.pow(10, d))/Math.pow(10, d);
-  const quantile = (arr, p) => { if (!arr || !arr.length) return null; const s = arr.slice().sort((a, b) => a - b); return s[Math.min(s.length - 1, Math.floor(s.length*p))]; };
-  const rec = (name, t, payload) => ["c", name, t, payload];
-  const isRec = r => Array.isArray(r) && r[0] === "c" && typeof r[1] === "string" && Number.isFinite(r[2]);
-
-  // The page's feeds. cur/prev: {streamId: {total, bytes, late, last, maxLat, lats[]}} (prev may be null); dtMs: time between the two.
-  // Per stream: messages and rate since the last sample, how old the newest message is, latency median / p90 / max, and late messages (over 1 s).
-  function feeds(prev, cur, nowMs, dtMs) {
-    const out = {};
-    for (const id in cur) {
-      const c = cur[id], p = prev && prev[id];
-      if (!c.total) continue;
-      const n = c.total - (p ? p.total : 0);
-      out[id] = {n, hz:dtMs > 0 ? round(n/(dtMs/1000), 1) : null, ageMs:c.last ? nowMs - c.last : null, latMed:quantile(c.lats, .5), latP90:quantile(c.lats, .9), latMax:c.maxLat == null ? null : c.maxLat, late:c.late - (p ? p.late : 0)};
-    }
-    return out;
-  }
-  // One stream seen from the worker: note(exchangeMs, localMs) for every message, take() at each sample. lag = local clock minus the exchange's
-  // clock, so it holds the clock offset as well as the real delay; a jump of the median is the thing to look for.
-  function streamStat() {
-    let n = 0, lags = [], last = 0, gap = 0;
-    return {
-      note(exch, local) { n++; if (exch > 0) { lags.push(local - exch); if (lags.length > 200) lags.shift(); } if (last) gap = Math.max(gap, local - last); last = local; },
-      take(nowMs, dtMs) { const r = {n, hz:dtMs > 0 ? round(n/(dtMs/1000), 1) : null, lagMed:quantile(lags, .5), lagP90:quantile(lags, .9), lagMax:lags.length ? Math.max.apply(null, lags) : null, gapMs:gap, ageMs:last ? nowMs - last : null}; n = 0; gap = 0; return r; },
-    };
-  }
-
-  // Socket close log (a worker's sockets; the Health log shows it as "socket closed"). watch(name, w) listens to one socket without touching its own handlers and, on every close that was not
-  // collection ending, posts the close code, wasClean, the reason, how long it had been up, how long since its last message, how many messages it carried, and ours = why OUR code closed it
-  // (shut(w, "silent") is a worker's silence check, so a "closed, reopening" can be told from a server close; shut(w, "stop") is collection ending and is not logged). A flapping source writes
-  // at most 5 notes an hour so the 400-event Health log is not pushed out; the notes carry the running close and error counts and how many were left out. now() and post() come from the worker.
-  function sockWatch(post, now) {
-    const stat = {};
-    return {
-      watch(name, w) {
-        const st = stat[name] || (stat[name] = {closes:0, errors:0, win:0, logged:0, suppressed:0}), at = {open:0, msg:0, n:0};
-        w.addEventListener("open", () => { at.open = now(); });
-        w.addEventListener("message", () => { at.msg = now(); at.n++; });
-        w.addEventListener("error", () => { st.errors++; });
-        w.addEventListener("close", ev => {
-          const t = now(), why = w._why || null; st.closes++;
-          if (why === "stop") return;
-          if (!st.win || t - st.win >= 3600000) { st.win = t; st.logged = 0; }
-          if (st.logged >= 5) { st.suppressed++; return; }
-          st.logged++; const lastIn = at.msg || at.open;
-          post({t:"note", k:"socket closed", d:{src:name, code:ev.code, clean:!!ev.wasClean, reason:String(ev.reason || "").slice(0, 60) || null, upMs:at.open ? t - at.open : null, silentMs:lastIn ? t - lastIn : null, msgs:at.n, ours:why, closes:st.closes, errors:st.errors, left_out:st.suppressed || null}});
-          st.suppressed = 0;
-        });
-      },
-      shut(w, why) { try { w._why = why; w.close(); } catch (e) { /* already closed */ } }
-    };
-  }
-
-  // ---- derivatives context (collector "derivs", run by collectors-worker.js). Readers of the public endpoints; each returns null for an answer that is not usable.
-  // Verified live 2026-10-23, see .scratch/collectors/01-collectors.md.
-  const EVERY = {prem:15000, hl:15000, basis:10000, dvol:10000}, BACKOFF_MS = 300000;      // polling spacing per source; a rate-limited source rests this long
-  const num = x => { const n = +x; return x != null && x !== "" && Number.isFinite(n) ? n : null; };
-  const due = (last, now, every) => !last || now - last >= every;
-  function premium(j) {
-    const mark = j && num(j.markPrice); if (mark == null) return null;
-    return {mark, index:num(j.indexPrice), est:num(j.estimatedSettlePrice), fund:num(j.lastFundingRate), next:num(j.nextFundingTime), t:num(j.time)};
-  }
-  function openInterest(j) { const oi = j && num(j.openInterest); return oi == null ? null : {oi, t:num(j.time)}; }
-  // Hyperliquid metaAndAssetCtxs: [{universe:[{name}]}, [ctx...]] with the contexts in the order of the universe
-  function hlCtx(j, coin) {
-    if (!Array.isArray(j) || !j[0] || !Array.isArray(j[0].universe) || !Array.isArray(j[1])) return null;
-    const i = j[0].universe.findIndex(u => u.name === coin), c = i >= 0 && j[1][i]; if (!c) return null;
-    const mark = num(c.markPx); if (mark == null) return null;
-    return {fund:num(c.funding), oi:num(c.openInterest), prem:num(c.premium), oracle:num(c.oraclePx), mark, mid:num(c.midPx)};
-  }
-  function force(d) {
-    const o = d && d.e === "forceOrder" && d.o; if (!o) return null;
-    const qty = num(o.z) || num(o.q), px = num(o.ap) || num(o.p); if (!qty || !px) return null;
-    return {side:o.S, qty, px, limit:num(o.p), status:o.X, T:num(o.T)};
-  }
-  // one markPrice@1s message: mark, index, funding and the next funding time; basis in bps of the index
-  function basis(d) {
-    const mark = d && num(d.p), index = d && num(d.i); if (mark == null || index == null || !index) return null;
-    return {mark, index, fund:num(d.r), next:num(d.T), bps:round((mark - index)/index*1e4, 2)};
-  }
-
-  // ---- calendar tags (collector "calendar", run by collectors-worker.js): when scheduled things happen, by rule, no network. Times are UTC.
-  // calendar(t0, t1) -> [{t, tags:[...]}] for every instant in (t0, t1], tags merged per instant. Tags: "15m", "1h", "4h", "1d", "1w" (Monday 00:00),
-  // "1M" (the 1st), "funding" (00 / 08 / 16: the Binance 8 h rule; a symbol on another interval is not followed), "usOpen" / "usClose" (09:30 / 16:00 New York
-  // on weekdays, daylight saving followed; exchange holidays are NOT known), "optExp:daily|weekly|monthly|quarterly" (08:00 UTC every day: Friday weekly,
-  // last Friday of the month monthly, last Friday of Mar / Jun / Sep / Dec quarterly). Macro releases (CPI, FOMC, jobs) follow no rule: not here.
-  const NY_FMT = typeof Intl !== "undefined" ? new Intl.DateTimeFormat("en-US", {timeZone:"America/New_York", hourCycle:"h23", year:"numeric", month:"numeric", day:"numeric", hour:"numeric", minute:"numeric"}) : null;
-  function nyOffsetMin(ms) {      // minutes New York is ahead of UTC at that instant (-300 or -240)
-    const p = {}; for (const x of NY_FMT.formatToParts(new Date(ms))) p[x.type] = +x.value;
-    return Math.round((Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute) - Math.floor(ms/60000)*60000)/60000);
-  }
-  function nyToUtc(y, m, d, h, mi) { const g = Date.UTC(y, m, d, h, mi); return g - nyOffsetMin(g - nyOffsetMin(g)*60000)*60000; }
-  const lastFriday = (y, m) => { const last = new Date(Date.UTC(y, m + 1, 0)); return last.getUTCDate() - ((last.getUTCDay() - 5 + 7) % 7); };
-  function calendar(t0, t1) {
-    const map = new Map(), add = (t, tag) => { if (t > t0 && t <= t1) { if (!map.has(t)) map.set(t, []); map.get(t).push(tag); } };
-    const Q = 900000;
-    for (let t = (Math.floor(t0/Q) + 1)*Q; t <= t1; t += Q) {
-      const d = new Date(t), h = d.getUTCHours(); add(t, "15m");
-      if (d.getUTCMinutes() !== 0) continue;
-      add(t, "1h"); if (h % 4 === 0) add(t, "4h");
-      if (h === 0) { add(t, "1d"); if (d.getUTCDay() === 1) add(t, "1w"); if (d.getUTCDate() === 1) add(t, "1M"); }
-      if (h % 8 === 0) add(t, "funding");
-    }
-    for (let D = Math.floor(t0/86400000) - 1; D <= Math.floor(t1/86400000) + 1; D++) {
-      const d = new Date(D*86400000), y = d.getUTCFullYear(), m = d.getUTCMonth(), day = d.getUTCDate(), wd = d.getUTCDay();
-      const monthly = wd === 5 && day === lastFriday(y, m);
-      add(Date.UTC(y, m, day, 8), "optExp:" + (monthly ? (m % 3 === 2 ? "quarterly" : "monthly") : wd === 5 ? "weekly" : "daily"));
-      if (wd >= 1 && wd <= 5) { add(nyToUtc(y, m, day, 9, 30), "usOpen"); add(nyToUtc(y, m, day, 16, 0), "usClose"); }      // (y, m, day) read as the New York date
-    }
-    return [...map].sort((a, b) => a[0] - b[0]).map(([t, tags]) => ({t, tags}));
-  }
-
-  // ---- book depth summaries (collector "book", run by collectors.js while a recording is on). The raw book the recording already keeps is shallow
-  // (Binance 30 levels is under 1 bp for BTC, Hyperliquid 20 levels about 2.4 bps), so these summaries are where depth out to 25 bps comes from.
-  const BOOK_EDGES = [1, 5, 10, 20];      // not 25: Binance's snapshot is 1000 levels (about 15 bps for BTC) and Hyperliquid's bucketed book reaches about 24 bps
-  // book(bids, asks, edges): levels are [px, qty] in any order. Returns the mid, the spread in bps, the size at the best bid and ask, how far out the
-  // data reaches on each side (bps from the mid) and the quantity within each edge: d[edge] = [bidQty, askQty], null where the data does not reach that far.
-  // `reach` [bid, ask] (bps) overrides the farthest level seen, for a book that keeps stray far levels (Binance's local book does): the levels past the real
-  // coverage are incomplete, so the reach there is only what the snapshot guaranteed.
-  function book(bids, asks, edges, reach) {
-    edges = edges || BOOK_EDGES;
-    let bb = -Infinity, ba = Infinity, tb = 0, ta = 0;
-    for (const l of bids) if (l[0] > bb) { bb = l[0]; tb = l[1]; }
-    for (const l of asks) if (l[0] < ba) { ba = l[0]; ta = l[1]; }
-    if (!(bb > 0) || !(ba > 0) || !Number.isFinite(ba) || ba <= bb) return null;
-    const mid = (bb + ba)/2, k = 1e4/mid, sb = edges.map(() => 0), sa = edges.map(() => 0);
-    let rb = 0, ra = 0;
-    for (const l of bids) { const dist = (mid - l[0])*k; if (dist > rb) rb = dist; for (let i = 0; i < edges.length; i++) if (dist <= edges[i]) sb[i] += l[1]; }
-    for (const l of asks) { const dist = (l[0] - mid)*k; if (dist > ra) ra = dist; for (let i = 0; i < edges.length; i++) if (dist <= edges[i]) sa[i] += l[1]; }
-    if (reach) { rb = reach[0]; ra = reach[1]; }
-    const d = {}; edges.forEach((e, i) => { d[e] = [rb >= e ? round(sb[i], 3) : null, ra >= e ? round(sa[i], 3) : null]; });
-    return {mid:round(mid, 2), spr:round((ba - bb)*k, 2), tb:round(tb, 4), ta:round(ta, 4), reach:[round(rb, 1), round(ra, 1)], d};
-  }
-  // a fine book (exact prices, shallow) topped up with a coarse one (price buckets, deeper): each edge comes from the fine book where it reaches,
-  // otherwise from the coarse one; `coarse` lists the edges that are bucket-resolution only (the bucket edge decides, so they are approximate).
-  function mergeBook(fine, coarse) {
-    if (!fine) return null;
-    const d = {}, coarseEdges = [];
-    for (const e in fine.d) {
-      const f = fine.d[e], c = coarse && coarse.d[e], pick = i => f[i] != null ? f[i] : (c && c[i] != null ? c[i] : null);
-      d[e] = [pick(0), pick(1)]; if ((f[0] == null && d[e][0] != null) || (f[1] == null && d[e][1] != null)) coarseEdges.push(+e);
-    }
-    return Object.assign({}, fine, {d, coarse:coarseEdges});
-  }
-  // size added and removed near the touch, from the book's incremental updates: note(side "b"|"a", qty before, qty after, bps from the mid), take() once a second.
-  // "Removed" is a level shrinking or disappearing: a cancel or a trade, which this cannot tell apart.
-  function flowStat(limitBps) {
-    const z = () => ({add:0, rem:0, nAdd:0, nUp:0, nRed:0, nDel:0}); let s = {b:z(), a:z()};
-    return {
-      note(side, oldQ, newQ, distBps) {
-        if (!(Math.abs(distBps) <= limitBps)) return;
-        const x = s[side], o = oldQ || 0, n = newQ || 0;
-        if (n === o) return;
-        if (!o) { x.nAdd++; x.add += n; } else if (!n) { x.nDel++; x.rem += o; } else if (n > o) { x.nUp++; x.add += n - o; } else { x.nRed++; x.rem += o - n; }
-      },
-      take() { const r = s; s = {b:z(), a:z()}; for (const k of ["b", "a"]) { r[k].add = round(r[k].add, 3); r[k].rem = round(r[k].rem, 3); } return r; },
-    };
-  }
-
-  // ---- venue prices (collector "venues", run by collectors-worker.js while a recording is on or auto-record is armed): the same instrument on Coinbase, Bybit and Binance spot, to see how
-  // far apart the prices are. Raw quotes only; the perp-spot basis and the correlation are worked out afterwards. Public sockets, no keys.
-  // the sockets to open for a coin: {id, url, sub (sent on open), ping (sent every 20 s)}
-  function venueSubs(coin) {
-    const C = String(coin || "BTC").toUpperCase(), c = C.toLowerCase();
-    return [
-      {id:"cb", url:"wss://ws-feed.exchange.coinbase.com", sub:{type:"subscribe", product_ids:[C + "-USD"], channels:["ticker"]}},
-      {id:"byL", url:"wss://stream.bybit.com/v5/public/linear", sub:{op:"subscribe", args:["tickers." + C + "USDT"]}, ping:{op:"ping"}},
-      {id:"bnS", url:"wss://stream.binance.com:9443/stream?streams=" + c + "usdt@bookTicker"},
-    ];
-  }
-  // One parsed socket message -> {src, set, e} (e = the exchange's own time in ms, or null), or null for anything that is not a price. Fields: b / a = best bid / ask,
-  // l = last trade, m = mark, i = index, f = funding rate. Sources: cb Coinbase spot, byL Bybit perp, bnS Binance spot.
-  // Bybit sends only the fields that changed, so a message is merged into what the source already holds (venueApply).
-  const BYBIT = {bid1Price:"b", ask1Price:"a", lastPrice:"l", markPrice:"m", indexPrice:"i", fundingRate:"f"};
-  function venueParse(id, j) {
-    if (!j || typeof j !== "object") return null;
-    const got = (src, pairs, e) => { const set = {}; let n = 0; for (const k in pairs) { const v = num(pairs[k]); if (v != null) { set[k] = v; n++; } } return n ? {src, set, e:e == null || !Number.isFinite(e) ? null : e} : null; };
-    if (id === "cb") return j.type === "ticker" ? got("cb", {b:j.best_bid, a:j.best_ask, l:j.price}, Date.parse(j.time)) : null;
-    if (id === "byL") {
-      if (!j.data || typeof j.topic !== "string" || j.topic.indexOf("tickers.") !== 0) return null;
-      const pairs = {}; for (const k in BYBIT) if (j.data[k] != null) pairs[BYBIT[k]] = j.data[k];
-      return got(id, pairs, num(j.ts));
-    }
-    if (id === "bnS") { const d = j.data; return d && d.b != null && d.a != null ? got("bnS", {b:d.b, a:d.a}, null) : null; }
-    return null;
-  }
-  function venueApply(state, p, nowMs) {
-    if (!p) return;
-    const s = state[p.src] || (state[p.src] = {f:{}, at:0, e:null});
-    Object.assign(s.f, p.set); s.at = nowMs; s.e = p.e;
-  }
-  // the once-a-second record: each source's latest fields, `age` (ms since it last spoke) and `lag` (local time minus the exchange's time when it sends one)
-  function venueRecord(state, nowMs) {
-    const out = {}; let n = 0;
-    for (const src in state) { const s = state[src]; out[src] = Object.assign({}, s.f, {age:nowMs - s.at}); if (s.e != null) out[src].lag = s.at - s.e; n++; }
-    return n ? out : null;
-  }
-
-  // ---- options and volatility (collector "options", run by collectors-worker.js): only Deribit's volatility index is read (the "dvol" record), for the market state.
-  const deribitCoin = sym => { const c = String(sym || "").toUpperCase(); return c === "BTC" || c === "ETH" ? c : null; };      // the coins with a Deribit volatility index
-
-  // ---- status of each collector, for the list in the Reader tab (view: collectors.js)
-  // derived from REGISTRY: which collector writes which record name; how often (ms) a collector writes while it is working (three times that late is "slow")
-  const OWNER = {}; for (const c of REGISTRY) for (const n of c.records) OWNER[n] = c.id;
-  const EXPECT_ORDER = ["telemetry", "derivs", "calendar", "options", "venues", "book"];      // the order the analysis reports list collectors in (it is not the registry order); kept as it was
-  const EXPECT_MS = {}; for (const id of EXPECT_ORDER) EXPECT_MS[id] = REGISTRY.find(c => c.id === id).expectMs;
-  const ownerOf = name => OWNER[name] || null;
-  // records -> {collectorId: {n, last}} (last = the newest record time)
-  function tally(recs) {
-    const out = {};
-    for (const r of recs) { const id = isRec(r) && OWNER[r[1]]; if (!id) continue; const s = out[id] || (out[id] = {n:0, last:0}); s.n++; if (r[2] > s.last) s.last = r[2]; }
-    return out;
-  }
-  function ageText(ms) { return ms < 90000 ? Math.max(0, Math.round(ms/1000)) + " s" : ms < 5400000 ? Math.round(ms/60000) + " min" : round(ms/3600000, 1) + " h"; }
-  // one line of status: o = {on (switch), why (text when it cannot be working now, else null), n (records on the tape), ageMs (since its last record, null if none), expectMs, sinceMs (page open for)}
-  // -> {text, tone: "ok" | "warn" | "info" | "idle" | "off"}
-  function health(o) {
-    if (!o.on) return {text:"off", tone:"off"};
-    const n = o.n ? o.n.toLocaleString("en-US") + " on the tape" : "";
-    if (o.why) return {text:o.why + (n ? " · " + n : ""), tone:"idle"};
-    if (o.ageMs == null) return o.sinceMs > o.expectMs*3 + 60000 ? {text:"nothing written yet: check the Health log", tone:"warn"} : {text:"starting…", tone:"info"};
-    return o.ageMs <= o.expectMs*3 ? {text:n + " · last " + ageText(o.ageMs) + " ago", tone:"ok"} : {text:n + " · last " + ageText(o.ageMs) + " ago, slower than expected", tone:"warn"};
-  }
-
-  // ---- features and context: what the collectors read, as numbers a person can read (shared by the offline analysis scripts and the episode cards)
-  // FEATURES: name -> [record name, function(payload) -> number | null]
-  const fmid = q => (q && num(q.b) != null && num(q.a) != null ? (q.b + q.a)/2 : null);
-  const fimb = (p, e) => { const d = p && p.d && p.d[e]; return d && num(d[0]) != null && num(d[1]) != null && d[0] + d[1] > 0 ? (d[0] - d[1])/(d[0] + d[1]) : null; };
-  const fdep = (p, e) => { const d = p && p.d && p.d[e]; return d && num(d[0]) != null && num(d[1]) != null ? d[0] + d[1] : null; };
-  // What each collector contributes (see REGISTRY): its features and how a card shows them. Added to the registry entry here because the functions use the helpers above.
-  const CONTRIB = {
-    derivs: {
-      features: {
-        "bnDerivs.fund":      ["bnDerivs", p => p.prem && num(p.prem.fund)],
-        "bnDerivs.basisBps":  ["bnDerivs", p => p.prem && num(p.prem.mark) != null && p.prem.index ? (p.prem.mark - p.prem.index)/p.prem.index*1e4 : null],
-        "bnDerivs.oi":        ["bnDerivs", p => p.oi && num(p.oi.oi)],
-        "hlCtx.fund":         ["hlCtx", p => num(p.fund)],
-        "hlCtx.prem":         ["hlCtx", p => num(p.prem)],
-        "hlCtx.oi":           ["hlCtx", p => num(p.oi)],
-        "basis.bps":          ["basis", p => num(p.bps)],
-      },
-      info: {
-        "bnDerivs.fund":{label:"Binance funding", unit:"bps", scale:1e4, min:0.2}, "bnDerivs.basisBps":{label:"Binance basis", unit:"bps", min:0.3}, "bnDerivs.oi":{label:"Binance open interest", rel:true, min:0.1},
-        "hlCtx.fund":{label:"Hyperliquid funding", unit:"bps", scale:1e4, min:0.2}, "hlCtx.prem":{label:"Hyperliquid premium", unit:"bps", scale:1e4, min:0.3}, "hlCtx.oi":{label:"Hyperliquid open interest", rel:true, min:0.1},
-        "basis.bps":{label:"mark vs index", unit:"bps", min:0.3},
-      },
-    },
-    book: {
-      features: {
-        "bookBn.spread":      ["bookBn", p => num(p.spr)],
-        "bookBn.imbalance5":  ["bookBn", p => fimb(p, 5)],
-        "bookBn.depth5":      ["bookBn", p => fdep(p, 5)],
-        "bookHl.spread":      ["bookHl", p => num(p.spr)],
-        "bookHl.imbalance5":  ["bookHl", p => fimb(p, 5)],
-        "bookHl.depth5":      ["bookHl", p => fdep(p, 5)],
-      },
-      info: {
-        "bookBn.imbalance5":{label:"Binance book imbalance (5 bps)", unit:"", min:0.1}, "bookBn.depth5":{label:"Binance depth (5 bps)", rel:true, min:10}, "bookHl.depth5":{label:"Hyperliquid depth (5 bps)", rel:true, min:10}, "bookHl.imbalance5":{label:"Hyperliquid book imbalance (5 bps)", unit:"", min:0.1},
-      },
-    },
-    venues: {
-      features: {
-        "venues.coinbaseVsBinanceBps": ["venues", p => { const m = fmid(p.bnS), c = p.cb && num(p.cb.l); return m && c != null ? (c - m)/m*1e4 : null; }],
-        "venues.bybitVsBinanceBps":    ["venues", p => { const m = fmid(p.bnS), c = p.byL && num(p.byL.l); return m && c != null ? (c - m)/m*1e4 : null; }],
-      },
-      info: {"venues.coinbaseVsBinanceBps":{label:"Coinbase vs Binance", unit:"bps", min:0.5}, "venues.bybitVsBinanceBps":{label:"Bybit vs Binance", unit:"bps", min:0.5}},
-    },
-    options: {
-      features: {
-        "dvol.vol":           ["dvol", p => num(p.vol)],
-      },
-      info: {
-        "dvol.vol":{label:"volatility index", rel:true, min:0.3},
-      },
-    },
-  };
-  for (const c of REGISTRY) { const k = CONTRIB[c.id] || {}; c.features = k.features || {}; c.info = k.info || {}; }      // every collector has both, empty if it contributes none
-  // FEATURES: name -> [record name, function(payload) -> number | null], FEATURE_INFO: name -> how a card shows it (a short name, and whether its change reads as a percentage of
-  // its recent level (`rel`) or in its own unit (`unit`)). Both are the union of the registry's contributions. The ORDER of FEATURES is fixed (analysis plans depend on it, the
-  // multiple-comparison count and the report lines follow it); the self-test checks that this list and the contributions are the same set.
-  const FEATURE_ORDER = ["dvol.vol", "bnDerivs.fund", "bnDerivs.basisBps", "bnDerivs.oi", "hlCtx.fund", "hlCtx.prem", "hlCtx.oi", "basis.bps",
-    "bookBn.spread", "bookBn.imbalance5", "bookBn.depth5", "bookHl.spread", "bookHl.imbalance5", "bookHl.depth5", "venues.coinbaseVsBinanceBps", "venues.bybitVsBinanceBps"];
-  const FEATURES = {}, FEATURE_INFO = {}, allF = {}, allI = {};
-  for (const c of REGISTRY) { Object.assign(allF, c.features); Object.assign(allI, c.info); }
-  for (const f of FEATURE_ORDER) { if (allF[f]) FEATURES[f] = allF[f]; if (allI[f]) FEATURE_INFO[f] = allI[f]; }
-  for (const f in allF) if (!(f in FEATURES)) FEATURES[f] = allF[f];      // a feature of a new collector not yet in the list goes last (the self-test flags it)
-  for (const f in allI) if (!(f in FEATURE_INFO)) FEATURE_INFO[f] = allI[f];
-  // the feature over time: at most one value per step, with `dev` = value minus the mean of the previous winMs (null until 5 earlier values exist)
-  function featureSeries(rows, fn, stepMs, winMs) {
-    const out = [], win = []; let sum = 0, lastT = -Infinity;
-    for (const r of rows) {
-      if (r[2] - lastT < stepMs) continue;
-      let x = null; try { x = fn(r[3] || {}); } catch {}
-      if (num(x) == null) continue;
-      while (win.length && win[0][0] < r[2] - winMs) sum -= win.shift()[1];
-      out.push({t:r[2], x, dev:win.length >= 5 ? x - sum/win.length : null});
-      win.push([r[2], x]); sum += x; lastT = r[2];
-    }
-    return out;
-  }
-  const featureMaxAge = f => Math.max(3*(EXPECT_MS[OWNER[FEATURES[f][0]]] || 60000), 120000);      // how old a reading may be and still count
-  // context(recs, tMs): what the collector records (any order, any times) said at time tMs, as the deviation of each shown feature from its own mean of the previous 30 minutes.
-  // `z` is that deviation in standard deviations of the same window; `unusual` is |z| >= zMin AND a move worth seeing (FEATURE_INFO.min, in the shown unit: a funding rate that moved 0.03 bps can be many standard deviations of its own jitter and still mean nothing). `liq` counts the Binance liquidations and the Hyperliquid liquidation fills in the minute before.
-  function context(recs, tMs, opt) {
-    opt = opt || {}; const winMs = (opt.winSec || 1800)*1000, zMin = opt.zMin || 1.5, by = {}; let lb = 0, lh = 0;
-    for (const r of recs) {
-      if (!isRec(r) || r[2] > tMs || r[2] < tMs - winMs - 120000) continue;
-      (by[r[1]] || (by[r[1]] = [])).push(r);
-      if (r[2] > tMs - 60000) { if (r[1] === "liq") lb++; else if (r[1] === "hlLiq") lh++; }
-    }
-    const items = [];
-    for (const f in FEATURE_INFO) {
-      const rows = by[FEATURES[f][0]]; if (!rows || rows.length < 6) continue;
-      rows.sort((a, b) => a[2] - b[2]);
-      const ser = featureSeries(rows, FEATURES[f][1], 10000, winMs), q = ser[ser.length - 1];
-      if (!q || q.dev == null || tMs - q.t > featureMaxAge(f)) continue;
-      const prev = ser.slice(0, -1).filter(s => s.t >= q.t - winMs).map(s => s.x); if (prev.length < 5) continue;
-      const mean = prev.reduce((a, b) => a + b, 0)/prev.length, sd = Math.sqrt(prev.reduce((a, b) => a + (b - mean)*(b - mean), 0)/prev.length), info = FEATURE_INFO[f];
-      const z = sd > 1e-12*Math.max(1, Math.abs(mean)) ? q.dev/sd : (Math.abs(q.dev) > 1e-9*Math.max(1, Math.abs(mean)) ? (q.dev > 0 ? 99 : -99) : 0);
-      const mag = info.rel ? (mean ? Math.abs(q.dev/mean)*100 : 0) : Math.abs(q.dev)*(info.scale || 1);
-      items.push({f, label:info.label, x:q.x, dev:q.dev, mean, z:round(z, 2), unusual:Math.abs(z) >= zMin && mag >= (info.min || 0), text:cardText(info, q.dev, mean)});
-    }
-    items.sort((a, b) => Math.abs(b.z) - Math.abs(a.z));
-    return {t:tMs, items, liq:{bn:lb, hl:lh}, liqx:liqDriven(recs, tMs, {coin:opt.coin})};
-  }
-  function cardText(info, dev, mean) {
-    const sign = dev >= 0 ? "+" : "-", a = Math.abs(dev);
-    if (info.rel) return mean ? sign + round(a/Math.abs(mean)*100, a/Math.abs(mean) < 0.1 ? 2 : 1) + "%" : sign + round(a, 2);
-    const v = a*(info.scale || 1); return sign + round(v, v < 10 ? 2 : 1) + (info.unit ? " " + info.unit : "");
-  }
-
-  // ---- was it forced flow? (v080) The forced orders in the 60 s before an episode was detected: Binance liquidations of this symbol, and the Hyperliquid liquidation fills of the
-  // followed wallets in this coin only (the followed wallet is the counterparty: it BOUGHT when the liquidated trader was forced to sell). Notional in dollars.
-  // Rule, written before looking at episodes: "liquidation-driven" = at least `minUsd` (500k) in the window AND at least `ratio` (10) times the average minute of the previous
-  // hour (when less than 10 minutes of earlier data exist, the floor alone decides). Most minutes hold nothing (76% in the first 17 recordings), the 99th percentile of a minute was about 3.6M.
-  function liqDriven(recs, tMs, opt) {
-    opt = opt || {}; const winMs = (opt.winSec || 60)*1000, histMs = (opt.histMin || 60)*60000, minUsd = opt.minUsd == null ? 5e5 : opt.minUsd, ratio = opt.ratio || 10, coin = String(opt.coin || "BTC").toUpperCase();
-    const w = {bn:{sell:0, buy:0, n:0}, hl:{sell:0, buy:0, n:0}}; let hist = 0, first = opt.since == null ? Infinity : opt.since, other = 0;
-    for (const r of recs) {
-      if (!isRec(r) || r[2] > tMs) continue;
-      if (r[2] < first) first = r[2];      // any record shows how far back the data reaches
-      const p = r[3] || {}; let k, sell, usd;
-      if (r[1] === "liq") { k = "bn"; sell = p.side === "SELL"; usd = (num(p.qty) || 0)*(num(p.px) || 0); }
-      else if (r[1] === "hlLiq") {
-        if (String(p.coin).toUpperCase() !== coin) { if (r[2] > tMs - winMs) other++; continue; }
-        k = "hl"; sell = p.side === "B"; usd = (num(p.sz) || 0)*(num(p.px) || 0);
-      } else continue;
-      if (!(usd > 0)) continue;
-      if (r[2] > tMs - winMs) { const x = w[k]; x[sell ? "sell" : "buy"] += usd; x.n++; }
-      else if (r[2] >= tMs - winMs - histMs) hist += usd;
-    }
-    const sell = w.bn.sell + w.hl.sell, buy = w.bn.buy + w.hl.buy, usd = sell + buy, avail = first === Infinity ? 0 : Math.min(histMs, tMs - winMs - first)/60000;
-    const avg = avail >= 10 ? hist/avail : null, x = avg ? usd/avg : null;
-    const tag = usd >= minUsd && (avg == null || avg === 0 || usd >= ratio*avg);
-    for (const k in w) for (const f of ["sell", "buy"]) w[k][f] = Math.round(w[k][f]);
-    return {t:tMs, usd:Math.round(usd), sell:Math.round(sell), buy:Math.round(buy), side:usd ? (sell/usd >= 0.7 ? "sells" : buy/usd >= 0.7 ? "buys" : "mixed") : null,
-      bn:w.bn, hl:w.hl, other, avg:avg == null ? null : Math.round(avg), x:x == null ? null : round(x, 1), histMin:Math.round(avail), tag};
-  }
-  const usdText = v => v >= 1e6 ? "$" + round(v/1e6, 1) + "M" : v >= 1e3 ? "$" + Math.round(v/1e3) + "k" : "$" + Math.round(v);
-
-  // ---- wall quality (v081): what the book depth summaries (collector "book", recordings only) say about a wall episode, as an independent view of the engine's own reading.
-  // wall = an episode group {venue "bn"|"hl", wall:{side "bid"|"ask", px, peak (base units)}, tStart, tEnd (null while open), tUpdate}. Depth is the quantity within an edge (1 / 5 / 10 / 20 bps)
-  // on the wall's side, taken at the smallest edge that holds the wall's distance from the mid at its start. Shown: the wall's share of that depth, that depth against its usual (median of the
-  // 30 minutes before), and what the depth did until the end. Fixed words: depth fell to half or less, with the mid still 2+ bps from the wall = "pulled before price arrived"; fell to half or less
-  // with the mid closer = "gone with price at the wall"; 80% or more kept = "depth held"; otherwise "partly gone". No verdict when the wall is under 20% of that depth. Records within 10 s of the moment count.
-  function wallQuality(recs, g, opt) {
-    opt = opt || {}; const name = g && g.venue === "bn" ? "bookBn" : g && g.venue === "hl" ? "bookHl" : null, none = why => ({none:why, venue:g && g.venue});
-    if (!name || !g.wall) return null;
-    const rows = recs.filter(r => isRec(r) && r[1] === name && r[3] && r[3].d).sort((x, y) => x[2] - y[2]);
-    if (!rows.length) return none("no book records (they exist only while recording)");
-    const nearest = t => { let b = null, bd = Infinity; for (const r of rows) { const d = Math.abs(r[2] - t); if (d < bd) { bd = d; b = r; } if (r[2] > t && d > bd) break; } return bd <= 10000 ? b : null; };
-    const w = g.wall, i = w.side === "bid" ? 0 : 1, r0 = nearest(g.tStart);
-    if (!r0) return none("no book record within 10 s of the wall's start");
-    const mid0 = num(r0[3].mid); if (!(mid0 > 0)) return none("book record without a mid");
-    const dist0 = Math.abs(w.px - mid0)/mid0*1e4, edge = BOOK_EDGES.find(e => e >= dist0);
-    if (!edge) return none("wall is " + round(dist0, 1) + " bps from the mid, beyond the " + BOOK_EDGES[BOOK_EDGES.length - 1] + " bps the summaries reach");
-    const d0 = r0[3].d[edge] && num(r0[3].d[edge][i]);
-    if (d0 == null || !(d0 > 0)) return none("the book did not reach " + edge + " bps on that side");
-    const prior = rows.filter(r => r[2] < g.tStart && r[2] >= g.tStart - 1800000).map(r => r[3].d[edge] && num(r[3].d[edge][i])).filter(v => v != null).sort((x, y) => x - y);
-    const usual = prior.length >= 20 ? (prior.length % 2 ? prior[(prior.length - 1)/2] : (prior[prior.length/2 - 1] + prior[prior.length/2])/2) : null;
-    const out = {venue:g.venue, side:w.side, edge, dist0:round(dist0, 2), depth0:round(d0, 3), peak:round(w.peak, 3), share:round(Math.min(1, w.peak/d0), 2), usual:usual == null ? null : round(usual, 3), x:usual ? round(d0/usual, 1) : null, open:g.tEnd == null};
-    const tE = g.tEnd != null ? g.tEnd : g.tUpdate, r1 = nearest(tE);
-    if (!r1 || r1 === r0) { out.end = null; out.verdict = null; return out; }
-    const m1 = num(r1[3].mid), d1 = r1[3].d[edge] && num(r1[3].d[edge][i]);
-    if (d1 == null || !(m1 > 0)) { out.end = null; out.verdict = null; return out; }
-    const dist1 = (w.side === "bid" ? m1 - w.px : w.px - m1)/m1*1e4, ret = d1/d0;      // negative distance: the mid went through the wall
-    out.end = {t:r1[2], depth:round(d1, 3), dist:round(dist1, 2), ret:round(ret, 2)};
-    out.weak = out.share < 0.2;      // a wall that is under a fifth of the depth says little through that depth
-    out.verdict = out.weak ? null : ret <= 0.5 ? (dist1 >= 2 ? "pulled before price arrived" : "gone with price at the wall") : ret >= 0.8 ? "depth held" : "partly gone";
-    return out;
-  }
-
-  // ---- market state (v082): a plain label for "what kind of market is this moment", from the past only, with its reasons. Rules version 1, written before looking at any episode
-  // (.scratch/collector-features/spec.md, step D); a change is a new version, never an edit. Indicators, each true / false / null (no reading):
-  //   V volatility index above its own previous 30 minutes (1.5 sd and 0.3%, the `context` rule); L "liquidation-driven" (liqDriven) at some moment of the last 5 minutes;
-  //   F Coinbase or Bybit vs Binance gap unusual (context rule); C funding unusual on Binance or Hyperliquid AND open interest on either not below its 30-minute mean.
-  // States, first match wins: stressed (2+ of V, L, F), crowded (C), unsettled (exactly one of V, L, F), calm (none of the four, at least 3 had a reading), unknown.
-  const STATE_VERSION = 1;
-  function marketState(recs, tMs, opt) {
-    opt = opt || {};
-    const c = opt.ctx || context(recs, tMs, {coin:opt.coin}), by = f => c.items.find(x => x.f === f);
-    const anyOf = (fs, test) => { let seen = false; for (const f of fs) { const x = by(f); if (!x) continue; seen = true; if (test(x)) return true; } return seen ? false : null; };
-    const V = anyOf(["dvol.vol"], x => x.unusual && x.z > 0), F = anyOf(["venues.coinbaseVsBinanceBps", "venues.bybitVsBinanceBps"], x => x.unusual);
-    const fund = anyOf(["bnDerivs.fund", "hlCtx.fund"], x => x.unusual), oi = anyOf(["bnDerivs.oi", "hlCtx.oi"], x => x.dev >= 0), C = fund == null || oi == null ? null : fund && oi;
-    let L = c.items.some(x => OWNER[FEATURES[x.f][0]] === "derivs") ? false : null;      // no derivatives reading at all: forced flow cannot be judged
-    if (L === false) {
-      let since = Infinity; const lr = [];
-      for (const r of recs) { if (!isRec(r) || r[2] > tMs) continue; if (r[2] < since) since = r[2]; if (r[1] === "liq" || r[1] === "hlLiq") lr.push(r); }
-      for (let k = 0; k <= 30 && !L; k++) if (liqDriven(lr, tMs - k*10000, {coin:opt.coin, since}).tag) L = true;
-    }
-    const ind = {V, L, F, C}, three = [V, L, F].filter(x => x === true).length, readings = [V, L, F, C].filter(x => x != null).length;
-    const s = three >= 2 ? "stressed" : C === true ? "crowded" : three === 1 ? "unsettled" : readings >= 3 ? "calm" : "unknown";
-    return {t:tMs, v:STATE_VERSION, s, ind, i:Object.keys(ind).filter(k => ind[k] === true).join(""), n:readings};
-  }
-  // the state every stepMs from t0 to t1 (for the strip under the Review timeline)
-  function marketStateSeries(recs, t0, t1, stepMs, opt) { const out = []; for (let t = t0; t <= t1; t += stepMs) { const m = marketState(recs, t, opt); out.push({t, s:m.s, i:m.i}); } return out; }
-
-  // ---- event clock (v083): the scheduled moments around now, all from the calendar rule above (no network). Funding (00 / 08 / 16 UTC), options expiry (08:00 UTC; the level is
-  // daily, weekly, monthly or quarterly), US stock open and close. Macro releases (CPI, FOMC, jobs) follow no rule and are NOT here.
-  const EVENT_LABEL = {funding:"funding", "optExp:daily":"options expiry (daily)", "optExp:weekly":"options expiry (weekly)", "optExp:monthly":"options expiry (monthly)", "optExp:quarterly":"options expiry (quarterly)", usOpen:"US stock open", usClose:"US stock close"};
-  function evSpan(ms) { const m = Math.round(Math.abs(ms)/60000); return m < 90 ? m + " min" : m < 2880 ? Math.floor(m/60) + " h " + (m % 60) + " min" : Math.floor(m/1440) + " d " + Math.floor(m % 1440/60) + " h"; }
-  // events within winMs either side of tMs: [{tag, label, t, off}] with off = tMs - t (positive: it was that long ago), nearest first
-  function eventsNear(tMs, winMs) {
-    const out = [];
-    for (const c of calendar(tMs - winMs - 1, tMs + winMs)) for (const tag of c.tags) if (EVENT_LABEL[tag]) out.push({tag, label:EVENT_LABEL[tag], t:c.t, off:tMs - c.t});
-    return out.sort((x, y) => Math.abs(x.off) - Math.abs(y.off) || (x.tag < y.tag ? -1 : 1));
-  }
-  // the next of each kind after tMs: {funding, expiry (nearest, any level), bigger (nearest weekly or larger, null when `expiry` already is one), stocks (next open or close)}; each {tag, label, t, in}
-  function eventClock(tMs) {
-    const next = (pred, spanMs) => { for (const c of calendar(tMs, tMs + spanMs)) for (const tag of c.tags) if (pred(tag)) return {tag, label:EVENT_LABEL[tag], t:c.t, in:c.t - tMs}; return null; };
-    const expiry = next(g => g.indexOf("optExp:") === 0, 3*86400000), big = g => g === "optExp:weekly" || g === "optExp:monthly" || g === "optExp:quarterly";
-    return {t:tMs, funding:next(g => g === "funding", 9*3600000), expiry, bigger:expiry && big(expiry.tag) ? null : next(big, 100*86400000), stocks:next(g => g === "usOpen" || g === "usClose", 5*86400000)};
-  }
-
-  // one socket message -> {venue, type "snapshot" | "delta", bids, asks (lists of [price, size] strings), seq, prev (OKX), cs (OKX checksum or null)} or null for anything that is not a book message
-  function bookParse(id, j) {
-    if (!j || typeof j !== "object") return null;
-    if (id === "bn") {      // Binance USD-M futures: a depthUpdate event (alone or inside the combined-stream wrapper {stream, data}) or the REST depth snapshot {lastUpdateId, bids, asks}
-      const d = j.data && typeof j.data === "object" && j.data.e ? j.data : j;
-      if (d.e === "depthUpdate" && Array.isArray(d.b) && Array.isArray(d.a) && num(d.u) != null) return {venue:"bn", type:"delta", bids:d.b, asks:d.a, seq:num(d.u), first:num(d.U), prev:num(d.pu), cs:null};
-      if (!d.e && num(d.lastUpdateId) != null && Array.isArray(d.bids) && Array.isArray(d.asks)) return {venue:"bn", type:"snapshot", bids:d.bids, asks:d.asks, seq:num(d.lastUpdateId), first:null, prev:null, cs:null};
-      return null;
-    }
-    return null;
-  }
-  // Binance book for the worker (collector "book"): the diff stream (the public route, like the page's) and the REST snapshot it is applied on top of (1000 levels, about 17 bps for BTC)
-  function bnBookSub(coin) {
-    const C = String(coin || "BTC").toUpperCase(), c = C.toLowerCase();
-    return {id:"bn", url:"wss://fstream.binance.com/public/stream?streams=" + c + "usdt@depth@100ms", snap:"https://fapi.binance.com/fapi/v1/depth?symbol=" + C + "USDT&limit=1000"};
-  }
-  // Hyperliquid l2Book push for the coin -> {bids, asks} as [price, size] numbers, best first, or null for anything else (the default 20 exact levels; the bucketed book is asked for separately, hlCoarse)
-  function hlBookParse(j, coin) {
-    const d = j && j.channel === "l2Book" && j.data; if (!d || !Array.isArray(d.levels) || !Array.isArray(d.levels[0]) || !Array.isArray(d.levels[1])) return null;
-    if (coin && String(d.coin).toUpperCase() !== String(coin).toUpperCase()) return null;
-    const side = a => a.map(l => [num(l.px), num(l.sz)]).filter(l => l[0] > 0 && l[1] != null);
-    return {bids:side(d.levels[0]), asks:side(d.levels[1])};
-  }
-  // the l2Book answer aggregated to 4 significant figures (20 levels that reach about 24 bps for BTC) -> a book summary at the standard edges, or null
-  function hlCoarse(j) {
-    const L = j && j.levels; if (!Array.isArray(L) || !Array.isArray(L[0]) || !Array.isArray(L[1])) return null;
-    return book(L[0].map(l => [+l.px, +l.sz]), L[1].map(l => [+l.px, +l.sz]), BOOK_EDGES);
-  }
-  // the "bookHl" record payload: the exact book (cur = {bids, asks, at}) topped up with the bucketed one where it reaches deeper; null when the exact book is missing or older than 5 s
-  function hlBookSummary(cur, coarse, nowMs, coarseAt) {
-    if (!cur || !(nowMs - cur.at < 5000)) return null;
-    const fine = book(cur.bids, cur.asks), m = mergeBook(fine, coarse && nowMs - coarseAt < 10000 ? coarse : null);
-    return m ? Object.assign(m, {cAge:coarseAt ? nowMs - coarseAt : null}) : null;
-  }
-  // venue "bn" (Binance: REST snapshot, then diffs; the first diff must straddle the snapshot id, later ones chain on pu; the summary claims only the snapshot window as reach); opt.ct = coin per contract (OKX), opt.edges, opt.flowBps (flow window, default 20 bps), opt.maxLevels (levels a side the summary uses: the venue's window, 1000 Bybit / 400 OKX)
-  function perpBook(venue, opt) {
-    opt = opt || {}; const ct = 1, edges = opt.edges || BOOK_EDGES, flow = flowStat(opt.flowBps || 20), cap = opt.maxLevels || Infinity, bids = new Map(), asks = new Map();
-    let ready = false, lastSeq = null, bb = -Infinity, ba = Infinity, firstDelta = false, snapLo = 0, snapHi = 0; const st = {snap:0, upd:0, gap:0, cross:0, ign:0, bad:0, resync:0};
-    const qty = e => num(e[1])*ct;
-    const rescan = () => { bb = -Infinity; ba = Infinity; for (const p of bids.keys()) if (p > bb) bb = p; for (const p of asks.keys()) if (p < ba) ba = p; };
-    function setLevel(isBid, e, track) {
-      if (!Array.isArray(e)) { st.bad++; return; }
-      const px = num(e[0]), sz = num(e[1]); if (!(px > 0) || sz == null || sz < 0) { st.bad++; return; }
-      const m = isBid ? bids : asks, old = m.get(px), oq = old ? qty(old) : 0;
-      if (sz === 0) { if (!old) return; m.delete(px); if (isBid ? px === bb : px === ba) rescan(); }
-      else { m.set(px, [e[0], e[1]]); if (isBid ? px > bb : px < ba) { if (isBid) bb = px; else ba = px; } }
-      if (track && bb > 0 && ba < Infinity) { const mid = (bb + ba)/2; flow.note(isBid ? "b" : "a", oq, sz === 0 ? 0 : qty(m.get(px)), (isBid ? mid - px : px - mid)*1e4/mid); }
-    }
-    const fail = kind => { st[kind]++; st.resync++; ready = false; lastSeq = null; bids.clear(); asks.clear(); bb = -Infinity; ba = Infinity; return "resync"; };
-    const crossed = () => bb > 0 && ba < Infinity && ba <= bb;
-    return {
-      apply(m) {
-        if (!m) return "ignored";
-        if (m.type === "snapshot") {
-          bids.clear(); asks.clear(); bb = -Infinity; ba = Infinity; flow.take();
-          for (const e of m.bids) setLevel(true, e, false); for (const e of m.asks) setLevel(false, e, false);
-          if (!bids.size || !asks.size || crossed()) return fail("cross");
-          ready = true; lastSeq = m.seq; st.snap++; firstDelta = true;
-          { snapLo = Infinity; snapHi = 0; for (const p of bids.keys()) if (p < snapLo) snapLo = p; for (const p of asks.keys()) if (p > snapHi) snapHi = p; }      // how far the snapshot reaches: past it the local book is incomplete
-          return "snapshot";
-        }
-        if (!ready) { st.ign++; return "ignored"; }
-        if (firstDelta) {      // the first event after a snapshot: drop what the snapshot already holds, then it must straddle the snapshot id
-          if (m.seq <= lastSeq) { st.ign++; return "ignored"; }
-          if (m.first > lastSeq + 1) return fail("gap");
-          firstDelta = false;
-        } else if (m.prev !== lastSeq) return fail("gap");
-        for (const e of m.bids) setLevel(true, e, true); for (const e of m.asks) setLevel(false, e, true);
-        lastSeq = m.seq; st.upd++;
-        if (!bids.size || !asks.size || crossed()) return fail("cross");
-        return "ok";
-      },
-      ready: () => ready,
-      stats: () => Object.assign({}, st),
-      // the summary record payload (bookBn's shape) or null when there is no good book; also empties the flow counters
-      summary() {
-        const fl = flow.take(); if (!ready) return null;
-        // keep the nearest `cap` levels a side: the venue's window is that deep, and a local book keeps stray levels beyond it that are incomplete (their reach would be claimed as depth)
-        const arr = (m, isBid) => { const a = []; for (const [, e] of m) a.push([+e[0], qty(e)]); if (a.length > cap) { a.sort((x, y) => isBid ? y[0] - x[0] : x[0] - y[0]); a.length = cap; } return a; };
-        let reach = null;
-        { const mid = (bb + ba)/2; reach = mid > 0 ? [Math.max(0, (mid - snapLo)*1e4/mid), Math.max(0, (snapHi - mid)*1e4/mid)] : [0, 0]; }      // Binance: the snapshot window, not the farthest stray level
-        const s = book(arr(bids, true), arr(asks, false), edges, reach); return s ? Object.assign(s, {fl, rs:st.resync}) : null;
-      },
-      best: () => ready ? [bb, ba] : null,
-    };
-  }
-
-  // tape helpers on arrays of records
-  const prune = (recs, nowMs, keepMs) => recs.filter(r => r[2] >= nowMs - (keepMs == null ? TAPE_MS : keepMs));
-  const slice = (recs, t0, t1) => recs.filter(r => r[2] >= t0 && r[2] <= t1);
-  // keep the newest records that fit in maxBytes of JSON
-  function fit(recs, maxBytes) {
-    const lim = maxBytes == null ? FILE_BUDGET : maxBytes, out = []; let size = 2;
-    for (let i = recs.length - 1; i >= 0; i--) { const b = JSON.stringify(recs[i]).length + 1; if (size + b > lim) break; size += b; out.push(recs[i]); }
-    return out.reverse();
-  }
-  return {REGISTRY, TAPE_MS, FILE_BUDGET, EVERY, BACKOFF_MS, quantile, rec, isRec, feeds, streamStat, sockWatch, due, calendar, OWNER, EXPECT_MS, ownerOf, tally, ageText, health, FEATURES, FEATURE_INFO, featureSeries, featureMaxAge, context, liqDriven, usdText, wallQuality, marketState, marketStateSeries, STATE_VERSION, EVENT_LABEL, evSpan, eventsNear, eventClock, deribitCoin, bookParse, bnBookSub, hlBookParse, hlCoarse, hlBookSummary, perpBook, venueSubs, venueParse, venueApply, venueRecord, BOOK_EDGES, book, mergeBook, flowStat, premium, openInterest, hlCtx, force, basis, prune, slice, fit};
-})();
-
-// Auto-record's price feed, run in a Web Worker (the page puts this text after auto-record-core.js and starts it as a worker).
-// Why a worker: a hidden tab has its timers slowed to once a minute and can be frozen, which starved the page's own price socket and made
-// auto-record start its 15 minutes of learning over. A worker keeps its own timers and socket, so the price history keeps building.
-// It owns the socket, the reconnects, the 15 s silence check and the volatility reading; the page only reads the result and decides.
-let ws = null, on = false, gen = 0, url = "", cfg = {}, h = null, lastMsg = 0, tickTimer = null, lastCol = 0;
-const stat = COLLECT.streamStat();      // self-telemetry of this stream (collectors-core.js is placed before this file)
-const post = m => self.postMessage(m);
-const { watch, shut } = COLLECT.sockWatch(post, Date.now);      // close log (code, wasClean, up time, who closed it), posted as a note for the Health log
-function open() {
-  const g = gen; let s;
-  try { s = new WebSocket(url); } catch (err) { post({t:"error", msg:String(err && err.message || err)}); return; }
-  watch("price stream", s); ws = s; lastMsg = Date.now(); const opened = lastMsg;
-  s.onmessage = ev => { try { const j = JSON.parse(ev.data), d = j.data || j; if (d && d.p){ lastMsg = Date.now(); AUTOREC.push(h, lastMsg, +d.p); stat.note(+d.E, lastMsg); } } catch {} };
-  s.onclose = () => {
-    if (!on || g !== gen) return;
-    post({t:"drop", d:{at:Date.now(), upMs:Date.now() - opened, silentMs:Date.now() - lastMsg}});
-    setTimeout(() => { if (on && g === gen) open(); }, 5000);
-  };
-}
-function tick() {
-  if (!on) return;
-  if (ws && Date.now() - lastMsg > 15000) shut(ws, "silent");      // a socket that went silent without closing: close it so onclose reopens it
-  const now = Date.now();
-  post({t:"vol", v:AUTOREC.vol(h, cfg, now), lastMsg, ws:ws ? ws.readyState : -1, at:now});
-  if (!lastCol) lastCol = now;
-  if (now - lastCol >= 10000) { if (cfg.collectors && cfg.collectors.telemetry) post({t:"col", rec:COLLECT.rec("markPrice", now, Object.assign({src:"worker", dtMs:now - lastCol}, stat.take(now, now - lastCol)))}); else stat.take(now, now - lastCol); lastCol = now; }
-}
-self.onmessage = ev => {
-  const m = ev.data;
-  if (m.t === "start") { on = true; gen++; url = m.url; cfg = m.cfg || {}; h = AUTOREC.createHistory(); open(); clearInterval(tickTimer); tickTimer = setInterval(tick, 2000); tick(); }
-  else if (m.t === "cfg") cfg = m.cfg || {};
-  else if (m.t === "dump") post({t:"trace", rows:AUTOREC.dump(h, Date.now(), m.secs || 1800)});
-  else if (m.t === "close") { if (ws) shut(ws, "page"); }
-  else if (m.t === "stop") { on = false; gen++; clearInterval(tickTimer); if (ws) shut(ws, "stop"); ws = null; }
-};
 
 </script>
 <script type="text/plain" id="colWorkerSrc">
@@ -7056,150 +6269,6 @@ self.onmessage = ev => {
 </script>
 <script>
 "use strict";
-// Auto-record (view): while armed it listens to ONE price stream (Binance mark price, about 1 message a second) and nothing else: no other feeds,
-// no Reader engine, no drawing. When AUTOREC says the market has turned volatile it connects the app and starts the normal recording; when it
-// has been calm long enough (or the time limit hits) it stops, saves the file, and disconnects again if it was the one who connected.
-const AR = {on:false, ws:null, gen:0, h:null, st:null, cfg:null, timer:null, lock:null, byUs:false, t0:0, lastMsg:0, runs:0, drops:[], worker:null, volAt:0, unlock:null, v:null, pre:null, preMeta:null};
-const ar$ = id => document.getElementById(id);
-const AR_FIELDS = {arTrigRatio:"trigRatio", arTrigSigma:"trigSigma", arExitRatio:"exitRatio", arExitSigma:"exitSigma", arCalmMin:"calmMin", arMaxMin:"maxMin", arCooldown:"cooldownMin", arPreMin:"preMin"};
-const arCfgFromUi = () => { const c = {}; for (const id in AR_FIELDS){ const v = +ar$(id).value; if (v > 0) c[AR_FIELDS[id]] = v; } c.v = 2; c.rearm = ar$("arRearm").checked; c.epTrig = ar$("arEpTrig").checked; c.colTrig = ar$("arColTrig").checked; return Object.assign({}, AUTOREC.DEFAULTS, c); };
-const arMsg = t => { ar$("arMsg").textContent = t; };
-const arDur = ms => { const m = Math.floor(ms/60000); return ms < 60000 ? Math.round(ms/1000) + " s" : m >= 60 ? Math.floor(m/60) + " h " + (m%60) + " min" : m + " min"; };
-
-(function arInit() {
-  const saved = store.get("ar.cfg", {});
-  for (const id in AR_FIELDS){ const k = AR_FIELDS[id]; ar$(id).value = saved && saved[k] > 0 && !(k === "cooldownMin" && saved.v !== 2) ? saved[k] : AUTOREC.DEFAULTS[k]; ar$(id).onchange = () => store.set("ar.cfg", arCfgFromUi()); }      // the cooldown default changed from 10 to 3 minutes (v090): a value saved before that is dropped once
-  ar$("arRearm").checked = !saved || saved.rearm !== false; ar$("arRearm").onchange = () => store.set("ar.cfg", arCfgFromUi());
-  ar$("arEpTrig").checked = !saved || saved.epTrig !== false; ar$("arEpTrig").onchange = () => store.set("ar.cfg", arCfgFromUi());
-  ar$("arColTrig").checked = !saved || saved.colTrig !== false; ar$("arColTrig").onchange = () => store.set("ar.cfg", arCfgFromUi());
-  ar$("arArm").onclick = arToggle;
-  ar$("arHdr").onclick = () => {      // the same switch from the header: arms with the settings of the Reader tab and shows the answer here for a few seconds
-    arToggle(); const full = ar$("arMsg").textContent, m = /^Disconnect first/.test(full) ? "Disconnect first, then press Arm." : full.split(/(?<=\.)\s/)[0], box = ar$("arHdrMsg"); box.textContent = m.length > 140 ? m.slice(0, 137) + "…" : m;      // the first sentence only: "Armed." / "Disarmed." / the reason it refused (a phone header must not grow for long)
-    clearTimeout(arInit.t); arInit.t = setTimeout(() => { box.textContent = ""; }, 9000);
-  };
-  document.addEventListener("visibilitychange", () => { if (AR.on && document.visibilityState === "visible") arLock(); });     // the screen lock is dropped when the tab is hidden
-})();
-
-function arLabels() { const t = AR.on ? "Disarm" : "Arm"; ar$("arArm").textContent = ar$("arHdr").textContent = t; ar$("arHdr").classList.toggle("on", AR.on); }
-
-function arUrl() {
-  const d = STREAMS.find(x => x.id === "bn.markPrice"), key = $("route").value === "routed" ? d.sock : "legacy", sub = d.sub(bnSym());
-  return key === "legacy" ? `wss://fstream.binance.com/stream?streams=${sub}` : `wss://fstream.binance.com/${key}/stream?streams=${sub}`;
-}
-function arOpen() {
-  const gen = AR.gen; let ws;
-  try { ws = new WebSocket(arUrl()); } catch { arMsg("The browser blocked the connection."); return; }
-  AR.ws = ws; AR.lastMsg = Date.now(); const opened = AR.lastMsg;
-  ws.onmessage = ev => { try { const j = JSON.parse(ev.data), d = j.data || j; if (d && d.p){ AR.lastMsg = Date.now(); AUTOREC.push(AR.h, AR.lastMsg, +d.p); } } catch {} };
-  ws.onclose = () => { if (AR.on && gen === AR.gen) AR.drops = AR.drops.concat({at:Date.now(), upMs:Date.now() - opened, silentMs:Date.now() - AR.lastMsg}).slice(-20);      // kept so a pattern in the drops can be read afterwards
-    if (AR.on && gen === AR.gen) setTimeout(() => { if (AR.on && gen === AR.gen) arOpen(); }, 5000); };
-}
-// The price feed in a Web Worker (auto-record-worker.js): its socket and timers may be slowed less than the page's in a hidden tab (undocumented), but a frozen page blocks its worker too.
-// Falls back to the page's own socket (arOpen) when workers are unavailable.
-function arStartFeed() {
-  let w;
-  try { const src = ar$("arWorkerSrc").textContent, u = URL.createObjectURL(new Blob([src], {type:"text/javascript"})); w = new Worker(u); URL.revokeObjectURL(u); }
-  catch { AR.worker = null; return arOpen(); }
-  AR.worker = w; AR.volAt = 0; AR.lastMsg = Date.now();
-  w.onmessage = ev => {
-    if (w !== AR.worker) return; const m = ev.data;
-    if (m.t === "vol") { AR.v = m.v; AR.lastMsg = m.lastMsg; AR.volAt = Date.now(); AR.ws = {readyState:m.ws, close:() => w.postMessage({t:"close"})}; }
-    else if (m.t === "col") { if (typeof colAdd === "function") colAdd(m.rec); }      // a collector record from the worker (collectors.js keeps the tape)
-    else if (m.t === "trace") { if (AR.preMeta) AR.pre = Object.assign({}, AR.preMeta, {prices:m.rows}); }
-    else if (m.t === "note") { if (typeof hlNote === "function") hlNote(m.k, m.d); }      // the worker's socket close log, for the Health log
-    else if (m.t === "drop") AR.drops = AR.drops.concat(m.d).slice(-20);      // kept so a pattern in the drops can be read afterwards
-  };
-  w.onerror = () => { if (w !== AR.worker) return; AR.worker = null; try { w.terminate(); } catch {} arOpen(); };      // the worker failed: do the same job on the page
-  w.postMessage({t:"start", url:arUrl(), cfg:Object.assign({}, AR.cfg, {collectors:typeof colWorkerCfg === "function" ? colWorkerCfg() : {}})});
-}
-// A page that holds a Web Lock is not frozen by the browser while hidden; hold one while armed.
-function arKeepAlive() { try { if (navigator.locks) navigator.locks.request("sv-armed", {mode:"shared"}, () => new Promise(res => { AR.unlock = res; })); } catch {} }
-async function arLock() { try { if (navigator.wakeLock && !AR.lock) { AR.lock = await navigator.wakeLock.request("screen"); AR.lock.onrelease = () => { AR.lock = null; }; } } catch {} }
-
-function arToggle() {
-  if (AR.on) return arFinish(AR.st.mode === "recording" ? "Disarmed. The recording and the connection keep running: stop them by hand (Stop recording, then Save session)." : "Disarmed.");
-  if (RT.rec){ arMsg("A recording is running: stop it first (Stop recording), then Arm."); return; }
-  AR.cfg = arCfgFromUi(); store.set("ar.cfg", AR.cfg);
-  AR.on = true; AR.gen++; AR.h = AUTOREC.createHistory(); AR.st = {mode:"waiting"}; AR.byUs = !connected; AR.t0 = Date.now(); AR.runs = 0; AR.drops = [];
-  if (!connected) $("go").click();      // full watch: the feeds and the Reader engine run while armed, with a rolling lead-in of the real inputs
-  arRoll(); arStartFeed(); arKeepAlive(); arLock(); AR.timer = setInterval(arTick, 5000);
-  arLabels(); arMsg(`Armed (full watch: the feeds run and the last ${AR.cfg.preMin} minutes of inputs are kept, so a recording starts with its lead-in). It needs 15 minutes of prices to know what a normal hour looks like before it can judge.`); arTick();
-}
-function arTick() {
-  if (!AR.on) return;
-  const now = Date.now(); let v;
-  if (AR.worker) { v = AR.v || AUTOREC.vol(AUTOREC.createHistory(), AR.cfg, now); if (now - AR.volAt > 20000) v = Object.assign({}, v, {ready:false}); }      // the worker's reading; if it has gone quiet the page cannot judge
-  else {
-    if (AR.ws && now - AR.lastMsg > 15000) try { AR.ws.close(); } catch {}     // a socket that went silent without closing: close it so onclose reopens it
-    v = AR.v = AUTOREC.vol(AR.h, AR.cfg, now);      // AR.v is read by the header status (status-bar.js)
-  }
-  if (AR.st.mode === "waiting" && !connected) return arFinish("You disconnected, so auto-record is off.");
-  if (AR.st.mode === "waiting") arRoll();
-  if (AR.st.mode === "recording" && !RT.rec){
-    if (AR.byUs && connected) $("go").click();
-    return arFinish("The recording stopped on its own (by hand or at its input limit), so auto-record is off. The session is loaded: use Save session.");
-  }
-  const eps = READER.activeEpisodes().filter(e => e.family !== "wall");      // walls can stand for hours: they neither start a recording nor keep one open
-  let col = false, colWhy = [];      // what the collectors read (collectors.js, the market state): forced flow, or a stressed market (two of volatility index, forced flow, venue gap)
-  try { const m = typeof colStateLive === "function" ? colStateLive() : null; if (m){ if (m.ind.L === true) colWhy.push("forced flow"); if (m.s === "stressed" && m.ind.L !== true) colWhy.push("stressed market (" + m.i + ")"); col = colWhy.length > 0; } } catch {}
-  AR.ep = {active:eps.filter(e => e.stage === "active").length, live:eps.length, fams:[...new Set(eps.map(e => e.family))], col, colWhy};
-  const r = AUTOREC.step(AR.st, v, now, AR.cfg, AR.ep); AR.st = r.st;
-  if (r.action === "start") arStart(r.why, v); else if (r.action === "stop") arStop(r.why);
-  if (AR.on) arStatus(v, now);
-}
-// The rolling lead-in: the engine's own input recording, trimmed to the last preMin minutes every tick. At a start it becomes the recording.
-function arRoll() {
-  if (RT.rec) return;
-  if (!AR.roll || !READER.recording().on){ READER.startRecording({quoteMs:100}); AR.roll = true; AR.leadFrom = Date.now(); }
-  READER.trimRecording(Date.now() - AR.cfg.preMin*60000); AR.leadMs = Math.min(AR.cfg.preMin*60000, Date.now() - AR.leadFrom);
-}
-function arStatus(v, now) {
-  const c = AR.cfg, fx = x => x.toFixed(2);
-  let t;
-  if (!v.ready) t = v.nSlow >= AR.cfg.minSlow ? "price stream stalled: waiting for fresh prices" : `learning the last hour: ${Math.min(15, Math.round(v.nSlow/60))} of 15 min`;
-  else if (AR.st.mode === "waiting" && AR.st.until > now) t = `cooldown after recording ${AR.runs}: ${Math.ceil((AR.st.until - now)/60000)} min left before it can start again`;
-  else if (AR.st.mode === "waiting") t = `lead-in ${arDur(AR.leadMs)} kept · waiting · sigma ${fx(v.fast)} (x${fx(v.ratio)} of the hour) · starts at x${c.trigRatio} or ${c.trigSigma}`;
-  else t = `recording ${arDur(now - AR.st.since)} of at most ${c.maxMin} min · sigma ${fx(v.fast)} (x${fx(v.ratio)}) · calm ${AR.st.calmSince == null ? 0 : Math.floor((now - AR.st.calmSince)/60000)} of ${c.calmMin} min`;
-  if (AR.drops.length) t += ` · price stream dropped ${AR.drops.length}x, last at ${new Date(AR.drops[AR.drops.length - 1].at).toLocaleTimeString()}`;
-  ar$("arStat").textContent = t;
-}
-function arStart(why, v) {
-  // keep the last 30 minutes of the mark price (one point a second) with this recording: what led up to the trigger, which no feed was recording yet
-  AR.preMeta = {at:Date.now(), why, eps:why === "episode" || why === "collectors" ? AR.ep : undefined, fast:v.fast, slow:v.slow, ratio:v.ratio, trigRatio:AR.cfg.trigRatio, trigSigma:AR.cfg.trigSigma}; AR.pre = null;
-  if (AR.worker) AR.worker.postMessage({t:"dump", secs:1800}); else AR.pre = Object.assign({}, AR.preMeta, {prices:AUTOREC.dump(AR.h, Date.now(), 1800)});
-  if (!connected){ AR.byUs = true; $("go").click(); }
-  RT.recLimit = {ms:(AR.cfg.maxMin + 2)*60000, n:2000000};
-  if (!RT.rec){      // adopt the rolling lead-in as the recording (the engine has been recording since the arming); startedAt is the trigger, the inputs begin earlier
-    if (!READER.recording().on) READER.startRecording({quoteMs:100});
-    RT.rec = {t0:Date.now(), sym:ar$("sym").value.trim().toUpperCase()}; AR.roll = false; if (typeof colRelay === "function") colRelay();      // tell the worker now: a hidden tab's timer would be a minute late
-    ar$("rtRec").textContent = "Stop recording"; RT.recTimer = setInterval(rtRecTick, 1000); rtRecTick();
-  }
-  arMsg(`Recording since ${new Date().toLocaleTimeString()}: ${why === "collectors" ? `the collectors read ${AR.ep.colWhy.join(" and ")} (volatility is x${v.ratio.toFixed(2)} of the hour).` : why === "episode" ? `the Reader sees ${AR.ep.fams.join(", ")} (volatility is x${v.ratio.toFixed(2)} of the hour).` : `the last 5 minutes are x${v.ratio.toFixed(2)} of the hour (sigma ${v.fast.toFixed(2)}).`} It stops after ${AR.cfg.calmMin} calm minutes or ${AR.cfg.maxMin} minutes in all.`);
-}
-function arStop(why) {
-  const mins = AR.st.since ? arDur(Date.now() - AR.st.since) : "";
-  if (RT.rec) rtRecStop();
-  ar$("rtSave").click();                                           // downloads the file; the session also stays loaded, so Save session still works
-  const saved = `${mins} recorded and saved: written to the save folder or downloaded, and kept on this device under Saved recordings (Share sends it to mail or Drive).`, how = why === "calm" ? "calm again" : "time limit";
-  AR.runs++;
-  if (!AR.cfg.rearm || AR.runs >= AR.cfg.maxRuns) return arFinish(`Done (${how}), ${saved}${AR.cfg.rearm ? ` That was recording ${AR.runs} of at most ${AR.cfg.maxRuns} per arming, so it is off now.` : ""}`);
-  AR.st = AUTOREC.afterStop(Date.now(), AR.cfg, why); arRoll();      // stay armed: the price stream and its history keep running (no new 15 minutes to learn) and so do the feeds, which buffer the lead-in of the next one
-  arMsg(`Recording ${AR.runs} done (${how}), ${saved} Still armed: it can start again ${why === "max" ? "at once (the market may still be wild)" : `after a ${AR.cfg.cooldownMin} minute cooldown`}.`); arTick();
-}
-function arFinish(msg) {
-  AR.on = false; AR.gen++; clearInterval(AR.timer); AR.timer = null;
-  if (AR.roll && !RT.rec){ READER.stopRecording(); AR.roll = false; }      // the lead-in buffer is dropped when nothing started
-  if (AR.byUs && connected) $("go").click(); AR.byUs = false;
-  try { if (AR.worker) { AR.worker.postMessage({t:"stop"}); AR.worker.terminate(); } } catch {} AR.worker = null;
-  try { if (AR.ws) AR.ws.close(); } catch {} AR.ws = null;
-  if (AR.unlock) { AR.unlock(); AR.unlock = null; }
-  try { if (AR.lock) AR.lock.release(); } catch {} AR.lock = null;
-  arLabels(); ar$("arStat").textContent = "off"; arMsg(msg);
-}
-
-</script>
-<script>
-"use strict";
 // Saved recordings (view): every session file that "Save session" or auto-record produces is also kept in this browser's own storage (IndexedDB),
 // so a phone that blocks an unattended download loses nothing. The list offers Share (the phone's share sheet: mail, Drive, Quick Share...),
 // Download, Open (load it into the replay) and Delete. Read-only for the Reader: nothing here touches detections. Loaded last, after reader-tools.js.
@@ -7238,10 +6307,10 @@ function rcShareable(r) {
   }
   return null;
 }
-// Hours recorded: one row per day, one cell per hour (local clock), brighter = more of that hour recorded (OVERNIGHT.coverage).
+// Hours recorded: one row per day, one cell per hour (local clock), brighter = more of that hour recorded (SQ.coverage).
 function rcCoverage() {
   const box = rc$("cvBox"); if (!box) return;
-  const days = +rc$("cvDays").value || 7, now = Date.now(), c = OVERNIGHT.coverage(RC.rows, now, days, -new Date(now).getTimezoneOffset() * 60000);
+  const days = +rc$("cvDays").value || 7, now = Date.now(), c = SQ.coverage(RC.rows, now, days, -new Date(now).getTimezoneOffset() * 60000);
   const h = x => (Math.round(x * 10) / 10).toFixed(1), rowsHtml = [];
   for (let d = 0; d < days; d++) {
     const cells = c.slots.slice(d * 24, d * 24 + 24), day = new Date(cells[0].start + 1);
@@ -7378,7 +6447,7 @@ function fsRender() {
   const ok = FS.log.filter(r => r.ok), bad = FS.log.filter(r => !r.ok), last = FS.log[0];
   let head, tone;
   if (!FS.supported) { head = "Folder saving is not available in this browser (it needs desktop Chrome or Edge). Recordings are downloaded and kept under Saved recordings below."; tone = "var(--dim)"; }
-  else if (!FS.dir) { head = "No folder chosen: recordings are downloaded. Choose a folder once and every recording is written into it without asking."; tone = "var(--warn)"; }
+  else if (!FS.dir) { head = "No folder chosen: chunks of the continuous recording stay in this browser for 24 hours only (a recording saved by hand is downloaded). Choose a folder once and every chunk is written into it without asking."; tone = "var(--warn)"; }
   else if (FS.perm !== "granted") { head = `Folder "${fsEsc(FS.name)}" needs your OK again after the browser restarted: press Allow. Until then recordings are downloaded.`; tone = "var(--warn)"; }
   else if (last && !last.ok) { head = `The last save to "${fsEsc(FS.name)}" failed (${fsEsc(last.err)}); it was downloaded instead.`; tone = "var(--sell)"; }
   else { head = `Saving into "${fsEsc(FS.name)}". ${ok.length ? `${ok.length} file${ok.length === 1 ? "" : "s"} written this session, last at ${fsClock(ok[0].at)}.` : "Nothing written yet this session."}`; tone = "var(--buy)"; }
@@ -7404,7 +6473,7 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden && FS
 "use strict";
 // Header status (view): live chips next to Connect/Pause and the BN/HL pills (STATUS.chips, status-core.js), and the "newer version" bar.
 // Read-only: it only looks at the app's state once a second and never changes a feed, a recording or a detection. Loaded last.
-const APP_VERSION = "v141";            // "vNNN" in a release build, "dev" otherwise (build.mjs stamps it)
+const APP_VERSION = "v142";            // "vNNN" in a release build, "dev" otherwise (build.mjs stamps it)
 const SB = {latest:null, sure:false, timer:null};
 const sb$ = id => document.getElementById(id);
 sb$("ver").textContent = APP_VERSION;           // tiny version tag next to the title
@@ -7415,12 +6484,10 @@ function sbSnapshot() {
     const on = Object.values(S).filter(s => s.def.v === v && s.on), last = Math.max(0, ...on.map(s => s.last));
     venues[v] = {on:on.length > 0, ageMs:last ? now - last : null, rate:on.reduce((a, s) => a + s.rates.slice(-3).reduce((x, y) => x + y, 0) / 3, 0)};
   }
-  const ar = AR.on ? {on:true, ready:!!(AR.v && AR.v.ready), learnMin:AR.v ? Math.round(AR.v.nSlow / 60) : 0, mode:AR.st && AR.st.mode, wake:!!AR.lock, runs:AR.runs, cooldownMin:AR.st && AR.st.until > now ? Math.ceil((AR.st.until - now) / 60000) : 0} : {on:false};
-  const rec = RT.rec ? {on:true, ms:now - RT.rec.t0, n:READER.recording().n} : {on:false};
   let folder = null;      // folder-save.js is loaded before this file; without it (or in a browser that cannot save into a folder) there is no folder chip
   if (typeof FS !== "undefined" && FS.supported) { const last = FS.log[0]; folder = !FS.dir ? {state:"none"} : FS.perm !== "granted" ? {state:"denied"} : last && !last.ok ? {state:"failed", err:last.err} : {state:"ok"}; }
-  let cr = null; try { if (typeof rrState === "function") { const q = rrState(); cr = {on:q.on && q.running, seq:q.seq, ms:q.ms, fail:q.fail, err:q.err, failedNow:q.fail > 0 && Date.now() - RR.lastAt < 7200000}; } } catch {}      // continuous recording (run-record.js)
-  return {connected, paused:false, online:navigator.onLine, venues, ar, rec, cr, kept:typeof RC !== "undefined" ? RC.rows.length : 0, folder};
+  let cr = null; try { if (typeof rrState === "function") { const q = rrState(); cr = {on:q.on && q.running, seq:q.seq, ms:q.ms, fail:q.fail, err:q.err, wake:q.wake}; } } catch {}      // continuous recording (run-record.js)
+  return {connected, paused:false, online:navigator.onLine, venues, cr, kept:typeof RC !== "undefined" ? RC.rows.length : 0, folder};
 }
 // phone header: a venue pill shows a coloured dot instead of its long text (styles.css); the state is classified here, the full text stays in the title
 function sbPills() {
@@ -7454,8 +6521,8 @@ async function sbCheckVersion() {
   } catch {}                                       // offline, or served without a version.json (local copy): no banner
 }
 sb$("updBtn").onclick = () => {
-  const busy = AR.on || RT.rec;
-  if (busy && sb$("updBtn").textContent === "Reload") { sb$("updBtn").textContent = AR.on ? "Reload anyway (ends the wait)" : "Reload anyway (loses the recording)"; return; }
+  const busy = connected && typeof RR !== "undefined" && RR.on;
+  if (busy && sb$("updBtn").textContent === "Reload") { sb$("updBtn").textContent = "Reload anyway (the chunk being recorded is lost)"; return; }
   location.replace(location.pathname + "?v=" + SB.latest);   // a new query string skips the cached copy of the page
 };
 sb$("updClose").onclick = () => { sb$("updBar").hidden = true; };
@@ -7463,33 +6530,22 @@ if (APP_VERSION !== "dev") {
   setTimeout(sbCheckVersion, 3000); setInterval(sbCheckVersion, 600000);
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") sbCheckVersion(); });
 }
-// the browser can take back the folder permission without telling the page: while something is armed or recording, ask it again every 30 s so the chip shows it before a save fails
-setInterval(() => { if (typeof fsQuery === "function" && typeof FS !== "undefined" && FS.dir && (AR.on || RT.rec)) fsQuery().catch(() => {}); }, 30000);
+// the browser can take back the folder permission without telling the page: while the page is recording, ask it again every 30 s so the chip shows it before a save fails
+setInterval(() => { if (typeof fsQuery === "function" && typeof FS !== "undefined" && FS.dir && typeof RR !== "undefined" && RR.on && connected) fsQuery().catch(() => {}); }, 30000);
 setInterval(sbRender, 1000); sbRender();
-// header Record button: the same switch as Record in Recordings (#rtRec), whose label and recording state it mirrors
-(function () {
-  const hb = document.getElementById("recHdr"), rb = document.getElementById("rtRec");
-  if (!hb || !rb) return;
-  const sync = () => { hb.textContent = rb.textContent; hb.classList.toggle("on", !!RT.rec); };
-  hb.onclick = () => {
-    if (!RT.rec && !connected) { const m = document.getElementById("arHdrMsg"); if (m) { m.textContent = "Connect first, then record."; setTimeout(() => { m.textContent = ""; }, 4000); } return; }
-    rb.click(); sync();
-  };
-  new MutationObserver(sync).observe(rb, {childList:true, characterData:true, subtree:true}); sync();
-})();
 
 </script>
 <script>
 "use strict";
 // Health log (view): a small black box that survives a reload. It writes down what the page and the feeds were doing around the moments that
 // cost data: the tab hidden, frozen or throttled, the computer asleep, the page reopened or gone, a venue going silent, the price stream
-// dropping, the wake lock lost, auto-record's learning starting over. Read-only: it only looks at the app's state once a second and never
+// dropping, the wake lock lost. Read-only: it only looks at the app's state once a second and never
 // touches a feed, a recording or a detection. Loaded after status-bar.js (it reuses sbSnapshot).
 const HL = {key:"sv.health", ev:[], t:Date.now(), mono:performance.now(), prev:{}, beatAt:0, silent:{}, drops:0, lastLog:0};
 const hl$ = id => document.getElementById(id);
 const hlLoad = () => { try { return JSON.parse(localStorage.getItem(HL.key)) || {}; } catch { return {}; } };
 const hlSave = (extra) => { try { localStorage.setItem(HL.key, JSON.stringify(Object.assign({ev:HL.ev.slice(-400)}, extra || {}, {beat:hlBeat()}))); } catch {} };
-const hlBeat = () => ({at:Date.now(), v:APP_VERSION, vis:document.visibilityState, ar:AR.on ? (AR.st && AR.st.mode) : "off", rec:!!RT.rec});
+const hlBeat = () => ({at:Date.now(), v:APP_VERSION, vis:document.visibilityState, rec:typeof PIPE !== "undefined" && PIPE.running()});
 function hlNote(k, d) {
   HL.ev.push({t:Date.now(), k, d:d || null}); if (HL.ev.length > 400) HL.ev.shift();
   hlSave(); hlRender();
@@ -7537,18 +6593,12 @@ setInterval(async () => {
     if (q && !HL.silent[v]) { HL.silent[v] = now; hlNote("silent", {venue:v, ageMs:snap.venues[v].ageMs}); }
     else if (!q && HL.silent[v]) { hlNote("back", {venue:v, silentMs:now - HL.silent[v]}); HL.silent[v] = 0; }
   }
-  // auto-record: the price stream dropping, the wake lock, the learning starting over, the mode
-  const p = HL.prev, ar = snap.ar;
-  if (AR.on) {
-    if (AR.drops.length && AR.drops[AR.drops.length - 1].at !== HL.drops) { const d = AR.drops[AR.drops.length - 1]; HL.drops = d.at; hlNote("price-stream drop", {upMs:d.upMs, silentMs:d.silentMs}); }
-    if (p.wake && !ar.wake) hlNote("wake lock lost", {vis:document.visibilityState});
-    if (p.ready && !ar.ready) hlNote("auto-record not ready", {learnMin:ar.learnMin, mode:ar.mode, lastMsgMs:now - AR.lastMsg, wsState:AR.ws && AR.ws.readyState});
-    if (p.mode && ar.mode && p.mode !== ar.mode) hlNote("auto-record " + p.mode + " -> " + ar.mode, {runs:ar.runs});
-    if (p.learnMin > 5 && ar.learnMin < p.learnMin - 2) hlNote("learning started over", {from:p.learnMin, to:ar.learnMin});
-  }
-  if (p.recOn != null && p.recOn !== snap.rec.on) hlNote(snap.rec.on ? "recording started" : "recording stopped", snap.rec.on ? null : {ms:p.recMs});
+  // the recording and the screen wake lock
+  const p = HL.prev, wake = typeof RR !== "undefined" && !!RR.wake, recOn = typeof PIPE !== "undefined" && PIPE.running();
+  if (snap.connected && p.wake && !wake) hlNote("wake lock lost", {vis:document.visibilityState});
+  if (p.recOn != null && p.recOn !== recOn) hlNote(recOn ? "recording started" : "recording stopped");
   if (p.online != null && p.online !== snap.online) hlNote(snap.online ? "back online" : "went offline");
-  HL.prev = {wake:ar.wake, ready:ar.ready, mode:ar.mode, learnMin:ar.learnMin, recOn:snap.rec.on, recMs:snap.rec.ms, online:snap.online};
+  HL.prev = {wake, recOn, online:snap.online};
   if (now - HL.beatAt > 5000) { HL.beatAt = now; hlSave({extra:await hlExtra()}); }
 }, 1000);
 
@@ -8172,7 +7222,7 @@ function colSample() {
 }
 setInterval(colSample, 10000);
 
-// ---- the always-on worker (collectors-worker.js): derivatives context and calendar tags. It runs whether or not auto-record is armed, in a worker so a hidden tab
+// ---- the always-on worker (collectors-worker.js): derivatives context and calendar tags. It runs whether or not the app is connected, in a worker so a hidden tab
 // does not slow it. Its records come here and go onto the tape; a record posted while the page is frozen is written when the page thaws.
 function colWorkerSync() {
   const sym = cl$("sym").value.trim().toLowerCase(), wants = {derivs:colOn("derivs"), calendar:colOn("calendar"), venues:colOn("venues"), book:colOn("book"), options:colOn("options")}, key = sym + "|" + wants.derivs + "|" + wants.calendar + "|" + wants.venues + "|" + wants.book + "|" + wants.options;
@@ -8185,14 +7235,13 @@ function colWorkerSync() {
   CL.worker = w; CL.workerKey = key;
   w.onmessage = ev => { if (w !== CL.worker) return; const m = ev.data; if (m.t === "col") colAdd(m.rec); else if (m.t === "note") hlNote(m.k, m.d); };
   w.onerror = () => { if (w !== CL.worker) return; CL.worker = null; try { w.terminate(); } catch {} hlNote("collector worker failed", {err:"stopped on an error"}); };      // no retry loop: reload the page
-  CL.recSent = colWatching(); CL.recNow = colRec(); w.postMessage({t:"start", sym, want:wants, rec:CL.recSent, recording:CL.recNow});
+  CL.recSent = colWatching(); CL.recNow = colWatching(); w.postMessage({t:"start", sym, want:wants, rec:CL.recSent, recording:CL.recNow});
 }
 cl$("sym").addEventListener("change", colWorkerSync);
-// tell the worker when the extra venues should be listened to: while a recording is on, and while auto-record is armed (so an auto-recording has the lead-in)
-const colRec = () => !!RT.rec || (typeof PIPE !== "undefined" && PIPE.running());      // a hand recording or the continuous recording (run-record.js)
-const colWatching = () => colRec() || (typeof AR !== "undefined" && !!AR.on);
+// tell the worker when the extra venues should be listened to: while the page is connected (the continuous recording runs then)
+const colWatching = () => !!connected;
 // colRelay is called the moment a recording starts or stops, because the 1 s timer below runs only once a minute in a hidden tab: the worker's book collectors started up to 60 s after the recording (a "holes" book in 11 of 20 overnight files, v129)
-function colRelay() { const on = colWatching(), rec = colRec(); if (CL.worker && (CL.recSent !== on || CL.recNow !== rec)) { CL.recSent = on; CL.recNow = rec; CL.worker.postMessage({t:"rec", on, recording:rec}); } }
+function colRelay() { const on = colWatching(), rec = on; if (CL.worker && (CL.recSent !== on || CL.recNow !== rec)) { CL.recSent = on; CL.recNow = rec; CL.worker.postMessage({t:"rec", on, recording:rec}); } }
 setInterval(colRelay, 1000);
 
 // ---- book depth summaries (fast collector "book"): moved into the worker (collectors-worker.js), which keeps its own Binance and Hyperliquid books while a recording is on, so a hidden
@@ -8204,10 +7253,10 @@ function colTally(all) { const t = COLLECT.tally(all); for (const id in t) { con
 // null when the collector should be writing right now, otherwise why it is not expected to
 function colWhy(id) {
   switch (id) {
-    case "telemetry": return connected || AR.on ? null : "waits for the app to be connected or armed";
+    case "telemetry": return connected ? null : "waits for the app to be connected";
     case "options": return !COLLECT.deribitCoin(cl$("sym").value.trim()) ? "Deribit lists BTC and ETH only" : CL.worker ? null : "worker not running";
-    case "venues": return CL.worker ? (colWatching() ? null : "waits for a recording or auto-record armed") : "worker not running";
-    case "book": return CL.worker ? (colRec() ? null : "waits for a recording") : "worker not running";
+    case "venues": return CL.worker ? (colWatching() ? null : "waits for the app to be connected") : "worker not running";
+    case "book": return CL.worker ? (connected ? null : "waits for the app to be connected") : "worker not running";
     default: return CL.worker ? null : "worker not running";
   }
 }
@@ -8335,17 +7384,17 @@ const rrCfgKey = () => { try { return JSON.stringify(rtCfg()); } catch { return 
 // ----- a run begins and ends with the engine's resets (READER.reset, feeds.js)
 function rrBeforeReset() { rrEnd(true, "reset"); }
 function rrAfterReset() { if (connected) rrBegin(); }
-function rrEnd(final, why) { trStop(); PIPE.end(final, why); RR.id = null; rrRender(); if (typeof colRelay === "function") colRelay(); }      // the runner stops first (its closing rows are part of the chunk), then the chunk is closed
+function rrEnd(final, why) { trStop(); PIPE.end(final, why); RR.id = null; rrRender(); }      // the runner stops first (its closing rows are part of the chunk), then the chunk is closed
 function rrBegin() {
   const sym = trAsset(), runner = trBegin(sym), now = Date.now(); RR.beganAt = now;
   if (!RR.on) { RR.id = null; rrRender(); return; }
   RR.id = rrStamp(new Date(now)); RR.sym = sym; RR.seqSaved = -1; RR.prevFailed = false;
   PIPE.begin({id: RR.id, sym: rt$("sym").value.trim().toUpperCase(), startedAt: now, lateMs: TF_LATE, engineCfg: (() => { try { return rtCfg(); } catch { return null; } })(),
     runner: {on: runner, cfg: TR_CFG, ids: SYSTEMS_DEFAULT.map(d => SYSTEM.id(d)), carry: TRN.driver ? TRN.driver.carry : []}});
-  store.set("rr.last", {id: RR.id, seq: -1, final: false, at: now, cut: false}); rrRender(); if (typeof colRelay === "function") colRelay();
+  store.set("rr.last", {id: RR.id, seq: -1, final: false, at: now, cut: false}); rrRender();
 }
-function rrDisconnect() { rrEnd(true, "disconnect"); store.set("rr.was", false); rrRelease(); }      // called by the Connect button before it disconnects
-function rrConnected() { store.set("rr.was", true); rrHold(); }      // ... and after it connects
+function rrDisconnect() { rrEnd(true, "disconnect"); store.set("rr.was", false); rrRelease(); setTimeout(() => { if (typeof colRelay === "function") colRelay(); }, 0); }      // called by the Connect button before it disconnects
+function rrConnected() { store.set("rr.was", true); rrHold(); if (typeof colRelay === "function") colRelay(); }      // ... and after it connects
 function rrSetOn(on) {
   RR.on = !!on; store.set("recOn", RR.on);
   if (!connected) return rrRender();
@@ -8438,142 +7487,23 @@ function rrShort() {
   if (!connected) return "Recording: not connected.";
   const s = PIPE.state(); return s ? "Recording: run " + s.id.slice(-6) + ", chunk " + s.seq + (RR.fail ? ", " + RR.fail + " save(s) failed" : "") + "." : "Recording: no run yet.";
 }
-setInterval(() => { try { rrRender(); } catch {} }, 2000);
+// ----- "left running": the checks that matter for a page left open for hours (CHUNK.leftRunning)
+RR.battery = null;
+async function rrPower() { try { if (navigator.getBattery) { const b = await navigator.getBattery(); RR.battery = {charging: b.charging, level: b.level}; } } catch {} }
+rrPower(); setInterval(rrPower, 60000);
+function rrLeft() {
+  const box = rr$("lrList"); if (!box) return;
+  const f = typeof FS !== "undefined" && FS.supported ? {supported: true, state: !FS.dir ? "none" : FS.perm !== "granted" ? "denied" : RR.folderFail ? "failed" : "ok", name: FS.name} : null;
+  const d = typeof DW !== "undefined" ? DW.assess() : null;
+  const r = CHUNK.leftRunning({connected, recOn: RR.on, folder: f, disk: d, battery: RR.battery, wakeApi: !!navigator.wakeLock, wake: !!RR.wake, newer: typeof SB !== "undefined" ? SB.latest : null});
+  const col = {ok: "var(--buy)", warn: "var(--warn)", bad: "var(--sell)", info: "var(--dim)"}, esc = x => String(x).replace(/[&<>]/g, ch => ({"&": "&amp;", "<": "&lt;", ">": "&gt;"}[ch]));
+  const html = r.items.map(x => `<div class="rv-row"><span style="color:${col[x.tone]};font-weight:700">${x.tone === "ok" ? "OK" : x.tone.toUpperCase()}</span><div class="grow">${esc(x.text)}${x.fix ? `<div class="stat">${esc(x.fix)}</div>` : ""}</div></div>`).join("");
+  if (box.dataset.h !== html) { box.dataset.h = html; box.innerHTML = html; }
+}
+setInterval(() => { try { rrRender(); rrLeft(); } catch {} }, 2000); rrLeft();
 rr$("rrOn").onchange = () => rrSetOn(rr$("rrOn").checked);
 rrRender();
 rrAfterLoad();
-
-</script>
-<script>
-"use strict";
-// Arm mode (view, Recordings > Arm mode): one screen to leave open while the app collects. Top: what the app is doing right now and anything that needs attention;
-// below: quality of the data coming in, the market now, the Reader, recordings made this session and the Health log. Read-only: it looks at state owned by
-// other files once a second (only while the view is open) and never changes a feed, a recording or a detection; the one button is the header's Arm.
-// Loaded last, after the files whose state it reads (typeof guards keep it harmless if one is missing).
-const AM = {t0:Date.now(), box:{}};
-const am$ = id => document.getElementById(id);
-const amEsc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;"}[c]));
-const amDur = ms => { const s = Math.max(0, Math.round(ms / 1000)); return s >= 3600 ? Math.floor(s / 3600) + "h " + String(Math.floor(s % 3600 / 60)).padStart(2, "0") + "m" : s >= 60 ? Math.floor(s / 60) + "m " + String(s % 60).padStart(2, "0") + "s" : s + "s"; };
-const amAge = ms => ms == null ? "never" : ms < 1500 ? "now" : amDur(ms) + " ago";
-const amSize = n => n <= 0 ? "0 KB" : n < 1048576 ? Math.max(1, Math.round(n / 1024)) + " KB" : (n / 1048576).toFixed(1) + " MB";
-const amClock = t => new Date(t).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
-const amShort = l => l.split(/[:(]/)[0].trim();      // "Derivatives context: funding, ..." -> "Derivatives context"
-const amTry = (fn, dflt) => { try { const v = fn(); return v === undefined ? dflt : v; } catch { return dflt; } };
-const amDot = tone => `<span class="am-dot am-${tone}"></span>`;
-const amRow = (label, value, tone) => `<div class="am-kv"><span>${label}</span><b${tone ? ` class="am-t-${tone}"` : ""}>${value}</b></div>`;
-const amSet = (id, html) => { const el = am$(id); if (el && el.innerHTML !== html) el.innerHTML = html; };
-
-// ---- what is the app doing: one headline and a colour
-function amHeadline(now) {
-  if (!connected) return AR.on ? {text:"ARMED, WAITING FOR FEEDS", sub:"auto-record is on but the feeds are not connected", tone:"warn"} : {text:"NOT ARMED", sub:"press Arm to watch and record automatically", tone:"warn"};
-  if (RT.rec) { const n = amTry(() => READER.recording().n, 0); return {text:"RECORDING", sub:`${amDur(now - RT.rec.t0)} so far · ${n.toLocaleString("en-US")} inputs${AR.on && AR.st ? " · started by auto-record" : ""}`, tone:"rec"}; }
-  if (!AR.on) return {text:"CONNECTED, NOT ARMED", sub:"the feeds run, but nothing will record by itself: press Arm", tone:"warn"};
-  const v = AR.v;
-  if (!v || !v.ready) return {text:"ARMED, LEARNING", sub:`learning what a normal hour looks like: ${v ? Math.min(15, Math.round(v.nSlow / 60)) : 0} of 15 min`, tone:"info"};
-  if (AR.st && AR.st.mode === "waiting" && AR.st.until > now) return {text:"ARMED, COOLING DOWN", sub:`recording ${AR.runs} finished · can start again in ${amDur(AR.st.until - now)}`, tone:"info"};
-  return {text:"ARMED, WATCHING", sub:`waiting for a volatile stretch, a Reader episode or forced flow · lead-in ${amDur(AR.leadMs || 0)} of ${AR.cfg ? AR.cfg.preMin : "?"} min kept`, tone:"ok"};
-}
-// ---- things that need a person (empty = all well)
-function amAlerts(now, snap) {
-  const out = [];
-  if (!connected) out.push(["bad", "Not connected: no data is coming in"]);
-  else if (!AR.on && !RT.rec) out.push(["warn", "Not armed: nothing will be recorded automatically"]);
-  if (document.hidden) out.push(["warn", "This tab is hidden: the browser slows its timers. Keep it visible (or its own window)"]);
-  if (AR.on && !AR.lock) out.push(["warn", "The screen/wake lock is not held: the computer may sleep"]);
-  if (!navigator.onLine) out.push(["bad", "The browser reports no internet connection"]);
-  if (snap) for (const c of amTry(() => STATUS.chips(snap), [])) if ((c.tone === "bad" || c.tone === "warn") && !/^armed/.test(c.text)) out.push([c.tone, c.text.replace(/<[^>]+>/g, "") + (c.title ? " — " + c.title : "")]);
-  if (AR.on && AR.drops && AR.drops.length) out.push(["warn", `The price stream dropped ${AR.drops.length}x, last at ${amClock(AR.drops[AR.drops.length - 1].at)}`]);
-  if (typeof FS !== "undefined" && FS.supported) {
-    if (!FS.dir) out.push(["info", "No save folder chosen: recordings are downloaded (Recordings, Saved recordings, Choose folder)"]);
-    else if (FS.perm !== "granted") out.push(["warn", `Save folder "${FS.name}" needs your OK again (Recordings, Saved recordings, Allow): recordings are downloaded meanwhile`]);
-    else if (FS.log.length && !FS.log[0].ok) out.push(["bad", `The last save into the folder failed (${FS.log[0].err}); it was downloaded instead`]);
-  }
-  const dk = typeof DW !== "undefined" ? amTry(() => DW.assess(), null) : null;
-  if (dk && (dk.tone === "bad" || dk.tone === "warn")) out.push([dk.tone, `Low disk space: ${dk.text}. Free some room or move the save folder: collecting stops when the drive is full`]);
-  const ago = amTry(() => HL.ev.filter(e => e.t > now - 600000 && e.k !== "load").length, 0);
-  if (ago >= 3) out.push(["info", `${ago} Health log notes in the last 10 minutes`]);
-  return out;
-}
-// ---- cards
-function amQuality(now, snap) {
-  let h = "";
-  for (const v of ["bn", "hl"]) {
-    const x = snap.venues[v], name = v === "bn" ? "Binance" : "Hyperliquid", st = am$(v + "State") ? am$(v + "State").textContent.trim() : "";
-    const tone = !x.on ? "off" : x.ageMs == null ? "warn" : x.ageMs > 5000 ? "bad" : "ok";
-    h += amRow(amDot(tone) + name, !x.on ? "off" : `${st} · last ${amAge(x.ageMs)} · ${Math.round(x.rate)} msg/s`, tone === "bad" ? "bad" : tone === "warn" ? "warn" : "");
-  }
-  const bk = amTry(() => READER.state().bookAgeMs, null);
-  if (bk) h += amRow("Order books", `BN ${bk.bn == null ? "–" : amAge(bk.bn)} · HL ${bk.hl == null ? "–" : amAge(bk.hl)}`);
-  const px = AR.on ? (AR.worker ? now - (AR.volAt || 0) : now - (AR.lastMsg || 0)) : null;
-  h += amRow("Price stream", !AR.on ? "off (not armed)" : AR.v && AR.v.ready && px != null && px < 20000 ? `ok · ${AR.worker ? "worker" : "page"} · ${AR.drops.length} drop${AR.drops.length === 1 ? "" : "s"}` : AR.v && !AR.v.ready && AR.v.nSlow < AR.cfg.minSlow ? `learning (${Math.min(15, Math.round(AR.v.nSlow / 60))} of 15 min)` : "stalled", AR.on && AR.v && AR.v.nSlow >= AR.cfg.minSlow && !(AR.v.ready && px < 20000) ? "warn" : "");
-  h += amRow("Tab", document.hidden ? "hidden (slowed)" : "visible", document.hidden ? "warn" : "");
-  h += amRow("Wake lock", AR.on ? (AR.lock ? "held" : "lost") : "–", AR.on && !AR.lock ? "warn" : "");
-  const dsk = typeof DW !== "undefined" ? amTry(() => DW.assess(), null) : null;
-  if (dsk) h += amRow("Disk space", dsk.text, dsk.tone === "bad" || dsk.tone === "warn" ? dsk.tone : "");
-  if (typeof COLLECT !== "undefined" && typeof CL !== "undefined") {
-    const rows = COLLECT.REGISTRY.map(c => { const s = CL.stat[c.id], hh = COLLECT.health({on:colOn(c.id), why:colWhy(c.id), n:s ? s.n : 0, ageMs:s && s.last ? now - s.last : null, expectMs:COLLECT.EXPECT_MS[c.id], sinceMs:now - CL.t0}); return {c, hh}; });
-    const live = rows.filter(r => r.hh.tone === "ok").length, bad = rows.filter(r => r.hh.tone === "warn");
-    h += `<div class="am-sub">Collectors: ${live} of ${rows.filter(r => r.hh.tone !== "off").length} active · ${CL.count.toLocaleString("en-US")} records on the tape</div>`;
-    h += rows.map(r => `<div class="am-chip" title="${amEsc(r.c.label + " — " + r.hh.text)}">${amDot(r.hh.tone === "ok" ? "ok" : r.hh.tone === "warn" ? "bad" : r.hh.tone === "info" ? "info" : "off")}${amEsc(amShort(r.c.label))}</div>`).join("");
-    if (bad.length) h += `<div class="note">Slow or silent: ${bad.map(r => amEsc(amShort(r.c.label))).join(", ")} (see Recordings, Collectors)</div>`;
-  }
-  return h;
-}
-function amMarket(now) {
-  const px = amTry(ovMid, null), v = AR.on ? AR.v : null;
-  let h = amRow("Price", px ? fmt(px, ovDec(px)) : "–");
-  for (const [k, ms] of [["5m", 300000], ["15m", 900000]]) { const b = amTry(() => ovBase(ms), null); h += amRow("Change " + k, b && px ? ovSigned((px / b.px - 1) * 100, a => a.toFixed(2)) + "%" : "–", b && px ? (px > b.px ? "up" : px < b.px ? "dn" : "") : ""); }
-  h += amRow("Volatility (sigma)", v && v.ready ? `${v.fast.toFixed(2)} bps · x${v.ratio.toFixed(2)} of the hour` : AR.on ? "learning" : "needs Arm", v && v.ready && v.ratio >= 1.5 ? "warn" : "");
-  const st = amTry(() => colStateLive(), null);
-  if (st) {
-    const tone = st.s === "stressed" ? "bad" : st.s === "unsettled" || st.s === "crowded" ? "warn" : st.s === "calm" ? "ok" : "";
-    h += amRow("Market state", st.s + (st.i ? ` (${st.i})` : ""), tone);
-    h += `<div class="am-sub">${Object.entries(ST_IND).map(([k, t]) => `<span class="am-chip">${amDot(st.ind[k] === true ? "bad" : st.ind[k] === false ? "ok" : "off")}${t}: ${st.ind[k] === true ? "yes" : st.ind[k] === false ? "no" : "no reading"}</span>`).join("")}</div>`;
-  } else h += amRow("Market state", "no collector data yet");
-  const rs = amTry(() => READER.state(), null);
-  if (rs) h += amRow("Activity", `${rs.regime} (x${rs.ratio.toFixed(2)} of its normal rate) · ${rs.eventsPerMin} events/min`);
-  return h;
-}
-function amReader(now) {
-  const rs = amTry(() => READER.state(), null); if (!rs) return `<div class="note">Reader not running.</div>`;
-  let h = amRow("Calibration", rs.calibrated ? "done" : `${Math.round(rs.calibratingPct * 100)}% (needs about 2 minutes of data)`, rs.calibrated ? "ok" : "warn");
-  const act = amTry(() => READER.activeEpisodes(), []), form = amTry(() => READER.formingEpisodes().length, 0), grp = amTry(() => READER.episodeGroups().length, 0);
-  h += amRow("Episodes", `${act.length} active · ${form} forming · ${grp} groups since the page started`);
-  h += act.length ? act.slice(0, 6).map(e => `<div class="am-ep"><b>${amEsc(e.family)}</b> ${amEsc(e.kind || "")} · ${amEsc(e.venue || "")} ${amEsc(e.horizon || "")}${e.aggressor ? " · aggressor " + amEsc(e.aggressor) : ""} · ${e.stage} · ${amAge(now - e.tDetected)}</div>`).join("") + (act.length > 6 ? `<div class="note">+${act.length - 6} more (Reader tab)</div>` : "") : `<div class="note">No active episode right now.</div>`;
-  return h;
-}
-function amRecordings(now) {
-  const rows = typeof RC !== "undefined" ? RC.rows.filter(r => r.at >= AM.t0) : [], all = typeof RC !== "undefined" ? RC.rows.length : 0;
-  let h = amRow("Now recording", RT.rec ? `yes, ${amDur(now - RT.rec.t0)}` : "no", RT.rec ? "rec" : "");
-  if (AR.on) h += amRow("Auto-record", `${AR.runs} finished this arming${AR.cfg ? " (up to " + AR.cfg.maxRuns + ")" : ""}`);
-  h += amRow("Saved this session", `${rows.length} file${rows.length === 1 ? "" : "s"} · ${amSize(rows.reduce((a, r) => a + r.size, 0))}`, rows.length ? "ok" : "");
-  h += amRow("Kept on this device", `${all} file${all === 1 ? "" : "s"} in total`);
-  if (typeof FS !== "undefined" && FS.supported) h += amRow("Save folder", !FS.dir ? "none (downloads)" : FS.perm !== "granted" ? `"${amEsc(FS.name)}" needs OK` : `"${amEsc(FS.name)}" · ${FS.log.filter(r => r.ok).length} written`, FS.dir && FS.perm === "granted" ? "ok" : "warn");
-  const inFolder = n => typeof FS !== "undefined" && FS.log.some(r => r.ok && r.name === n);
-  h += rows.length ? rows.slice(0, 8).map(r => `<div class="am-ep"><b>${amClock(r.at)}</b> ${amEsc(r.name)} · ${amSize(r.size)}${inFolder(r.name) ? " · in folder" : ""}${r.quality ? ` · <span class="${SQ.clean(r.quality) ? "" : "am-t-warn"}">${amEsc(amTry(() => SQ.line(r.quality), ""))}</span>` : ""}</div>`).join("") : `<div class="note">Nothing saved since this page opened.</div>`;
-  return h;
-}
-function amHealth(now) {
-  const ev = amTry(() => HL.ev.filter(e => e.k !== "load"), []), hr = ev.filter(e => e.t > now - 3600000).length;
-  let h = amRow("Notes in the last hour", String(hr), hr >= 5 ? "warn" : "");
-  h += ev.length ? ev.slice(-6).reverse().map(e => `<div class="am-ep"><b>${amClock(e.t)}</b> ${amEsc(amTry(() => hlText(e), e.k))}</div>`).join("") : `<div class="note">The Health log is empty.</div>`;
-  return h;
-}
-function amRender() {
-  if (tab !== "armmode") return;
-  const now = Date.now(), snap = amTry(sbSnapshot, null), hd = amHeadline(now), al = amAlerts(now, snap);
-  amSet("amHero", `<div class="am-hero am-h-${hd.tone}"><div><div class="am-big">${hd.text}</div><div class="am-subline">${amEsc(hd.sub)}</div></div>`
-    + `<div class="am-side"><div class="am-clock">${new Date(now).toLocaleTimeString()}</div><div class="stat">page open ${amDur(now - AM.t0)}${AR.on ? " · armed " + amDur(now - AR.t0) : ""} · ${typeof APP_VERSION !== "undefined" ? APP_VERSION : ""}</div>`
-    + `<button id="amArm">${AR.on ? "Disarm" : "Arm"}</button></div></div>`);
-  amSet("amAlerts", al.length ? al.map(([t, m]) => `<div class="am-alert am-a-${t}">${amDot(t === "info" ? "info" : t)}${amEsc(m)}</div>`).join("") : `<div class="am-alert am-a-ok">${amDot("ok")}Everything looks fine: data is flowing, nothing needs attention.</div>`);
-  if (snap) amSet("amQuality", amQuality(now, snap));
-  amSet("amMarket", amTry(() => amMarket(now), ""));
-  amSet("amReader", amTry(() => amReader(now), ""));
-  amSet("amRecs", amTry(() => amRecordings(now), ""));
-  amSet("amHealth", amTry(() => amHealth(now), ""));
-}
-document.addEventListener("click", e => { if (e.target && e.target.id === "amArm") { const b = am$("arHdr"); if (b) b.click(); } });
-setInterval(amRender, 1000); amRender();
 
 </script>
 <script>
@@ -8711,245 +7641,6 @@ const PAPER = (() => {
 
 </script>
 <script>
-"use strict";
-// Remembering that auto-record was armed (pure, no DOM, no timers, no storage, no clock: the caller passes now). A reload, a browser restart or a closed tab silently ends an overnight
-// collection, because the armed state lives only in the page. The page therefore keeps a flag {on, since, last, runs} in the browser's storage while it is armed; a deliberate Disarm (or a
-// finished arming) clears it; a page that loads and finds the flag but is not armed shows a prompt to re-arm. Display and storage only: arming itself is auto-record's.
-// Spec: .scratch/arm-memory/spec.md.
-const ARMMEM = (() => {
-  const WRITE_MS = 10000, STALE_MS = 7*24*3600000;
-  // The flag to store now. flag: what is stored (or null); st: {armed (this page), justArmed (it became armed since the last call), justDisarmed (it stopped being armed since the last call), now, runs}.
-  // Returns {flag, write}: write = the stored value should change to `flag` (null clears it).
-  function step(flag, st) {
-    if (st.armed) {
-      if (!flag || !flag.on || st.justArmed) return {flag:{on:true, since:st.now, last:st.now, runs:st.runs || 0}, write:true};      // the moment of arming is a new arming, whatever an earlier arming left behind
-      if (st.now - flag.last >= WRITE_MS || (st.runs || 0) !== flag.runs) return {flag:{on:true, since:flag.since, last:st.now, runs:st.runs || 0}, write:true};
-      return {flag, write:false};
-    }
-    if (st.justDisarmed && flag) return {flag:null, write:true};      // this page stopped being armed just now (a Disarm, or the arming finished): nothing to remind. Only at that moment: a page that disarmed earlier must not wipe another page's flag
-    return {flag, write:false};
-  }
-  // The prompt to show, or null. o: {now, armed (this page), lockElsewhere (another page of this app holds the armed lock), dismissed (this page's prompt was dismissed)}.
-  function prompt(flag, o) {
-    if (!flag || !flag.on || o.armed || o.lockElsewhere || o.dismissed) return null;
-    const ago = o.now - flag.last; if (!(ago >= 0) || ago > STALE_MS) return null;
-    return {since:flag.since, last:flag.last, runs:flag.runs || 0, agoMs:ago};
-  }
-  const dur = ms => { const m = Math.round(ms/60000); return m < 90 ? m + " min" : m < 2880 ? (m/60).toFixed(m < 600 ? 1 : 0) + " h" : Math.round(m/1440) + " days"; };
-  // The sentence for the bar. clock(t) formats a time (the caller's locale).
-  function text(p, clock) {
-    return "Auto-record was armed (last seen " + clock(p.last) + ", " + dur(p.agoMs) + " ago" + (p.runs ? ", " + p.runs + " recording" + (p.runs === 1 ? "" : "s") + " made" : "") + "), and this page is not armed: nothing is being recorded automatically.";
-  }
-
-  function selftest() {
-    const out = [], ok = (name, pass, detail) => out.push({name:"arm memory: " + name, ok:!!pass, detail:detail || ""});
-    const T = 1.8e12, J = JSON.stringify;
-    const a1 = step(null, {armed:true, justArmed:true, now:T, runs:0});
-    ok("arming writes the flag with its start", a1.write && J(a1.flag) === J({on:true, since:T, last:T, runs:0}));
-    const a2 = step(a1.flag, {armed:true, now:T + 5000, runs:0}), a3 = step(a1.flag, {armed:true, now:T + 10000, runs:0});
-    ok("while armed the flag is refreshed every 10 s, keeping its start, not on every call", !a2.write && a3.write && a3.flag.since === T && a3.flag.last === T + 10000);
-    ok("a finished recording (runs went up) is written at once", step(a1.flag, {armed:true, now:T + 1000, runs:1}).write);
-    const d = step(a3.flag, {armed:false, justDisarmed:true, now:T + 20000, runs:3});
-    ok("the moment a Disarm or a finished arming happens clears the flag", d.write && d.flag === null);
-    const re = step({on:true, since:T - 7*3600000, last:T - 6*3600000, runs:4}, {armed:true, justArmed:true, now:T, runs:0});
-    ok("re-arming after an earlier page left a flag starts a new arming (since = now, runs from this page)", re.write && re.flag.since === T && re.flag.runs === 0);
-    const l = step(a3.flag, {armed:false, now:T + 3600000, runs:0});
-    ok("a page that is not armed leaves the flag alone every other time: one that loads and finds it (so the prompt can show), and one that disarmed long ago while another page armed", !l.write && l.flag === a3.flag);
-    ok("nothing stored and not armed: nothing to do", J(step(null, {armed:false, now:T, runs:0})) === J({flag:null, write:false}) && !step(null, {armed:false, justDisarmed:true, now:T, runs:0}).write);
-    const f = {on:true, since:T, last:T + 600000, runs:4}, now = T + 600000 + 6*3600000;
-    const p = prompt(f, {now, armed:false, lockElsewhere:false, dismissed:false});
-    ok("the prompt: when it was last seen, how long ago, how many recordings", p && p.last === f.last && p.since === T && p.runs === 4 && p.agoMs === 6*3600000);
-    ok("no prompt when this page is armed, another page holds the armed lock, it was dismissed, or nothing is stored", prompt(f, {now, armed:true}) === null && prompt(f, {now, armed:false, lockElsewhere:true}) === null && prompt(f, {now, armed:false, dismissed:true}) === null && prompt(null, {now}) === null && prompt({on:false}, {now}) === null);
-    ok("a flag older than a week is ignored", prompt(f, {now:f.last + 8*24*3600000, armed:false}) === null && prompt(f, {now:f.last + 6*24*3600000, armed:false}) !== null);
-    ok("a clock that went backwards gives no prompt", prompt(f, {now:f.last - 1000, armed:false}) === null);
-    const clock = t => "HH:MM";
-    ok("the sentence: time, age, count (singular and plural), what it means", /last seen HH:MM, 6\.0 h ago, 4 recordings made/.test(text(p, clock)) && /1 recording made/.test(text({last:T, agoMs:2*60000, runs:1}, clock)) && !/made/.test(text({last:T, agoMs:60000, runs:0}, clock)) && /not armed: nothing is being recorded/.test(text(p, clock)) && /2 min ago/.test(text({last:T, agoMs:120000, runs:0}, clock)) && /3 days ago/.test(text({last:T, agoMs:3*86400000, runs:0}, clock)));
-    return out;
-  }
-  return {WRITE_MS, STALE_MS, step, prompt, text, selftest};
-})();
-
-</script>
-<script>
-"use strict";
-// Overnight run (pure, no DOM, no timers, no storage, no clock: the caller passes now): the "Ready to arm?" checklist and the "Last night" summary of Arm mode.
-// preflight turns a plain description of the environment into checklist items; morning turns the saved recordings and Health log notes of a time window into a summary.
-// Display only: nothing here changes a feed, a recording or a detection. Spec: .scratch/overnight/spec.md.
-const OVERNIGHT = (() => {
-  const HOUR = 3600000, DAY = 24 * HOUR, PROBLEM_NOTE = /^(gap|silent|page frozen|wake lock lost|learning started over|auto-record not ready|price-stream drop|tab hidden|page error|promise error|armed page ended)/;
-  // env: {online, newer (latest version string or null), connected, armed, hidden, wakeLockApi,
-  //       folder:{supported, state:"ok"|"none"|"denied"|"failed", name}|null, disk:{tone,text}|null, persisted:true|false|null,
-  //       battery:{charging, level 0..1}|null, collectors:{expected, active, slow:[label]}|null}
-  // items: {id, tone:"ok"|"warn"|"bad"|"info", text, fix}; fix is what to do, empty when ok.
-  function preflight(env) {
-    const it = [], add = (id, tone, text, fix) => it.push({id, tone, text, fix:fix || ""});
-    add("online", env.online === false ? "bad" : "ok", env.online === false ? "No internet connection" : "Online", env.online === false ? "Connect the computer or phone to the network." : "");
-    add("version", env.newer ? "warn" : "ok", env.newer ? `A newer version (${env.newer}) is available` : "Latest version", env.newer ? "Reload the page (the bar at the top does it) before arming." : "");
-    const f = env.folder;
-    if (f && f.supported) {
-      if (f.state === "ok") add("folder", "ok", `Save folder "${f.name || ""}" is allowed`);
-      else if (f.state === "none") add("folder", "warn", "No save folder chosen: recordings are downloaded, and a phone may block that when nobody is looking", "Recordings, Saved recordings, Choose folder.");
-      else if (f.state === "denied") add("folder", "bad", `Save folder "${f.name || ""}" needs your OK again`, "Recordings, Saved recordings, Allow (the browser takes the permission back after a reload).");
-      else add("folder", "bad", "The last save into the folder failed", "Check that the folder still exists and has room, then choose it again.");
-    }
-    const d = env.disk;
-    if (d) add("disk", d.tone === "bad" || d.tone === "warn" ? d.tone : "ok", "Disk space: " + d.text, d.tone === "bad" || d.tone === "warn" ? "Free some room or move the save folder: collecting stops when the drive is full." : "");
-    if (env.persisted === false) add("persist", "warn", "Saved recordings may be deleted by the browser when storage runs low", "Keep a save folder, or install the page as an app / bookmark it so the browser grants persistent storage.");
-    else if (env.persisted === true) add("persist", "ok", "Storage is persistent");
-    const b = env.battery;
-    if (b) {
-      const pc = Math.round(b.level * 100);
-      if (b.charging) add("power", "ok", `Charging (${pc}%)`);
-      else add("power", pc < 50 ? "bad" : "warn", `On battery (${pc}%)`, "Plug it in and set the device not to sleep; a night on battery will not last.");
-    }
-    add("wake", env.wakeLockApi ? "ok" : "warn", env.wakeLockApi ? "Screen wake lock is available" : "This browser has no screen wake lock", env.wakeLockApi ? "" : "Turn the screen timeout off in the device settings, and set the computer not to sleep.");
-    add("tab", env.hidden ? "warn" : "ok", env.hidden ? "This tab is hidden" : "Tab is visible", env.hidden ? "Keep it in front, or in its own window: a hidden tab has its timers slowed and can be frozen." : "");
-    const c = env.collectors;
-    if (c) add("collectors", c.slow && c.slow.length ? "warn" : c.expected && !c.active ? "warn" : "ok",
-      c.slow && c.slow.length ? `Collectors slow or silent: ${c.slow.join(", ")}` : `${c.active} of ${c.expected} collectors active`,
-      c.slow && c.slow.length ? "Recordings, Collectors shows each one's last record." : c.expected && !c.active ? "Switch them on in Recordings, Collectors." : "");
-    if (env.armed) add("armed", "ok", "Armed");
-    else if (env.connected) add("armed", "warn", "Feeds are connected, and arming needs them disconnected", "Press Disconnect, then Arm.");
-    else add("armed", "info", "Not armed yet", "Press Arm when the rest is ready (it needs 15 minutes to learn a normal hour).");
-    const bad = it.filter(x => x.tone === "bad").length, warn = it.filter(x => x.tone === "warn").length;
-    return {items:it, bad, warn, ready:!bad && !warn, text:!bad && !warn ? "Ready" : (bad + warn) + " to check"};
-  }
-
-  // rows: saved recordings [{name, at, size, quality}] (quality as written by session-quality.js, may be null); notes: Health log events [{t, k}];
-  // opts: {hours}; sq: {clean(q), line(q), colProblems(q)} (SQ in the page).
-  function morning(rows, notes, now, opts, sq) {
-    const hours = opts && opts.hours > 0 ? opts.hours : 24, from = now - hours * HOUR;
-    const recs = rows.filter(r => r.at >= from && r.at <= now).sort((a, b) => a.at - b.at).map(r => {
-      const q = r.quality, v = q && q.verdict;
-      const tone = !q ? "info" : v === "hollow" || v === "empty" ? "bad" : sq.clean(q) ? "ok" : "warn";
-      return {name:r.name, at:r.at, size:r.size || 0, tone, line:q ? sq.line(q) : "no quality information", problems:q ? sq.colProblems(q).map(p => p.id) : []};
-    });
-    const byCol = {}; for (const r of recs) for (const id of r.problems) byCol[id] = (byCol[id] || 0) + 1;
-    const counts = {}; for (const e of notes || []) if (e.t >= from && e.t <= now && PROBLEM_NOTE.test(e.k)) counts[e.k] = (counts[e.k] || 0) + 1;
-    const tones = {ok:0, warn:0, bad:0, info:0}; for (const r of recs) tones[r.tone]++;
-    return {hours, n:recs.length, bytes:recs.reduce((a, r) => a + r.size, 0), recs, tones, collectorProblems:Object.keys(byCol).sort((a, b) => byCol[b] - byCol[a]).map(id => ({id, recordings:byCol[id]})),
-      notes:Object.keys(counts).sort((a, b) => counts[b] - counts[a]).map(k => ({k, n:counts[k]}))};
-  }
-
-  // Hours recorded: one cell per hour (local clock; offMs = local offset from UTC), one row of 24 per day, the last row is today (cells still to come stay empty).
-  // A recording covers [t0, t1] of its quality (files from before v111: [kept time - span, kept time]); overlaps count once. frac = share of the hour covered.
-  // last24 = hours recorded in the 24 hours before `now`.
-  function coverage(rows, now, days, offMs) {
-    const iv = [];
-    for (const r of rows) {
-      const q = r.quality; if (!q) continue;
-      const a = q.t0 && q.t1 ? q.t0 : q.spanMin ? r.at - q.spanMin * 60000 : 0, b = q.t0 && q.t1 ? q.t1 : r.at;
-      if (a && b > a) iv.push([a, b]);
-    }
-    iv.sort((x, y) => x[0] - y[0]);
-    const un = []; for (const [a, b] of iv) { const l = un[un.length - 1]; if (l && a <= l[1]) l[1] = Math.max(l[1], b); else un.push([a, b]); }
-    const within = (s, e) => { let cov = 0; for (const [a, b] of un) { if (b <= s) continue; if (a >= e) break; cov += Math.min(b, e) - Math.max(a, s); } return cov; };
-    const first = Math.floor((now + offMs) / DAY) * DAY - offMs - (days - 1) * DAY, slots = [];
-    let total = 0;
-    for (let i = 0; i < days * 24; i++) { const s = first + i * HOUR, cov = within(s, s + HOUR); total += cov; slots.push({start:s, frac:Math.min(1, cov / HOUR)}); }
-    return {slots, hours:total / HOUR, last24:within(now - DAY, now) / HOUR, days};
-  }
-
-  function selftest() {
-    const out = [], ok = (name, pass) => out.push({name:"overnight: " + name, ok:!!pass, detail:""});
-    { const H = HOUR, now = 100 * H + 30 * 60000, rows = [      // 100 h = day 4 at 04:00 UTC, so today's cells run from 96 h
-        {at:90 * H, quality:{t0:88 * H, t1:90 * H}}, {at:90 * H, quality:{t0:89 * H, t1:91 * H}},
-        {at:99 * H, quality:{spanMin:60}}, {at:50 * H, quality:null}, {at:100 * H, quality:{t0:100 * H, t1:100 * H + 30 * 60000}}];
-      const c = coverage(rows, now, 2, 0), at = h => c.slots.find(x => x.start === h * H);
-      ok("coverage: rows of 24 hourly cells, the last day starts at local midnight", c.slots.length === 48 && c.slots[24].start === 96 * H && c.slots[0].start === 72 * H);
-      ok("coverage: overlapping recordings count once", [88, 89, 90].every(h => at(h).frac === 1) && at(87).frac === 0 && at(91).frac === 0);
-      ok("coverage: older files use kept time minus span; no quality is skipped", at(98).frac === 1 && at(99).frac === 0 && c.hours === 3 + 1 + .5);
-      ok("coverage: the current hour counts only what has happened; later cells are empty", at(100).frac === .5 && at(101).frac === 0);
-      ok("coverage: last 24 h counts the window before now", c.last24 === 4.5 && coverage(rows, 125 * H, 2, 0).last24 === 0);
-      ok("coverage: a local offset moves midnight", coverage(rows, now, 1, 2 * H).slots[0].start === 94 * H); }
-    const good = {online:true, newer:null, connected:false, armed:false, hidden:false, wakeLockApi:true, folder:{supported:true, state:"ok", name:"sessions"}, disk:{tone:"ok", text:"40 GB free"}, persisted:true, battery:{charging:true, level:.8}, collectors:{expected:6, active:6, slow:[]}};
-    const p = preflight(good), tone = (env, id) => preflight(Object.assign({}, good, env)).items.find(x => x.id === id);
-    ok("everything fine: ready, only 'not armed yet' is informational", p.ready && p.text === "Ready" && p.items.find(x => x.id === "armed").tone === "info" && p.bad === 0 && p.warn === 0);
-    ok("offline is bad, with a fix", tone({online:false}, "online").tone === "bad" && tone({online:false}, "online").fix !== "");
-    ok("a newer version is a warning that names it", tone({newer:"v200"}, "version").tone === "warn" && /v200/.test(tone({newer:"v200"}, "version").text));
-    ok("save folder: none warns, denied and failed are bad, an unsupported browser has no item", tone({folder:{supported:true, state:"none"}}, "folder").tone === "warn" && tone({folder:{supported:true, state:"denied", name:"x"}}, "folder").tone === "bad" && tone({folder:{supported:true, state:"failed"}}, "folder").tone === "bad" && preflight(Object.assign({}, good, {folder:{supported:false}})).items.every(x => x.id !== "folder") && preflight(Object.assign({}, good, {folder:null})).items.every(x => x.id !== "folder"));
-    ok("low disk space is passed on; ok disk is ok", tone({disk:{tone:"bad", text:"1 GB"}}, "disk").tone === "bad" && tone({disk:{tone:"warn", text:"4 GB"}}, "disk").tone === "warn" && tone({}, "disk").tone === "ok");
-    ok("storage that may be evicted warns; unknown is not shown", tone({persisted:false}, "persist").tone === "warn" && preflight(Object.assign({}, good, {persisted:null})).items.every(x => x.id !== "persist"));
-    ok("power: charging ok; on battery warns, under 50% is bad; unknown is not shown", tone({}, "power").tone === "ok" && tone({battery:{charging:false, level:.8}}, "power").tone === "warn" && tone({battery:{charging:false, level:.3}}, "power").tone === "bad" && preflight(Object.assign({}, good, {battery:null})).items.every(x => x.id !== "power"));
-    ok("hidden tab and missing wake lock warn", tone({hidden:true}, "tab").tone === "warn" && tone({wakeLockApi:false}, "wake").tone === "warn");
-    ok("collectors: slow ones are named; none active when some are expected warns", /Binance/.test(tone({collectors:{expected:6, active:5, slow:["Binance book"]}}, "collectors").text) && tone({collectors:{expected:6, active:0, slow:[]}}, "collectors").tone === "warn");
-    ok("connected and not armed: warns that arming needs a disconnect; armed is ok", tone({connected:true}, "armed").tone === "warn" && /Disconnect/.test(tone({connected:true}, "armed").fix) && tone({armed:true, connected:true}, "armed").tone === "ok");
-    ok("one bad item makes it not ready and is counted", (() => { const r = preflight(Object.assign({}, good, {online:false, hidden:true})); return !r.ready && r.bad === 1 && r.warn === 1 && r.text === "2 to check"; })());
-    const sq = {clean:q => q.verdict === "complete" && !(q.collectors && q.collectors.length), line:q => q.verdict + " line", colProblems:q => q.collectors || []};
-    const H = HOUR, now = 100 * H, rows = [
-      {name:"a", at:now - 2 * H, size:1000, quality:{verdict:"complete"}}, {name:"b", at:now - 5 * H, size:2000, quality:{verdict:"holes", collectors:[{id:"derivs"}]}},
-      {name:"c", at:now - 30 * H, size:4000, quality:{verdict:"complete"}}, {name:"d", at:now - 1 * H, size:500, quality:{verdict:"hollow"}}, {name:"e", at:now - 3 * H, size:700, quality:null},
-      {name:"f", at:now - 4 * H, size:100, quality:{verdict:"complete", collectors:[{id:"derivs"}, {id:"options"}]}}];
-    const notes = [{t:now - H, k:"gap"}, {t:now - 2 * H, k:"gap"}, {t:now - 3 * H, k:"page frozen by the browser"}, {t:now - 4 * H, k:"load"}, {t:now - 40 * H, k:"gap"}, {t:now - H, k:"tab visible"}];
-    const m = morning(rows, notes, now, {hours:24}, sq);
-    ok("morning: only recordings inside the window, oldest first", m.n === 5 && m.recs[0].name === "b" && m.recs[m.n - 1].name === "d" && m.recs.every((r, i) => !i || r.at >= m.recs[i - 1].at));
-    ok("morning: size is summed over the window", m.bytes === 1000 + 2000 + 500 + 700 + 100);
-    ok("morning: tones: complete = ok, collector problems = warn, hollow = bad, no quality = info", m.tones.ok === 1 && m.tones.warn === 2 && m.tones.bad === 1 && m.tones.info === 1);
-    ok("morning: collectors with problems are counted per recording, most first", m.collectorProblems[0].id === "derivs" && m.collectorProblems[0].recordings === 2 && m.collectorProblems[1].id === "options");
-    ok("morning: only problem notes inside the window are counted", m.notes.length === 2 && m.notes[0].k === "gap" && m.notes[0].n === 2 && m.notes[1].k === "page frozen by the browser");
-    ok("morning: a missing quality says so, a longer window takes in more", m.recs.find(r => r.name === "e").line === "no quality information" && morning(rows, notes, now, {hours:48}, sq).n === 6);
-    return out;
-  }
-  return {preflight, morning, coverage, selftest, PROBLEM_NOTE};
-})();
-
-</script>
-<script>
-"use strict";
-// Overnight run (view, Recordings > Arm mode): "Ready to arm?" (a checklist before you leave) and "Last night" (what the saved recordings of the last hours look like).
-// The decisions are in overnight-core.js (pure, self-tested). Read-only: it looks at state owned by other files (like arm-mode.js, which it extends) and changes nothing
-// except by the button Open (loads a recording into the replay).
-// Loaded after arm-mode.js. Spec: .scratch/overnight/spec.md.
-const ON = {hours:24, busy:false, battery:null, persisted:null};
-const on$ = id => document.getElementById(id);
-try { if (navigator.getBattery) navigator.getBattery().then(b => { ON.battery = b; }).catch(() => {}); } catch {}
-const onPersist = () => { try { if (navigator.storage && navigator.storage.persisted) navigator.storage.persisted().then(v => { ON.persisted = v; }).catch(() => {}); } catch {} };
-onPersist(); setInterval(onPersist, 60000);
-
-function onEnv() {
-  const now = Date.now(), fs = typeof FS !== "undefined" && FS.supported;
-  const cols = typeof COLLECT !== "undefined" && typeof CL !== "undefined" ? amTry(() => COLLECT.REGISTRY.map(c => { const s = CL.stat[c.id]; return {c, h:COLLECT.health({on:colOn(c.id), why:colWhy(c.id), n:s ? s.n : 0, ageMs:s && s.last ? now - s.last : null, expectMs:COLLECT.EXPECT_MS[c.id], sinceMs:now - CL.t0})}; }), null) : null;
-  return {
-    online:navigator.onLine, newer:typeof SB !== "undefined" && SB.latest && STATUS.newer(APP_VERSION, SB.latest) ? SB.latest : null,
-    connected:!!connected, armed:!!AR.on, hidden:document.hidden, wakeLockApi:!!(navigator.wakeLock),
-    folder:fs ? {supported:true, state:!FS.dir ? "none" : FS.perm !== "granted" ? "denied" : FS.log.length && !FS.log[0].ok ? "failed" : "ok", name:FS.name} : null,
-    disk:typeof DW !== "undefined" ? amTry(() => DW.assess(), null) : null, persisted:ON.persisted,
-    battery:ON.battery ? {charging:!!ON.battery.charging, level:ON.battery.level} : null,
-    collectors:cols ? {expected:cols.filter(r => r.h.tone !== "off").length, active:cols.filter(r => r.h.tone === "ok").length, slow:cols.filter(r => r.h.tone === "warn").map(r => amShort(r.c.label))} : null,
-  };
-}
-function onPre() {
-  const r = OVERNIGHT.preflight(onEnv());
-  return `<div class="am-alert am-a-${r.ready ? "ok" : r.bad ? "bad" : "warn"}">${amDot(r.ready ? "ok" : r.bad ? "bad" : "warn")}<b>${r.ready ? "Ready to arm" : r.text}</b></div>`
-    + r.items.map(i => `<div class="am-kv"><span>${amDot(i.tone)}${amEsc(i.text)}</span><b class="${i.fix ? "am-t-" + (i.tone === "bad" ? "bad" : "warn") : ""}">${amEsc(i.fix)}</b></div>`).join("")
-    + `<div class="note">Not checked: Chrome's Memory Saver can freeze a hidden tab (chrome://settings/performance, turn it off or add this site), and the computer's own sleep settings.</div>`;
-}
-function onMorning() {
-  const m = OVERNIGHT.morning(typeof RC !== "undefined" ? RC.rows : [], amTry(() => HL.ev, []), Date.now(), {hours:ON.hours}, SQ);
-  if (!m.n) return `<div class="note">No recordings were saved in the last ${m.hours} hours.</div>`;
-  let h = `<div class="am-alert am-a-${m.tones.bad ? "bad" : m.tones.warn || m.tones.info ? "warn" : "ok"}">${amDot(m.tones.bad ? "bad" : m.tones.warn || m.tones.info ? "warn" : "ok")}<b>${m.n} recording${m.n === 1 ? "" : "s"}, ${amSize(m.bytes)}</b> · ${m.tones.ok} clean${m.tones.warn ? `, ${m.tones.warn} with holes` : ""}${m.tones.bad ? `, ${m.tones.bad} hollow or empty` : ""}${m.tones.info ? `, ${m.tones.info} without quality information` : ""}</div>`;
-  if (m.collectorProblems.length) h += amRow("Collectors with holes", m.collectorProblems.map(c => `${amEsc(c.id)} (${c.recordings})`).join(", "), "warn");
-  if (m.notes.length) h += amRow("Health log notes", m.notes.map(n => `${amEsc(n.k)} ×${n.n}`).join(", "), "warn");
-  h += m.recs.slice().reverse().map(r => {
-    return `<div class="am-ep" data-onrec="${encodeURIComponent(r.name)}">${amDot(r.tone)}<b>${amClock(r.at)}</b> ${amEsc(r.name)} · ${amSize(r.size)} · ${amEsc(r.line)} <button data-onact="open">Open</button></div>`; }).join("");
-  return h;
-}
-function onRender() {
-  if (tab !== "armmode") return;
-  amSet("amPre", amTry(onPre, ""));
-  amSet("amMorning", amTry(onMorning, ""));
-}
-on$("onHours").onchange = e => { ON.hours = +e.target.value || 24; onRender(); };
-on$("amMorning").onclick = async e => {
-  const b = e.target.closest("button[data-onact]"); if (!b) return;
-  const name = decodeURIComponent(b.closest("[data-onrec]").dataset.onrec), r = RC.rows.find(x => x.name === name); if (!r) return;
-  try { rtSetSession(await rtReadSessionFile(rcFile(r))); rtMsg(`Loaded ${r.name}. Press Replay.`); setTab("replay"); }
-  catch (err) { on$("onStatus").textContent = "Could not open it: " + (err && err.message || err); }
-};
-setInterval(onRender, 1000); onRender();
-
-</script>
-<script>
 // Disk space warning (pure, self-tested): how worried to be about the room left for recordings.
 // A web page cannot read the drive's free space. What it can read is the browser's storage estimate (quota minus usage); Chrome caps that quota by what the drive has free,
 // so it follows the drive down but reads lower than the real figure (about three quarters of it on the first machine it was checked on, 10.7 GB against 14.4 GB). That makes it a
@@ -8978,9 +7669,8 @@ const DISK = (() => {
 </script>
 <script>
 "use strict";
-// Disk space watch (view side of disk-core.js): asks the browser for its storage estimate once a minute and keeps the latest reading in DW for the Arm mode screen
-// (a row in Data quality, and an alert when it is low). Read-only: it never writes, deletes or changes a recording, a feed or a detection. Loaded after the Reader files; arm-mode.js
-// reads `DW` through a typeof guard, so the screen is unharmed if this file is missing or the browser has no estimate.
+// Disk space watch (view side of disk-core.js): asks the browser for its storage estimate once a minute and keeps the latest reading in DW for the "left running" list (Recordings). Read-only: it never writes, deletes or changes a recording, a feed or a detection. Loaded after the Reader files; run-record.js
+// reads `DW` through a typeof guard, so the list is unharmed if this file is missing or the browser has no estimate.
 const DW = {free:null, at:0, last:null};
 DW.assess = () => {
   if (DW.free == null) return null;
@@ -9039,33 +7729,6 @@ dwPoll(); setInterval(dwPoll, 60000);
   document.addEventListener("keydown", e => { if (e.key === "Escape") close(); });
   setInterval(sync, 1000); sync();
 })();
-
-</script>
-<script>
-"use strict";
-// Re-arm prompt (view, header bar #armBar): while auto-record is armed this page keeps a flag in the browser's storage ("ar.armed": since, last seen, recordings made); a deliberate Disarm clears it.
-// A page that loads, finds the flag and is not armed shows the bar: a reload, a browser restart or a closed tab silently ends an overnight collection otherwise. Nothing is shown while another page of
-// this app is armed (it holds the Web Lock "sv-armed"). Arming is auto-record's own: the button only presses the header Arm button. Decisions: arm-memory-core.js. Spec: .scratch/arm-memory/spec.md.
-const ARMV = {prev:false, elsewhere:false, dismissed:false, noted:false};
-const armv$ = id => document.getElementById(id);
-async function armvLocks() {
-  try { if (!navigator.locks || !navigator.locks.query) return; const q = await navigator.locks.query(); ARMV.elsewhere = !AR.on && (q.held || []).some(l => l.name === "sv-armed"); } catch {}
-}
-function armvTick() {
-  const now = Date.now(), flag = store.get("ar.armed", null), st = ARMMEM.step(flag, {armed:AR.on, justArmed:AR.on && !ARMV.prev, justDisarmed:!AR.on && ARMV.prev, now, runs:AR.runs});
-  ARMV.prev = AR.on;
-  if (st.write) store.set("ar.armed", st.flag);
-  const p = ARMMEM.prompt(st.write ? st.flag : flag, {now, armed:AR.on, lockElsewhere:ARMV.elsewhere, dismissed:ARMV.dismissed}), bar = armv$("armBar");
-  if (!bar) return;
-  if (!p) { if (!bar.hidden) bar.hidden = true; return; }
-  const t = ARMMEM.text(p, x => new Date(x).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}) + (now - x > 20*3600000 ? " on " + new Date(x).toLocaleDateString([], {day:"numeric", month:"short"}) : ""));
-  if (armv$("armText").textContent !== t) armv$("armText").textContent = t;
-  bar.title = "A reload, a browser restart or a closed tab ends an armed page. Re-arm needs 15 minutes of prices before it can judge the market again."; if (bar.hidden) bar.hidden = false;
-  if (!ARMV.noted) { ARMV.noted = true; try { hlNote("armed page ended", {lastSeen:new Date(p.last).toISOString(), agoMin:Math.round(p.agoMs/60000), runs:p.runs}); } catch {} }      // the Health log keeps the unexpected end for the morning summary
-}
-armv$("armBtn").onclick = () => { const b = armv$("arHdr"); if (b && !AR.on) b.click(); };      // the same switch as the header's Arm
-armv$("armClose").onclick = () => { ARMV.dismissed = true; store.set("ar.armed", null); armvTick(); };
-setInterval(armvTick, 1000); setInterval(armvLocks, 5000); armvLocks().then(armvTick);
 
 </script>
 </body>

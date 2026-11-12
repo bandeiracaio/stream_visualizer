@@ -11,11 +11,9 @@
 </head>
 <body>
 <header>
-  <div id="armBar" hidden><span id="armText"></span><button id="armBtn" class="primary">Re-arm now</button><button id="armClose" title="Forget that it was armed">Dismiss</button></div>
   <div id="updBar" hidden><span id="updText"></span><button id="updBtn" class="primary">Reload</button><button id="updClose" title="Hide until the next check">✕</button></div>
   <h1>Live Stream Visualizer <small id="ver"></small></h1>
   <button id="go" class="primary">Connect</button>
-  <span class="seg"><button id="recHdr" title="Record the raw inputs now (same as Record in the Recordings tab)">Record</button><button id="arHdr" title="Auto-record: watch the price and record when the market gets volatile (settings: Recordings tab)">Arm</button></span><span id="arHdrMsg" class="stat"></span>
   <button id="stBtn" title="Feeds status (Binance, Hyperliquid) and cat mode" aria-expanded="false"><span class="sd" id="stBn" data-st="off">BN</span><span class="sd" id="stHl" data-st="off">HL</span></button>
   <button id="catLock" aria-pressed="false">🐱</button>
   <span id="accSplit" class="split"><button id="accMain" title="Account info (or connect an account)"><span class="dot"></span><b id="accLbl">Account</b><span id="accPnl"></span></button><button id="accCaret" title="Switch or connect an account" aria-label="Switch or connect an account" aria-expanded="false">▾</button></span>
@@ -238,39 +236,19 @@
   </section>
 
   <section data-tab="record" class="full">
-    <h2>Record</h2>
-    <div class="row"><button id="rtRec">Record</button><span id="rtStat" class="stat">not recording</span></div>
-    <div class="rt-h">Auto-record when the market gets volatile</div>
-    <div class="rd-det" id="arCfg">
-      <label title="Start when the last 5 minutes are this many times as volatile as the last hour">start at x of the hour <input id="arTrigRatio" type="number" step="0.1" min="1"></label>
-      <label title="Or start when the last 5 minutes are above this sigma (bps per root second; BTC is about 0.5 on a normal day)">or sigma above <input id="arTrigSigma" type="number" step="0.1" min="0"></label>
-      <label title="Calm again when below this many times the hour's volatility">calm below x of the hour <input id="arExitRatio" type="number" step="0.1" min="1"></label>
-      <label title="and below this sigma">and sigma below <input id="arExitSigma" type="number" step="0.1" min="0"></label>
-      <label title="Stop after it has been calm this long">stop after calm (min) <input id="arCalmMin" type="number" step="1" min="1"></label>
-      <label title="Never record longer than this">at most (min) <input id="arMaxMin" type="number" step="5" min="5"></label>
-      <label title="After a recording is saved, stay armed and watch for the next volatile stretch (up to 8 recordings per arming)">keep watching after a recording <input id="arRearm" type="checkbox"></label>
-      <label title="Also start when the Reader sees an absorption, exhaustion or burst episode (no big price move needed); a recording then stays open while one is active or fading">also start on a Reader episode <input id="arEpTrig" type="checkbox"></label>
-      <label title="Also start when the collectors read forced flow (liquidations of at least $500k in a minute and 10x the usual) or a stressed market (two of: volatility index up, forced flow, venue price gap). Funding and open interest are slow and do not trigger">also start on forced flow or a stressed market <input id="arColTrig" type="checkbox"></label>
-      <label title="Minutes of the real inputs (trades, book) kept while it waits, so a recording starts with what led up to the trigger">lead-in kept (min) <input id="arPreMin" type="number" step="1" min="1" max="30"></label>
-      <label title="Minutes after a recording during which it will not start another (none after a stop at the time limit)">cooldown after one (min) <input id="arCooldown" type="number" step="1" min="1"></label>
-    </div>
-    <div class="row" style="margin-top:6px"><button id="arArm">Arm</button><span id="arStat" class="stat">off</span></div>
-    <div id="arMsg" class="note">While armed the app connects the feeds itself, runs the Reader and keeps the last minutes of the real inputs; when the market turns volatile it starts recording with that lead-in, then saves the file when it calms down. It costs more CPU and battery than the old light wait: use a PC or a charging phone, and keep this tab open and the screen on (it is the page that records).</div>
+    <h2>Replay a file</h2>
+    <div class="note">Recordings are made by the continuous recording above. Here you load a file (a chunk or a session saved earlier) to replay it under Review, Replay and labels.</div>
     <div class="row" style="margin-top:8px">
       <button id="rtSave" disabled>Save session</button><button id="rtLoadBtn">Load session</button><input id="rtLoad" type="file" accept=".json,.gz,application/json,application/gzip" hidden>
     </div>
     <div class="note rtmsg"></div>
   </section>
 
-  <section data-tab="armmode" class="full ovhero"><div id="amHero"></div></section>
-  <section data-tab="armmode" class="full"><h2>Ready to arm?</h2><div id="amPre"></div></section>
-  <section data-tab="armmode" class="full"><h2>Needs attention</h2><div id="amAlerts"></div></section>
-  <section data-tab="armmode"><h2>Data quality</h2><div id="amQuality"></div></section>
-  <section data-tab="armmode"><h2>Market now</h2><div id="amMarket"></div></section>
-  <section data-tab="armmode"><h2>Reader</h2><div id="amReader"></div></section>
-  <section data-tab="armmode"><h2>Recordings this session</h2><div id="amRecs"></div></section>
-  <section data-tab="armmode" class="full"><h2>Last night <span class="ctl"><select id="onHours" title="How far back to look"><option value="12">12 h</option><option value="24" selected>24 h</option><option value="48">48 h</option></select></span></h2><div id="onStatus" class="stat"></div><div id="amMorning"></div></section>
-  <section data-tab="armmode" class="full"><h2>Health log (latest)</h2><div id="amHealth"></div></section>
+  <section data-tab="record" class="full">
+    <h2>Left running</h2>
+    <div class="note">What to check when the page is left open for hours.</div>
+    <div id="lrList"></div>
+  </section>
 
   <section data-tab="record" class="full">
     <h2>Saved recordings</h2>
@@ -300,14 +278,14 @@
 
   <section data-tab="replay" class="full">
     <h2>Replay</h2>
-    <div class="note">Load a session in Recordings (Record, Load session) or open one from Recordings (Saved recordings). Replay it here with the thresholds below to compare.</div>
+    <div class="note">Load a session in Recordings (Load session) or open one from Recordings (Saved recordings). Replay it here with the thresholds below to compare.</div>
     <div class="rt-h">Episode thresholds (used live and in replays)</div>
     <div id="rtTune" class="rd-det"></div>
     <div class="row" style="margin-top:8px">
       <button id="rtReplay" disabled>Replay with current settings</button><button id="rtLive" disabled>Back to live</button>
     </div>
     <div class="note rtmsg"></div>
-    <div class="note">Record a session while connected, save it, then replay it with different thresholds to compare. Everything stays on this device.</div>
+    <div class="note">Connect (it records by itself), then load a saved chunk and replay it with different thresholds to compare. Everything stays on this device.</div>
   </section>
 
   <section data-tab="signals" class="full">
@@ -415,9 +393,6 @@
 <script id="trader-core">
 <!--@include js/trader-core.js-->
 </script>
-<script id="auto-record-core">
-<!--@include js/auto-record-core.js-->
-</script>
 <script>
 <!--@include js/status-core.js-->
 </script>
@@ -478,17 +453,9 @@
 <script>
 <!--@include js/order-history.js-->
 </script>
-<script type="text/plain" id="arWorkerSrc">
-<!--@include js/auto-record-core.js-->
-<!--@include js/collectors-core.js-->
-<!--@include js/auto-record-worker.js-->
-</script>
 <script type="text/plain" id="colWorkerSrc">
 <!--@include js/collectors-core.js-->
 <!--@include js/collectors-worker.js-->
-</script>
-<script>
-<!--@include js/auto-record.js-->
 </script>
 <script>
 <!--@include js/recordings.js-->
@@ -512,19 +479,7 @@
 <!--@include js/run-record.js-->
 </script>
 <script>
-<!--@include js/arm-mode.js-->
-</script>
-<script>
 <!--@include js/paper-broker-core.js-->
-</script>
-<script>
-<!--@include js/arm-memory-core.js-->
-</script>
-<script>
-<!--@include js/overnight-core.js-->
-</script>
-<script>
-<!--@include js/overnight-view.js-->
 </script>
 <script>
 <!--@include js/disk-core.js-->
@@ -537,9 +492,6 @@
 </script>
 <script>
 <!--@include js/status-button.js-->
-</script>
-<script>
-<!--@include js/arm-memory.js-->
 </script>
 </body>
 </html>

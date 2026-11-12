@@ -1,7 +1,6 @@
 "use strict";
-// Disk space watch (view side of disk-core.js): asks the browser for its storage estimate once a minute and keeps the latest reading in DW for the Arm mode screen
-// (a row in Data quality, and an alert when it is low). Read-only: it never writes, deletes or changes a recording, a feed or a detection. Loaded after the Reader files; arm-mode.js
-// reads `DW` through a typeof guard, so the screen is unharmed if this file is missing or the browser has no estimate.
+// Disk space watch (view side of disk-core.js): asks the browser for its storage estimate once a minute and keeps the latest reading in DW for the "left running" list (Recordings). Read-only: it never writes, deletes or changes a recording, a feed or a detection. Loaded after the Reader files; run-record.js
+// reads `DW` through a typeof guard, so the list is unharmed if this file is missing or the browser has no estimate.
 const DW = {free:null, at:0, last:null};
 DW.assess = () => {
   if (DW.free == null) return null;

@@ -60,5 +60,37 @@ const SQ = (() => {
     return `${q.dataMinutes} of ${q.minutes} min with data` + (q.verdict === "complete" ? "" : `, longest silence ${q.longestGapSec} s`) + (q.clock < 80 ? `, clock at ${q.clock}%` : "")
       + (bad.length ? "; collectors: " + bad.map(b => b.state === "none" ? `${b.id} no data` : `${b.id} silent ${span(b.gapSec)}`).join(", ") : "");
   }
-  return {of, line, collectors, colProblems, clean};
+  // Hours recorded: one cell per hour (local clock; offMs = local offset from UTC), one row of 24 per day, the last row is today (cells still to come stay empty).
+  // A recording covers [t0, t1] of its quality (files from before v111: [kept time - span, kept time]); overlaps count once. frac = share of the hour covered. last24 = hours recorded in the 24 hours before `now`.
+  const HOUR = 3600000, DAY = 24 * HOUR;
+  function coverage(rows, now, days, offMs) {
+    const iv = [];
+    for (const r of rows) {
+      const q = r.quality; if (!q) continue;
+      const a = q.t0 && q.t1 ? q.t0 : q.spanMin ? r.at - q.spanMin * 60000 : 0, b = q.t0 && q.t1 ? q.t1 : r.at;
+      if (a && b > a) iv.push([a, b]);
+    }
+    iv.sort((x, y) => x[0] - y[0]);
+    const un = []; for (const [a, b] of iv) { const l = un[un.length - 1]; if (l && a <= l[1]) l[1] = Math.max(l[1], b); else un.push([a, b]); }
+    const within = (s, e) => { let cov = 0; for (const [a, b] of un) { if (b <= s) continue; if (a >= e) break; cov += Math.min(b, e) - Math.max(a, s); } return cov; };
+    const first = Math.floor((now + offMs) / DAY) * DAY - offMs - (days - 1) * DAY, slots = [];
+    let total = 0;
+    for (let i = 0; i < days * 24; i++) { const s = first + i * HOUR, cov = within(s, s + HOUR); total += cov; slots.push({start:s, frac:Math.min(1, cov / HOUR)}); }
+    return {slots, hours:total / HOUR, last24:within(now - DAY, now) / HOUR, days};
+  }
+  function selftest() {
+    const out = [], ok = (name, pass) => out.push({name:"coverage: " + name, ok:!!pass, detail:""});
+    { const H = HOUR, now = 100 * H + 30 * 60000, rows = [      // 100 h = day 4 at 04:00 UTC, so today's cells run from 96 h
+        {at:90 * H, quality:{t0:88 * H, t1:90 * H}}, {at:90 * H, quality:{t0:89 * H, t1:91 * H}},
+        {at:99 * H, quality:{spanMin:60}}, {at:50 * H, quality:null}, {at:100 * H, quality:{t0:100 * H, t1:100 * H + 30 * 60000}}];
+      const c = coverage(rows, now, 2, 0), at = h => c.slots.find(x => x.start === h * H);
+      ok("rows of 24 hourly cells, the last day starts at local midnight", c.slots.length === 48 && c.slots[24].start === 96 * H && c.slots[0].start === 72 * H);
+      ok("overlapping recordings count once", [88, 89, 90].every(h => at(h).frac === 1) && at(87).frac === 0 && at(91).frac === 0);
+      ok("older files use kept time minus span; no quality is skipped", at(98).frac === 1 && at(99).frac === 0 && c.hours === 3 + 1 + .5);
+      ok("the current hour counts only what has happened; later cells are empty", at(100).frac === .5 && at(101).frac === 0);
+      ok("last 24 h counts the window before now", c.last24 === 4.5 && coverage(rows, 125 * H, 2, 0).last24 === 0);
+      ok("a local offset moves midnight", coverage(rows, now, 1, 2 * H).slots[0].start === 94 * H); }
+    return out;
+  }
+  return {of, line, collectors, colProblems, clean, coverage, selftest};
 })();

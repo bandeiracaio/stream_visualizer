@@ -465,7 +465,6 @@ VIEWS.register({id:"market", label:"Market and tape", area:"market"});
 VIEWS.register(Object.assign({id:"reader", label:"Episodes", area:"market"}, READER_SLOT));
 VIEWS.register({id:"record", label:"Recordings", area:"rec", slot:"reader"});   // Record, Saved, Health log and Collectors are blocks of this one view
 VIEWS.register({id:"replay", label:"Replay", area:"rec", slot:"reader"});
-VIEWS.register({id:"armmode", label:"Arm mode", area:"rec"});   // stays until step 6 replaces auto-record
 VIEWS.register({id:"trading", label:"Trading", area:"account", minIntervalMs:400, render:()=>renderTrading()});
 VIEWS.register({id:"history", label:"History", area:"account"});
 VIEWS.register({id:"health", label:"Feed health", area:"diag"});

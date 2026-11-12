@@ -2,7 +2,7 @@
 // Reader tools: record a session, replay it with different settings, tune the episode thresholds, see episodes on a
 // timeline. Reads the live engine (READER) or a
 // replayed one (rdView.engine) through RD(). Loaded after app.js, which owns the engine and the episode cards.
-const RT = {session:null, rec:null, recTimer:null, sel:null, hits:[], last:{}};
+const RT = {session:null, sel:null, hits:[], last:{}};
 const rt$ = id => document.getElementById(id);
 const RT_COLORS = {absorption:"#7aa2f7", exhaustion:"#d9a43b", burst:"#c792ea", wall:"#7fb7a8"};
 const RT_SHORT = {absorption:"absorb", exhaustion:"exhaust", burst:"burst", wall:"wall"};
@@ -40,24 +40,6 @@ function rtSetSession(s){
   rtMsg(span ? `Session ready: ${s.sym || "?"}, ${rtDur(span.t1-span.t0)}, ${s.inputs.length.toLocaleString()} inputs.${span.t1-span.t0 < 150000 ? " It is shorter than the 2-minute warm-up, so a replay will find nothing." : ""}` : "That session has no usable data.");
   rtButtons();
 }
-function rtRecTick(){
-  const r = READER.recording(), ms = Date.now()-RT.rec.t0;
-  rt$("rtStat").textContent = `recording ${rtDur(ms)} · ${r.n.toLocaleString()} inputs`;
-  const lim = RT.recLimit || {n:600000, ms:1800000}; if (r.n > lim.n || ms > lim.ms) rtRecStop();
-}
-function rtRecStop(){
-  clearInterval(RT.recTimer); const inputs = READER.stopRecording(), meta = RT.rec; RT.rec = null; RT.recLimit = null; if (typeof colRelay === "function") colRelay();
-  rt$("rtRec").textContent = "Record"; rt$("rtStat").textContent = "not recording";
-  rtSetSession({inputs, sym:meta.sym, startedAt:meta.t0});
-}
-rt$("rtRec").onclick = () => {
-  if (RT.rec) return rtRecStop();
-  if (!connected){ rtMsg("Connect first, then record."); return; }
-  READER.startRecording({quoteMs:100});       // quotes are decimated to one per 100 ms per venue; the live engine still sees every one
-  RT.rec = {t0:Date.now(), sym:rt$("sym").value.trim().toUpperCase()}; if (typeof colRelay === "function") colRelay();
-  rt$("rtRec").textContent = "Stop recording"; RT.recTimer = setInterval(rtRecTick, 1000); rtRecTick();
-  rtMsg("Recording the raw inputs. It stops by itself after 30 minutes. The engine needs 2 minutes of data before it can detect anything, so record at least 3.");
-};
 function rtDownload(blob, name){
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
@@ -66,10 +48,9 @@ rt$("rtSave").onclick = async () => {
   const s = RT.session; if (!s) return;
   const stamp = new Date(s.startedAt || Date.now()).toISOString().slice(0,16).replace(/[-:T]/g, ""), base = `session_${String(s.sym || "X").replace(/[^A-Za-z0-9_-]/g, "") || "X"}_${stamp}`;
   const quality = SQ.of(s.inputs), health = typeof HL !== "undefined" ? HL.ev.filter(e => e.t >= (s.startedAt || 0) - 60000).slice(-60) : null;      // how complete it is, and what the page noted meanwhile
-  const pre = typeof AR !== "undefined" && AR.pre && AR.pre.at >= (s.startedAt || 0) - 120000 && AR.pre.at <= (s.startedAt || 0) + 120000 ? AR.pre : null;      // auto-record's 30 minutes of mark price before the trigger
-  const ext = await colSlice(s.startedAt, pre ? 1800000 : 60000);      // collector records (collectors.js); the engine never sees them. An auto-recording takes 30 minutes before the trigger, like its `pre` prices
+  const ext = await colSlice(s.startedAt, 60000);      // collector records (collectors.js); the engine never sees them
   if (typeof colExpected === "function") { const c = SQ.collectors(ext, s.startedAt || 0, quality.t1, colExpected()); if (c) quality.collectors = c; }      // which collectors wrote during the recording and how long each was silent
-  const text = JSON.stringify({kind:"sv-session", v:1, sym:s.sym, startedAt:s.startedAt, quality, health, pre, ext, inputs:s.inputs});
+  const text = JSON.stringify({kind:"sv-session", v:1, sym:s.sym, startedAt:s.startedAt, quality, health, ext, inputs:s.inputs});
   const gz = typeof CompressionStream !== "undefined", name = base + (gz ? ".json.gz" : ".json");
   const blob = gz ? await new Response(new Blob([text]).stream().pipeThrough(new CompressionStream("gzip"))).blob() : new Blob([text], {type:"application/json"});
   const inFolder = typeof fsSave === "function" ? await fsSave(name, blob) : false;      // the chosen save folder (folder-save.js); if there is none, or it failed, download as before
@@ -180,6 +161,5 @@ rt$("tlLegend").innerHTML = Object.keys(RT_COLORS).map(f => `<span><i style="bac
 function rdToolsRender(s){
   rtTimeline(s);
   if (rdView.engine) rt$("rdStatus").textContent = "REPLAY of a recorded session";
-  const rec = rt$("rtRec"); if (rec && !RT.rec && rec.textContent !== "Record") rec.textContent = "Record";
   rtButtons();
 }

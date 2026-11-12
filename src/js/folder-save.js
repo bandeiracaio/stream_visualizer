@@ -86,7 +86,7 @@ function fsRender() {
   const ok = FS.log.filter(r => r.ok), bad = FS.log.filter(r => !r.ok), last = FS.log[0];
   let head, tone;
   if (!FS.supported) { head = "Folder saving is not available in this browser (it needs desktop Chrome or Edge). Recordings are downloaded and kept under Saved recordings below."; tone = "var(--dim)"; }
-  else if (!FS.dir) { head = "No folder chosen: recordings are downloaded. Choose a folder once and every recording is written into it without asking."; tone = "var(--warn)"; }
+  else if (!FS.dir) { head = "No folder chosen: chunks of the continuous recording stay in this browser for 24 hours only (a recording saved by hand is downloaded). Choose a folder once and every chunk is written into it without asking."; tone = "var(--warn)"; }
   else if (FS.perm !== "granted") { head = `Folder "${fsEsc(FS.name)}" needs your OK again after the browser restarted: press Allow. Until then recordings are downloaded.`; tone = "var(--warn)"; }
   else if (last && !last.ok) { head = `The last save to "${fsEsc(FS.name)}" failed (${fsEsc(last.err)}); it was downloaded instead.`; tone = "var(--sell)"; }
   else { head = `Saving into "${fsEsc(FS.name)}". ${ok.length ? `${ok.length} file${ok.length === 1 ? "" : "s"} written this session, last at ${fsClock(ok[0].at)}.` : "Nothing written yet this session."}`; tone = "var(--buy)"; }

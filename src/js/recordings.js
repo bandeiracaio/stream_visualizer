@@ -37,10 +37,10 @@ function rcShareable(r) {
   }
   return null;
 }
-// Hours recorded: one row per day, one cell per hour (local clock), brighter = more of that hour recorded (OVERNIGHT.coverage).
+// Hours recorded: one row per day, one cell per hour (local clock), brighter = more of that hour recorded (SQ.coverage).
 function rcCoverage() {
   const box = rc$("cvBox"); if (!box) return;
-  const days = +rc$("cvDays").value || 7, now = Date.now(), c = OVERNIGHT.coverage(RC.rows, now, days, -new Date(now).getTimezoneOffset() * 60000);
+  const days = +rc$("cvDays").value || 7, now = Date.now(), c = SQ.coverage(RC.rows, now, days, -new Date(now).getTimezoneOffset() * 60000);
   const h = x => (Math.round(x * 10) / 10).toFixed(1), rowsHtml = [];
   for (let d = 0; d < days; d++) {
     const cells = c.slots.slice(d * 24, d * 24 + 24), day = new Date(cells[0].start + 1);

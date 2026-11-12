@@ -26,18 +26,17 @@ Stream Visualizer tries to do both jobs honestly:
 |---|---|
 | **One file** | `stream-visualizer_vNNN.html`, self-contained. Open the hosted copy, or copy the file to any device. |
 | **Two venues at once** | Binance USD-M futures and Hyperliquid, trades, books, liquidations, open interest, basis. |
-| **Five areas** | Trader (the seven parts of each paper system, the price chart with its trades, the journal), Market (microstructure, market and tape, episodes), Recordings (recordings, replay, arm mode), Account (trading, history), Diagnostics (feed health, streams, raw, engine, signals). |
+| **Five areas** | Trader (the seven parts of each paper system, the price chart with its trades, the journal), Market (microstructure, market and tape, episodes), Recordings (recordings, replay, left running), Account (trading, history), Diagnostics (feed health, streams, raw, engine, signals). |
 | **Episode-based Reader** | Phenomena have a lifecycle (forming, active, fading, ended, resumable) with a back-dated start and a multi-variable evidence checklist. |
 | **Record and replay** | Save a live session to a file, load it on any device and replay it with different thresholds. |
-| **Auto-record** | Arm it and the app waits on a single price stream, then connects and records by itself when the market gets volatile (relative to its last hour, or above a fixed sigma), and saves the file when it calms down or hits a time limit. |
+| **Continuous recording** | While connected the page records everything the Reader consumes, in 30-minute chunks (one session file each, with the paper runner's journal rows). Chunks go into the save folder (all of them) and into the browser's storage (the newest 24 hours). One switch turns it off. `node design-harness.mjs --replay-run <chunks>` replays a run and checks the journal equals the page's. |
 | **Saved recordings and Share** | Every saved session is also kept in the browser's own storage, with Share (the phone's share sheet: mail it to yourself, Drive, Quick Share), Download, Open and Delete. A phone that blocks an unattended download loses nothing. |
-| **Live status in the header** | Chips next to Connect/Pause show whether data is streaming (or a venue went silent), whether auto-record is armed, learning, waiting or recording, whether the screen may sleep, and how many recordings are kept. |
-| **Keeps watching while hidden** | The price feed behind auto-record runs in a Web Worker and the armed page holds a Web Lock, so a hidden tab learns and judges more reliably. For recordings, still keep the tab visible: the recording itself runs on the page. |
-| **What led up to the trigger** | An auto-recording also carries the 30 minutes of Binance mark price before it started (one point a second) and the volatility reading that fired it, in the file's `pre` field, because no feed is recording while the bot waits. |
+| **Live status in the header** | Chips next to Connect/Pause show whether data is streaming (or a venue went silent), whether the page is recording (and a chunk save failed), whether the screen may sleep, and how many recordings are kept. |
+| **Keeps running while hidden** | A connected page holds a Web Lock and the screen wake lock, so a hidden tab is not frozen; the collectors run in a Web Worker. Chunks are cut by input time, so a hidden tab cuts in the same place. |
 | **Collectors** | Data no detector uses yet is kept on a rolling 24 h tape on the device and attached to every saved recording (`ext`). Six collectors: self-telemetry (feed latency, message rates, gaps, clock offset), derivatives context (Binance and Hyperliquid), calendar tags, book depth summaries (Binance, Hyperliquid), and, for the market state, venue prices and the Deribit volatility index. Switch them in Recordings, under Collectors. |
 | **Recording quality** | Every saved session records how complete it is (minutes with data, longest silence, clock rate) and the Saved recordings list shows it, so a hollow file is obvious before you replay it. |
 | **Health log** | A black box under Saved recordings that survives a reload: when the tab was hidden or frozen, timers stalled or the computer slept, a venue went silent, the price stream dropped, the screen lock was lost, or learning started over. Download it next to a recording that has holes, to see why. |
-| **Knows when it is out of date** | The hosted page checks for a newer release and offers a Reload bar. It never reloads by itself, and asks twice while armed or recording. |
+| **Knows when it is out of date** | The hosted page checks for a newer release and offers a Reload bar. It never reloads by itself, and asks twice while the page is recording. |
 | **Pure, tested engine** | The Reader engine has no DOM and no timers, and 100+ simulator scenarios run on every build; a failing one aborts the build. |
 | **Trading built in** | A simulated paper broker filled against live prices, Binance's own demo account, or a real-money Binance account behind an explicit acknowledgement. |
 
@@ -51,7 +50,7 @@ Saved recordings are kept in the browser's own storage for that address; the hos
 
 ### Collecting data unattended
 
-Arm **auto-record** (Reader tab, *Session, replay and labels*) and leave the tab open with the screen awake. It needs 15 minutes of prices to learn what a normal hour looks like, then starts a recording by itself when the market turns volatile and stops after 5 calm minutes or 60 minutes at most. On a phone, keep the tab in the foreground and the device charging; closing the tab or a sleeping phone ends the wait. The header chips tell you the state at a glance. A checklist for what counts as a usable session, and what to do after, is in [docs/data-collection-checklist.md](docs/data-collection-checklist.md).
+Leave the tab open with the screen awake and the page connected: it records by itself (Recordings, *Left running*, lists what to check).
 
 ## The Reader
 
@@ -130,8 +129,6 @@ src/
     reader-engine.js    pure order-flow engine + one-off detectors (replayable)
     reader-episodes.js  pure episode state machines and evidence checklists
     reader-tools.js     record / save / load / replay, timeline
-    auto-record-core.js pure volatility estimate and start/stop decision for auto-record
-    auto-record.js      its view: arming, the price stream, saving
     recordings.js       saved recordings: IndexedDB copies with Share / Download / Open / Delete
     status-core.js      pure header status chips and the version comparison
     status-bar.js       its view: chips next to Connect/Pause, the "newer version" bar

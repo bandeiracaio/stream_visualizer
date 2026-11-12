@@ -1,13 +1,13 @@
 "use strict";
 // Health log (view): a small black box that survives a reload. It writes down what the page and the feeds were doing around the moments that
 // cost data: the tab hidden, frozen or throttled, the computer asleep, the page reopened or gone, a venue going silent, the price stream
-// dropping, the wake lock lost, auto-record's learning starting over. Read-only: it only looks at the app's state once a second and never
+// dropping, the wake lock lost. Read-only: it only looks at the app's state once a second and never
 // touches a feed, a recording or a detection. Loaded after status-bar.js (it reuses sbSnapshot).
 const HL = {key:"sv.health", ev:[], t:Date.now(), mono:performance.now(), prev:{}, beatAt:0, silent:{}, drops:0, lastLog:0};
 const hl$ = id => document.getElementById(id);
 const hlLoad = () => { try { return JSON.parse(localStorage.getItem(HL.key)) || {}; } catch { return {}; } };
 const hlSave = (extra) => { try { localStorage.setItem(HL.key, JSON.stringify(Object.assign({ev:HL.ev.slice(-400)}, extra || {}, {beat:hlBeat()}))); } catch {} };
-const hlBeat = () => ({at:Date.now(), v:APP_VERSION, vis:document.visibilityState, ar:AR.on ? (AR.st && AR.st.mode) : "off", rec:!!RT.rec});
+const hlBeat = () => ({at:Date.now(), v:APP_VERSION, vis:document.visibilityState, rec:typeof PIPE !== "undefined" && PIPE.running()});
 function hlNote(k, d) {
   HL.ev.push({t:Date.now(), k, d:d || null}); if (HL.ev.length > 400) HL.ev.shift();
   hlSave(); hlRender();
@@ -55,18 +55,12 @@ setInterval(async () => {
     if (q && !HL.silent[v]) { HL.silent[v] = now; hlNote("silent", {venue:v, ageMs:snap.venues[v].ageMs}); }
     else if (!q && HL.silent[v]) { hlNote("back", {venue:v, silentMs:now - HL.silent[v]}); HL.silent[v] = 0; }
   }
-  // auto-record: the price stream dropping, the wake lock, the learning starting over, the mode
-  const p = HL.prev, ar = snap.ar;
-  if (AR.on) {
-    if (AR.drops.length && AR.drops[AR.drops.length - 1].at !== HL.drops) { const d = AR.drops[AR.drops.length - 1]; HL.drops = d.at; hlNote("price-stream drop", {upMs:d.upMs, silentMs:d.silentMs}); }
-    if (p.wake && !ar.wake) hlNote("wake lock lost", {vis:document.visibilityState});
-    if (p.ready && !ar.ready) hlNote("auto-record not ready", {learnMin:ar.learnMin, mode:ar.mode, lastMsgMs:now - AR.lastMsg, wsState:AR.ws && AR.ws.readyState});
-    if (p.mode && ar.mode && p.mode !== ar.mode) hlNote("auto-record " + p.mode + " -> " + ar.mode, {runs:ar.runs});
-    if (p.learnMin > 5 && ar.learnMin < p.learnMin - 2) hlNote("learning started over", {from:p.learnMin, to:ar.learnMin});
-  }
-  if (p.recOn != null && p.recOn !== snap.rec.on) hlNote(snap.rec.on ? "recording started" : "recording stopped", snap.rec.on ? null : {ms:p.recMs});
+  // the recording and the screen wake lock
+  const p = HL.prev, wake = typeof RR !== "undefined" && !!RR.wake, recOn = typeof PIPE !== "undefined" && PIPE.running();
+  if (snap.connected && p.wake && !wake) hlNote("wake lock lost", {vis:document.visibilityState});
+  if (p.recOn != null && p.recOn !== recOn) hlNote(recOn ? "recording started" : "recording stopped");
   if (p.online != null && p.online !== snap.online) hlNote(snap.online ? "back online" : "went offline");
-  HL.prev = {wake:ar.wake, ready:ar.ready, mode:ar.mode, learnMin:ar.learnMin, recOn:snap.rec.on, recMs:snap.rec.ms, online:snap.online};
+  HL.prev = {wake, recOn, online:snap.online};
   if (now - HL.beatAt > 5000) { HL.beatAt = now; hlSave({extra:await hlExtra()}); }
 }, 1000);
 

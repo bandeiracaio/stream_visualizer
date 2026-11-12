@@ -92,6 +92,30 @@ const CHUNK = (() => {
     return "session_" + (String(c.sym || "X").replace(/[^A-Za-z0-9_-]/g, "") || "X") + "_" + stamp + "_run" + c.run + "-c" + String(c.seq).padStart(3, "0") + (gz ? ".json.gz" : ".json");
   }
 
+  // The checks that still matter for a page left running for hours (they were the Arm mode checklist). env: {connected, recOn, folder:{supported, state:"ok"|"none"|"denied"|"failed", name}|null, disk:{tone, text}|null,
+  // battery:{charging, level 0..1}|null, wakeApi, wake (lock held), newer (a newer version string or null), hidden, persisted}. Items {id, tone:"ok"|"warn"|"bad"|"info", text, fix}; fix is empty when ok.
+  function leftRunning(env) {
+    const out = [], add = (id, tone, text, fix) => out.push({ id, tone, text, fix: tone === "ok" ? "" : fix || "" });
+    if (!env.recOn) add("rec", "bad", "Recording is off", "Turn the switch on (Continuous recording): nothing is being kept.");
+    else if (!env.connected) add("rec", "warn", "Not connected", "Press Connect: a run is recorded from connect to disconnect.");
+    else add("rec", "ok", "Connected and recording");
+    const f = env.folder;
+    if (f && f.supported) {
+      if (f.state === "ok") add("folder", "ok", "Save folder: " + (f.name || "chosen"));
+      else if (f.state === "none") add("folder", "warn", "No save folder: chunks are kept in this browser for 24 hours only", "Choose a folder (Saved recordings, Choose folder).");
+      else if (f.state === "denied") add("folder", "bad", "The browser took back access to the save folder", "Press Allow (Saved recordings).");
+      else add("folder", "bad", "The last save into the folder failed", "Check the folder and the disk.");
+    }
+    if (env.disk) add("disk", env.disk.tone === "ok" ? "ok" : env.disk.tone, "Disk room: " + env.disk.text, "Free some space or choose another folder.");
+    if (env.persisted === false) add("persist", "warn", "The browser may evict stored chunks", "Allow persistent storage for this site.");
+    if (env.battery) add("power", env.battery.charging ? "ok" : env.battery.level < 0.5 ? "bad" : "warn", env.battery.charging ? "Power: charging" : "Power: on battery, " + Math.round(env.battery.level * 100) + "%", "Plug in the device.");
+    if (env.connected && env.wakeApi === false) add("wake", "warn", "No screen wake lock in this browser: the device may sleep", "Turn off sleep in the system settings.");
+    else if (env.connected && env.wakeApi && !env.wake) add("wake", "warn", "The screen wake lock is not held: the device may sleep", "Keep the tab visible; the lock is asked for again when it is.");
+    else if (env.connected) add("wake", "ok", "Screen wake lock held");
+    if (env.newer) add("version", "warn", "A newer version (" + env.newer + ") is out", "Reload when you can stop the run: the chunk being recorded is lost on a reload.");
+    return { items: out, bad: out.filter(x => x.tone === "bad").length, warn: out.filter(x => x.tone === "warn").length };
+  }
+
   // ---------- self-test: scenarios named chunk:* ----------
   function selftest() {
     const res = [], ok = (name, c, detail) => res.push({ name: "chunk:" + name, ok: !!c, detail: c ? "" : String(detail || "") });
@@ -148,8 +172,13 @@ const CHUNK = (() => {
     { const { F } = mkFacts(), got = []; let cfg = "a"; const p = pipeline({ facts: F, maxMs: 1e9, cfgNow: () => cfg, onChunk: c => got.push(c) }); p.reset(); p.begin({ id: "r3", sym: "BTC", startedAt: T0, runner: { on: false }, engineCfg: null, lateMs: 1000 });
       const s = stream(20); for (let i = 0; i < s.length; i++) { if (i === 200) cfg = "b"; apply(p, s[i]); } p.end(false, "switch");
       ok("settings that changed during a chunk are noted on it", got.length === 1 && got[0].changed.join() === "engine settings" && got[0].final === false && got[0].why === "switch"); }
+    { const good = { connected: true, recOn: true, folder: { supported: true, state: "ok", name: "sessions" }, disk: { tone: "ok", text: "40 GB" }, battery: { charging: true, level: 1 }, wakeApi: true, wake: true, newer: null, persisted: true };
+      const r = leftRunning(good), t = (env, id) => leftRunning(Object.assign({}, good, env)).items.find(x => x.id === id);
+      ok("left running: everything fine has no warning and no fix text", r.bad === 0 && r.warn === 0 && r.items.every(x => x.tone === "ok" && x.fix === ""));
+      ok("left running: recording off is bad, not connected warns, a missing folder warns, a denied one is bad", t({ recOn: false }, "rec").tone === "bad" && t({ connected: false }, "rec").tone === "warn" && t({ folder: { supported: true, state: "none" } }, "folder").tone === "warn" && t({ folder: { supported: true, state: "denied" } }, "folder").tone === "bad" && !t({ folder: { supported: false } }, "folder"));
+      ok("left running: disk tone passes on, battery under 50% is bad, a lost wake lock and a newer version warn", t({ disk: { tone: "bad", text: "1 GB" } }, "disk").tone === "bad" && t({ battery: { charging: false, level: 0.3 } }, "power").tone === "bad" && t({ battery: { charging: false, level: 0.8 } }, "power").tone === "warn" && t({ wake: false }, "wake").tone === "warn" && /v200/.test(t({ newer: "v200" }, "version").text)); }
     return res;
   }
 
-  return { MAX_MS, MAX_N, THIN_MS, timeOf, thinner, pipeline, replay, check, firstDiff, fileName, selftest };
+  return { MAX_MS, MAX_N, THIN_MS, timeOf, thinner, pipeline, replay, check, firstDiff, fileName, leftRunning, selftest };
 })();

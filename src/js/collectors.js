@@ -52,7 +52,7 @@ function colSample() {
 }
 setInterval(colSample, 10000);
 
-// ---- the always-on worker (collectors-worker.js): derivatives context and calendar tags. It runs whether or not auto-record is armed, in a worker so a hidden tab
+// ---- the always-on worker (collectors-worker.js): derivatives context and calendar tags. It runs whether or not the app is connected, in a worker so a hidden tab
 // does not slow it. Its records come here and go onto the tape; a record posted while the page is frozen is written when the page thaws.
 function colWorkerSync() {
   const sym = cl$("sym").value.trim().toLowerCase(), wants = {derivs:colOn("derivs"), calendar:colOn("calendar"), venues:colOn("venues"), book:colOn("book"), options:colOn("options")}, key = sym + "|" + wants.derivs + "|" + wants.calendar + "|" + wants.venues + "|" + wants.book + "|" + wants.options;
@@ -65,14 +65,13 @@ function colWorkerSync() {
   CL.worker = w; CL.workerKey = key;
   w.onmessage = ev => { if (w !== CL.worker) return; const m = ev.data; if (m.t === "col") colAdd(m.rec); else if (m.t === "note") hlNote(m.k, m.d); };
   w.onerror = () => { if (w !== CL.worker) return; CL.worker = null; try { w.terminate(); } catch {} hlNote("collector worker failed", {err:"stopped on an error"}); };      // no retry loop: reload the page
-  CL.recSent = colWatching(); CL.recNow = colRec(); w.postMessage({t:"start", sym, want:wants, rec:CL.recSent, recording:CL.recNow});
+  CL.recSent = colWatching(); CL.recNow = colWatching(); w.postMessage({t:"start", sym, want:wants, rec:CL.recSent, recording:CL.recNow});
 }
 cl$("sym").addEventListener("change", colWorkerSync);
-// tell the worker when the extra venues should be listened to: while a recording is on, and while auto-record is armed (so an auto-recording has the lead-in)
-const colRec = () => !!RT.rec || (typeof PIPE !== "undefined" && PIPE.running());      // a hand recording or the continuous recording (run-record.js)
-const colWatching = () => colRec() || (typeof AR !== "undefined" && !!AR.on);
+// tell the worker when the extra venues should be listened to: while the page is connected (the continuous recording runs then)
+const colWatching = () => !!connected;
 // colRelay is called the moment a recording starts or stops, because the 1 s timer below runs only once a minute in a hidden tab: the worker's book collectors started up to 60 s after the recording (a "holes" book in 11 of 20 overnight files, v129)
-function colRelay() { const on = colWatching(), rec = colRec(); if (CL.worker && (CL.recSent !== on || CL.recNow !== rec)) { CL.recSent = on; CL.recNow = rec; CL.worker.postMessage({t:"rec", on, recording:rec}); } }
+function colRelay() { const on = colWatching(), rec = on; if (CL.worker && (CL.recSent !== on || CL.recNow !== rec)) { CL.recSent = on; CL.recNow = rec; CL.worker.postMessage({t:"rec", on, recording:rec}); } }
 setInterval(colRelay, 1000);
 
 // ---- book depth summaries (fast collector "book"): moved into the worker (collectors-worker.js), which keeps its own Binance and Hyperliquid books while a recording is on, so a hidden
@@ -84,10 +83,10 @@ function colTally(all) { const t = COLLECT.tally(all); for (const id in t) { con
 // null when the collector should be writing right now, otherwise why it is not expected to
 function colWhy(id) {
   switch (id) {
-    case "telemetry": return connected || AR.on ? null : "waits for the app to be connected or armed";
+    case "telemetry": return connected ? null : "waits for the app to be connected";
     case "options": return !COLLECT.deribitCoin(cl$("sym").value.trim()) ? "Deribit lists BTC and ETH only" : CL.worker ? null : "worker not running";
-    case "venues": return CL.worker ? (colWatching() ? null : "waits for a recording or auto-record armed") : "worker not running";
-    case "book": return CL.worker ? (colRec() ? null : "waits for a recording") : "worker not running";
+    case "venues": return CL.worker ? (colWatching() ? null : "waits for the app to be connected") : "worker not running";
+    case "book": return CL.worker ? (connected ? null : "waits for the app to be connected") : "worker not running";
     default: return CL.worker ? null : "worker not running";
   }
 }

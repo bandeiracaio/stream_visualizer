@@ -1,6 +1,6 @@
 # 5. An arming keeps at most 100 runs (`maxRuns`)
 
-Status: accepted
+Status: superseded by step 6b (v142): auto-record and arming were removed, so there is no `maxRuns`. The page records continuously while connected, in 30-minute chunks; the storage guards are the 24-hour browser copies and the "left running" list (disk room). Kept for the reasoning below.
 
 `maxRuns` is the number of auto-recordings (runs) one arming may make before it disarms. It was 8 (v042). It is 100 since v097.
 

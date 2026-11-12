@@ -22,8 +22,9 @@
 
 **Sigma**: the scale of normal price movement, in bps per root second (the 75th percentile of the absolute deviation from the median of overlapping 15-second returns, divided by 1.1503 and by the square root of 15; not the MAD, see `docs/adr/0004`). Price progress and distances are measured in multiples of it (see `docs/adr/0004`).
 
-**Recording**: the inputs the engine consumed over a stretch of time (plus the `ext` collector slice and `quality`), saved as one session file so it can be replayed. Made by hand (Record) or by auto-record. Saved recordings are the IndexedDB copies of those files. Not the same as a Session (one continuous live run of the app, which may hold several recordings).
+**Recording**: the inputs the engine consumed, in chunks (see Chunk), each saved as one session file (plus the `ext` collector slice, `quality` and the paper runner's journal rows of that stretch) so it can be replayed. The page records everything it consumes while connected; one switch turns it off. Saved recordings are the IndexedDB copies of those files (the newest 24 hours) and the files in the save folder. Not the same as a Session (one continuous live run of the app).
 
-**Arming**: switching auto-record on (header Arm). While armed it watches the mark-price volatility and starts and stops recordings by itself; it ends when disarmed by hand, when a recording is stopped by hand, when it hits `maxRuns`, or when the page closes. Armed is the state; Recording is what it produces.
 
-**Run**: one auto-recording started within one arming, counted in `AR.runs`. An arming has 0 to `maxRuns` runs. A hand-made recording is not a run.
+**Run**: what lies between two resets of the engine (a connect, a change of asset, a page load) or ends at a disconnect. At the start of a run the engine, the facts accumulator and the paper runner are all new, so replaying the run's chunks gives the page's journal row for row. A page that closes without a disconnect leaves a run cut short.
+
+**Chunk**: one cut of a run's input stream, made when an input's own time is 30 minutes after the chunk's first input, or at 600,000 inputs (never by a timer, so a hidden tab cuts in the same place). It is a session file with the run's id, its number in the run, the runner's configuration and the journal rows written during the chunk. No input is lost or repeated between two chunks of a run.

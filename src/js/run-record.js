@@ -14,17 +14,17 @@ const rrCfgKey = () => { try { return JSON.stringify(rtCfg()); } catch { return 
 // ----- a run begins and ends with the engine's resets (READER.reset, feeds.js)
 function rrBeforeReset() { rrEnd(true, "reset"); }
 function rrAfterReset() { if (connected) rrBegin(); }
-function rrEnd(final, why) { trStop(); PIPE.end(final, why); RR.id = null; rrRender(); if (typeof colRelay === "function") colRelay(); }      // the runner stops first (its closing rows are part of the chunk), then the chunk is closed
+function rrEnd(final, why) { trStop(); PIPE.end(final, why); RR.id = null; rrRender(); }      // the runner stops first (its closing rows are part of the chunk), then the chunk is closed
 function rrBegin() {
   const sym = trAsset(), runner = trBegin(sym), now = Date.now(); RR.beganAt = now;
   if (!RR.on) { RR.id = null; rrRender(); return; }
   RR.id = rrStamp(new Date(now)); RR.sym = sym; RR.seqSaved = -1; RR.prevFailed = false;
   PIPE.begin({id: RR.id, sym: rt$("sym").value.trim().toUpperCase(), startedAt: now, lateMs: TF_LATE, engineCfg: (() => { try { return rtCfg(); } catch { return null; } })(),
     runner: {on: runner, cfg: TR_CFG, ids: SYSTEMS_DEFAULT.map(d => SYSTEM.id(d)), carry: TRN.driver ? TRN.driver.carry : []}});
-  store.set("rr.last", {id: RR.id, seq: -1, final: false, at: now, cut: false}); rrRender(); if (typeof colRelay === "function") colRelay();
+  store.set("rr.last", {id: RR.id, seq: -1, final: false, at: now, cut: false}); rrRender();
 }
-function rrDisconnect() { rrEnd(true, "disconnect"); store.set("rr.was", false); rrRelease(); }      // called by the Connect button before it disconnects
-function rrConnected() { store.set("rr.was", true); rrHold(); }      // ... and after it connects
+function rrDisconnect() { rrEnd(true, "disconnect"); store.set("rr.was", false); rrRelease(); setTimeout(() => { if (typeof colRelay === "function") colRelay(); }, 0); }      // called by the Connect button before it disconnects
+function rrConnected() { store.set("rr.was", true); rrHold(); if (typeof colRelay === "function") colRelay(); }      // ... and after it connects
 function rrSetOn(on) {
   RR.on = !!on; store.set("recOn", RR.on);
   if (!connected) return rrRender();
@@ -117,7 +117,20 @@ function rrShort() {
   if (!connected) return "Recording: not connected.";
   const s = PIPE.state(); return s ? "Recording: run " + s.id.slice(-6) + ", chunk " + s.seq + (RR.fail ? ", " + RR.fail + " save(s) failed" : "") + "." : "Recording: no run yet.";
 }
-setInterval(() => { try { rrRender(); } catch {} }, 2000);
+// ----- "left running": the checks that matter for a page left open for hours (CHUNK.leftRunning)
+RR.battery = null;
+async function rrPower() { try { if (navigator.getBattery) { const b = await navigator.getBattery(); RR.battery = {charging: b.charging, level: b.level}; } } catch {} }
+rrPower(); setInterval(rrPower, 60000);
+function rrLeft() {
+  const box = rr$("lrList"); if (!box) return;
+  const f = typeof FS !== "undefined" && FS.supported ? {supported: true, state: !FS.dir ? "none" : FS.perm !== "granted" ? "denied" : RR.folderFail ? "failed" : "ok", name: FS.name} : null;
+  const d = typeof DW !== "undefined" ? DW.assess() : null;
+  const r = CHUNK.leftRunning({connected, recOn: RR.on, folder: f, disk: d, battery: RR.battery, wakeApi: !!navigator.wakeLock, wake: !!RR.wake, newer: typeof SB !== "undefined" ? SB.latest : null});
+  const col = {ok: "var(--buy)", warn: "var(--warn)", bad: "var(--sell)", info: "var(--dim)"}, esc = x => String(x).replace(/[&<>]/g, ch => ({"&": "&amp;", "<": "&lt;", ">": "&gt;"}[ch]));
+  const html = r.items.map(x => `<div class="rv-row"><span style="color:${col[x.tone]};font-weight:700">${x.tone === "ok" ? "OK" : x.tone.toUpperCase()}</span><div class="grow">${esc(x.text)}${x.fix ? `<div class="stat">${esc(x.fix)}</div>` : ""}</div></div>`).join("");
+  if (box.dataset.h !== html) { box.dataset.h = html; box.innerHTML = html; }
+}
+setInterval(() => { try { rrRender(); rrLeft(); } catch {} }, 2000); rrLeft();
 rr$("rrOn").onchange = () => rrSetOn(rr$("rrOn").checked);
 rrRender();
 rrAfterLoad();

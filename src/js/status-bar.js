@@ -12,12 +12,10 @@ function sbSnapshot() {
     const on = Object.values(S).filter(s => s.def.v === v && s.on), last = Math.max(0, ...on.map(s => s.last));
     venues[v] = {on:on.length > 0, ageMs:last ? now - last : null, rate:on.reduce((a, s) => a + s.rates.slice(-3).reduce((x, y) => x + y, 0) / 3, 0)};
   }
-  const ar = AR.on ? {on:true, ready:!!(AR.v && AR.v.ready), learnMin:AR.v ? Math.round(AR.v.nSlow / 60) : 0, mode:AR.st && AR.st.mode, wake:!!AR.lock, runs:AR.runs, cooldownMin:AR.st && AR.st.until > now ? Math.ceil((AR.st.until - now) / 60000) : 0} : {on:false};
-  const rec = RT.rec ? {on:true, ms:now - RT.rec.t0, n:READER.recording().n} : {on:false};
   let folder = null;      // folder-save.js is loaded before this file; without it (or in a browser that cannot save into a folder) there is no folder chip
   if (typeof FS !== "undefined" && FS.supported) { const last = FS.log[0]; folder = !FS.dir ? {state:"none"} : FS.perm !== "granted" ? {state:"denied"} : last && !last.ok ? {state:"failed", err:last.err} : {state:"ok"}; }
-  let cr = null; try { if (typeof rrState === "function") { const q = rrState(); cr = {on:q.on && q.running, seq:q.seq, ms:q.ms, fail:q.fail, err:q.err, failedNow:q.fail > 0 && Date.now() - RR.lastAt < 7200000}; } } catch {}      // continuous recording (run-record.js)
-  return {connected, paused:false, online:navigator.onLine, venues, ar, rec, cr, kept:typeof RC !== "undefined" ? RC.rows.length : 0, folder};
+  let cr = null; try { if (typeof rrState === "function") { const q = rrState(); cr = {on:q.on && q.running, seq:q.seq, ms:q.ms, fail:q.fail, err:q.err, wake:q.wake}; } } catch {}      // continuous recording (run-record.js)
+  return {connected, paused:false, online:navigator.onLine, venues, cr, kept:typeof RC !== "undefined" ? RC.rows.length : 0, folder};
 }
 // phone header: a venue pill shows a coloured dot instead of its long text (styles.css); the state is classified here, the full text stays in the title
 function sbPills() {
@@ -51,8 +49,8 @@ async function sbCheckVersion() {
   } catch {}                                       // offline, or served without a version.json (local copy): no banner
 }
 sb$("updBtn").onclick = () => {
-  const busy = AR.on || RT.rec;
-  if (busy && sb$("updBtn").textContent === "Reload") { sb$("updBtn").textContent = AR.on ? "Reload anyway (ends the wait)" : "Reload anyway (loses the recording)"; return; }
+  const busy = connected && typeof RR !== "undefined" && RR.on;
+  if (busy && sb$("updBtn").textContent === "Reload") { sb$("updBtn").textContent = "Reload anyway (the chunk being recorded is lost)"; return; }
   location.replace(location.pathname + "?v=" + SB.latest);   // a new query string skips the cached copy of the page
 };
 sb$("updClose").onclick = () => { sb$("updBar").hidden = true; };
@@ -60,17 +58,6 @@ if (APP_VERSION !== "dev") {
   setTimeout(sbCheckVersion, 3000); setInterval(sbCheckVersion, 600000);
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") sbCheckVersion(); });
 }
-// the browser can take back the folder permission without telling the page: while something is armed or recording, ask it again every 30 s so the chip shows it before a save fails
-setInterval(() => { if (typeof fsQuery === "function" && typeof FS !== "undefined" && FS.dir && (AR.on || RT.rec)) fsQuery().catch(() => {}); }, 30000);
+// the browser can take back the folder permission without telling the page: while the page is recording, ask it again every 30 s so the chip shows it before a save fails
+setInterval(() => { if (typeof fsQuery === "function" && typeof FS !== "undefined" && FS.dir && typeof RR !== "undefined" && RR.on && connected) fsQuery().catch(() => {}); }, 30000);
 setInterval(sbRender, 1000); sbRender();
-// header Record button: the same switch as Record in Recordings (#rtRec), whose label and recording state it mirrors
-(function () {
-  const hb = document.getElementById("recHdr"), rb = document.getElementById("rtRec");
-  if (!hb || !rb) return;
-  const sync = () => { hb.textContent = rb.textContent; hb.classList.toggle("on", !!RT.rec); };
-  hb.onclick = () => {
-    if (!RT.rec && !connected) { const m = document.getElementById("arHdrMsg"); if (m) { m.textContent = "Connect first, then record."; setTimeout(() => { m.textContent = ""; }, 4000); } return; }
-    rb.click(); sync();
-  };
-  new MutationObserver(sync).observe(rb, {childList:true, characterData:true, subtree:true}); sync();
-})();

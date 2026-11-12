@@ -61,9 +61,9 @@ After each finished step, so the user always has an up-to-date single file. Anot
 Reference that is read when you touch the area, not every session:
 
 - Reader engine, episodes, replay and timeline: `docs/agents/source-map.md` § Reader.
-- Navigation, account, order history, Overview, arm, restyle, headers and the Look: § App shell and views.
-- Recording, auto-record, collectors, worker, tape, session quality: § Recording and collectors.
+- Navigation, account, order history, Overview, restyle, headers and the Look: § App shell and views.
+- Continuous recording (chunks, runs, `--replay-run`), collectors, worker, tape, session quality: § Recording and collectors.
 - How `HOOKS`, `VIEWS`, `feeds.js` and `COLLECT.REGISTRY` fit: § Seams.
-- Scripts at the repo root (`compare-detections.mjs`, `design-harness.mjs`, `sample-designs.mjs`): `docs/agents/studies.md`. Closed studies and their scripts: `archive/README.md`.
+- Scripts at the repo root (`compare-detections.mjs`, `design-harness.mjs` including `--replay-run` for recorded chunks, `sample-designs.mjs`): `docs/agents/studies.md`. Closed studies and their scripts: `archive/README.md`.
 - Testing the UI in Chrome and at phone width: `docs/agents/testing-ui.md`.
 - Terms: `CONTEXT.md`. Decisions: `docs/adr/`. Specs: `.scratch/<feature>/spec.md`.

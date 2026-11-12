@@ -72,11 +72,6 @@ const READER_SELFTEST=(()=>{
     const ok=SQ.of(make(5)),holes=SQ.of(make(6,m=>m===2)),hollow=SQ.of(make(6,m=>m!==0&&m!==5)),none=SQ.of([]);
     return{ok:ok.verdict==="complete"&&ok.dataMinutes===ok.minutes&&holes.verdict==="holes"&&holes.longestGapSec>=60&&hollow.verdict==="hollow"&&none.verdict==="empty"&&/silence/.test(SQ.line(holes))&&SQ.line(ok)===`${ok.minutes} of ${ok.minutes} min with data`,detail:JSON.stringify({ok,holes,hollow})};
   });
-  add("autorec: dump returns the last seconds of prices as pairs, leaving out missed seconds",E=>{
-    const A=AUTOREC,h=A.createHistory();let t=T0;for(let i=0;i<300;i++){t+=1000;if(i>=100&&i<120)continue;A.push(h,t,82000+i);}
-    const d=A.dump(h,t,200),all=A.dump(h,t,4000);
-    return{ok:d.length===180&&d[d.length-1][1]===82299&&d.every((p,i)=>i===0||p[0]>d[i-1][0])&&all.length===280&&A.dump(A.createHistory(),t,50).length===0,detail:JSON.stringify({n:d.length,all:all.length,last:d[d.length-1]})};
-  });
   add("wallet: one order split into many fills at one instant is not a wallet that keeps hitting; fills over several seconds are",E=>{
     const run=(spread)=>{const e=E.create(),a=calm(e);for(let i=0;i<12;i++)e.onTrade({t:a.t+(spread?i*700:50),v:"hl",side:"sell",px:a.mid,q:1,ntl:a.mid,users:["0xbuyer"+i,"0xsellerAAAAAA"]});return e.debug().walletEvidence("hl","sell",a.t-1000);};
     const one=run(false),many=run(true);
@@ -433,31 +428,6 @@ const READER_SELFTEST=(()=>{
     return{ok:E.DEFAULTS.sigmaFastN===0&&mk({})===mk({sigmaFastN:0,sigmaFastW:.9}),detail:String(E.DEFAULTS.sigmaFastN)};
   });
   // ---- auto-record (v031): when to start and stop recording, from a one-second price series ----
-  add("autorec: sigma of a random walk matches its true scale, on the same footing as the engine's sigma",E=>{
-    const r=rng(11),h=AUTOREC.createHistory();let px=82000,t=T0;for(let i=0;i<3700;i++){px*=1+(r()-.5)*2*.6/1e4;t+=1000;AUTOREC.push(h,t,px);}
-    const g=AUTOREC.sigma(h,3600,15),want=.6/Math.sqrt(3);
-    return{ok:Math.abs(g.sigma/want-1)<.15&&g.n>3500,detail:JSON.stringify({got:+g.sigma.toFixed(3),want:+want.toFixed(3),n:g.n})};
-  });
-  add("autorec: it learns an hour first, ignores a calm market, starts soon after a jump, stays while it lasts, and stops after the calm minutes",E=>{
-    const A=AUTOREC,r=rng(5),h=A.createHistory(),cfg={};let px=82000,t=T0,st={mode:"waiting"};const ev=[];
-    const run=(secs,vol)=>{for(let i=0;i<secs;i++){px*=1+(r()-.5)*2*vol/1e4;t+=1000;A.push(h,t,px);if(i%5===4&&!ev.some(x=>x.a==="stop")){const v=A.vol(h,cfg),o=A.step(st,v,t,cfg);st=o.st;if(o.action)ev.push({a:o.action,why:o.why,t});}}};   // the view disarms after a stop, so nothing is asked after it
-    run(600,.3);const notReady=ev.length===0;run(1800,.3);const quiet=ev.length===0,jumpAt=t;run(900,1.2);const jumpEnd=t;run(2400,.3);
-    const start=ev.find(x=>x.a==="start"),stop=ev.find(x=>x.a==="stop");
-    return{ok:notReady&&quiet&&!!start&&start.t>jumpAt&&start.t-jumpAt<=300000&&!!stop&&stop.why==="calm"&&stop.t>jumpEnd&&ev.length===2,detail:JSON.stringify({notReady,quiet,start:start&&(start.t-jumpAt)/1000,why:start&&start.why,stop:stop&&(stop.t-jumpEnd)/1000,n:ev.length})};
-  });
-  add("autorec: a recording ends at its time limit even if the market stays wild, and either trigger alone is enough to start",E=>{
-    const A=AUTOREC,calm={fast:.5,slow:.5,ratio:1,ready:true},wild={fast:2,slow:1,ratio:2,ready:true},T=1e6;
-    const byRatio=A.step({mode:"waiting"},{fast:.9,slow:.4,ratio:2.2,ready:true},T,{}),bySigma=A.step({mode:"waiting"},{fast:1.5,slow:1.4,ratio:1.07,ready:true},T,{}),no=A.step({mode:"waiting"},{fast:1.1,slow:.7,ratio:1.57,ready:true},T,{}),notReady=A.step({mode:"waiting"},{fast:3,slow:.4,ratio:7,ready:false},T,{}),deadCalm=A.step({mode:"waiting"},{fast:.2,slow:.08,ratio:2.5,ready:true},T,{});
-    const st={mode:"recording",since:T,calmSince:null},o=A.step(st,wild,T+59*60000,{maxMin:60}),o2=A.step(st,wild,T+60*60000,{maxMin:60});
-    const dip=A.step({mode:"recording",since:T,calmSince:T+60000},wild,T+400000,{}),keep=A.step({mode:"recording",since:T,calmSince:T+60000},calm,T+240000,{calmMin:5});
-    return{ok:byRatio.action==="start"&&byRatio.why==="ratio"&&bySigma.action==="start"&&bySigma.why==="sigma"&&no.action===null&&notReady.action===null&&deadCalm.action===null&&o.action===null&&o2.action==="stop"&&o2.why==="max"&&dip.action===null&&dip.st.calmSince===null&&keep.action===null,
-      detail:JSON.stringify({byRatio:byRatio.why,bySigma:bySigma.why,no:no.action,o:o.action,o2:o2.why,dip:dip.action,keep:keep.action})};
-  });
-  add("autorec: a price stream that has gone quiet is not judged: the last window is stale, so nothing starts and nothing counts as calm",E=>{
-    const A=AUTOREC,r=rng(3),h=A.createHistory();let px=82000,t=T0;for(let i=0;i<3700;i++){px*=1+(r()-.5)*2*1.5/1e4;t+=1000;A.push(h,t,px);}
-    const live=A.vol(h,{},t+2000),stale=A.vol(h,{},t+60000),a=A.step({mode:"waiting"},stale,t+60000,{});
-    return{ok:live.ready&&!stale.ready&&a.action===null,detail:JSON.stringify({live:live.ready,stale:stale.ready,action:a.action})};
-  });
   add("replay: an empty recording and one with unknown record types replay to a quiet engine without throwing",E=>{
     const a=E.replayEngine([]),b=E.replayEngine([["zz",1],["a",T0],["x"],["a",T0+1000]]);
     return{ok:a.events.length===0&&a.episodes.length===0&&b.events.length===0&&b.episodes.length===0,detail:`empty ${a.events.length}/${a.episodes.length}, unknown ${b.events.length}/${b.episodes.length}`};
@@ -472,13 +442,6 @@ const READER_SELFTEST=(()=>{
     const silent=STATUS.chips(base)[0],never=STATUS.chips(Object.assign({},base,{venues:{bn:v(200,40),hl:v(null,0)}}))[0],off=STATUS.chips(Object.assign({},base,{venues:{bn:v(200,40),hl:v(null,0,false)}}))[0];
     const net=STATUS.chips(Object.assign({},base,{online:false}))[0],pz=STATUS.chips(Object.assign({},base,{paused:true}))[0];
     return{ok:silent.tone==="bad"&&silent.text==="HL silent 12 s"&&never.text==="HL silent"&&off.tone==="ok"&&net.id==="net"&&pz.text==="paused",detail:JSON.stringify({silent,never,off,net,pz})};
-  });
-  add("status: auto-record shows learning, waiting and recording; a lost wake lock and a manual recording are shown too",E=>{
-    const base={connected:false,paused:false,online:true,venues:{},rec:{on:false},kept:2};
-    const learn=STATUS.chips(Object.assign({},base,{ar:{on:true,ready:false,learnMin:4,wake:true}})),wait=STATUS.chips(Object.assign({},base,{ar:{on:true,ready:true,mode:"waiting",wake:false}}));
-    const rec=STATUS.chips(Object.assign({},base,{ar:{on:true,ready:true,mode:"recording",wake:true},rec:{on:true,ms:192000,n:5}})),man=STATUS.chips(Object.assign({},base,{rec:{on:true,ms:65000,n:12345}}));
-    const t=l=>l.map(c=>c.text).join(" | ");
-    return{ok:t(learn)==="armed · learning 4/15 min | 2 saved"&&t(wait)==="armed · waiting | screen may sleep | 2 saved"&&t(rec)==="auto REC 3:12 | 2 saved"&&/^REC 1:05 · 12[.,  ]?345 inputs/.test(t(man)),detail:[t(learn),t(wait),t(rec),t(man)].join(" // ")};
   });
   add("session quality: each collector's records, minutes and longest silence over the recording; none / holes / ok; slow writers and the lead-in are not judged; the list line names the problem",E=>{
     const J=JSON.stringify,T0=1792800000000,MIN=60000,to=T0+10*MIN;
@@ -498,13 +461,13 @@ const READER_SELFTEST=(()=>{
       &&SQ.line(q)==="10 of 10 min with data; collectors: book silent 5 min, options no data"&&SQ.line(Object.assign({},old,{collectors:{a:{state:"holes",gapSec:90},b:{state:"ok"}}}))==="10 of 10 min with data; collectors: a silent 90 s"
       &&withIn.t0===T0&&withIn.t1===T0+MIN,detail:J({c,none,short,line:SQ.line(q)})};
   });
-  add("status: a lost, failing or missing save folder is shown while armed or recording, and only then",E=>{
-    const base={connected:false,paused:false,online:true,venues:{},rec:{on:false},kept:0},arm={on:true,ready:true,mode:"waiting",wake:true};
-    const t=l=>l.map(c=>c.text).join(" | "),f=(st,extra)=>Object.assign({},base,{ar:arm,folder:Object.assign({state:st},extra)});
+  add("status: a lost, failing or missing save folder is shown while the page records, and only then; a failed chunk save and a lost wake lock are shown",E=>{
+    const base={connected:false,paused:false,online:true,venues:{},kept:0},on={on:true,seq:3,fail:0,wake:true};
+    const t=l=>l.map(c=>c.text).join(" | "),f=(st,extra)=>Object.assign({},base,{cr:on,folder:Object.assign({state:st},extra)});
     const den=STATUS.chips(f("denied")),fail=STATUS.chips(f("failed",{err:"disk full"})),none=STATUS.chips(f("none")),ok=STATUS.chips(f("ok"));
-    const idle=STATUS.chips(Object.assign({},base,{folder:{state:"denied"}})),man=STATUS.chips(Object.assign({},base,{rec:{on:true,ms:1000,n:1},folder:{state:"denied"}})),absent=STATUS.chips(Object.assign({},base,{ar:arm}));
-    return{ok:t(den)==="armed · waiting | save folder needs OK"&&den[1].tone==="bad"&&/Allow/.test(den[1].title)&&t(fail)==="armed · waiting | last save failed"&&/disk full/.test(fail[1].title)&&t(none)==="armed · waiting | no save folder"&&none[1].tone==="info"
-      &&t(ok)==="armed · waiting"&&idle.length===0&&/save folder needs OK/.test(t(man))&&t(absent)==="armed · waiting",detail:[t(den),t(fail),t(none),t(ok),t(idle),t(man),t(absent)].join(" // ")};
+    const idle=STATUS.chips(Object.assign({},base,{cr:{on:false},folder:{state:"denied"}})),absent=STATUS.chips(Object.assign({},base)),sav=STATUS.chips(Object.assign({},base,{cr:Object.assign({},on,{fail:1,err:"quota",wake:false})}));
+    return{ok:t(den)==="REC run, chunk 3 | save folder needs OK"&&den[1].tone==="bad"&&/Allow/.test(den[1].title)&&t(fail)==="REC run, chunk 3 | last save failed"&&/disk full/.test(fail[1].title)&&t(none)==="REC run, chunk 3 | no save folder"&&none[1].tone==="info"
+      &&t(ok)==="REC run, chunk 3"&&idle.length===0&&absent.length===0&&t(sav)==="REC run, chunk 3 | screen may sleep | chunk save failed"&&sav[2].tone==="bad"&&/quota/.test(sav[2].title),detail:[t(den),t(fail),t(none),t(ok),t(idle),t(absent),t(sav)].join(" // ")};
   });
   add("status: only a higher release number counts as a newer version; a dev build never asks to update",E=>{
     const n=STATUS.newer;
@@ -570,34 +533,6 @@ const READER_SELFTEST=(()=>{
   add("history: the simulated log keeps only the newest rows once it is over its cap",E=>{
     const a=[];for(let k=0;k<HIST.LOG_CAP+25;k++)HIST.push(a,{k});
     return{ok:a.length===HIST.LOG_CAP&&a[0].k===25&&a[a.length-1].k===HIST.LOG_CAP+24,detail:`${a.length} rows, first ${a[0].k}`};
-  });
-  add("autorec: an active Reader episode starts a recording in a calm market, only when the setting is on and the baseline is ready; walls are not counted; a live episode keeps it from counting as calm",E=>{
-    const A=AUTOREC,calm={ready:true,ratio:1,fast:.3},ep1={active:1,live:1},T=T0;
-    const on=A.step({mode:"waiting"},calm,T,{},ep1),off=A.step({mode:"waiting"},calm,T,{epTrig:false},ep1),none=A.step({mode:"waiting"},calm,T,{},{active:0,live:0}),cold=A.step({mode:"waiting"},{ready:false,ratio:0,fast:0},T,{},ep1),cool=A.step({mode:"waiting",until:T+60000},calm,T,{},ep1);
-    let st=on.st,stop=null;for(let m=0;m<=20&&!stop;m++){const o=A.step(st,calm,T+m*60000,{},m<8?ep1:{active:0,live:0});st=o.st;if(o.action==="stop")stop=m;}
-    const old=A.step({mode:"waiting"},calm,T,{},undefined).action;
-    return{ok:on.action==="start"&&on.why==="episode"&&off.action==null&&none.action==null&&cold.action==null&&cool.why==="cooldown"&&old==null&&stop===13,detail:`stop after minute ${stop}`};
-  });
-  add("autorec: forced flow or a stressed market (ep.col) starts a recording in a calm market, only with colTrig on, and keeps it from counting as calm; an episode takes the reason when both hold",E=>{
-    const A=AUTOREC,calm={ready:true,ratio:1,fast:.3},T=T0,col={active:0,live:0,col:true};
-    const on=A.step({mode:"waiting"},calm,T,{},col),off=A.step({mode:"waiting"},calm,T,{colTrig:false},col),both=A.step({mode:"waiting"},calm,T,{},{active:1,live:1,col:true}),cold=A.step({mode:"waiting"},{ready:false,ratio:0,fast:0},T,{},col);
-    let st=on.st,stop=null;for(let m=0;m<=20&&!stop;m++){const o=A.step(st,calm,T+m*60000,{},{active:0,live:0,col:m<6});st=o.st;if(o.action==="stop")stop=m;}
-    return{ok:on.action==="start"&&on.why==="collectors"&&off.action==null&&both.why==="episode"&&cold.action==null&&stop===11,detail:`stop after minute ${stop}`};
-  });
-  add("autorec: after a recording it stays armed but waits out the cooldown, then starts again on the next jump",E=>{
-    const A=AUTOREC,r=rng(9),h=A.createHistory(),cfg={cooldownMin:10};let px=82000,t=T0,st={mode:"waiting"};const ev=[];
-    const run=(secs,vol)=>{for(let i=0;i<secs;i++){px*=1+(r()-.5)*2*vol/1e4;t+=1000;A.push(h,t,px);if(i%5===4){const v=A.vol(h,cfg),o=A.step(st,v,t,cfg);st=o.st;if(o.action){ev.push({a:o.action,why:o.why,t});if(o.action==="stop")st=A.afterStop(t,cfg);}}}};
-    run(2400,.3);run(900,1.2);for(let g=0;g<1000&&!ev.some(x=>x.a==="stop");g++)run(5,.3);      // learn, a jump, calm until the recording stops: then the view stays armed
-    const stop=ev.find(x=>x.a==="stop"),n1=ev.length;
-    run(180,2.5);const v=A.vol(h,cfg),wouldTrigger=v.fast>=cfg.trigSigma||v.ratio>=1.8&&v.fast>=.4,blocked=ev.length===n1&&st.mode==="waiting";   // wild again 3 minutes later, inside the cooldown
-    run(600,2.5);const second=ev.filter(x=>x.a==="start")[1];                  // still wild once the cooldown is over
-    const none=A.step({mode:"waiting"},{ready:true,ratio:3,fast:2},T0,cfg).action==="start";   // a state with no cooldown starts at once
-    return{ok:!!stop&&n1===2&&wouldTrigger&&blocked&&!!second&&second.t>=stop.t+600000&&none&&A.afterStop(T0,{}).until===T0+180000&&A.afterStop(T0,{},"calm").until===T0+180000&&A.afterStop(T0,{},"max").until===T0&&A.step(A.afterStop(T0,{},"max"),{ready:true,ratio:3,fast:2},T0,{}).action==="start"&&A.step(A.afterStop(T0,{},"calm"),{ready:true,ratio:3,fast:2},T0+60000,{}).why==="cooldown",detail:JSON.stringify({n1,wouldTrigger,blocked,second:second&&(second.t-stop.t)/1000,none})};
-  });
-  add("status: auto-record shows the cooldown after a recording and how many it has made",E=>{
-    const base={connected:false,paused:false,online:true,venues:{},rec:{on:false},kept:0},t=l=>l.map(c=>c.text).join(" | ");
-    const cd=STATUS.chips(Object.assign({},base,{ar:{on:true,ready:true,mode:"waiting",wake:true,runs:1,cooldownMin:7}})),after=STATUS.chips(Object.assign({},base,{ar:{on:true,ready:true,mode:"waiting",wake:true,runs:2,cooldownMin:0}}));
-    return{ok:t(cd)==="armed · cooldown 7 min"&&t(after)==="armed · waiting · 2 recorded",detail:t(cd)+" // "+t(after)};
   });
   add("hooks: subscribers run in subscription order with the emitted arguments, a throwing one is contained, an unknown name is a no-op",E=>{
     const log=[],H=HOOKS,n="selftest-"+Math.random(),err=console.error;

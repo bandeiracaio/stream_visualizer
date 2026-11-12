@@ -75,7 +75,7 @@ function renderOverview(){
     const m = typeof colStateLive === "function" ? colStateLive() : null, el = ov$("ovState");
     if (m){
       const word = {stressed:"stressed", crowded:"crowded", unsettled:"unsettled", calm:"calm", unknown:"unknown"}[m.s], names = {V:"volatility up", L:"forced flow", F:"venues disagree", C:"crowded"};
-      const sub = m.s === "unknown" ? m.n+" of 4 indicators have a reading: start the collectors (connect, or arm auto-record)" : m.i ? m.i.split("").map(k=>names[k]).join(" · ") : "none of the four indicators fired";
+      const sub = m.s === "unknown" ? m.n+" of 4 indicators have a reading: start the collectors (connect)" : m.i ? m.i.split("").map(k=>names[k]).join(" · ") : "none of the four indicators fired";
       const chip = k => `<span class="chip" title="${typeof ST_IND !== "undefined" ? ST_IND[k] : names[k]}">${names[k]}: ${m.ind[k]===true ? "yes" : m.ind[k]===false ? "no" : "no reading"}</span>`;
       const html = `<div class="metrics"><div class="metric"><span>market now (rules v${m.v})</span><b>${word}</b><small>${sub}</small></div></div><div class="epctx">${["V","L","F","C"].map(chip).join("")}</div><div class="note">Each indicator compares the market with its own previous 30 minutes. A label, not a signal.</div>`;
       if (el.dataset.h !== html){ el.dataset.h = html; el.innerHTML = html; }
@@ -99,9 +99,9 @@ function renderOverview(){
   ov$("ovReader").innerHTML = act.length ? act.map(e=>`<div class="ovev ${e.stage}"><span class="stat">${ovSpan(Math.max(0,rs.now-e.tStart))}</span> <b>${READER_EPISODES.FAMILY_LABEL[e.family]}</b> <span class="venue v-${e.venue}">${e.venue.toUpperCase()}</span> <span class="chip">${e.horizon}</span> <span class="stg">${e.stage}</span><div class="ovevd">${e.reading}</div></div>`).join("")
     : `<div class="note" style="margin:0">${!connected ? "Not connected." : !rs.calibrated ? "Calibrating: detectors arm after about two minutes of data." : "Quiet: no active episodes."}${lastEnded ? ` Last: ${READER_EPISODES.FAMILY_LABEL[lastEnded.family].toLowerCase()} (${lastEnded.venue.toUpperCase()}) ended ${ovSpan(Math.max(0,rs.now-lastEnded.tEnd))} ago.` : ""}</div>`;
 
-  // Recording: what auto-record and a manual recording are doing, and how many are kept (read from the Recordings views' own text)
+  // Recording: what the continuous recording is doing, and how many chunks are kept
   const rcN = typeof RC !== "undefined" ? RC.rows.length : 0, mtile = (k, v) => `<div class="metric"><span>${k}</span><b>${v}</b></div>`;
-  ov$("ovRec").innerHTML = `<div class="metrics">${mtile("auto-record", ov$("arStat").textContent || "off")}${mtile("recording", ov$("rtStat").textContent || "not recording")}${mtile("saved on this device", rcN)}</div>`;
+  ov$("ovRec").innerHTML = `<div class="metrics">${mtile("recording", typeof rrShort === "function" ? rrShort().replace(/^Recording: /, "") : "off")}${mtile("saved on this device", rcN)}</div>`;
 
   // Account
   if (ACC.mode==="sim") ACC.data = simSnapshot();
