@@ -2616,7 +2616,7 @@ const EXEC = (() => {
       if (role === "x") {
         if (!pos || pos.exit) return;
         if (d.found && d.qty > 0) return gotExit(pos, d, now);
-        if (q.prev) { if (++pos.prevMiss >= pos.prevN) { fault2(pos, "unknown order state", "the exit was refused as reduce-only and no earlier exit order was found", now); pos.paperDone = pos.paperDone === undefined ? "none" : pos.paperDone; writeRow(pos, now, "failed"); pos = null; st = "idle"; } return; }
+        if (q.prev) { if (++pos.prevMiss >= pos.prevN) { if (pos.stopCid && pos.stopOk && !pos.stopTriggered) { stopFired(pos, now); return; } fault2(pos, "unknown order state", "the exit was refused as reduce-only and no earlier exit order was found", now); pos.paperDone = pos.paperDone === undefined ? "none" : pos.paperDone; writeRow(pos, now, "failed"); pos = null; st = "idle"; } return; }
         return sendExit(pos, now);      // never reached the exchange
       }
     }
@@ -2624,10 +2624,14 @@ const EXEC = (() => {
       for (const [id, p] of Array.from(pend)) if (p.due <= now) { pend.delete(id); late.set(id, p); unknown(p, now); }
       for (let i = retry.length - 1; i >= 0; i--) {
         const x = retry[i]; if (x.at > now) continue; retry.splice(i, 1);
-        if (now - x.q.since > C.unknownMs) { if (pos) { fault2(pos, "unknown order state", "order " + x.q.of + " still unknown after 5 s", now); if (x.q.role === "x" && !x.q.prev && !pos.exit && !pos.resent && pos.tries < C.exitTries) { pos.resent = true; sendExit(pos, now); } else closeAfterUnknown(now); } continue; }      // an exit that stayed unknown is sent again once (reduce-only: it cannot double-close)
+        if (now - x.q.since > C.unknownMs) { if (pos) { if (x.q.prev) pos.prevChecked = false; if (x.q.role === "k") pos.stopTriggered = false; fault2(pos, "unknown order state", "order " + x.q.of + " still unknown after 5 s", now); if (x.q.role === "x" && !x.q.prev && !pos.exit && !pos.resent && pos.tries < C.exitTries) { pos.resent = true; sendExit(pos, now); } else closeAfterUnknown(now); } continue; }      // an exit that stayed unknown is sent again once (reduce-only: it cannot double-close)
         send(Object.assign({}, x.q), now);
       }
       if (pos && st === "stopping" && !pos.stopDone && now >= pos.stopDue) { pos.stopDone = false; stopLate(pos, now); }
+    }
+    function stopFired(p, now) {      // flat on the exchange and no exit order of ours found: the resting stop must have fired. Its fill is the real exit.
+      p.stopTriggered = true; p.why = p.why && /^(time|stop|invalidate|end|gap)/.test(p.why) ? p.why : (p.why || "stop (exchange)"); note(p, "stop fired on the exchange");
+      send({ op: "lookup", role: "k", of: p.stopCid, algo: true, orig: { role: "k" }, since: now }, now);
     }
     const exitBusy = () => { for (const q of pend.values()) if (q.r.role === "x") return true; return retry.some(x => x.q.role === "x"); };
     function closeAfterUnknown(now) { if (pos && pos.entry && !pos.closing) closeNow("unknown order state", now); else if (pos && !pos.entry) { pos.closeFromPoll = true; pos.why = "unknown order state"; } }      // no fill is known: the next poll says what is held
@@ -2667,6 +2671,7 @@ const EXEC = (() => {
       }
       if (p.closing && !p.exit && !p.exitFailed && (st === "exiting" || st === "stuck") && !exitBusy()) {      // an exit that stalled (the exchange or the network was down for longer than the retries): the poll takes it up again
         if (Math.abs(net) > 1e-12) { if (p.tries < 6) { p.resent = false; sendExit(p, now); } else { p.exitFailed = true; st = "stuck"; fault2(p, "exit failed", "six exit attempts, the position is still open", now); } }
+        else if (p.stopCid && p.stopOk && !p.stopTriggered && !(p.exitCids && p.exitCids.length && !p.prevChecked)) stopFired(p, now);
         else if (p.exitCids && p.exitCids.length && !p.prevChecked) { p.prevChecked = true; p.prevMiss = 0; p.prevN = p.exitCids.length; for (const c of p.exitCids) send({ op: "lookup", role: "x", of: c, algo: false, orig: { role: "x" }, since: now, prev: true }, now); }
         return;
       }
@@ -2714,7 +2719,8 @@ const EXEC = (() => {
       const p = pend.get(id); if (p && p.r.op === "lookup" && p.r.role === "k") { pend.delete(id); return settleReply(p, res, now); }
       return reply(id, res, now);
     };
-    return { onRow, reply: replyAll, tick, start, poll: (x, now) => { if (started) reconcile(x, now, false, {}); }, kill, unkill, clearFault, drain, state, snapshot, faults: () => faults.slice(), allowed };
+    const debug = () => ({ pend: Array.from(pend.values()).map(q => q.r.op + ":" + q.r.role), retry: retry.map(x => x.q.op + ":" + x.q.role + (x.q.prev ? ":prev" : "")), pos: pos && { tries: pos.tries, prevChecked: pos.prevChecked, prevMiss: pos.prevMiss, prevN: pos.prevN, closing: pos.closing, exit: !!pos.exit, stopOk: pos.stopOk, stopTriggered: pos.stopTriggered, exitCids: pos.exitCids && pos.exitCids.length, resent: pos.resent, exitFailed: pos.exitFailed } });
+    return { debug, onRow, reply: replyAll, tick, start, poll: (x, now) => { if (started) reconcile(x, now, false, {}); }, kill, unkill, clearFault, drain, state, snapshot, faults: () => faults.slice(), allowed };
   }
 
   // Trades of the journal as the promotion rule should read them: a paper trade that was also filled on the demo exchange (mirror row, fill "demo") reads as a demo trade with the real net result and the paper one beside it.
@@ -2843,6 +2849,9 @@ const EXEC = (() => {
       ok("a network drop of 45 s across the exit: the position stays (the stop holds it), faults are raised, and once the network is back the poll sends the exit again; flat, one mirror row with the real exit", during.pos === 1 && R.flat() && R.faults.some(f => f.kind === "unknown order state") && R.rows.filter(x => x.k === "mirror" && x.status === "filled").length === 1 && R.M.state().phase === "idle", JSON.stringify([during, R.faults.map(f => f.kind), R.rows.map(x => x.status), R.X.pos, R.M.state()])); }
     { const { R, e } = hold({ beh: { "market:x#1": "silent" } }); R.run(500); R.X.netDown = R.now + 40000; R.row(exitRow(e, R.now)); R.run(70000); R.row(tradeRow(e, R.now)); R.run(1000);
       ok("an exit that DID fill, then a 40 s drop: flat on the exchange and nothing left to reduce; the poll looks up the earlier exit by client id and the row has its real fill", R.flat() && R.rows.some(x => x.k === "mirror" && x.status === "filled" && x.exitPx > 0) && R.M.state().phase === "idle", JSON.stringify([R.faults.map(f => f.kind), R.rows, R.M.state()])); }
+    { const { R, e } = hold(); R.run(500); R.X.netDown = R.now + 45000; R.row(exitRow(e, R.now)); R.run(5000); R.X.setPx(99.0, R.now); R.run(60000); R.row(tradeRow(e, R.now)); R.run(1000);
+      const m = R.rows.find(x => x.k === "mirror");
+      ok("a network drop across the exit during which the exchange STOP fires: the account is flat, the stop's fill is the real exit, the row says so and is a demo fill, faults are raised, nothing is left on the exchange", R.flat() && m && m.status === "filled" && m.fill === "demo" && m.notes.includes("stop fired on the exchange") && m.exitPx < 99.5 && R.faults.length >= 1 && R.M.state().phase === "idle", JSON.stringify([m, R.faults.map(f => f.kind), R.X.pos, R.X.stops, R.M.state(), R.M.debug()])); }
     { const { R, e } = hold({ beh: { "market:x": "reject" } }); R.run(500); R.row(exitRow(e, R.now)); R.run(3000);
       ok("an exit that always fails stops after three tries, raises a fault, keeps the stop on the exchange and waits for the user (no endless loop)", R.X.sent.filter(r => r.op === "market" && r.role === "x").length === 3 && R.faults.some(f => f.kind === "exit failed") && R.X.stops.length === 1 && R.X.pos === 1 && R.M.state().state === "fault", JSON.stringify(R.M.state())); }
     { const { R, e } = hold(); R.run(500); R.X.setPx(99.0, R.now); R.run(3200);
@@ -7573,7 +7582,7 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden && FS
 "use strict";
 // Header status (view): live chips next to Connect/Pause and the BN/HL pills (STATUS.chips, status-core.js), and the "newer version" bar.
 // Read-only: it only looks at the app's state once a second and never changes a feed, a recording or a detection. Loaded last.
-const APP_VERSION = "v148";            // "vNNN" in a release build, "dev" otherwise (build.mjs stamps it)
+const APP_VERSION = "v149";            // "vNNN" in a release build, "dev" otherwise (build.mjs stamps it)
 const SB = {latest:null, sure:false, timer:null};
 const sb$ = id => document.getElementById(id);
 sb$("ver").textContent = APP_VERSION;           // tiny version tag next to the title
