@@ -271,7 +271,7 @@ td.up{color:var(--buy)}td.dn{color:var(--sell)}
 .trck .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .trstat{font-weight:700;margin:2px 0 6px}.trstat.el{color:var(--buy)}
 .trbtns{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 4px}
-#trPromo button:disabled,#trConfirm button:disabled{opacity:.75}
+#trPromo button:disabled,#trConfirm button:disabled{opacity:.9}
 .trwhy{margin:0 0 8px}
 .trprog{display:block;color:var(--dim);font-size:11px;margin-top:2px}
 #trConfirm{margin-top:8px;background:var(--panel2);border:1px solid var(--accent);border-radius:var(--r);padding:8px}

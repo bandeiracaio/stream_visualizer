@@ -279,7 +279,7 @@ td.up{color:var(--buy)}td.dn{color:var(--sell)}
 .trck .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .trstat{font-weight:700;margin:2px 0 6px}.trstat.el{color:var(--buy)}
 .trbtns{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 4px}
-#trPromo button:disabled,#trConfirm button:disabled{opacity:.75}
+#trPromo button:disabled,#trConfirm button:disabled{opacity:.9}
 .trwhy{margin:0 0 8px}
 .trprog{display:block;color:var(--dim);font-size:11px;margin-top:2px}
 #trConfirm{margin-top:8px;background:var(--panel2);border:1px solid var(--accent);border-radius:var(--r);padding:8px}
@@ -5427,7 +5427,7 @@ function tvDetailHtml(x, ev, rows){
 }
 
 // ----- promotion (step 7): the rule's checklist, the buttons, the stage log, and the confirmation panel (promotion-core.js decides; here it is only shown and a move is asked for)
-const TV_LUCK = "With seven systems looked at every day, the chance that at least one of them passes criterion 4 (ahead of its twins) by luck alone is about 30%; the other criteria and the demo stage are there for that reason.";
+const TV_LUCK = "With seven systems looked at every day, the chance that at least one of them passes criterion 4 (ahead of at least 19 of its 20 twins) by luck alone is about 50% if they were independent (less, as they share one market); the other criteria and the demo stage are there for that reason.";
 const TV_TOUCH_WHY = "Promotion to demo and live is done on a PC: a phone can sleep or lose its connection while real orders rest on the exchange. Moving a system down works here.";
 function tvChecklist(el){
   return `<ul class="trck">${el.criteria.map(c => `<li class="${c.met ? "met" : "no"}"><span class="mk" aria-hidden="true">${c.met ? "✓" : "✗"}</span><span>${tvEsc(c.text)}<span class="sr"> (${c.met ? "met" : "not met"})</span></span></li>`).join("")}</ul>`;
@@ -6826,7 +6826,7 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden && FS
 "use strict";
 // Header status (view): live chips next to Connect/Pause and the BN/HL pills (STATUS.chips, status-core.js), and the "newer version" bar.
 // Read-only: it only looks at the app's state once a second and never changes a feed, a recording or a detection. Loaded last.
-const APP_VERSION = "v143";            // "vNNN" in a release build, "dev" otherwise (build.mjs stamps it)
+const APP_VERSION = "v144";            // "vNNN" in a release build, "dev" otherwise (build.mjs stamps it)
 const SB = {latest:null, sure:false, timer:null};
 const sb$ = id => document.getElementById(id);
 sb$("ver").textContent = APP_VERSION;           // tiny version tag next to the title

@@ -73,7 +73,7 @@ function tvDetailHtml(x, ev, rows){
 }
 
 // ----- promotion (step 7): the rule's checklist, the buttons, the stage log, and the confirmation panel (promotion-core.js decides; here it is only shown and a move is asked for)
-const TV_LUCK = "With seven systems looked at every day, the chance that at least one of them passes criterion 4 (ahead of its twins) by luck alone is about 30%; the other criteria and the demo stage are there for that reason.";
+const TV_LUCK = "With seven systems looked at every day, the chance that at least one of them passes criterion 4 (ahead of at least 19 of its 20 twins) by luck alone is about 50% if they were independent (less, as they share one market); the other criteria and the demo stage are there for that reason.";
 const TV_TOUCH_WHY = "Promotion to demo and live is done on a PC: a phone can sleep or lose its connection while real orders rest on the exchange. Moving a system down works here.";
 function tvChecklist(el){
   return `<ul class="trck">${el.criteria.map(c => `<li class="${c.met ? "met" : "no"}"><span class="mk" aria-hidden="true">${c.met ? "✓" : "✗"}</span><span>${tvEsc(c.text)}<span class="sr"> (${c.met ? "met" : "not met"})</span></span></li>`).join("")}</ul>`;
