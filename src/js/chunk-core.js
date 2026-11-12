@@ -24,13 +24,13 @@ const CHUNK = (() => {
   function pipeline(o) {
     const F = o.facts, maxMs = o.maxMs || MAX_MS, maxN = o.maxN || MAX_N, thin = thinner(o.thinMs == null ? THIN_MS : o.thinMs), cfgNow = o.cfgNow || (() => "");
     let run = null;
-    const startChunk = () => { run.rec = []; run.rows = []; run.moves = []; run.t0 = null; run.t1 = null; run.changed = []; run.cfg0 = cfgNow(); };
+    const startChunk = () => { run.rec = []; run.rows = []; run.moves = []; run.exec = []; run.t0 = null; run.t1 = null; run.changed = []; run.cfg0 = cfgNow(); };
     function emit(final, why) {
       const r = run; if (!r) return;
       if (cfgNow() !== r.cfg0 && !r.changed.includes("engine settings")) r.changed.push("engine settings");
-      if (r.rec.length || r.rows.length || r.moves.length) {
+      if (r.rec.length || r.rows.length || r.moves.length || r.exec.length) {
         const c = { kind: KIND, v: 1, sym: r.meta.sym, startedAt: r.t0 || r.meta.startedAt, run: r.meta.id, seq: r.seq, final: !!final, why: why || "cut", prevMissing: false, changed: r.changed.slice(),
-          runner: r.seq === 0 ? r.meta.runner : Object.assign({}, r.meta.runner, { carry: undefined, stages: undefined }), engineCfg: r.meta.engineCfg, lateMs: r.meta.lateMs, thinMs: r.thinMs, t0: r.t0, t1: r.t1, rows: r.rows, moves: r.moves, inputs: r.rec };
+          runner: r.seq === 0 ? r.meta.runner : Object.assign({}, r.meta.runner, { carry: undefined, stages: undefined }), engineCfg: r.meta.engineCfg, lateMs: r.meta.lateMs, thinMs: r.thinMs, t0: r.t0, t1: r.t1, rows: r.rows, moves: r.moves, exec: r.exec, inputs: r.rec };
         r.seq++; startChunk(); o.onChunk(c);
       } else startChunk();
     }
@@ -54,6 +54,7 @@ const CHUNK = (() => {
       // final: the caller stopped its runner (its closing rows are already in addRows), so a replay stops its own runner too. why: "disconnect" | "reset" | "switch" | ...
       end(final, why) { if (run) { emit(final, why || "end"); run = null; } },
       addRows(rows) { if (run && rows.length) for (const r of rows) run.rows.push(r); },
+      addExec(rows) { if (run && rows.length) for (const r of rows) run.exec.push(r); },      // step 8: mirror rows (what the demo exchange did). Recorded facts: a replay does not reproduce them and firstDiff does not read them.
       addMoves(moves) { if (run && moves.length) for (const m of moves) run.moves.push(m); },      // [{sys, to, at}] from RUNNER.driver().drain()
       touch(what) { if (run && !run.changed.includes(what)) run.changed.push(what); },
       running: () => !!run, state: () => run ? { id: run.meta.id, seq: run.seq, n: run.rec.length, t0: run.t0, t1: run.t1, rows: run.rows.length } : null,

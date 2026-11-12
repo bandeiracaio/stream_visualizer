@@ -252,6 +252,9 @@ td.up{color:var(--buy)}td.dn{color:var(--sell)}
 .trsys.sel{border-color:var(--accent)}
 .trhead{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px}
 .trname{font-weight:600;border-color:transparent;padding:2px 4px;text-align:left}.trsys.sel .trname{color:var(--accent)}
+.exkill{border-color:var(--sell);color:var(--sell);font-weight:700}
+.exkill[aria-pressed="true"]{background:var(--sell);color:var(--ink)}
+.exl{font-size:12.5px;margin-top:3px}.exl.ok span:first-child{color:var(--buy)}.exl.no span:first-child{color:var(--sell)}
 .trbadge{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;border:1px solid var(--edge);border-radius:var(--r);padding:0 6px;color:var(--text)}
 .trpos{color:var(--dim);font-size:11.5px;margin-left:auto}
 .trcells{display:grid;grid-template-columns:minmax(0,1fr);gap:3px}
@@ -301,6 +304,7 @@ canvas.trchart{width:100%;height:280px;display:block;background:var(--canvas);bo
   <button id="go" class="primary">Connect</button>
   <button id="stBtn" title="Feeds status (Binance, Hyperliquid) and cat mode" aria-expanded="false"><span class="sd" id="stBn" data-st="off">BN</span><span class="sd" id="stHl" data-st="off">HL</span></button>
   <button id="catLock" aria-pressed="false">🐱</button>
+  <button id="exKill" class="exkill" aria-pressed="false" hidden>Kill switch</button>
   <span id="accSplit" class="split"><button id="accMain" title="Account info (or connect an account)"><span class="dot"></span><b id="accLbl">Account</b><span id="accPnl"></span></button><button id="accCaret" title="Switch or connect an account" aria-label="Switch or connect an account" aria-expanded="false">▾</button></span>
   <button id="cog" title="Settings" aria-expanded="false">⚙ <span id="symLbl">BTC</span></button>
   <div id="alerts"></div>
@@ -328,6 +332,10 @@ canvas.trchart{width:100%;height:280px;display:block;background:var(--canvas);bo
         <input id="demoSecret" type="password" placeholder="Secret key" autocomplete="new-password">
         <button id="demoGo" class="primary">Connect demo</button>
         <div class="acc-msg" id="demoMsg"></div>
+        <p style="margin-top:10px">Demo execution (Trader): a system in the demo stage sends its trades here, with a stop resting on the exchange. It needs this check to pass first (valid 24 hours). The check places a minimum-size order and closes it again.</p>
+        <button id="exCheckGo">Run connection check</button>
+        <div class="acc-msg" id="exCheckMsg"></div>
+        <div id="exCheckOut"></div>
       </div>
       <div class="acc-card live">
         <h3>Binance live — real money</h3>
@@ -378,7 +386,7 @@ canvas.trchart{width:100%;height:280px;display:block;background:var(--canvas);bo
 
 <main id="main">
   <section data-tab="overview" class="full" id="trHome">
-    <h2>Trader <span class="ctl"><label class="ctl"><input type="checkbox" id="trOn"> run</label><button id="trExport">Export</button><button id="trReset">Reset</button></span></h2>
+    <h2>Trader <span class="ctl"><label class="ctl"><input type="checkbox" id="trOn"> run</label><button id="exFaultClear" hidden>Clear fault</button><button id="trExport">Export</button><button id="trReset">Reset</button></span></h2>
     <div id="trStat" class="note" style="margin-top:0"></div>
     <div id="trRows"></div>
     <div id="trDetail" hidden></div>
@@ -2052,13 +2060,13 @@ const CHUNK = (() => {
   function pipeline(o) {
     const F = o.facts, maxMs = o.maxMs || MAX_MS, maxN = o.maxN || MAX_N, thin = thinner(o.thinMs == null ? THIN_MS : o.thinMs), cfgNow = o.cfgNow || (() => "");
     let run = null;
-    const startChunk = () => { run.rec = []; run.rows = []; run.moves = []; run.t0 = null; run.t1 = null; run.changed = []; run.cfg0 = cfgNow(); };
+    const startChunk = () => { run.rec = []; run.rows = []; run.moves = []; run.exec = []; run.t0 = null; run.t1 = null; run.changed = []; run.cfg0 = cfgNow(); };
     function emit(final, why) {
       const r = run; if (!r) return;
       if (cfgNow() !== r.cfg0 && !r.changed.includes("engine settings")) r.changed.push("engine settings");
-      if (r.rec.length || r.rows.length || r.moves.length) {
+      if (r.rec.length || r.rows.length || r.moves.length || r.exec.length) {
         const c = { kind: KIND, v: 1, sym: r.meta.sym, startedAt: r.t0 || r.meta.startedAt, run: r.meta.id, seq: r.seq, final: !!final, why: why || "cut", prevMissing: false, changed: r.changed.slice(),
-          runner: r.seq === 0 ? r.meta.runner : Object.assign({}, r.meta.runner, { carry: undefined, stages: undefined }), engineCfg: r.meta.engineCfg, lateMs: r.meta.lateMs, thinMs: r.thinMs, t0: r.t0, t1: r.t1, rows: r.rows, moves: r.moves, inputs: r.rec };
+          runner: r.seq === 0 ? r.meta.runner : Object.assign({}, r.meta.runner, { carry: undefined, stages: undefined }), engineCfg: r.meta.engineCfg, lateMs: r.meta.lateMs, thinMs: r.thinMs, t0: r.t0, t1: r.t1, rows: r.rows, moves: r.moves, exec: r.exec, inputs: r.rec };
         r.seq++; startChunk(); o.onChunk(c);
       } else startChunk();
     }
@@ -2082,6 +2090,7 @@ const CHUNK = (() => {
       // final: the caller stopped its runner (its closing rows are already in addRows), so a replay stops its own runner too. why: "disconnect" | "reset" | "switch" | ...
       end(final, why) { if (run) { emit(final, why || "end"); run = null; } },
       addRows(rows) { if (run && rows.length) for (const r of rows) run.rows.push(r); },
+      addExec(rows) { if (run && rows.length) for (const r of rows) run.exec.push(r); },      // step 8: mirror rows (what the demo exchange did). Recorded facts: a replay does not reproduce them and firstDiff does not read them.
       addMoves(moves) { if (run && moves.length) for (const m of moves) run.moves.push(m); },      // [{sys, to, at}] from RUNNER.driver().drain()
       touch(what) { if (run && !run.changed.includes(what)) run.changed.push(what); },
       running: () => !!run, state: () => run ? { id: run.meta.id, seq: run.seq, n: run.rec.length, t0: run.t0, t1: run.t1, rows: run.rows.length } : null,
@@ -2415,6 +2424,449 @@ const PROMO = (() => {
   }
 
   return { RULE, DAY, STAGES, stageOf, stages, since, edgeOf, capOf, eligibility, lossLimit, apply, selftest };
+})();
+
+</script>
+<script id="exec-core">
+// Execution core (Trader step 8): mirrors the paper rows of a demo-stage system onto the Binance DEMO account. Pure: no DOM, timers, storage, network or clock; the time is handed in, requests are returned
+// (drain()) and the exchange's answers are handed back (reply()). Nothing here decides a trade: it follows the runner's journal rows (enter, then exit / invalidate, then trade) and never feeds anything back.
+// Spec: .scratch/trader/spec.md section 7, prompt prompts/08-demo-execution.md.   Words: mirror, fault, kill switch (CONTEXT.md).
+// One machine per asset (the account nets one position per asset, so one system holds it at a time).
+// Requests (all carry id, role): {op:"market", role:"e"|"x", side, qty, qtyStr, reduce, cid}   {op:"stop", role:"s", side, qty, qtyStr, stopPx, stopStr, cid}   {op:"cancel", role:"c", cid, algo}
+//   {op:"lookup", role, of: cid, algo}   (the state of an order by its client id). Answers: {ok:true, data} | {ok:false, unknown:true, err} (no answer: timeout, dropped) | {ok:false, err, code} (the exchange said no).
+//   data of a fill: {px, qty, fee (USDT), t, status}; of a lookup: {found, status, px, qty, fee, t}.
+// Exchange state handed in (start(), poll()): {t, positions: [signed qty ...], orders: [{cid, algo}] (every open regular and algo order on the asset)}.
+// Guards handed in with an enter row: {quoteAgeMs, offsetMs, oneWay, readOk, step, tick, minQty, minNotional}.
+// Rows written: {k:"mirror", sys, pid, t, status: "filled"|"paper"|"failed"|"interrupted", fill: "demo"|"paper", dir, qty, entryPx, exitPx, fees, feesBps, netBps, paperNetBps, entrySlipBps, exitSlipBps (positive = worse than paper),
+//   entryDelayMs, exitDelayMs, exitReason, lateMs, notes: [...]}. A refused entry writes a mirror row at once (status "paper", the reason in notes): the trade stays a paper trade.
+const EXEC = (() => {
+  "use strict";
+  const DEMO_BASE = "https://demo-fapi.binance.com", LIVE_BASE = "https://fapi.binance.com";
+  const ALLOW_LIVE = false;      // the live path stays closed until step 9
+  const C = { prefix: "svx_", capUsd: 5000, quoteMs: 3000, offsetMs: 1000, stopMs: 3000, unknownMs: 5000, reqMs: 8000, lateMs: 5000, exitTries: 3, retryMs: 1000 };
+  const hash36 = s => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return (h >>> 0).toString(36); };
+  const allowedBase = b => b === DEMO_BASE || (ALLOW_LIVE && b === LIVE_BASE);
+  const decOf = x => { const s = Number(x).toString(); if (s.includes("e-")) return +s.split("e-")[1]; return (s.split(".")[1] || "").length; };
+  const floorStep = (v, step) => Math.floor(v / step + 1e-9) * step;
+  const toStr = (v, step) => v.toFixed(decOf(step));
+  const gone = r => /-2011|-2013|unknown order|no such order/i.test(String(r.err || "") + String(r.code || ""));
+
+  function create(o) {
+    const allowed = allowedBase(o.base), saved = o.saved || {};
+    let st = "idle", pos = null, started = false, blockWhy = "", faultWhy = "", killed = !!saved.killed, seq = 0, nCid = 0, now0 = 0;
+    const reqs = [], rows = [], newFaults = [], faults = (saved.faults || []).slice(), pend = new Map(), late = new Map(), retry = [], paperTr = new Map(), cidOf = {};
+    const send = (r, now, ms) => { if (!allowed) return 0; r.id = ++seq; reqs.push(r); const p = { r, due: now + (ms || C.reqMs) }; pend.set(r.id, p); return r.id; };
+    const mkCid = (p, role) => C.prefix + hash36(p.sys || "?") + "_" + (p.t0 || 0).toString(36) + "_" + role + (++nCid);
+    const note = (p, n) => { if (!p.notes.includes(n)) p.notes.push(n); };
+
+    function fault(kind, text, now) {
+      const f = { t: now, kind, text: String(text || "") }; faults.push(f); newFaults.push(f); faultWhy = kind;
+      closeNow("fault: " + kind, now);
+    }
+    // close what is the page's own at market, once; a position still being entered is closed as soon as its fill is known
+    function closeNow(why, now) {
+      const p = pos; if (!p) return;
+      if (p.closing) return;
+      if (st === "entering") { p.closeAsap = p.closeAsap || why; return; }
+      if (p.exitFailed || p.exit) return;
+      p.closing = true; p.why = p.why || why; if (st !== "settling") st = "exiting";
+      sendExit(p, now);
+    }
+    function sendExit(p, now) {
+      p.tries = (p.tries || 0) + 1;
+      if (p.tries > 1) note(p, "exit retried");
+      const cid = mkCid(p, "x"); send({ op: "market", role: "x", side: (p.closeSide || (p.dir > 0 ? "SELL" : "BUY")), qty: p.qty, qtyStr: p.qtyStr || String(p.qty), reduce: true, cid }, now);
+    }
+    function failEntry(p, why, now) {      // nothing is held: the trade stays a paper trade
+      note(p, why); writeRow(p, now, "failed"); pos = null; st = "idle";
+    }
+
+    // ---- the mirror row, written once the real exit is known and the paper trade row has been seen
+    function writeRow(p, now, status) {
+      const e = p.entry, x = p.exit, tr = p.paperDone && p.paperDone !== "none" ? p.paperDone : null;
+      const row = { k: "mirror", sys: p.sys, t: now, pid: p.pid, status, fill: "paper", dir: p.dir, notes: p.notes.slice() };
+      if (e) { row.qty = e.qty; row.entryPx = e.px; row.entryDelayMs = e.t - p.tPaper; if (p.paperPx) row.entrySlipBps = p.dir * (e.px / p.paperPx - 1) * 1e4; }
+      if (x) { row.exitPx = x.px; row.exitDelayMs = x.t - (p.tPaperExit || p.tPaper); if (tr) row.exitSlipBps = -p.dir * (x.px / tr.exitPx - 1) * 1e4; row.exitReason = p.why; }
+      if (e && x) {
+        const fees = (e.fee || 0) + (x.fee || 0), notional = e.px * e.qty;
+        row.fees = fees; row.feesBps = fees / notional * 1e4; row.netBps = p.dir * (x.px / e.px - 1) * 1e4 - row.feesBps; row.paperNetBps = tr ? tr.netBps : null;
+        if (status === "filled" && tr) row.fill = "demo";
+      }
+      if (p.lateMs) row.lateMs = p.lateMs;
+      rows.push(row);
+    }
+    function tryFinalize(now) {
+      const p = pos; if (!p || !p.exit || p.paperDone === undefined) return;
+      if (p.exitCancelPending) return;
+      const status = !p.entry && !p.leftover ? "failed" : p.leftover || p.interrupted || p.paperDone === "none" ? "interrupted" : "filled";
+      writeRow(p, now, status); pos = null; st = "idle";
+    }
+
+    // ---- entries
+    function onEnter(row, now, g) {
+      g = g || {};
+      const refuse = why => { rows.push({ k: "mirror", sys: row.sys, t: now, pid: row.pid, status: "paper", fill: "paper", dir: row.dir, notes: [why] }); };
+      if (!allowed) return refuse("not the demo account");
+      if (!started) return refuse("execution not started");
+      if (killed) return refuse("kill switch");
+      if (faultWhy) return refuse("fault not cleared");
+      if (blockWhy) return refuse("blocked: " + blockWhy);
+      if (g.readOk === false) return refuse("cannot read the exchange");
+      if (pos) return refuse("account busy");
+      if (!(g.quoteAgeMs != null && g.quoteAgeMs <= C.quoteMs)) return refuse("no Binance quote for 3 s");
+      if (!(g.offsetMs != null && Math.abs(g.offsetMs) <= C.offsetMs)) return refuse("clock offset over 1 s");
+      if (g.oneWay !== true) return refuse("not one-way position mode");
+      const raw = Math.min(row.qty, C.capUsd / row.px), capped = row.qty * row.px > C.capUsd, qty = floorStep(raw, g.step);
+      if (!(qty >= g.minQty) || (g.minNotional && qty * row.px < g.minNotional)) return refuse("below the exchange minimum");
+      const p = { sys: row.sys, pid: row.pid, dir: row.dir, qty, qtyStr: toStr(qty, g.step), tPaper: row.t, paperPx: row.px, t0: row.t, step: g.step, stopBps: row.stopBps, tick: g.tick, notes: [] };
+      if (capped) note(p, "capped");
+      pos = p; st = "entering";
+      p.entryCid = mkCid(p, "e"); send({ op: "market", role: "e", side: p.dir > 0 ? "BUY" : "SELL", qty, qtyStr: p.qtyStr, reduce: false, cid: p.entryCid }, now);
+    }
+    function gotEntry(p, d, now) {
+      if (p.entryDone) return; p.entryDone = true;
+      if (!(d && d.qty > 0)) return failEntry(p, "entry not filled", now);
+      if (d.qty < p.qty - 1e-12) note(p, "partial fill");
+      p.entry = { px: d.px, qty: d.qty, fee: d.fee || 0, t: d.t != null ? d.t : now }; p.qty = d.qty; p.qtyStr = toStr(d.qty, p.step);
+      if (p.closeAsap) { st = "holding"; p.closing = false; return closeNow(p.closeAsap, now); }
+      st = "stopping"; p.stopDue = now + C.stopMs;
+      const sp = p.dir > 0 ? p.entry.px * (1 - p.stopBps / 1e4) : p.entry.px * (1 + p.stopBps / 1e4), tick = p.tick || 0.01;
+      p.stopPx = Math.round(sp / tick) * tick; p.stopCid = mkCid(p, "s");
+      send({ op: "stop", role: "s", side: p.dir > 0 ? "SELL" : "BUY", qty: p.qty, qtyStr: p.qtyStr, stopPx: p.stopPx, stopStr: p.stopPx.toFixed(decOf(tick)), cid: p.stopCid }, now);
+    }
+    function gotStop(p, now) {
+      if (p.stopDone) return; p.stopDone = true; p.stopOk = true; p.stopAt = now;
+      if (st === "stopping") st = "holding";
+      if (p.closing || p.exit) { p.stopCancelled = false; cancelStop(p, now); }      // a stop that was confirmed late, after the position was already being closed
+    }
+    function stopFailed(p, text, now) {
+      if (p.stopDone) return; p.stopDone = true; note(p, "stop rejected");
+      fault("stop rejected", text, now);
+    }
+    function cancelStop(p, now) { if (!p.stopCid) return; p.exitCancelPending = true; send({ op: "cancel", role: "c", cid: p.stopCid, algo: true }, now); }
+    function gotExit(p, d, now) {
+      if (p.exit) return; p.exit = { px: d.px, qty: d.qty, fee: d.fee || 0, t: d.t != null ? d.t : now };
+      if (p.stopCid && !p.stopTriggered) cancelStop(p, now);      // also when the stop answer never came: the cancel of an order that is not there is tolerated (gone())
+      tryFinalize(now);
+    }
+
+    // ---- an answer
+    function reply(id, res, now) {
+      let p = pend.get(id), wasLate = false;
+      if (p) pend.delete(id); else { p = late.get(id); if (!p) return; wasLate = true; late.delete(id); }
+      const r = p.r, role = r.role;
+      if (r.op === "lookup") return lookupReply(p, res, now);
+      if (res.ok === false && res.unknown) { late.set(id, p); return unknown(p, now); }
+      if (wasLate && !pos) return;
+      if (role === "e") {
+        if (!pos || pos.entryDone) return;
+        if (res.ok) return gotEntry(pos, res.data, now);
+        return failEntry(pos, "entry rejected: " + (res.err || ""), now);
+      }
+      if (role === "s") {
+        if (!pos) { if (res.ok) send({ op: "cancel", role: "c", cid: r.cid, algo: true, recon: true }, now); return; }
+        if (res.ok) return gotStop(pos, now);
+        return stopFailed(pos, res.err, now);
+      }
+      if (role === "x") {
+        if (!pos) return;
+        if (res.ok) return gotExit(pos, res.data, now);
+        // the exchange said no: with no position left (reduce-only refused) the stop probably fired; the next poll tells. Otherwise try again, up to the limit.
+        if (pos.tries >= C.exitTries) { pos.exitFailed = true; st = "stuck"; return fault("exit failed", res.err, now); }
+        if (pos.tries === 1) { fault2(pos, "exit needed more than one attempt", res.err, now); }
+        return sendExit(pos, now);
+      }
+      if (role === "c") {
+        if (r.recon) return;
+        if (!pos) return;
+        if (!res.ok && !gone(res)) fault2(pos, "unknown order state", "cancel of the stop: " + (res.err || ""), now);
+        pos.exitCancelPending = false; tryFinalize(now);
+      }
+    }
+    function fault2(p, kind, text, now) { const f = { t: now, kind, text: String(text || "") }; faults.push(f); newFaults.push(f); faultWhy = kind; }
+    // no answer (timeout, dropped): ask the exchange by client id; a state still unknown after 5 s is a fault
+    function unknown(p, now) {
+      const r = p.r; if (r.role === "c") { if (pos) { fault2(pos, "unknown order state", "cancel of the stop timed out", now); pos.exitCancelPending = false; tryFinalize(now); } return; }
+      const q = { op: "lookup", role: r.role, of: r.cid, algo: r.role === "s", orig: r, since: p.since || now };
+      send(q, now);
+    }
+    function lookupReply(p, res, now) {
+      const q = p.r, role = q.role;
+      if (!res.ok || res.unknown) { retry.push({ q, at: now + C.retryMs }); return; }
+      const d = res.data || {};
+      if (role === "e") {
+        if (!pos || pos.entryDone) return;
+        if (d.found && d.qty > 0) return gotEntry(pos, d, now);
+        if (d.found && /NEW|PARTIAL/i.test(d.status || "") && !/EXPIRED|CANCEL|REJECT/i.test(d.status)) { retry.push({ q, at: now + C.retryMs }); return; }
+        return failEntry(pos, "entry not found on the exchange", now);
+      }
+      if (role === "s") {
+        if (!pos || pos.stopDone) return;
+        if (d.found && !/CANCEL|REJECT|EXPIRED/i.test(d.status || "")) return gotStop(pos, now);
+        return stopFailed(pos, "stop not found on the exchange", now);
+      }
+      if (role === "x") {
+        if (!pos || pos.exit) return;
+        if (d.found && d.qty > 0) return gotExit(pos, d, now);
+        return sendExit(pos, now);      // never reached the exchange
+      }
+    }
+    function tick(now) {
+      for (const [id, p] of Array.from(pend)) if (p.due <= now) { pend.delete(id); late.set(id, p); unknown(p, now); }
+      for (let i = retry.length - 1; i >= 0; i--) {
+        const x = retry[i]; if (x.at > now) continue; retry.splice(i, 1);
+        if (now - x.q.since > C.unknownMs) { if (pos) { fault2(pos, "unknown order state", "order " + x.q.of + " still unknown after 5 s", now); closeAfterUnknown(now); } continue; }
+        send(Object.assign({}, x.q), now);
+      }
+      if (pos && st === "stopping" && !pos.stopDone && now >= pos.stopDue) { pos.stopDone = false; stopLate(pos, now); }
+    }
+    function closeAfterUnknown(now) { if (pos && pos.entry && !pos.closing) closeNow("unknown order state", now); else if (pos && !pos.entry) { pos.closeFromPoll = true; pos.why = "unknown order state"; } }      // no fill is known: the next poll says what is held
+    function stopLate(p, now) {
+      if (p.closing) return;
+      note(p, "stop rejected"); fault("stop rejected or late", "no confirmation within 3 s", now);
+    }
+
+    // ---- the exchange as it is now (start: once; poll: every few seconds)
+    function start(x, now, extra) {
+      if (!allowed) return; started = true; reconcile(x, now, true, extra || {});
+    }
+    function reconcile(x, now, atStart, extra) {
+      const net = (x.positions || []).reduce((a, b) => a + b, 0), own = (x.orders || []).filter(k => k.cid && k.cid.startsWith(C.prefix)), foreign = (x.orders || []).filter(k => !(k.cid && k.cid.startsWith(C.prefix)));
+      if (atStart) {
+        if (Math.abs(net) > 0) {
+          const ownPos = own.length > 0 || !!extra.savedOpen;
+          if (!ownPos) { blockWhy = "a position on this asset that is not the page's own"; fault2({ notes: [] }, "foreign position found", blockWhy, now); return; }
+          for (const k of own) send({ op: "cancel", role: "c", cid: k.cid, algo: !!k.algo, recon: true }, now);
+          pos = { sys: extra.savedSys || "?", pid: "leftover:" + now, dir: net > 0 ? 1 : -1, qty: Math.abs(net), qtyStr: String(Math.abs(net)), tPaper: now, t0: now, notes: ["leftover own position"], leftover: true, interrupted: true, paperDone: "none", entry: null, why: "interrupted", entryDone: true, stopDone: true, closing: true, tries: 0 };
+          st = "exiting"; fault2(pos, "leftover own position found at start", "position " + net + " with " + own.length + " own order(s)", now); sendExit(pos, now); return;
+        }
+        for (const k of own) send({ op: "cancel", role: "c", cid: k.cid, algo: !!k.algo, recon: true }, now);
+      }
+      if (!pos) {      // nothing of ours is open: a foreign position or order blocks; it clears when it is gone
+        if (Math.abs(net) > 0 && !atStart) { if (!blockWhy) fault2({ notes: [] }, "foreign position found", "position " + net, now); blockWhy = "a position on this asset that is not the page's own"; }
+        else if (foreign.length) blockWhy = foreign.length + " open order(s) on this asset that are not the page's own";
+        else blockWhy = "";
+        return;
+      }
+      if (foreign.length) blockWhy = foreign.length + " open order(s) on this asset that are not the page's own"; else if (blockWhy && !/position/.test(blockWhy)) blockWhy = "";
+      const p = pos;
+      if (p.closeFromPoll) {      // an entry whose state stayed unknown: close what the exchange shows, cancel what is ours
+        p.closeFromPoll = false; for (const k of own) send({ op: "cancel", role: "c", cid: k.cid, algo: !!k.algo, recon: true }, now);
+        if (Math.abs(net) < 1e-12) { writeRow(p, now, "failed"); pos = null; st = "idle"; return; }
+        p.dir = net > 0 ? 1 : -1; p.qty = Math.abs(net); p.qtyStr = toStr(p.qty, p.step || 0.001); p.closing = true; p.entryDone = true; p.stopDone = true; p.paperDone = p.paperDone === undefined ? "none" : p.paperDone; st = "exiting"; sendExit(p, now); return;
+      }
+      if (st === "holding") {
+        if (Math.abs(net) < 1e-12) {      // flat: the exchange stop fired before the paper exit
+          st = "settling"; p.stopTriggered = true; p.why = p.why || "stop (exchange)"; note(p, "stop fired on the exchange");
+          send({ op: "lookup", role: "k", of: p.stopCid, algo: true, orig: { role: "k" }, since: now }, now); return;
+        }
+        if (Math.sign(net) !== p.dir || Math.abs(Math.abs(net) - p.qty) > Math.max(1e-9, p.qty * 1e-6)) { const was = p.dir * p.qty; p.qty = Math.abs(net); p.qtyStr = toStr(p.qty, p.step || 0.001); p.closeSide = net > 0 ? "SELL" : "BUY"; fault("position differs from what the page believes", "page " + was + ", exchange " + net, now); return; }
+        if (p.stopOk && p.stopAt != null && x.t > p.stopAt + 1500 && !own.some(k => k.cid === p.stopCid)) { fault("position differs from what the page believes", "the stop order is not on the exchange", now); }
+      }
+    }
+    // lookup of the fired stop (role "k"): its fill is the real exit
+    function settleReply(p, res, now) {
+      if (!pos) return;
+      const d = res.data || {};
+      if (res.ok && d.found && d.qty > 0) { pos.stopOk = false; gotExit(pos, d, now); return; }
+      retry.push({ q: p.r, at: now + C.retryMs });
+    }
+
+    // ---- the journal rows of the runner
+    function onRow(row, now, g) {
+      if (row.k === "enter" && row.stage === "demo") return onEnter(row, now, g);
+      if (row.k === "trade") {
+        if (pos && row.pid === pos.pid) { pos.paperDone = row.interrupted ? "none" : row; if (row.interrupted) { pos.interrupted = true; closeNow("interrupted", now); } tryFinalize(now); }
+        return;
+      }
+      if ((row.k === "exit" || row.k === "invalidate") && pos && row.pid === pos.pid) {
+        pos.tPaperExit = row.t; const l = now - row.t; if (l > C.lateMs) { pos.lateMs = l; note(pos, "late exit"); }
+        pos.why = pos.why || row.reason; closeNow(row.reason, now);
+      }
+    }
+    function kill(now) { killed = true; if (pos) closeNow("kill switch", now); }
+    function unkill() { killed = false; }
+    function clearFault() { faultWhy = ""; }
+    function drain() { const r = { reqs: reqs.splice(0), rows: rows.splice(0), faults: newFaults.splice(0) }; return r; }
+    function state() {
+      const s = !allowed || !started ? "off" : killed ? "killed" : faultWhy ? "fault" : blockWhy ? "blocked" : pos ? "holding" : "ready";
+      return { state: s, why: !allowed ? "not the demo account" : !started ? "not started" : killed ? "kill switch on" : faultWhy || blockWhy, phase: st, faults: faults.length, pos: pos ? { sys: pos.sys, pid: pos.pid, dir: pos.dir, qty: pos.qty, phase: st } : null, killed };
+    }
+    // what to keep across a reload (the page stores it): the kill switch, the fault log, and whether a position was open
+    const snapshot = () => ({ killed, faults: faults.slice(), open: pos ? { sys: pos.sys, pid: pos.pid } : null });
+    // settle replies (role "k") go through the same door
+    const replyAll = (id, res, now) => {
+      const p = pend.get(id); if (p && p.r.op === "lookup" && p.r.role === "k") { pend.delete(id); return settleReply(p, res, now); }
+      return reply(id, res, now);
+    };
+    return { onRow, reply: replyAll, tick, start, poll: (x, now) => { if (started) reconcile(x, now, false, {}); }, kill, unkill, clearFault, drain, state, snapshot, faults: () => faults.slice(), allowed };
+  }
+
+  // Trades of the journal as the promotion rule should read them: a paper trade that was also filled on the demo exchange (mirror row, fill "demo") reads as a demo trade with the real net result and the paper one beside it.
+  // The recorded paper rows are not changed (a replay reproduces them exactly); this is a view.
+  function merge(rows) {
+    const m = new Map(); for (const r of rows) if (r.k === "mirror" && r.fill === "demo" && typeof r.netBps === "number") m.set(r.pid, r);
+    if (!m.size) return rows;
+    return rows.map(r => { if (r.k !== "trade" || r.interrupted) return r; const x = m.get(r.pid); if (!x) return r; return Object.assign({}, r, { fill: "demo", paperNetBps: r.netBps, netBps: x.netBps, R: x.netBps / r.stopBps, usd: x.netBps / 1e4 * r.notional }); });
+  }
+
+  // ---------- self-test: a fake exchange and the scenarios exec:* ----------
+  function selftest() {
+    const res = [], ok = (name, c, detail) => res.push({ name: "exec:" + name, ok: !!c, detail: c ? "" : String(detail || "") });
+    const G = { quoteAgeMs: 100, offsetMs: 10, oneWay: true, step: 0.001, tick: 0.1, minQty: 0.001, minNotional: 5 };
+    // The fake exchange. S.px is the market price; behaviours: S.beh[key] = "reject" | "lost" (not executed, no answer) | "silent" (executed, no answer) | {slow: ms} (executed, answered late)
+    // key: op + role, with an optional "#n" for the nth request of that kind (1-based).
+    function fx(over) {
+      const S = Object.assign({ px: 100, pos: 0, stops: [], book: {}, foreign: [], beh: {}, count: {}, partial: 1, slip: 0.05, sent: [], dual: false, queue: [], log: [] }, over);
+      const fill = (side, qty, px) => { S.pos += side === "BUY" ? qty : -qty; return { px, qty, fee: px * qty * 0.0005, t: S.now, status: "FILLED" }; };
+      S.exec = (r, now) => {
+        S.now = now; S.sent.push(r); const k = r.op + ":" + r.role, n = S.count[k] = (S.count[k] || 0) + 1, b = S.beh[k + "#" + n] || S.beh[k];
+        const answer = (a, delay) => S.queue.push({ at: now + (delay || 50), id: r.id, a });
+        if (b === "lost") return;
+        let a;
+        if (r.op === "market") {
+          if (r.reduce && (S.pos === 0 || Math.sign(S.pos) === (r.side === "BUY" ? 1 : -1))) a = { ok: false, code: -2022, err: "-2022 ReduceOnly rejected" };
+          else if (b === "reject") a = { ok: false, code: -4003, err: "-4003 quantity less than zero" };
+          else { const q = r.reduce ? Math.min(r.qty, Math.abs(S.pos)) : r.qty * S.partial, px = r.side === "BUY" ? S.px + S.slip : S.px - S.slip; const f = fill(r.side, q, px); S.book[r.cid] = f; a = { ok: true, data: f }; }
+        } else if (r.op === "stop") {
+          const bad = r.side === "SELL" ? r.stopPx >= S.px : r.stopPx <= S.px;
+          if (b === "reject" || bad) a = { ok: false, code: -2021, err: "-2021 Order would immediately trigger" };
+          else { S.stops.push({ cid: r.cid, side: r.side, qty: r.qty, trig: r.stopPx }); a = { ok: true, data: {} }; }
+        } else if (r.op === "cancel") {
+          const i = S.stops.findIndex(s => s.cid === r.cid); if (i >= 0) { S.stops.splice(i, 1); a = { ok: true, data: {} }; } else a = { ok: false, code: -2011, err: "-2011 Unknown order sent" };
+          if (b === "reject") a = { ok: false, code: -1000, err: "-1000 internal error" };
+        } else if (r.op === "lookup") {
+          const s = S.stops.find(x => x.cid === r.of), f = S.book[r.of];
+          a = f ? { ok: true, data: Object.assign({ found: true }, f) } : s ? { ok: true, data: { found: true, status: "NEW" } } : { ok: true, data: { found: false } };
+          if (b === "reject") a = { ok: false, unknown: true, err: "timeout" };
+        }
+        if (b === "silent") return;
+        answer(a, b && b.slow);
+      };
+      S.setPx = (px, now) => { S.px = px; S.now = now; for (const s of S.stops.slice()) if (s.side === "SELL" ? px <= s.trig : px >= s.trig) { S.stops.splice(S.stops.indexOf(s), 1); const f = fill(s.side, s.qty, s.trig - (s.side === "SELL" ? S.slip : -S.slip)); S.book[s.cid] = Object.assign({}, f, { status: "TRIGGERED" }); } };
+      S.snap = now => ({ t: now, positions: S.pos === 0 ? [] : [S.pos], orders: S.stops.map(s => ({ cid: s.cid, algo: true })).concat(S.foreign) });
+      return S;
+    }
+    const enter = (o, sys) => Object.assign({ k: "enter", sys: sys || "A", t: 1000, pid: (sys || "A") + ":1000", dir: 1, px: 100, qty: 1, notional: 100, stopBps: 50, thesis: "x", stage: "demo", fill: "paper" }, o);
+    const exitRow = (e, t, why) => ({ k: "exit", sys: e.sys, t, pid: e.pid, reason: why || "time" });
+    const tradeRow = (e, t, o) => Object.assign({ k: "trade", sys: e.sys, t, pid: e.pid, tIn: e.t, tOut: t, dir: e.dir, qty: e.qty, notional: e.notional, entryPx: e.px, exitPx: 100.2, grossBps: 20, feesBps: 10, netBps: 10, R: 0.2, usd: 0.1, stopBps: e.stopBps, reason: "time", stage: "demo", fill: "paper" }, o);
+    // the driver: advances time in 100 ms steps, ships requests to the fake exchange, hands answers back, polls every 3 s
+    function rig(over, mopts) {
+      const X = fx(over), M = create(Object.assign({ base: DEMO_BASE }, mopts)), R = { X, M, now: 0, rows: [], faults: [], poll: true, reqs: [] };
+      R.pump = now => { const d = M.drain(); for (const r of d.rows) R.rows.push(r); for (const f of d.faults) R.faults.push(f); for (const q of d.reqs) { R.reqs.push(q); X.exec(q, now); } return d; };
+      R.run = ms => { const end = R.now + ms; while (R.now < end) { R.now += 100; R.pump(R.now); for (const q of X.queue.filter(z => z.at <= R.now)) { X.queue.splice(X.queue.indexOf(q), 1); M.reply(q.id, q.a, R.now); } M.tick(R.now); R.pump(R.now); if (R.poll && R.now % 3000 === 0) { M.poll(X.snap(R.now), R.now); R.pump(R.now); } } };
+      R.start = (extra) => { M.start(X.snap(R.now), R.now, extra); R.pump(R.now); R.run(1000); };
+      R.row = (r, g) => { M.onRow(r, R.now, g === undefined ? G : g); R.pump(R.now); };
+      R.flat = () => X.pos === 0 && X.stops.length === 0;
+      return R;
+    }
+    const happy = (over, mopts) => { const R = rig(over, mopts); R.now = 1000; R.start(); const e = enter(); R.row(e); R.run(1000); return { R, e }; };
+
+    // ----- the working path
+    { const { R, e } = happy(); const st = R.M.state();
+      ok("a demo entry: market buy, then a reduce-only stop at the stop price from the REAL fill, state holding", R.X.pos === 1 && R.X.stops.length === 1 && Math.abs(R.X.stops[0].trig - Math.round(100.05 * (1 - 0.005) / 0.1) * 0.1) < 1e-9 && R.X.sent[0].op === "market" && R.X.sent[0].reduce === false && R.X.sent[1].op === "stop" && st.state === "holding", JSON.stringify([R.X.stops, st]));
+      ok("every order carries the page's prefix, the system and the position", R.X.sent.every(r => r.cid.startsWith("svx_") && r.cid.length <= 36) && new Set(R.X.sent.map(r => r.cid)).size === R.X.sent.length, R.X.sent.map(r => r.cid).join(" "));
+      R.run(2500); R.row(exitRow(e, R.now, "time")); R.run(1000); R.row(tradeRow(e, R.now)); R.run(500);
+      const m = R.rows.find(x => x.k === "mirror" && x.pid === e.pid);
+      ok("the exit is a reduce-only market order; the stop is cancelled only after the exit is filled; the position ends flat", R.flat() && R.X.sent.filter(r => r.op === "market").length === 2 && R.X.sent[2].reduce === true && R.X.sent[3].op === "cancel" && R.M.state().state === "ready", JSON.stringify(R.X.sent.map(r => r.op + r.role)));
+      ok("the mirror row: both real fills, fees, slip against the paper fill (buy at 100.05 against 100: 5 bps), delays, fill demo", m && m.status === "filled" && m.fill === "demo" && Math.abs(m.entrySlipBps - 5) < 1e-6 && m.entryDelayMs >= 0 && m.exitDelayMs >= 0 && m.fees > 0 && typeof m.netBps === "number" && m.paperNetBps === 10, JSON.stringify(m));
+      const mg = merge(R.rows.concat([tradeRow(e, 4000)])).find(x => x.k === "trade");
+      ok("merge: the paper trade reads as a demo trade with the real net result and the paper one beside it; the stored rows are not changed", mg.fill === "demo" && mg.paperNetBps === 10 && mg.netBps === m.netBps && tradeRow(e, 4000).fill === "paper"); }
+    // ----- never on a non-demo account
+    { const R = rig({}, { base: "https://fapi.binance.com" }); R.now = 1000; R.start(); R.row(enter()); R.run(1000);
+      ok("no request is ever produced when the account is not the demo one (live host, mode name irrelevant)", R.reqs.length === 0 && R.X.pos === 0 && R.M.state().state === "off");
+      const R2 = rig({}, { base: "https://demo-fapi.binance.com.evil.example" }); R2.now = 1000; R2.start(); R2.row(enter()); R2.run(1000); ok("a look-alike host is refused too", R2.reqs.length === 0); }
+    // ----- entry blocks (the paper trade goes on, the note says why)
+    const blocked = (name, g, setup, why) => { const R = rig(); R.now = 1000; R.start(); if (setup) setup(R); R.row(enter(), g); R.run(500); const m = R.rows.find(x => x.k === "mirror");
+      ok("block: " + name, R.reqs.length === (setup && setup.keep ? R.reqs.length : 0) && m && m.status === "paper" && m.fill === "paper" && m.notes[0].includes(why), JSON.stringify(m)); };
+    blocked("no Binance quote for 3 s", Object.assign({}, G, { quoteAgeMs: 3500 }), null, "quote");
+    blocked("clock offset above 1 s", Object.assign({}, G, { offsetMs: 1500 }), null, "clock");
+    blocked("not in one-way position mode", Object.assign({}, G, { oneWay: false }), null, "one-way");
+    blocked("size below the exchange minimum after rounding", Object.assign({}, G, { minQty: 5 }), null, "minimum");
+    blocked("the page cannot read the exchange (the poll fails)", Object.assign({}, G, { readOk: false }), null, "cannot read");
+    blocked("the kill switch is on", G, R => R.M.kill(R.now), "kill switch");
+    { const R = rig(); R.now = 1000; R.row(enter()); ok("block: execution not started yet (no read of the exchange)", R.rows[0].notes[0].includes("not started")); }
+    { const R = rig(); R.now = 1000; R.start(); R.M.start({ positions: [], orders: [] }, R.now); R.row(enter(), Object.assign({}, G, { quoteAgeMs: null })); ok("block: an unknown quote age counts as no quote", R.rows[0].notes[0].includes("quote")); }
+    { const { R, e } = happy(); const e2 = enter({ sys: "B", pid: "B:2000", t: 2000 }); R.row(e2); R.run(500);
+      const m = R.rows.find(x => x.k === "mirror" && x.sys === "B");
+      ok("one exchange position at a time: a second system's entry is not sent, counts as a paper fill, note account busy", m && m.notes[0] === "account busy" && m.fill === "paper" && R.X.sent.filter(r => r.op === "market").length === 1); }
+    { const { R } = happy(); const R2 = rig(); R2.now = 1000; R2.start(); R2.row(enter({ qty: 100, px: 100, notional: 10000 })); R2.run(1000);
+      ok("size is capped at 5,000 notional per trade and the trade says capped", R2.X.pos === 50 && R2.X.sent[0].qty === 50 && R2.M.state().state === "holding"); R2.row(exitRow(enter({ qty: 100 }), 2000)); R2.run(1000); R2.row(tradeRow(enter({ qty: 100 }), 2100)); R2.run(500);
+      const m = R2.rows.find(x => x.k === "mirror" && x.status === "filled"); ok("the mirror row of a capped trade says capped", m && m.notes.includes("capped"), JSON.stringify(m)); }
+    // ----- rule 3: the stop
+    { const R = rig({ beh: { "stop:s": "reject" } }); R.now = 1000; R.start(); const e = enter(); R.row(e); R.run(1500);
+      ok("a rejected stop: the position is closed at market at once, a fault is logged, new entries are blocked", R.flat() && R.faults.length === 1 && /stop rejected/.test(R.faults[0].kind) && R.M.state().state === "fault" && R.X.sent.filter(r => r.op === "market").length === 2, JSON.stringify([R.faults, R.X.pos]));
+      R.row(tradeRow(e, R.now)); R.run(500); const m = R.rows.find(x => x.k === "mirror" && x.status === "filled"); ok("...and the trade is recorded with the reason stop rejected", m && m.notes.includes("stop rejected") && m.exitReason.includes("stop rejected"), JSON.stringify(m));
+      const R3 = rig(); R3.now = 1000; R3.start(); R3.M.clearFault(); ok("clearing a fault by the user lets entries through again", R.M.clearFault() === undefined && (R.M.clearFault(), R.M.state().state === "ready")); }
+    { const R = rig({ beh: { "stop:s": "silent" } }); R.now = 1000; R.start(); R.row(enter()); R.run(5000);
+      ok("a stop not confirmed within 3 seconds: the position is closed at market", R.flat() && R.faults.length >= 1 && /stop/.test(R.faults[0].kind), JSON.stringify(R.faults)); }
+    { const R = rig({ beh: { "stop:s": { slow: 6000 } } }); R.now = 1000; R.start(); R.row(enter()); R.run(9000);
+      ok("a stop confirmed late, after the position was closed: the stray stop is cancelled, the account ends flat", R.flat() && R.faults.length >= 1, JSON.stringify([R.X.stops, R.X.pos, R.faults])); }
+    // ----- rule 6: unknown result
+    { const R = rig({ beh: { "market:e": "silent" } }); R.now = 1000; R.start(); R.row(enter()); R.run(10000);
+      ok("an entry with no answer is looked up by its client id: it was filled, so the machine goes on (stop placed), no fault", R.X.sent.some(r => r.op === "lookup" && r.of.startsWith("svx_")) && R.X.stops.length === 1 && R.faults.length === 0 && R.M.state().state === "holding", JSON.stringify([R.M.state(), R.faults])); }
+    { const R = rig({ beh: { "market:e": "lost" } }); R.now = 1000; R.start(); R.row(enter()); R.run(10000);
+      ok("an entry that never reached the exchange: the lookup says not found, nothing is held, no fault, the trade stays paper", R.X.pos === 0 && R.faults.length === 0 && R.M.state().state === "ready" && R.rows.some(x => x.k === "mirror" && x.status === "failed"), JSON.stringify(R.rows)); }
+    { const R = rig({ beh: { "market:e": { slow: 2000 } } }); R.now = 1000; R.start(); R.row(enter()); R.run(12000);
+      ok("an answer that arrives after the timeout does not place two stops or two entries", R.X.pos === 1 && R.X.stops.length === 1 && R.X.sent.filter(r => r.op === "market").length === 1, JSON.stringify(R.X.sent.map(r => r.op + r.role))); }
+    { const R = rig({ beh: { "market:e": "silent", "lookup:e": "reject" } }); R.now = 1000; R.start(); R.row(enter()); R.run(20000);
+      ok("a state still unknown after 5 seconds: fault, own position closed, entries blocked", R.faults.some(f => f.kind === "unknown order state") && R.flat() && R.M.state().state === "fault", JSON.stringify([R.faults, R.X.pos, R.X.stops])); }
+    // ----- exits
+    const hold = (over) => { const o = happy(over); return o; };
+    { const { R, e } = hold({ beh: { "market:x#1": "reject" } }); R.run(500); R.row(exitRow(e, R.now)); R.run(2000); R.row(tradeRow(e, R.now)); R.run(500);
+      ok("an exit that needed a second attempt succeeds, is a fault, and ends flat", R.flat() && R.faults.some(f => f.kind === "exit needed more than one attempt") && R.rows.some(x => x.k === "mirror" && x.fill === "demo"), JSON.stringify([R.faults, R.X.sent.map(r => r.op + r.role)])); }
+    { const { R, e } = hold({ beh: { "market:x": "reject" } }); R.run(500); R.row(exitRow(e, R.now)); R.run(3000);
+      ok("an exit that always fails stops after three tries, raises a fault, keeps the stop on the exchange and waits for the user (no endless loop)", R.X.sent.filter(r => r.op === "market" && r.role === "x").length === 3 && R.faults.some(f => f.kind === "exit failed") && R.X.stops.length === 1 && R.X.pos === 1 && R.M.state().state === "fault", JSON.stringify(R.M.state())); }
+    { const { R, e } = hold(); R.run(500); R.X.setPx(99.0, R.now); R.run(3200);
+      ok("a stop that triggers on the exchange before the paper exit: the page sees flat on its poll, reads the stop's fill as the real exit", R.X.pos === 0 && R.rows.length === 0 && R.M.state().phase !== "holding", JSON.stringify([R.M.state(), R.X.book]));
+      R.row(exitRow(e, R.now, "stop")); R.row(tradeRow(e, R.now, { reason: "stop" })); R.run(500);
+      const m = R.rows.find(x => x.k === "mirror"); ok("...and the row has the exchange stop's fill, the note, and the account is flat", m && m.status === "filled" && m.notes.includes("stop fired on the exchange") && m.exitPx < 99.5 && R.flat(), JSON.stringify(m)); }
+    { const { R, e } = hold({ partial: 0.5 }); R.run(500); R.row(exitRow(e, R.now)); R.run(1500); R.row(tradeRow(e, R.now)); R.run(500);
+      ok("a partial entry fill: the stop and the exit are sized on what was filled, the note says partial, flat at the end", R.flat() && R.X.stops.length === 0 && R.rows.some(x => x.k === "mirror" && x.notes.includes("partial fill") && x.qty === 0.5), JSON.stringify([R.rows, R.X.sent.map(r => r.qty)])); }
+    { const { R, e } = hold(); R.run(500); R.M.onRow(exitRow(e, R.now - 12000), R.now, G); R.pump(R.now); R.run(1500); R.row(tradeRow(e, R.now)); R.run(500); const m = R.rows.find(x => x.k === "mirror" && x.status === "filled");
+      ok("a late exit (the page woke 12 s after the paper exit): exited at once, lateness and the note recorded, the stop bounded the loss meanwhile", m && m.lateMs >= 12000 && m.notes.includes("late exit") && R.flat(), JSON.stringify(m)); }
+    // ----- rule 5 and faults: start, foreign, leftover
+    { const R = rig({ pos: 0.4, stops: [{ cid: "svx_zz_1_s1", side: "SELL", qty: 0.4, trig: 90 }] }); R.now = 1000; R.start({ savedOpen: true, savedSys: "A" });
+      ok("a reload with the page's own position left: its orders are cancelled, it is closed at market, recorded as interrupted with the real exit, a fault is raised, ends flat", R.flat() && R.faults.some(f => /leftover/.test(f.kind)) && R.rows.some(x => x.k === "mirror" && x.status === "interrupted"), JSON.stringify([R.rows, R.faults, R.X.pos])); }
+    { const R = rig({ pos: 0.4 }); R.now = 1000; R.start({ savedOpen: false });
+      ok("a position that is not the page's own blocks execution, is not touched, and says why", R.X.pos === 0.4 && R.X.sent.length === 0 && R.M.state().state === "fault" || (R.X.pos === 0.4 && R.X.sent.length === 0 && /not the page's own/.test(R.M.state().why)), JSON.stringify(R.M.state()));
+      R.M.clearFault(); R.row(enter()); R.run(500); ok("...and no entry is sent while it is there", R.X.sent.length === 0 && R.rows[R.rows.length - 1].notes[0].includes("blocked"), JSON.stringify(R.rows));
+      R.X.pos = 0; R.run(4000); R.row(enter({ t: 9000, pid: "A:9000" })); R.run(1000); ok("...it clears by itself when the position is gone", R.X.pos === 1, JSON.stringify(R.M.state())); }
+    { const R = rig({ foreign: [{ cid: "manual-1", algo: false }] }); R.now = 1000; R.start(); R.row(enter()); R.run(500);
+      ok("an order made by hand on the asset blocks entries and is never cancelled by the page", R.X.sent.length === 0 && R.M.state().state === "blocked" && R.rows[0].notes[0].includes("blocked")); }
+    { const R = rig({ stops: [{ cid: "svx_zz_1_s1", side: "SELL", qty: 1, trig: 90 }] }); R.now = 1000; R.start(); ok("an own order with no position is cancelled at start, no fault", R.X.stops.length === 0 && R.faults.length === 0); }
+    { const { R } = hold(); R.X.pos = 3; R.run(3500);
+      ok("the exchange position changed from outside while holding: a fault, the whole exchange position is closed", R.faults.some(f => /differs/.test(f.kind)) && R.X.pos === 0, JSON.stringify([R.faults, R.X.pos])); }
+    { const { R } = hold(); R.X.stops.length = 0; R.run(4500);
+      ok("the stop order vanished from the exchange: a fault and the position is closed", R.faults.some(f => /differs/.test(f.kind)) && R.X.pos === 0, JSON.stringify(R.faults)); }
+    // ----- the kill switch from every state
+    const killAt = (name, setup, steps) => { const R = rig(setup && setup.over); R.now = 1000; R.start(); const e = enter(); R.row(e); R.run(steps); R.M.kill(R.now); R.pump(R.now); R.run(4000);
+      ok("kill switch " + name + ": flat, no order left, entries blocked, the switch stays on", R.flat() && R.M.state().state === "killed" && R.M.snapshot().killed === true, JSON.stringify([R.X.pos, R.X.stops, R.M.state()])); return R; };
+    killAt("while the entry is in flight", { over: {} }, 0); killAt("while the stop is being placed", { over: {} }, 100); killAt("while holding", { over: {} }, 1000);
+    { const R = rig({ beh: { "market:e": { slow: 1500 } } }); R.now = 1000; R.start(); R.row(enter()); R.run(200); R.M.kill(R.now); R.pump(R.now); R.run(6000); ok("kill switch pressed while the entry answer is still on its way: the fill arrives, is closed at once, flat", R.flat() && R.X.stops.length === 0); }
+    { const { R, e } = hold(); R.run(300); R.row(exitRow(e, R.now)); R.M.kill(R.now); R.run(3000); ok("kill switch while the exit is in flight: one exit only, flat", R.flat() && R.X.sent.filter(r => r.op === "market" && r.role === "x").length === 1); }
+    { const R = rig(); R.now = 1000; R.start(); R.M.kill(R.now); R.row(enter()); R.run(500); R.M.unkill(); R.row(enter({ t: 5000, pid: "A:5000" })); R.run(1000); ok("kill switch while ready blocks entries; turned off it lets them through", R.rows[0].notes[0] === "kill switch" && R.X.pos === 1); }
+    { const R = rig({}, { saved: { killed: true } }); R.now = 1000; R.start(); R.row(enter()); R.run(300); ok("a kill switch saved by the page is still on after a reload", R.M.state().state === "killed" && R.X.sent.length === 0); }
+    // ----- a reload in every state ends flat
+    const reloadAt = (name, steps, over) => { const R = rig(over); R.now = 1000; R.start(); R.row(enter()); R.run(steps); const snap = R.M.snapshot(), X = R.X; X.queue.length = 0;
+      const R2 = rig(); R2.X = X; R2.M = create({ base: DEMO_BASE, saved: snap }); R2.pump = R.pump.bind({}); const M2 = R2.M; R2.now = R.now;
+      const pump2 = now => { const d = M2.drain(); for (const q of d.reqs) X.exec(q, now); return d; };
+      M2.start(X.snap(R2.now), R2.now, { savedOpen: !!snap.open, savedSys: snap.open && snap.open.sys }); pump2(R2.now);
+      for (let i = 0; i < 60; i++) { R2.now += 100; for (const q of X.queue.filter(z => z.at <= R2.now)) { X.queue.splice(X.queue.indexOf(q), 1); M2.reply(q.id, q.a, R2.now); } M2.tick(R2.now); pump2(R2.now); }
+      ok("a reload " + name + " ends flat with no order of the page's left", X.pos === 0 && X.stops.length === 0, JSON.stringify([X.pos, X.stops, M2.state()])); };
+    reloadAt("while the entry is in flight (answer comes back)", 50); reloadAt("while the stop is being placed", 150); reloadAt("while holding", 1500);
+    // every machine state is left by some scenario above: entering (fill, reject, lost, late), stopping (confirm, reject, late), holding (exit, stop fired, changed, kill), exiting (filled, failed), settling (stop fired), stuck (waits for the user)
+    // ----- a fault never lets a new entry through until cleared
+    { const R = rig({ beh: { "stop:s": "reject" } }); R.now = 1000; R.start(); R.row(enter()); R.run(1500); R.row(enter({ sys: "B", pid: "B:3000", t: 3000 })); const m = R.rows.filter(x => x.k === "mirror").pop();
+      ok("after a fault a new entry is refused (the paper trade goes on) until the user clears it", m.notes[0] === "fault not cleared" && R.X.sent.filter(r => r.op === "market" && r.role === "e").length === 1); }
+    // ----- other stages are ignored
+    { const R = rig(); R.now = 1000; R.start(); R.row(enter({ stage: "paper" })); R.run(300); ok("a paper-stage entry is not mirrored", R.X.sent.length === 0 && R.rows.length === 0); }
+    // ----- the interrupted paper trade (a gap or a disconnect) closes the real position too
+    { const { R, e } = hold(); R.run(300); R.row(tradeRow(e, R.now, { interrupted: true, reason: "interrupted" })); R.run(2000);
+      ok("the paper trade closed as interrupted (disconnect or gap): the real position is closed, the row says interrupted", R.flat() && R.rows.some(x => x.k === "mirror" && x.status === "interrupted"), JSON.stringify(R.rows)); }
+    return res;
+  }
+  return { create, merge, selftest, DEMO_BASE, ALLOW_LIVE, C };
 })();
 
 </script>
@@ -4182,6 +4634,35 @@ const BROKER = (() => {
       },
       async cancel(id){ await d.signed("DELETE","/fapi/v1/order",{symbol:d.sym(), orderId:String(id)}); },
       async cancelAll(){ await d.signed("DELETE","/fapi/v1/allOpenOrders",{symbol:d.sym()}); },
+      // ---- step 8 (demo execution, exec.js): client order ids, the stop on the algo endpoint, lookups by client id. Nothing above this line changed.
+      async marketCid(o){      // {side, qtyStr, reduce, cid}; RESULT so a market order answers with its fill
+        const prm = {symbol:d.sym(), side:o.side, type:"MARKET", quantity:o.qtyStr, newClientOrderId:o.cid, newOrderRespType:"RESULT"};
+        if (o.reduce) prm.reduceOnly = "true";
+        const r = await d.signed("POST","/fapi/v1/order", prm);
+        return {id:r.orderId, status:r.status, px:+r.avgPrice, qty:+r.executedQty, t:r.updateTime};
+      },
+      async stopAlgo(o){      // {side, qtyStr, stopStr, cid}: a reduce-only stop-market (conditional orders are on the algo endpoint, error -4120 on /fapi/v1/order)
+        const r = await d.signed("POST","/fapi/v1/algoOrder", {algoType:"CONDITIONAL", symbol:d.sym(), side:o.side, type:"STOP_MARKET", quantity:o.qtyStr, triggerPrice:o.stopStr, reduceOnly:"true", clientAlgoId:o.cid});
+        return {id:r.algoId, status:r.algoStatus};
+      },
+      async cancelAlgoCid(cid){ await d.signed("DELETE","/fapi/v1/algoOrder",{symbol:d.sym(), clientAlgoId:cid}); },
+      async cancelCid(cid){ await d.signed("DELETE","/fapi/v1/order",{symbol:d.sym(), origClientOrderId:cid}); },
+      async orderByCid(cid){ const r = await d.signed("GET","/fapi/v1/order",{symbol:d.sym(), origClientOrderId:cid}); return {id:r.orderId, status:r.status, px:+r.avgPrice, qty:+r.executedQty, t:r.updateTime}; },
+      async algoByCid(cid){ const r = await d.signed("GET","/fapi/v1/algoOrder",{symbol:d.sym(), clientAlgoId:cid}); return {id:r.algoId, status:r.algoStatus, px:+r.actualPrice||0, qty:+r.actualQty||0, orderId:r.actualOrderId, t:r.updateTime||r.triggerTime}; },
+      async tradesOf(orderId){      // what an order really paid: quantity, average price and commission (null when charged in something other than USDT)
+        const a = await d.signed("GET","/fapi/v1/userTrades",{symbol:d.sym(), orderId:String(orderId)});
+        if (!Array.isArray(a) || !a.length) return null;
+        let q = 0, n = 0, fee = 0, usdt = true; for (const f of a){ q += +f.qty; n += +f.qty * +f.price; fee += +f.commission; if (f.commissionAsset !== "USDT") usdt = false; }
+        return {qty:q, px:n/q, fee:usdt ? fee : null};
+      },
+      async oneWay(){ const r = await d.signed("GET","/fapi/v1/positionSide/dual"); return r.dualSidePosition === false; },
+      async netPosition(){ const r = await d.signed("GET","/fapi/v2/positionRisk",{symbol:d.sym()}); if (!Array.isArray(r)) throw new Error("unexpected response from Binance"); return r.reduce((a,p)=>a+(+p.positionAmt||0), 0); },
+      async openAll(){      // every open order on the asset, regular and algo: [{cid, algo}]. The algo list path is checked on the demo host in 8b; a failure here throws and execution is blocked.
+        const [a, b] = await Promise.all([d.signed("GET","/fapi/v1/openOrders",{symbol:d.sym()}), d.signed("GET","/fapi/v1/openAlgoOrders",{symbol:d.sym()})]);
+        const l = Array.isArray(b) ? b : (b && Array.isArray(b.orders) ? b.orders : null);
+        if (!Array.isArray(a) || !l) throw new Error("unexpected response from Binance (open orders)");
+        return a.map(o=>({cid:o.clientOrderId, algo:false})).concat(l.map(o=>({cid:o.clientAlgoId, algo:true})));
+      },
       async snapshot(){
         const sym = d.sym();
         const [bal, pos, ords, fills] = await Promise.all([
@@ -4213,6 +4694,13 @@ const BROKER = (() => {
     ok("market place params", calls[0][2]==='{"symbol":"BTCUSDT","side":"SELL","type":"MARKET","quantity":"2"}');
     calls.length = 0; await b.cancel(12);
     ok("cancel", calls[0].join(" ")==='DELETE /fapi/v1/order {"symbol":"BTCUSDT","orderId":"12"}');
+    // step 8 additions
+    calls.length = 0; await b.marketCid({side:"BUY", qtyStr:"0.002", reduce:false, cid:"svx_a_b_e1"}); await b.marketCid({side:"SELL", qtyStr:"0.002", reduce:true, cid:"svx_a_b_x2"});
+    ok("marketCid params", calls[0][2]==='{"symbol":"BTCUSDT","side":"BUY","type":"MARKET","quantity":"0.002","newClientOrderId":"svx_a_b_e1","newOrderRespType":"RESULT"}' && /"reduceOnly":"true"/.test(calls[1][2]));
+    calls.length = 0; await b.stopAlgo({side:"SELL", qtyStr:"0.002", stopStr:"99000.0", cid:"svx_a_b_s1"});
+    ok("stopAlgo goes to the algo endpoint, reduce-only, with the client id", calls[0][0]==="POST" && calls[0][1]==="/fapi/v1/algoOrder" && calls[0][2]==='{"algoType":"CONDITIONAL","symbol":"BTCUSDT","side":"SELL","type":"STOP_MARKET","quantity":"0.002","triggerPrice":"99000.0","reduceOnly":"true","clientAlgoId":"svx_a_b_s1"}');
+    calls.length = 0; await b.cancelAlgoCid("svx_x"); await b.cancelCid("svx_y"); await b.orderByCid("svx_y"); await b.algoByCid("svx_x");
+    ok("cancel and lookup by client id", calls.map(c=>c[0]+" "+c[1]+" "+c[2]).join("|")===['DELETE /fapi/v1/algoOrder {"symbol":"BTCUSDT","clientAlgoId":"svx_x"}','DELETE /fapi/v1/order {"symbol":"BTCUSDT","origClientOrderId":"svx_y"}','GET /fapi/v1/order {"symbol":"BTCUSDT","origClientOrderId":"svx_y"}','GET /fapi/v1/algoOrder {"symbol":"BTCUSDT","clientAlgoId":"svx_x"}'].join("|"));
     calls.length = 0; await b.cancelAll();
     ok("cancelAll", calls[0].join(" ")==='DELETE /fapi/v1/allOpenOrders {"symbol":"BTCUSDT"}');
     calls.length = 0; const snap = await b.snapshot();
@@ -5250,7 +5738,7 @@ function rdToolsRender(s){
 // Paper runner (Trader step 4, page side, thin): feeds the one-snapshot-a-second series from feeds.js (trSink) to RUNNER (runner-core.js), keeps the journal in its own IndexedDB database (sv-trader),
 // and the stage log (step 7: one entry per move of a system between paper / demo / live, in the same database), and exposes what the Trader home (trader-view.js) draws. Nothing here sends an order anywhere: the brokers, placeOrder, the Trading view and the hand-operated paper account (SIM) are not touched.
 // Decisions come only from snapshots (made from input times), never from a timer here, so a hidden tab that delivers late gives the same rows. Runs while the page is connected and the asset is BTC.
-const TRN = {on: store.get("trOn", true) !== false, driver: null, journal: [], stageLog: [], loaded: false, db: null, lastT: 0, err: "", ev: null, evAt: 0, saved: 0, ready: null};      // ev, evAt: unused since step 5 (the view keeps its own cache)
+const TRN = {on: store.get("trOn", true) !== false, driver: null, journal: [], stageLog: [], mirror: [], faults: [], loaded: false, db: null, lastT: 0, err: "", ev: null, evAt: 0, saved: 0, ready: null};      // ev, evAt: unused since step 5 (the view keeps its own cache)
 Object.defineProperty(TRN, "runner", {get: () => TRN.driver ? TRN.driver.runner() : null});      // the runner now running (the Trader home reads its state and risk), null between runs and after a gap until the next snapshot
 const TR_DEF = Object.fromEntries(SYSTEMS_DEFAULT.map(d => [SYSTEM.id(d), d]));
 const TR_CFG = {twins: 20, equity: 10000, feeBps: 5, riskCap: 0.02, seed: 1, gapMs: 30000};
@@ -5260,8 +5748,8 @@ const tr$ = id => document.getElementById(id);
 function trDb(){
   return new Promise((res, rej) => {
     try{
-      const q = indexedDB.open("sv-trader", 2);
-      q.onupgradeneeded = () => { for (const n of ["rows", "stages"]) if (!q.result.objectStoreNames.contains(n)) q.result.createObjectStore(n, {autoIncrement:true}); };
+      const q = indexedDB.open("sv-trader", 3);
+      q.onupgradeneeded = () => { for (const n of ["rows", "stages", "mirror", "faults"]) if (!q.result.objectStoreNames.contains(n)) q.result.createObjectStore(n, {autoIncrement:true}); };
       q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error);
     }catch(e){ rej(e); }
   });
@@ -5272,6 +5760,8 @@ async function trLoad(){
     TRN.db = await trDb();
     TRN.journal = await trReq(TRN.db.transaction("rows").objectStore("rows").getAll());
     TRN.stageLog = await trReq(TRN.db.transaction("stages").objectStore("stages").getAll());
+    TRN.mirror = await trReq(TRN.db.transaction("mirror").objectStore("mirror").getAll());      // step 8: what the demo exchange did for each mirrored trade (exec.js)
+    TRN.faults = await trReq(TRN.db.transaction("faults").objectStore("faults").getAll());     // step 8: the fault log, kept beside the stage log
   }catch(e){ TRN.err = "journal storage unavailable, rows are kept in memory only"; TRN.db = null; console.error("trader", e); }
   TRN.loaded = true;
 }
@@ -5297,6 +5787,7 @@ function trEmit(rows){      // rows the runner wrote: to the journal's storage, 
   if (!rows.length) return;
   trPersist(rows); for (const r of rows) TRN.journal.push(r); PIPE.addRows(rows);
   for (const r of rows) if (r.k === "trade" && r.stage === "live" && !r.interrupted) trLossCheck(r.sys, r.t);
+  if (typeof exeRows === "function") exeRows(rows);      // step 8: a demo-stage system's rows are mirrored onto the demo account (exec.js); it only reads them
 }
 function trStop(){      // what is open cannot go on: it is closed as interrupted, the journal is kept and the next run begins again from it
   if (!TRN.driver) return;
@@ -5322,9 +5813,10 @@ function trExportJournal(){
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
 async function trResetJournal(){
-  if (!confirm("Delete the whole paper-systems journal (every trade, skip and twin trade) AND the stage log (every move between paper, demo and live, so every system goes back to its starting stage) on this device? This cannot be undone.")) return false;
-  PIPE.touch("journal reset"); TRN.driver = null; TRN.journal = []; TRN.stageLog = []; TRN.ev = null; TRN.saved = 0;
-  try{ if (TRN.db){ const tx = TRN.db.transaction(["rows", "stages"], "readwrite"); tx.objectStore("rows").clear(); tx.objectStore("stages").clear(); await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); } }catch(e){ TRN.err = "reset failed"; console.error("trader", e); }
+  if (!confirm("Delete the whole paper-systems journal (every trade, skip and twin trade) AND the stage log (every move between paper, demo and live, so every system goes back to its starting stage) AND the demo mirror rows on this device (the fault log is kept)? This cannot be undone.")) return false;
+  // the fault log is NOT cleared below: step 9 needs a week without a fault, and a reset must not hide one
+  PIPE.touch("journal reset"); TRN.driver = null; TRN.journal = []; TRN.stageLog = []; TRN.mirror = []; TRN.ev = null; TRN.saved = 0;
+  try{ if (TRN.db){ const tx = TRN.db.transaction(["rows", "stages", "mirror"], "readwrite"); for (const n of ["rows", "stages", "mirror"]) tx.objectStore(n).clear(); await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); } }catch(e){ TRN.err = "reset failed"; console.error("trader", e); }
   return true;
 }
 
@@ -5340,8 +5832,9 @@ function trAppendStage(e){      // one entry into the log, then to the runner; a
 }
 // m: {sys, to, by: "user"|"auto", reason?, cap?}. Returns {ok, entry} or {ok: false, reason}; nothing is written when it is refused.
 function trMove(m){
-  const t = TRN.lastT || (typeof nowEx === "function" ? nowEx() : Date.now()), r = PROMO.apply(TRN.stageLog, Object.assign({t, start: TR_DEF[m.sys] ? TR_DEF[m.sys].stage : "paper"}, m), TRN.journal);
+  const t = TRN.lastT || (typeof nowEx === "function" ? nowEx() : Date.now()), r = PROMO.apply(TRN.stageLog, Object.assign({t, start: TR_DEF[m.sys] ? TR_DEF[m.sys].stage : "paper"}, m), EXEC.merge(TRN.mirror.length ? TRN.journal.concat(TRN.mirror) : TRN.journal));      // demo trades filled on the exchange both ways read as demo trades (exec-core.js merge)
   if (!r.ok) return r;
+  if (m.to === "demo" && m.by === "user" && typeof exeCheckRecent === "function" && !exeCheckRecent()) return {ok: false, reason: "a passed connection check on this device in the last 24 hours is needed first (Account panel, Binance demo, Run connection check)"};
   trAppendStage(r.entry); return r;
 }
 function trLossCheck(id, t){      // a live system that lost its limit in one UTC day goes back to paper by itself
@@ -5371,9 +5864,9 @@ function tvEval(rows){
   const now = performance.now();
   if (rows.length < TV.evLen || (rows.length !== TV.evLen && now - TV.evAt > 2000)){ TV.ev = RUNNER.evaluate(rows); TV.tw = TRADER.twinMeans(rows); TV.evLen = rows.length; TV.evAt = now; }
   // the standing against the promotion rule, from the same rows (recomputed when they changed as far as the figures above did, or when a move was made)
-  if (TV.elLog !== TRN.stageLog.length || TV.elRows !== TV.evLen){ TV.el = {}; for (const x of TV_SYS) TV.el[x.id] = PROMO.eligibility(rows, TRN.stageLog, x.id, x.d.stage); TV.elLog = TRN.stageLog.length; TV.elRows = TV.evLen; }
+  if (TV.elLog !== TRN.stageLog.length || TV.elRows !== TV.evLen || TV.elMir !== TRN.mirror.length){ const pr = EXEC.merge(TRN.mirror.length ? rows.concat(TRN.mirror) : rows); TV.el = {}; for (const x of TV_SYS) TV.el[x.id] = PROMO.eligibility(pr, TRN.stageLog, x.id, x.d.stage); TV.elLog = TRN.stageLog.length; TV.elRows = TV.evLen; TV.elMir = TRN.mirror.length; }
 }
-const tvStageLabel = s => s === "paper" ? "paper" : s + " (paper fills)";      // demo and live execution are steps 8 and 9: until then a system in either stage still fills on paper, and the badge says so
+const tvStageLabel = s => { if (s === "paper") return "paper"; if (s === "demo"){ const w = typeof exeWhy === "function" ? exeWhy() : "no execution"; return w ? "demo (paper fills): " + w : "demo"; } return s + " (paper fills)"; };      // demo is mirrored onto the demo account by exec.js when it runs, and says why when it does not; live is step 9: still paper fills
 const tvTouchOnly = () => { try{ return !window.matchMedia("(any-pointer: fine)").matches; }catch{ return false; } };      // no mouse or trackpad on this device: demo and live need the PC (spec section 9, decision 4)
 function tvProg(el, stage){
   if (!el || el.stage !== stage) return "";
@@ -5414,6 +5907,12 @@ function tvBars(bars, colour){
     return `<rect class="${cls}" x="${x}" y="${y.toFixed(1)}" width="28" height="${Math.max(1, hgt).toFixed(1)}"/><text x="${x + 14}" y="${ty.toFixed(1)}" text-anchor="middle">${TRADER.fx(b.netBps, 1)}</text><text class="dimt" x="${x + 14}" y="104" text-anchor="middle">${b.day.slice(5)}</text><text class="dimt" x="${x + 14}" y="114" text-anchor="middle">${b.trades} tr</text>`; }).join("");
   return `<svg class="trbars" viewBox="0 0 ${w} 118" role="img" aria-label="Net result per UTC day in bps, summed over the day's trades"><line x1="0" x2="${w}" y1="${mid}" y2="${mid}"/>${g}</svg>`;
 }
+// the last mirrored trades of a system: what the demo exchange did against the paper fill (slip: positive = worse than paper; delay: paper fill to real fill)
+function tvMirrorHtml(id){
+  const m = TRN.mirror.filter(r => r.sys === id).slice(-8).reverse(), f = (v, d) => v == null ? "–" : TRADER.fx(v, d);
+  if (!m.length) return `<div class="note" style="margin-top:0">Mirrored trades (demo exchange): none yet.</div>`;
+  return `<div class="note" style="margin-top:0">Mirrored trades, newest first (slip in bps, positive is worse than the paper fill; delay in ms from the paper fill)</div><div style="overflow-x:auto"><table class="tt"><tr><th>time</th><th>fill</th><th>entry slip</th><th>exit slip</th><th>delay in / out</th><th>real net</th><th>paper net</th><th>notes</th></tr>${m.map(r => `<tr><td>${tvTime(r.t, true)}</td><td>${tvEsc(r.fill)}</td><td>${f(r.entrySlipBps, 2)}</td><td>${f(r.exitSlipBps, 2)}</td><td>${r.entryDelayMs == null ? "–" : Math.round(r.entryDelayMs)} / ${r.exitDelayMs == null ? "–" : Math.round(r.exitDelayMs)}</td><td>${f(r.netBps, 2)}</td><td>${f(r.paperNetBps, 2)}</td><td style="white-space:normal">${tvEsc((r.notes || []).join(", "))}</td></tr>`).join("")}</table></div>`;
+}
 function tvDetailHtml(x, ev, rows){
   const d = TRADER.describe(x.d), e = ev[x.id], order = ["time", "stop", "invalidate", "target", "trail", "norm", "flow", "gap", "end"];
   const by = e ? e.byReason : {}, reasons = order.filter(k => by[k]).concat(Object.keys(by).filter(k => !order.includes(k)));
@@ -5423,6 +5922,7 @@ function tvDetailHtml(x, ev, rows){
     + `<dl class="trdl">${d.lines.map(l => `<dt>${l[0]}</dt><dd>${tvEsc(l[1])}</dd>`).join("")}<dt>Venue</dt><dd>${tvEsc(d.venue)}, stage ${tvEsc(tvStageLabel(trStage(x.id)))}</dd></dl>`
     + `<div class="note" style="margin-top:0">Closed trades by how they ended (an invalidation is counted apart from a stop)</div><div class="trchips">${chips || "<span>no closed trades yet</span>"}</div>`
     + `<div class="note" style="margin-top:0">Net result per day (bps, UTC day of the entry)${e && e.trades < TRADER.MIN_TRADES ? ": no colour until 20 trades" : ""}</div>${tvBars(TRADER.dayBars(rows, x.id), !!(e && e.trades >= TRADER.MIN_TRADES))}`
+    + tvMirrorHtml(x.id)
     + `<div class="note" style="margin-top:0">Skipped triggers, latest first</div>` + (sk.length ? `<table class="tt"><tr><th>reason</th><th>count</th><th>last</th><th>what it means</th></tr>${sk.map(s => `<tr><td>${tvEsc(s.reason)}</td><td>${s.n}</td><td>${TRADER.dur((now - s.last) / 1000)} ago</td><td style="white-space:normal">${tvEsc(s.words)}</td></tr>`).join("")}</table>` : `<div class="note">No trigger has been skipped yet.</div>`);
 }
 
@@ -5444,7 +5944,7 @@ function tvPromoHtml(x, el){
   else if (el){
     h += `<div class="note" style="margin-top:0">${stage === "paper" ? "Paper to demo" : "Demo to live"}: all of these, counted on ${stage === "paper" ? "paper-filled" : "demo-filled"} trades made live by this page ${el.since != null ? "since " + tvTime(el.since, true) + " (the last move into " + stage + ")" : "since the journal began"}; interrupted positions never count.</div>`
       + tvChecklist(el) + `<div class="trstat${el.eligible ? " el" : ""}">${el.waiting ? tvEsc(el.waiting) : el.eligible ? "eligible" : "not eligible"}</div>`;
-    if (stage === "demo") h += `<div class="note" style="margin-top:0">Demo execution is built in step 8: until then this system's demo stage keeps filling on paper and nothing is sent to any exchange.</div>`;
+    if (stage === "demo") h += `<div class="note" style="margin-top:0">Demo: ${typeof exeStatus === "function" ? tvEsc(exeStatus()) : ""} Each trade is also sent to the Binance demo account when execution is ready; the paper fill stays the clock. A trade counts here only when it was filled on the exchange both ways.</div>`;
   }
   const canUp = stage !== "live" && el && el.eligible && !touch, why = stage === "live" ? "" : touch ? TV_TOUCH_WHY : !el || !el.eligible ? "Not eligible: the checklist shows what is still missing." : "";
   h += `<div class="trbtns">` + (stage === "live" ? "" : `<button class="primary" data-act="promote" ${canUp ? "" : "disabled"}>Promote to ${tvEsc(el ? el.next : "demo")}</button>`) + (stage !== "paper" ? `<button data-act="down">Move to paper</button>` : "") + `</div>`
@@ -5452,7 +5952,7 @@ function tvPromoHtml(x, el){
     + tvLogHtml(x.id) + `<div class="note">${tvEsc(TV_LUCK)}</div>`;
   return h;
 }
-const tvToday = {demo: "Demo: from the next second this system's new trades are marked stage demo. Demo execution does not exist yet (step 8), so it keeps filling on paper and nothing is sent to any exchange. The count for demo to live starts now and needs demo-filled trades.",
+const tvToday = {demo: "Demo: from the next second this system's new trades are marked stage demo. While the Binance demo account is connected and the connection check has passed, each of its trades is also sent to the demo exchange; otherwise it fills on paper only. The count for demo to live starts now and needs trades filled on the exchange both ways.",
   live: "Live: from the next second this system's new trades are marked stage live. Live execution does not exist yet (step 9), so it keeps filling on paper and nothing is sent to any exchange. It returns to paper by itself if it loses 3 times its risk per trade, or the cap, in one UTC day.",
   paper: "Paper: the count for the next promotion starts again from now; the trades so far stay in the journal but no longer count. A position open at this moment finishes under the stage it was entered in. The move takes effect at the next snapshot."};
 function tvCloseConfirm(){ TV.conf = null; const c = tv$("trConfirm"); c.hidden = true; c.innerHTML = ""; }
@@ -5583,7 +6083,7 @@ function renderTrader(force){
     tvEval(rows);
     let interrupted = 0; for (const k in TV.ev) interrupted += TV.ev[k].interrupted;
     tv$("trOn").checked = TRN.on;
-    tv$("trStat").textContent = (typeof rrShort === "function" ? rrShort() + " " : "") + TRADER.status({loaded: TRN.loaded, on: TRN.on, connected, asset: trAsset(), running: !!run, ageSec: Math.max(0, Math.round((nowEx() - TRN.lastT) / 1000)), feeBps: TR_CFG.feeBps, openRisk: rk ? rk.open : 0, riskCap: TR_CFG.riskCap, interrupted, err: TRN.err});
+    tv$("trStat").textContent = (typeof exeStatus === "function" ? exeStatus() + " " : "") + (typeof rrShort === "function" ? rrShort() + " " : "") + TRADER.status({loaded: TRN.loaded, on: TRN.on, connected, asset: trAsset(), running: !!run, ageSec: Math.max(0, Math.round((nowEx() - TRN.lastT) / 1000)), feeBps: TR_CFG.feeBps, openRisk: rk ? rk.open : 0, riskCap: TR_CFG.riskCap, interrupted, err: TRN.err});
     // one card per system
     const t = nowEx(), html = TV_SYS.map(x => { const s = byId[x.id]; return tvSystemHtml(x, s, TRADER.cells({def: x.d, inst: s ? s.inst : null, led: s || null, ev: TV.ev[x.id] || null, twins: TV.tw[x.id] || [], t})); }).join("");
     if (html !== TV.rowsHtml){
@@ -5731,6 +6231,214 @@ HOOKS.on("renderAccount", () => {
 });
 setInterval(accBtnRender, 1000);       // the unrealised PnL changes between logins
 accBtnRender();
+
+</script>
+<script id="exec">
+"use strict";
+// Demo execution (Trader step 8, page side, thin). Runs EXEC (exec-core.js) against the connected Binance DEMO account: hands it the runner's rows (exeRows, called from trEmit), sends the requests it asks for through
+// BROKER.binance (broker.js, the step 8 functions), hands the answers back, polls the position and open orders, keeps the mirror rows and the fault log (IndexedDB, runner.js) and the kill switch (this browser's storage).
+// The decisions are in exec-core.js; nothing here decides a trade. It only runs when the connected account is the demo one (base URL checked here and again in the core) AND a connection check passed on this device in the last 24 hours.
+// No key, secret or signature is read, stored or logged here: the keys stay in ACC (app.js) and only bnSigned touches them; errors carry Binance's code and message only.
+const EXE = {m: null, filt: null, oneWay: null, oneWayAt: 0, quoteAt: 0, pollFails: 0, pollBusy: false, pollAt: 0, checking: false, err: "", starting: false, startAt: 0, openSaved: "", killed: store.get("exKill", false) === true, check: store.get("exCheck", null), lines: []};
+const exe$ = id => document.getElementById(id);
+const exeSleep = ms => new Promise(r => setTimeout(r, ms));
+const exeDemo = () => ACC.mode === "demo" && ACC.base === EXEC.DEMO_BASE && !!ACC.key;
+const exeCheckRecent = () => !!(EXE.check && EXE.check.ok && Date.now() - EXE.check.t < 86400000);
+const exeEnabled = () => exeDemo() && exeCheckRecent();
+
+// ----- errors: the exchange said no (a code) or nothing is known (timeout, dropped connection, server error)
+const exeCode = e => { const m = /^Binance (-?\d+)/.exec(e && e.message || ""); return m ? +m[1] : null; };
+function exeRes(e){
+  const code = exeCode(e), text = String(e && e.message || e).slice(0, 200);
+  if (code != null && code < 0 && code !== -1007 && code !== -1001) return {ok: false, code, err: text};
+  return {ok: false, unknown: true, err: text};
+}
+const exeNotFound = e => { const c = exeCode(e); return c === -2013 || c === -2011 || /not exist|unknown order|no such/i.test(String(e && e.message || "")); };
+
+// ----- the requests the core asks for -> BROKER.binance
+async function exeFill(r){      // a market fill with what it really paid (the order response has no commission)
+  let px = r.px, qty = r.qty, fee = null, est = false;
+  if (qty > 0){
+    for (let i = 0; i < 3 && fee == null; i++){ try{ const t = await BNB.tradesOf(r.id); if (t){ fee = t.fee; if (t.qty > 0){ px = t.px; qty = t.qty; } } }catch{} if (fee == null) await exeSleep(300); }
+    if (fee == null){ fee = px * qty * 0.0005; est = true; }
+  }
+  return {px, qty, fee: fee || 0, feeEst: est, t: r.t || Date.now(), status: r.status};
+}
+async function exeRun(q){
+  if (!exeDemo()) throw new Error("not the demo account");      // belt and braces: the core already refuses
+  if (q.op === "market") return {ok: true, data: await exeFill(await BNB.marketCid({side: q.side, qtyStr: q.qtyStr, reduce: q.reduce, cid: q.cid}))};
+  if (q.op === "stop"){ await BNB.stopAlgo({side: q.side, qtyStr: q.qtyStr, stopStr: q.stopStr, cid: q.cid}); return {ok: true, data: {}}; }
+  if (q.op === "cancel"){ if (q.algo) await BNB.cancelAlgoCid(q.cid); else await BNB.cancelCid(q.cid); return {ok: true, data: {}}; }
+  if (q.op === "lookup"){
+    try{
+      if (q.algo){ const r = await BNB.algoByCid(q.of), d = {found: true, status: r.status, px: r.px, qty: r.qty, t: r.t || Date.now(), fee: 0}; if (r.qty > 0 && r.orderId){ const f = await exeFill({id: r.orderId, px: r.px, qty: r.qty, t: r.t, status: r.status}); d.px = f.px; d.qty = f.qty; d.fee = f.fee; } return {ok: true, data: d}; }
+      const r = await BNB.orderByCid(q.of); return {ok: true, data: Object.assign({found: true}, await exeFill(r))};
+    }catch(e){ if (exeNotFound(e)) return {ok: true, data: {found: false}}; throw e; }
+  }
+  throw new Error("unknown request " + q.op);
+}
+function exeSend(q, m){
+  let done = false;
+  const deliver = res => { m.reply(q.id, res, Date.now()); if (EXE.m === m) exePump(); };
+  const timer = setTimeout(() => { if (!done) deliver({ok: false, unknown: true, err: "no answer in 7 s"}); }, 7000);      // the real answer, if it comes later, is delivered too (the core knows how to take it)
+  exeRun(q).then(d => { done = true; clearTimeout(timer); deliver(d); }, e => { done = true; clearTimeout(timer); deliver(exeRes(e)); });
+}
+
+// ----- rows, faults, what to keep across a reload
+function exeStoreAdd(name, rows){
+  if (!TRN.db) return;
+  try{ const tx = TRN.db.transaction(name, "readwrite"), st = tx.objectStore(name); for (const r of rows) st.add(r); tx.onerror = () => { EXE.err = name + " write failed"; }; }
+  catch(e){ EXE.err = name + " write failed"; console.error("exec", e); }
+}
+function exePump(){
+  const m = EXE.m; if (!m) return;
+  const d = m.drain();
+  if (d.rows.length){ for (const r of d.rows) TRN.mirror.push(r); exeStoreAdd("mirror", d.rows); try{ PIPE.addExec(d.rows); }catch{} }
+  if (d.faults.length){ for (const f of d.faults) TRN.faults.push(f); exeStoreAdd("faults", d.faults); for (const f of d.faults){ try{ hlNote("exec fault", {kind: f.kind, text: f.text}); }catch{} } }
+  for (const q of d.reqs) exeSend(q, m);
+  const o = m.snapshot().open, k = JSON.stringify(o); if (k !== EXE.openSaved){ EXE.openSaved = k; store.set("exOpen", o); }      // a reload must know a position of ours was open (ownership)
+  if (d.rows.length || d.faults.length || d.reqs.length) exeRender();
+}
+function exeGuards(){
+  const f = EXE.filt || {};
+  return {quoteAgeMs: EXE.quoteAt ? performance.now() - EXE.quoteAt : null, offsetMs: clockOk ? clockOffset : null, oneWay: EXE.oneWay, readOk: EXE.pollFails < 3 && !EXE.checking, step: f.step, tick: f.tick, minQty: f.minQty, minNotional: f.minNotional};
+}
+function exeRows(rows){      // from trEmit: every row the runner wrote
+  const m = EXE.m; if (!m) return;
+  const g = exeGuards(), now = Date.now();
+  for (const r of rows) if (r.k === "enter" || r.k === "exit" || r.k === "invalidate" || r.k === "trade") m.onRow(r, now, g);
+  exePump();
+}
+{ const prev = trSink; trSink = snaps => { if (prev) prev(snaps); for (const s of snaps) if (s.age && s.age.bn != null) EXE.quoteAt = performance.now() - s.age.bn; }; }      // the Binance quote's age, for the entry guard
+
+// ----- the exchange now: at start (reconcile) and every few seconds (poll)
+async function exeRead(){
+  const [net, orders] = await Promise.all([BNB.netPosition(), BNB.openAll()]);
+  return {t: Date.now(), positions: Math.abs(net) > 1e-12 ? [net] : [], orders};
+}
+async function exeStart(m){
+  EXE.starting = true; EXE.startAt = Date.now();
+  try{
+    EXE.filt = await loadFilters(); EXE.oneWay = await BNB.oneWay(); EXE.oneWayAt = Date.now();
+    const x = await exeRead(), open = store.get("exOpen", null);
+    if (EXE.m !== m) return;
+    m.start(x, Date.now(), {savedOpen: !!open, savedSys: open && open.sys}); EXE.pollFails = 0; EXE.err = ""; exePump();
+  }catch(e){ EXE.err = "cannot read the exchange: " + String(e.message).slice(0, 120); }
+  finally{ EXE.starting = false; }
+}
+async function exePoll(){
+  const m = EXE.m; if (!m || EXE.checking || EXE.pollBusy || !m.state().phase) return;
+  EXE.pollBusy = true;
+  try{
+    if (Date.now() - EXE.oneWayAt > 60000){ EXE.oneWay = await BNB.oneWay(); EXE.oneWayAt = Date.now(); }
+    const x = await exeRead(); if (EXE.m !== m) return;
+    EXE.pollFails = 0; EXE.err = ""; m.poll(x, Date.now()); exePump();
+  }catch(e){ EXE.pollFails++; EXE.err = "cannot read the exchange: " + String(e.message).slice(0, 120); }
+  finally{ EXE.pollBusy = false; EXE.pollAt = Date.now(); }
+}
+// the lifecycle: one machine per demo connection, dropped on logout or when the check goes stale
+function exeLife(){
+  const on = exeEnabled() && TRN.loaded;
+  if (!on){ if (EXE.m){ EXE.m = null; EXE.openSaved = ""; } return; }
+  if (!EXE.m){ EXE.m = EXEC.create({base: ACC.base, saved: {killed: EXE.killed, faults: []}}); EXE.err = ""; }
+  const m = EXE.m, s = m.state();
+  if (s.state === "off" && s.why === "not started" && !EXE.starting && Date.now() - EXE.startAt > 5000) exeStart(m);
+  else if (s.state !== "off"){ const holding = !!s.pos; if (Date.now() - EXE.pollAt > (holding ? 3000 : 10000)) exePoll(); }
+  m.tick(Date.now()); exePump();
+}
+setInterval(exeLife, 500);
+HOOKS.on("logout", () => { EXE.m = null; EXE.openSaved = ""; exeRender(); });      // the keys are gone: what was open is closed by the next connection (exOpen says it was ours)
+
+// ----- the kill switch
+function exeKill(){ EXE.killed = true; store.set("exKill", true); if (EXE.m){ EXE.m.kill(Date.now()); exePump(); } exeRender(); }
+function exeUnkill(){ EXE.killed = false; store.set("exKill", false); if (EXE.m){ EXE.m.unkill(); } exeRender(); }
+exe$("exKill").onclick = () => {
+  if (!EXE.killed) return exeKill();      // no confirmation to turn it on
+  if (confirm("Turn the kill switch off? Demo execution can open new positions again.")) exeUnkill();
+};
+exe$("exFaultClear").onclick = () => { if (EXE.m && confirm("Clear the fault and allow new entries? The fault stays in the fault log.")){ EXE.m.clearFault(); exeRender(); } };
+
+// ----- what the screen shows
+const exeAnyDemo = () => SYSTEMS_DEFAULT.some(d => { const s = trStage(SYSTEM.id(d)); return s === "demo" || s === "live"; });
+function exeStateText(){
+  if (!exeDemo()) return {state: "off", why: "no Binance demo account connected"};
+  if (!exeCheckRecent()) return {state: "off", why: "run the connection check first (Account panel)"};
+  if (!EXE.m) return {state: "off", why: "starting"};
+  const s = EXE.m.state(); if (s.state === "off" && EXE.err) return {state: "off", why: EXE.err};
+  return {state: s.state, why: s.state === "holding" ? "holding a position" : s.why};
+}
+function exeWhy(){      // "" when a demo system's trades are being mirrored; else why they fill on paper only (the Trader home badge)
+  const s = exeStateText(); if (s.state === "ready" || s.state === "holding") return EXE.pollFails >= 3 ? "cannot read the exchange" : "";
+  return s.state === "off" ? s.why : s.state === "killed" ? "kill switch" : s.state === "fault" ? "fault" : "blocked";
+}
+function exeStatus(){      // the line for the Trader home
+  const s = exeStateText(), nf = TRN.faults.length;
+  return "Execution: " + s.state + (s.why && s.state !== "holding" && s.state !== "ready" ? " (" + s.why + ")" : s.state === "holding" ? " (holding a position)" : "") + (EXE.pollFails >= 3 ? ", cannot read the exchange" : "") + " · faults " + nf + (nf ? " (last: " + TRN.faults[nf - 1].kind + ")" : "") + ".";
+}
+function exeRender(){
+  const s = EXE.m ? EXE.m.state() : null, show = exeAnyDemo() || !!(s && s.pos) || EXE.killed, b = exe$("exKill");
+  b.hidden = !show; b.setAttribute("aria-pressed", String(EXE.killed)); b.textContent = EXE.killed ? "Kill switch ON" : "Kill switch";
+  b.title = EXE.killed ? "Execution is blocked. Press to turn it off (asks to confirm)." : "Block all demo execution, cancel the page's own orders and close its own position at market.";
+  const fc = exe$("exFaultClear"); fc.hidden = !(s && s.state === "fault");
+  exe$("exCheckOut").innerHTML = (EXE.lines.length ? EXE.lines : (EXE.check ? EXE.check.lines : [])).map(l => `<div class="exl ${l.ok ? "ok" : "no"}"><span aria-hidden="true">${l.ok ? "✓" : "✗"}</span> ${String(l.name).replace(/[&<>]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;"}[c]))}${l.text ? ": " + String(l.text).replace(/[&<>]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;"}[c])) : ""}<span class="sr"> (${l.ok ? "passed" : "failed"})</span></div>`).join("")
+    + (EXE.check && !EXE.checking ? `<div class="note" style="margin-top:4px">Last check ${EXE.check.ok ? "passed" : "FAILED"} at ${new Date(EXE.check.t).toLocaleString()}${EXE.check.ok && !exeCheckRecent() ? " (older than 24 hours: run it again)" : ""}.</div>` : "");
+}
+setInterval(exeRender, 1000);
+
+// ----- the connection check: a fixed script on the demo account, each line pass or fail, stored with its time
+async function exeRunCheck(){
+  const out = exe$("exCheckMsg"), lines = []; EXE.lines = lines;
+  const line = (name, ok, text) => { lines.push({name, ok: !!ok, text: text || ""}); exeRender(); return !!ok; };
+  if (!exeDemo()) return line("Binance demo account connected", false, "connect the demo account first (keys are typed into this page only)");
+  if (EXE.m && EXE.m.state().pos) return line("page holds no position", false, "a mirrored position is open");
+  EXE.checking = true; exeRender();
+  const id = Date.now().toString(36), cid = r => "svx_chk" + id + "_" + r;
+  let held = 0, f = null, px = 0, stopCid = null, allOk = true;
+  const step = async (name, fn) => { if (!allOk) return; try{ const t = await fn(); if (!line(name, t !== false && !(t && t.fail), t && typeof t === "string" ? t : t && t.fail ? t.fail : "")) allOk = false; }catch(e){ line(name, false, String(e.message).slice(0, 160)); allOk = false; } };
+  try{
+    await step("read balance, position and position mode", async () => {
+      f = await loadFilters(); const sn = await BNB.snapshot(), net = await BNB.netPosition(), one = await BNB.oneWay(), ords = await BNB.openAll();
+      if (!one) return {fail: "hedge mode is on; the page needs one-way mode"};
+      if (Math.abs(net) > 1e-12 || ords.length) return {fail: "the account is not flat (" + net + " position, " + ords.length + " open orders); close them first"};
+      const r = await fetch(ACC.base + "/fapi/v1/ticker/price?symbol=" + accSym()); px = +(await r.json()).price; if (!(px > 0)) return {fail: "no price"};
+      return `wallet ${fmt(sn.balance.wallet, 2)} USDT, flat, one-way mode, price ${px}`;
+    });
+    let qty = 0, qs = "";
+    await step("a minimum-size market buy fills", async () => {
+      qty = Math.max(f.minQty, Math.ceil(Math.max(f.minNotional || 5, 5) * 1.5 / px / f.step) * f.step); qs = qty.toFixed(decOf(f.step));
+      const r = await exeFill(await BNB.marketCid({side: "BUY", qtyStr: qs, reduce: false, cid: cid("e")})); held = r.qty;
+      return r.qty > 0 ? `bought ${r.qty} at ${r.px}, fee ${r.fee.toFixed(4)}${r.feeEst ? " (estimated)" : ""}` : {fail: "not filled"};
+    });
+    await step("a reduce-only stop is placed and seen in the open orders", async () => {
+      stopCid = cid("s"); const sp = Math.round(px * 0.9 / f.tick) * f.tick;
+      await BNB.stopAlgo({side: "SELL", qtyStr: qs, stopStr: sp.toFixed(decOf(f.tick)), cid: stopCid}); await exeSleep(500);
+      const o = await BNB.openAll(); return o.some(x => x.cid === stopCid && x.algo) ? "seen as an algo order at " + sp.toFixed(decOf(f.tick)) : {fail: "not in the open orders list (check the algo open-orders path)"};
+    });
+    await step("the stop is cancelled and gone", async () => { await BNB.cancelAlgoCid(stopCid); await exeSleep(500); const o = await BNB.openAll(); return o.some(x => x.cid === stopCid) ? {fail: "still listed"} : "gone"; });
+    await step("a stop with a price that must be rejected is rejected (and the rejection is seen)", async () => {
+      const bad = Math.round(px * 1.1 / f.tick) * f.tick, c2 = cid("b"); let rej = null;
+      try{ await BNB.stopAlgo({side: "SELL", qtyStr: qs, stopStr: bad.toFixed(decOf(f.tick)), cid: c2}); }catch(e){ rej = e; }
+      if (!rej){ try{ await BNB.cancelAlgoCid(c2); }catch{} return {fail: "it was ACCEPTED: the rejection path cannot be trusted"}; }
+      const r = exeRes(rej); return r.ok === false && !r.unknown ? "rejected: " + r.err : {fail: "no clear answer: " + r.err};
+    });
+  }catch(e){ line("check", false, String(e.message).slice(0, 160)); allOk = false; }
+  // whatever happened above, the account is brought back flat before the last lines
+  try{
+    if (held > 0 || !allOk){
+      try{ const net = await BNB.netPosition(); if (Math.abs(net) > 1e-12){ const ds = (Math.abs(net)).toFixed(decOf(f ? f.step : 0.001)); await exeFill(await BNB.marketCid({side: net > 0 ? "SELL" : "BUY", qtyStr: ds, reduce: true, cid: cid("x")})); line("the position is closed with a reduce-only market order", true, "closed " + net); } }catch(e){ line("the position is closed with a reduce-only market order", false, String(e.message).slice(0, 160)); allOk = false; }
+      try{ if (stopCid) await BNB.cancelAlgoCid(stopCid); }catch{}
+    }
+    await exeSleep(600);
+    const net = await BNB.netPosition(), o = await BNB.openAll(), own = o.filter(x => x.cid && x.cid.startsWith("svx_"));
+    if (!line("the account is flat with no open order of the page's at the end", Math.abs(net) < 1e-12 && !own.length, Math.abs(net) < 1e-12 && !own.length ? "" : net + " position, " + own.length + " open orders")) allOk = false;
+  }catch(e){ line("the account is flat at the end", false, String(e.message).slice(0, 160)); allOk = false; }
+  EXE.checking = false;
+  EXE.check = {t: Date.now(), ok: allOk, lines: lines.slice()}; store.set("exCheck", EXE.check); EXE.lines = [];
+  out.textContent = allOk ? "Connection check passed." : "Connection check FAILED: see the lines."; out.className = "acc-msg " + (allOk ? "ok" : "err");
+  exeRender();
+}
+exe$("exCheckGo").onclick = () => { if (EXE.checking) return; exe$("exCheckMsg").textContent = "Running…"; exeRunCheck(); };
+exeRender();
 
 </script>
 <script>
@@ -6826,7 +7534,7 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden && FS
 "use strict";
 // Header status (view): live chips next to Connect/Pause and the BN/HL pills (STATUS.chips, status-core.js), and the "newer version" bar.
 // Read-only: it only looks at the app's state once a second and never changes a feed, a recording or a detection. Loaded last.
-const APP_VERSION = "v144";            // "vNNN" in a release build, "dev" otherwise (build.mjs stamps it)
+const APP_VERSION = "v145";            // "vNNN" in a release build, "dev" otherwise (build.mjs stamps it)
 const SB = {latest:null, sure:false, timer:null};
 const sb$ = id => document.getElementById(id);
 sb$("ver").textContent = APP_VERSION;           // tiny version tag next to the title

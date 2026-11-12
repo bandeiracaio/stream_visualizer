@@ -2,7 +2,7 @@
 // Paper runner (Trader step 4, page side, thin): feeds the one-snapshot-a-second series from feeds.js (trSink) to RUNNER (runner-core.js), keeps the journal in its own IndexedDB database (sv-trader),
 // and the stage log (step 7: one entry per move of a system between paper / demo / live, in the same database), and exposes what the Trader home (trader-view.js) draws. Nothing here sends an order anywhere: the brokers, placeOrder, the Trading view and the hand-operated paper account (SIM) are not touched.
 // Decisions come only from snapshots (made from input times), never from a timer here, so a hidden tab that delivers late gives the same rows. Runs while the page is connected and the asset is BTC.
-const TRN = {on: store.get("trOn", true) !== false, driver: null, journal: [], stageLog: [], loaded: false, db: null, lastT: 0, err: "", ev: null, evAt: 0, saved: 0, ready: null};      // ev, evAt: unused since step 5 (the view keeps its own cache)
+const TRN = {on: store.get("trOn", true) !== false, driver: null, journal: [], stageLog: [], mirror: [], faults: [], loaded: false, db: null, lastT: 0, err: "", ev: null, evAt: 0, saved: 0, ready: null};      // ev, evAt: unused since step 5 (the view keeps its own cache)
 Object.defineProperty(TRN, "runner", {get: () => TRN.driver ? TRN.driver.runner() : null});      // the runner now running (the Trader home reads its state and risk), null between runs and after a gap until the next snapshot
 const TR_DEF = Object.fromEntries(SYSTEMS_DEFAULT.map(d => [SYSTEM.id(d), d]));
 const TR_CFG = {twins: 20, equity: 10000, feeBps: 5, riskCap: 0.02, seed: 1, gapMs: 30000};
@@ -12,8 +12,8 @@ const tr$ = id => document.getElementById(id);
 function trDb(){
   return new Promise((res, rej) => {
     try{
-      const q = indexedDB.open("sv-trader", 2);
-      q.onupgradeneeded = () => { for (const n of ["rows", "stages"]) if (!q.result.objectStoreNames.contains(n)) q.result.createObjectStore(n, {autoIncrement:true}); };
+      const q = indexedDB.open("sv-trader", 3);
+      q.onupgradeneeded = () => { for (const n of ["rows", "stages", "mirror", "faults"]) if (!q.result.objectStoreNames.contains(n)) q.result.createObjectStore(n, {autoIncrement:true}); };
       q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error);
     }catch(e){ rej(e); }
   });
@@ -24,6 +24,8 @@ async function trLoad(){
     TRN.db = await trDb();
     TRN.journal = await trReq(TRN.db.transaction("rows").objectStore("rows").getAll());
     TRN.stageLog = await trReq(TRN.db.transaction("stages").objectStore("stages").getAll());
+    TRN.mirror = await trReq(TRN.db.transaction("mirror").objectStore("mirror").getAll());      // step 8: what the demo exchange did for each mirrored trade (exec.js)
+    TRN.faults = await trReq(TRN.db.transaction("faults").objectStore("faults").getAll());     // step 8: the fault log, kept beside the stage log
   }catch(e){ TRN.err = "journal storage unavailable, rows are kept in memory only"; TRN.db = null; console.error("trader", e); }
   TRN.loaded = true;
 }
@@ -49,6 +51,7 @@ function trEmit(rows){      // rows the runner wrote: to the journal's storage, 
   if (!rows.length) return;
   trPersist(rows); for (const r of rows) TRN.journal.push(r); PIPE.addRows(rows);
   for (const r of rows) if (r.k === "trade" && r.stage === "live" && !r.interrupted) trLossCheck(r.sys, r.t);
+  if (typeof exeRows === "function") exeRows(rows);      // step 8: a demo-stage system's rows are mirrored onto the demo account (exec.js); it only reads them
 }
 function trStop(){      // what is open cannot go on: it is closed as interrupted, the journal is kept and the next run begins again from it
   if (!TRN.driver) return;
@@ -74,9 +77,10 @@ function trExportJournal(){
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
 async function trResetJournal(){
-  if (!confirm("Delete the whole paper-systems journal (every trade, skip and twin trade) AND the stage log (every move between paper, demo and live, so every system goes back to its starting stage) on this device? This cannot be undone.")) return false;
-  PIPE.touch("journal reset"); TRN.driver = null; TRN.journal = []; TRN.stageLog = []; TRN.ev = null; TRN.saved = 0;
-  try{ if (TRN.db){ const tx = TRN.db.transaction(["rows", "stages"], "readwrite"); tx.objectStore("rows").clear(); tx.objectStore("stages").clear(); await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); } }catch(e){ TRN.err = "reset failed"; console.error("trader", e); }
+  if (!confirm("Delete the whole paper-systems journal (every trade, skip and twin trade) AND the stage log (every move between paper, demo and live, so every system goes back to its starting stage) AND the demo mirror rows on this device (the fault log is kept)? This cannot be undone.")) return false;
+  // the fault log is NOT cleared below: step 9 needs a week without a fault, and a reset must not hide one
+  PIPE.touch("journal reset"); TRN.driver = null; TRN.journal = []; TRN.stageLog = []; TRN.mirror = []; TRN.ev = null; TRN.saved = 0;
+  try{ if (TRN.db){ const tx = TRN.db.transaction(["rows", "stages", "mirror"], "readwrite"); for (const n of ["rows", "stages", "mirror"]) tx.objectStore(n).clear(); await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); } }catch(e){ TRN.err = "reset failed"; console.error("trader", e); }
   return true;
 }
 
@@ -92,8 +96,9 @@ function trAppendStage(e){      // one entry into the log, then to the runner; a
 }
 // m: {sys, to, by: "user"|"auto", reason?, cap?}. Returns {ok, entry} or {ok: false, reason}; nothing is written when it is refused.
 function trMove(m){
-  const t = TRN.lastT || (typeof nowEx === "function" ? nowEx() : Date.now()), r = PROMO.apply(TRN.stageLog, Object.assign({t, start: TR_DEF[m.sys] ? TR_DEF[m.sys].stage : "paper"}, m), TRN.journal);
+  const t = TRN.lastT || (typeof nowEx === "function" ? nowEx() : Date.now()), r = PROMO.apply(TRN.stageLog, Object.assign({t, start: TR_DEF[m.sys] ? TR_DEF[m.sys].stage : "paper"}, m), EXEC.merge(TRN.mirror.length ? TRN.journal.concat(TRN.mirror) : TRN.journal));      // demo trades filled on the exchange both ways read as demo trades (exec-core.js merge)
   if (!r.ok) return r;
+  if (m.to === "demo" && m.by === "user" && typeof exeCheckRecent === "function" && !exeCheckRecent()) return {ok: false, reason: "a passed connection check on this device in the last 24 hours is needed first (Account panel, Binance demo, Run connection check)"};
   trAppendStage(r.entry); return r;
 }
 function trLossCheck(id, t){      // a live system that lost its limit in one UTC day goes back to paper by itself

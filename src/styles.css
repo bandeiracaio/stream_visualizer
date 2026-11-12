@@ -244,6 +244,9 @@ td.up{color:var(--buy)}td.dn{color:var(--sell)}
 .trsys.sel{border-color:var(--accent)}
 .trhead{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px}
 .trname{font-weight:600;border-color:transparent;padding:2px 4px;text-align:left}.trsys.sel .trname{color:var(--accent)}
+.exkill{border-color:var(--sell);color:var(--sell);font-weight:700}
+.exkill[aria-pressed="true"]{background:var(--sell);color:var(--ink)}
+.exl{font-size:12.5px;margin-top:3px}.exl.ok span:first-child{color:var(--buy)}.exl.no span:first-child{color:var(--sell)}
 .trbadge{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;border:1px solid var(--edge);border-radius:var(--r);padding:0 6px;color:var(--text)}
 .trpos{color:var(--dim);font-size:11.5px;margin-left:auto}
 .trcells{display:grid;grid-template-columns:minmax(0,1fr);gap:3px}

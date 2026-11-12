@@ -34,3 +34,9 @@
 **Promotion**: a move up one stage, by the user and never automatic, allowed only when the system meets the fixed rule (spec 4.7) counted on trades the page made live since its last move into the stage; live also needs a dollar cap. A move down to paper is always allowed and restarts the count; a live system is moved down by itself on a one-day loss limit.
 
 **Twin**: a random-entry copy of a system (same context, region, exit, stop and sizing; entries at random times and directions at the system's own trigger rate), paper only, 20 per system. A system's result is read against its twins' results.
+
+**Mirror**: what demo execution does for a demo-stage system: each of its paper trades is also sent to the Binance demo account (market entry, a reduce-only stop resting on the exchange, a market exit), and a mirror row records the real fills, fees, slip against the paper fill and delays. The paper fill stays the clock: the mirror follows the runner's rows and never feeds a decision, so a replay still reproduces the paper rows exactly. Only one system holds the exchange position at a time; another's entry stays paper-only (`account busy`).
+
+**Fault**: something that went wrong at the exchange that a person must look at: a stop rejected or late, an order whose state stayed unknown, an exit that needed more than one try, a position that is not the page's own, a leftover own position at start, the exchange differing from what the page believes. A fault closes what is the page's own, blocks new entries until the user clears it, and is written to the fault log (kept when the journal is reset). Step 9 needs a week without one.
+
+**Kill switch**: one header button (shown whenever a system is demo or live, or a position is held) that blocks all execution, cancels the page's own orders and closes its own position at market. No confirmation to turn on, a confirmation to turn off; it stays on across reloads.

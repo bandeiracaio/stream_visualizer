@@ -16,6 +16,7 @@
   <button id="go" class="primary">Connect</button>
   <button id="stBtn" title="Feeds status (Binance, Hyperliquid) and cat mode" aria-expanded="false"><span class="sd" id="stBn" data-st="off">BN</span><span class="sd" id="stHl" data-st="off">HL</span></button>
   <button id="catLock" aria-pressed="false">🐱</button>
+  <button id="exKill" class="exkill" aria-pressed="false" hidden>Kill switch</button>
   <span id="accSplit" class="split"><button id="accMain" title="Account info (or connect an account)"><span class="dot"></span><b id="accLbl">Account</b><span id="accPnl"></span></button><button id="accCaret" title="Switch or connect an account" aria-label="Switch or connect an account" aria-expanded="false">▾</button></span>
   <button id="cog" title="Settings" aria-expanded="false">⚙ <span id="symLbl">BTC</span></button>
   <div id="alerts"></div>
@@ -43,6 +44,10 @@
         <input id="demoSecret" type="password" placeholder="Secret key" autocomplete="new-password">
         <button id="demoGo" class="primary">Connect demo</button>
         <div class="acc-msg" id="demoMsg"></div>
+        <p style="margin-top:10px">Demo execution (Trader): a system in the demo stage sends its trades here, with a stop resting on the exchange. It needs this check to pass first (valid 24 hours). The check places a minimum-size order and closes it again.</p>
+        <button id="exCheckGo">Run connection check</button>
+        <div class="acc-msg" id="exCheckMsg"></div>
+        <div id="exCheckOut"></div>
       </div>
       <div class="acc-card live">
         <h3>Binance live — real money</h3>
@@ -93,7 +98,7 @@
 
 <main id="main">
   <section data-tab="overview" class="full" id="trHome">
-    <h2>Trader <span class="ctl"><label class="ctl"><input type="checkbox" id="trOn"> run</label><button id="trExport">Export</button><button id="trReset">Reset</button></span></h2>
+    <h2>Trader <span class="ctl"><label class="ctl"><input type="checkbox" id="trOn"> run</label><button id="exFaultClear" hidden>Clear fault</button><button id="trExport">Export</button><button id="trReset">Reset</button></span></h2>
     <div id="trStat" class="note" style="margin-top:0"></div>
     <div id="trRows"></div>
     <div id="trDetail" hidden></div>
@@ -395,6 +400,9 @@
 <script id="promotion-core">
 <!--@include js/promotion-core.js-->
 </script>
+<script id="exec-core">
+<!--@include js/exec-core.js-->
+</script>
 <script id="trader-core">
 <!--@include js/trader-core.js-->
 </script>
@@ -454,6 +462,9 @@
 </script>
 <script>
 <!--@include js/account-button.js-->
+</script>
+<script id="exec">
+<!--@include js/exec.js-->
 </script>
 <script>
 <!--@include js/order-history.js-->

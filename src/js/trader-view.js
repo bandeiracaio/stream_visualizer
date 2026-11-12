@@ -17,9 +17,9 @@ function tvEval(rows){
   const now = performance.now();
   if (rows.length < TV.evLen || (rows.length !== TV.evLen && now - TV.evAt > 2000)){ TV.ev = RUNNER.evaluate(rows); TV.tw = TRADER.twinMeans(rows); TV.evLen = rows.length; TV.evAt = now; }
   // the standing against the promotion rule, from the same rows (recomputed when they changed as far as the figures above did, or when a move was made)
-  if (TV.elLog !== TRN.stageLog.length || TV.elRows !== TV.evLen){ TV.el = {}; for (const x of TV_SYS) TV.el[x.id] = PROMO.eligibility(rows, TRN.stageLog, x.id, x.d.stage); TV.elLog = TRN.stageLog.length; TV.elRows = TV.evLen; }
+  if (TV.elLog !== TRN.stageLog.length || TV.elRows !== TV.evLen || TV.elMir !== TRN.mirror.length){ const pr = EXEC.merge(TRN.mirror.length ? rows.concat(TRN.mirror) : rows); TV.el = {}; for (const x of TV_SYS) TV.el[x.id] = PROMO.eligibility(pr, TRN.stageLog, x.id, x.d.stage); TV.elLog = TRN.stageLog.length; TV.elRows = TV.evLen; TV.elMir = TRN.mirror.length; }
 }
-const tvStageLabel = s => s === "paper" ? "paper" : s + " (paper fills)";      // demo and live execution are steps 8 and 9: until then a system in either stage still fills on paper, and the badge says so
+const tvStageLabel = s => { if (s === "paper") return "paper"; if (s === "demo"){ const w = typeof exeWhy === "function" ? exeWhy() : "no execution"; return w ? "demo (paper fills): " + w : "demo"; } return s + " (paper fills)"; };      // demo is mirrored onto the demo account by exec.js when it runs, and says why when it does not; live is step 9: still paper fills
 const tvTouchOnly = () => { try{ return !window.matchMedia("(any-pointer: fine)").matches; }catch{ return false; } };      // no mouse or trackpad on this device: demo and live need the PC (spec section 9, decision 4)
 function tvProg(el, stage){
   if (!el || el.stage !== stage) return "";
@@ -60,6 +60,12 @@ function tvBars(bars, colour){
     return `<rect class="${cls}" x="${x}" y="${y.toFixed(1)}" width="28" height="${Math.max(1, hgt).toFixed(1)}"/><text x="${x + 14}" y="${ty.toFixed(1)}" text-anchor="middle">${TRADER.fx(b.netBps, 1)}</text><text class="dimt" x="${x + 14}" y="104" text-anchor="middle">${b.day.slice(5)}</text><text class="dimt" x="${x + 14}" y="114" text-anchor="middle">${b.trades} tr</text>`; }).join("");
   return `<svg class="trbars" viewBox="0 0 ${w} 118" role="img" aria-label="Net result per UTC day in bps, summed over the day's trades"><line x1="0" x2="${w}" y1="${mid}" y2="${mid}"/>${g}</svg>`;
 }
+// the last mirrored trades of a system: what the demo exchange did against the paper fill (slip: positive = worse than paper; delay: paper fill to real fill)
+function tvMirrorHtml(id){
+  const m = TRN.mirror.filter(r => r.sys === id).slice(-8).reverse(), f = (v, d) => v == null ? "–" : TRADER.fx(v, d);
+  if (!m.length) return `<div class="note" style="margin-top:0">Mirrored trades (demo exchange): none yet.</div>`;
+  return `<div class="note" style="margin-top:0">Mirrored trades, newest first (slip in bps, positive is worse than the paper fill; delay in ms from the paper fill)</div><div style="overflow-x:auto"><table class="tt"><tr><th>time</th><th>fill</th><th>entry slip</th><th>exit slip</th><th>delay in / out</th><th>real net</th><th>paper net</th><th>notes</th></tr>${m.map(r => `<tr><td>${tvTime(r.t, true)}</td><td>${tvEsc(r.fill)}</td><td>${f(r.entrySlipBps, 2)}</td><td>${f(r.exitSlipBps, 2)}</td><td>${r.entryDelayMs == null ? "–" : Math.round(r.entryDelayMs)} / ${r.exitDelayMs == null ? "–" : Math.round(r.exitDelayMs)}</td><td>${f(r.netBps, 2)}</td><td>${f(r.paperNetBps, 2)}</td><td style="white-space:normal">${tvEsc((r.notes || []).join(", "))}</td></tr>`).join("")}</table></div>`;
+}
 function tvDetailHtml(x, ev, rows){
   const d = TRADER.describe(x.d), e = ev[x.id], order = ["time", "stop", "invalidate", "target", "trail", "norm", "flow", "gap", "end"];
   const by = e ? e.byReason : {}, reasons = order.filter(k => by[k]).concat(Object.keys(by).filter(k => !order.includes(k)));
@@ -69,6 +75,7 @@ function tvDetailHtml(x, ev, rows){
     + `<dl class="trdl">${d.lines.map(l => `<dt>${l[0]}</dt><dd>${tvEsc(l[1])}</dd>`).join("")}<dt>Venue</dt><dd>${tvEsc(d.venue)}, stage ${tvEsc(tvStageLabel(trStage(x.id)))}</dd></dl>`
     + `<div class="note" style="margin-top:0">Closed trades by how they ended (an invalidation is counted apart from a stop)</div><div class="trchips">${chips || "<span>no closed trades yet</span>"}</div>`
     + `<div class="note" style="margin-top:0">Net result per day (bps, UTC day of the entry)${e && e.trades < TRADER.MIN_TRADES ? ": no colour until 20 trades" : ""}</div>${tvBars(TRADER.dayBars(rows, x.id), !!(e && e.trades >= TRADER.MIN_TRADES))}`
+    + tvMirrorHtml(x.id)
     + `<div class="note" style="margin-top:0">Skipped triggers, latest first</div>` + (sk.length ? `<table class="tt"><tr><th>reason</th><th>count</th><th>last</th><th>what it means</th></tr>${sk.map(s => `<tr><td>${tvEsc(s.reason)}</td><td>${s.n}</td><td>${TRADER.dur((now - s.last) / 1000)} ago</td><td style="white-space:normal">${tvEsc(s.words)}</td></tr>`).join("")}</table>` : `<div class="note">No trigger has been skipped yet.</div>`);
 }
 
@@ -90,7 +97,7 @@ function tvPromoHtml(x, el){
   else if (el){
     h += `<div class="note" style="margin-top:0">${stage === "paper" ? "Paper to demo" : "Demo to live"}: all of these, counted on ${stage === "paper" ? "paper-filled" : "demo-filled"} trades made live by this page ${el.since != null ? "since " + tvTime(el.since, true) + " (the last move into " + stage + ")" : "since the journal began"}; interrupted positions never count.</div>`
       + tvChecklist(el) + `<div class="trstat${el.eligible ? " el" : ""}">${el.waiting ? tvEsc(el.waiting) : el.eligible ? "eligible" : "not eligible"}</div>`;
-    if (stage === "demo") h += `<div class="note" style="margin-top:0">Demo execution is built in step 8: until then this system's demo stage keeps filling on paper and nothing is sent to any exchange.</div>`;
+    if (stage === "demo") h += `<div class="note" style="margin-top:0">Demo: ${typeof exeStatus === "function" ? tvEsc(exeStatus()) : ""} Each trade is also sent to the Binance demo account when execution is ready; the paper fill stays the clock. A trade counts here only when it was filled on the exchange both ways.</div>`;
   }
   const canUp = stage !== "live" && el && el.eligible && !touch, why = stage === "live" ? "" : touch ? TV_TOUCH_WHY : !el || !el.eligible ? "Not eligible: the checklist shows what is still missing." : "";
   h += `<div class="trbtns">` + (stage === "live" ? "" : `<button class="primary" data-act="promote" ${canUp ? "" : "disabled"}>Promote to ${tvEsc(el ? el.next : "demo")}</button>`) + (stage !== "paper" ? `<button data-act="down">Move to paper</button>` : "") + `</div>`
@@ -98,7 +105,7 @@ function tvPromoHtml(x, el){
     + tvLogHtml(x.id) + `<div class="note">${tvEsc(TV_LUCK)}</div>`;
   return h;
 }
-const tvToday = {demo: "Demo: from the next second this system's new trades are marked stage demo. Demo execution does not exist yet (step 8), so it keeps filling on paper and nothing is sent to any exchange. The count for demo to live starts now and needs demo-filled trades.",
+const tvToday = {demo: "Demo: from the next second this system's new trades are marked stage demo. While the Binance demo account is connected and the connection check has passed, each of its trades is also sent to the demo exchange; otherwise it fills on paper only. The count for demo to live starts now and needs trades filled on the exchange both ways.",
   live: "Live: from the next second this system's new trades are marked stage live. Live execution does not exist yet (step 9), so it keeps filling on paper and nothing is sent to any exchange. It returns to paper by itself if it loses 3 times its risk per trade, or the cap, in one UTC day.",
   paper: "Paper: the count for the next promotion starts again from now; the trades so far stay in the journal but no longer count. A position open at this moment finishes under the stage it was entered in. The move takes effect at the next snapshot."};
 function tvCloseConfirm(){ TV.conf = null; const c = tv$("trConfirm"); c.hidden = true; c.innerHTML = ""; }
@@ -229,7 +236,7 @@ function renderTrader(force){
     tvEval(rows);
     let interrupted = 0; for (const k in TV.ev) interrupted += TV.ev[k].interrupted;
     tv$("trOn").checked = TRN.on;
-    tv$("trStat").textContent = (typeof rrShort === "function" ? rrShort() + " " : "") + TRADER.status({loaded: TRN.loaded, on: TRN.on, connected, asset: trAsset(), running: !!run, ageSec: Math.max(0, Math.round((nowEx() - TRN.lastT) / 1000)), feeBps: TR_CFG.feeBps, openRisk: rk ? rk.open : 0, riskCap: TR_CFG.riskCap, interrupted, err: TRN.err});
+    tv$("trStat").textContent = (typeof exeStatus === "function" ? exeStatus() + " " : "") + (typeof rrShort === "function" ? rrShort() + " " : "") + TRADER.status({loaded: TRN.loaded, on: TRN.on, connected, asset: trAsset(), running: !!run, ageSec: Math.max(0, Math.round((nowEx() - TRN.lastT) / 1000)), feeBps: TR_CFG.feeBps, openRisk: rk ? rk.open : 0, riskCap: TR_CFG.riskCap, interrupted, err: TRN.err});
     // one card per system
     const t = nowEx(), html = TV_SYS.map(x => { const s = byId[x.id]; return tvSystemHtml(x, s, TRADER.cells({def: x.d, inst: s ? s.inst : null, led: s || null, ev: TV.ev[x.id] || null, twins: TV.tw[x.id] || [], t})); }).join("");
     if (html !== TV.rowsHtml){

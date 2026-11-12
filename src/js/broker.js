@@ -23,6 +23,35 @@ const BROKER = (() => {
       },
       async cancel(id){ await d.signed("DELETE","/fapi/v1/order",{symbol:d.sym(), orderId:String(id)}); },
       async cancelAll(){ await d.signed("DELETE","/fapi/v1/allOpenOrders",{symbol:d.sym()}); },
+      // ---- step 8 (demo execution, exec.js): client order ids, the stop on the algo endpoint, lookups by client id. Nothing above this line changed.
+      async marketCid(o){      // {side, qtyStr, reduce, cid}; RESULT so a market order answers with its fill
+        const prm = {symbol:d.sym(), side:o.side, type:"MARKET", quantity:o.qtyStr, newClientOrderId:o.cid, newOrderRespType:"RESULT"};
+        if (o.reduce) prm.reduceOnly = "true";
+        const r = await d.signed("POST","/fapi/v1/order", prm);
+        return {id:r.orderId, status:r.status, px:+r.avgPrice, qty:+r.executedQty, t:r.updateTime};
+      },
+      async stopAlgo(o){      // {side, qtyStr, stopStr, cid}: a reduce-only stop-market (conditional orders are on the algo endpoint, error -4120 on /fapi/v1/order)
+        const r = await d.signed("POST","/fapi/v1/algoOrder", {algoType:"CONDITIONAL", symbol:d.sym(), side:o.side, type:"STOP_MARKET", quantity:o.qtyStr, triggerPrice:o.stopStr, reduceOnly:"true", clientAlgoId:o.cid});
+        return {id:r.algoId, status:r.algoStatus};
+      },
+      async cancelAlgoCid(cid){ await d.signed("DELETE","/fapi/v1/algoOrder",{symbol:d.sym(), clientAlgoId:cid}); },
+      async cancelCid(cid){ await d.signed("DELETE","/fapi/v1/order",{symbol:d.sym(), origClientOrderId:cid}); },
+      async orderByCid(cid){ const r = await d.signed("GET","/fapi/v1/order",{symbol:d.sym(), origClientOrderId:cid}); return {id:r.orderId, status:r.status, px:+r.avgPrice, qty:+r.executedQty, t:r.updateTime}; },
+      async algoByCid(cid){ const r = await d.signed("GET","/fapi/v1/algoOrder",{symbol:d.sym(), clientAlgoId:cid}); return {id:r.algoId, status:r.algoStatus, px:+r.actualPrice||0, qty:+r.actualQty||0, orderId:r.actualOrderId, t:r.updateTime||r.triggerTime}; },
+      async tradesOf(orderId){      // what an order really paid: quantity, average price and commission (null when charged in something other than USDT)
+        const a = await d.signed("GET","/fapi/v1/userTrades",{symbol:d.sym(), orderId:String(orderId)});
+        if (!Array.isArray(a) || !a.length) return null;
+        let q = 0, n = 0, fee = 0, usdt = true; for (const f of a){ q += +f.qty; n += +f.qty * +f.price; fee += +f.commission; if (f.commissionAsset !== "USDT") usdt = false; }
+        return {qty:q, px:n/q, fee:usdt ? fee : null};
+      },
+      async oneWay(){ const r = await d.signed("GET","/fapi/v1/positionSide/dual"); return r.dualSidePosition === false; },
+      async netPosition(){ const r = await d.signed("GET","/fapi/v2/positionRisk",{symbol:d.sym()}); if (!Array.isArray(r)) throw new Error("unexpected response from Binance"); return r.reduce((a,p)=>a+(+p.positionAmt||0), 0); },
+      async openAll(){      // every open order on the asset, regular and algo: [{cid, algo}]. The algo list path is checked on the demo host in 8b; a failure here throws and execution is blocked.
+        const [a, b] = await Promise.all([d.signed("GET","/fapi/v1/openOrders",{symbol:d.sym()}), d.signed("GET","/fapi/v1/openAlgoOrders",{symbol:d.sym()})]);
+        const l = Array.isArray(b) ? b : (b && Array.isArray(b.orders) ? b.orders : null);
+        if (!Array.isArray(a) || !l) throw new Error("unexpected response from Binance (open orders)");
+        return a.map(o=>({cid:o.clientOrderId, algo:false})).concat(l.map(o=>({cid:o.clientAlgoId, algo:true})));
+      },
       async snapshot(){
         const sym = d.sym();
         const [bal, pos, ords, fills] = await Promise.all([
@@ -54,6 +83,13 @@ const BROKER = (() => {
     ok("market place params", calls[0][2]==='{"symbol":"BTCUSDT","side":"SELL","type":"MARKET","quantity":"2"}');
     calls.length = 0; await b.cancel(12);
     ok("cancel", calls[0].join(" ")==='DELETE /fapi/v1/order {"symbol":"BTCUSDT","orderId":"12"}');
+    // step 8 additions
+    calls.length = 0; await b.marketCid({side:"BUY", qtyStr:"0.002", reduce:false, cid:"svx_a_b_e1"}); await b.marketCid({side:"SELL", qtyStr:"0.002", reduce:true, cid:"svx_a_b_x2"});
+    ok("marketCid params", calls[0][2]==='{"symbol":"BTCUSDT","side":"BUY","type":"MARKET","quantity":"0.002","newClientOrderId":"svx_a_b_e1","newOrderRespType":"RESULT"}' && /"reduceOnly":"true"/.test(calls[1][2]));
+    calls.length = 0; await b.stopAlgo({side:"SELL", qtyStr:"0.002", stopStr:"99000.0", cid:"svx_a_b_s1"});
+    ok("stopAlgo goes to the algo endpoint, reduce-only, with the client id", calls[0][0]==="POST" && calls[0][1]==="/fapi/v1/algoOrder" && calls[0][2]==='{"algoType":"CONDITIONAL","symbol":"BTCUSDT","side":"SELL","type":"STOP_MARKET","quantity":"0.002","triggerPrice":"99000.0","reduceOnly":"true","clientAlgoId":"svx_a_b_s1"}');
+    calls.length = 0; await b.cancelAlgoCid("svx_x"); await b.cancelCid("svx_y"); await b.orderByCid("svx_y"); await b.algoByCid("svx_x");
+    ok("cancel and lookup by client id", calls.map(c=>c[0]+" "+c[1]+" "+c[2]).join("|")===['DELETE /fapi/v1/algoOrder {"symbol":"BTCUSDT","clientAlgoId":"svx_x"}','DELETE /fapi/v1/order {"symbol":"BTCUSDT","origClientOrderId":"svx_y"}','GET /fapi/v1/order {"symbol":"BTCUSDT","origClientOrderId":"svx_y"}','GET /fapi/v1/algoOrder {"symbol":"BTCUSDT","clientAlgoId":"svx_x"}'].join("|"));
     calls.length = 0; await b.cancelAll();
     ok("cancelAll", calls[0].join(" ")==='DELETE /fapi/v1/allOpenOrders {"symbol":"BTCUSDT"}');
     calls.length = 0; const snap = await b.snapshot();
