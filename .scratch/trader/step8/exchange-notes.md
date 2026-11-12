@@ -27,3 +27,8 @@ Read 2026-11-11 from developers.binance.com/docs/derivatives/usds-margined-futur
 - the open algo orders path and the shape of its answer;
 - that a stop with a trigger on the wrong side of the price is rejected (-2021) and how the algo endpoint reports it;
 - whether `userTrades` returns the commission for a market order immediately.
+
+## Found on the demo host, 2026-11-12 (8b, before any order)
+
+- **CORS preflight.** From a browser page, `demo-fapi.binance.com` (and the older `testnet.binancefuture.com`) answers the OPTIONS preflight for `/fapi/v1/openOrders` and `/fapi/v1/order` with **404**, and for `/fapi/v1/algoOrder` with **500**, with no `Access-Control-Allow-Headers`. `/fapi/v2/balance`, `/fapi/v1/userTrades`, `/fapi/v2/positionRisk`, `/fapi/v1/positionSide/dual` answer 204 with `Allow-Headers: *`. The live host answers 204 for all of them. So a page cannot log in to demo (the snapshot reads open orders) nor place any order with the `X-MBX-APIKEY` header. A search found no report of it.
+- **Fix used:** `demo-proxy.mjs` (repo root), a local proxy on 127.0.0.1 that answers the preflight and forwards to the demo host only. The page verifies `GET /__proxy` says the target is the demo host before it logs in.

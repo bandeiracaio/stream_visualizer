@@ -42,6 +42,7 @@
         <p>Binance's own paper-trading futures account (demo-fapi.binance.com). Use keys created in Binance Demo Trading.</p>
         <input id="demoKey" type="text" placeholder="API key" autocomplete="off" spellcheck="false">
         <input id="demoSecret" type="password" placeholder="Secret key" autocomplete="new-password">
+        <input id="demoProxy" type="text" placeholder="Proxy address (optional), e.g. http://127.0.0.1:8787" autocomplete="off" spellcheck="false" title="Binance's demo host refuses a browser's CORS preflight on its order routes. Run  node demo-proxy.mjs  on this PC and put its address here. It forwards only to the demo host.">
         <button id="demoGo" class="primary">Connect demo</button>
         <div class="acc-msg" id="demoMsg"></div>
         <p style="margin-top:10px">Demo execution (Trader): a system in the demo stage sends its trades here, with a stop resting on the exchange. It needs this check to pass first (valid 24 hours). The check places a minimum-size order and closes it again.</p>

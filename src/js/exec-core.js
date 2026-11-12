@@ -15,7 +15,9 @@ const EXEC = (() => {
   const ALLOW_LIVE = false;      // the live path stays closed until step 9
   const C = { prefix: "svx_", capUsd: 5000, quoteMs: 3000, offsetMs: 1000, stopMs: 3000, unknownMs: 5000, reqMs: 8000, lateMs: 5000, exitTries: 3, retryMs: 1000 };
   const hash36 = s => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return (h >>> 0).toString(36); };
-  const allowedBase = b => b === DEMO_BASE || (ALLOW_LIVE && b === LIVE_BASE);
+  // the demo host itself, or this PC's demo proxy (demo-proxy.mjs: forwards only to the demo host; the page checks that with GET /__proxy before it logs in)
+  const isDemoBase = b => b === DEMO_BASE || /^http:\/\/(127\.0\.0\.1|localhost):\d{2,5}$/.test(String(b));
+  const allowedBase = b => isDemoBase(b) || (ALLOW_LIVE && b === LIVE_BASE);
   const decOf = x => { const s = Number(x).toString(); if (s.includes("e-")) return +s.split("e-")[1]; return (s.split(".")[1] || "").length; };
   const floorStep = (v, step) => Math.floor(v / step + 1e-9) * step;
   const toStr = (v, step) => v.toFixed(decOf(step));
@@ -345,7 +347,10 @@ const EXEC = (() => {
     // ----- never on a non-demo account
     { const R = rig({}, { base: "https://fapi.binance.com" }); R.now = 1000; R.start(); R.row(enter()); R.run(1000);
       ok("no request is ever produced when the account is not the demo one (live host, mode name irrelevant)", R.reqs.length === 0 && R.X.pos === 0 && R.M.state().state === "off");
-      const R2 = rig({}, { base: "https://demo-fapi.binance.com.evil.example" }); R2.now = 1000; R2.start(); R2.row(enter()); R2.run(1000); ok("a look-alike host is refused too", R2.reqs.length === 0); }
+      const R2 = rig({}, { base: "https://demo-fapi.binance.com.evil.example" }); R2.now = 1000; R2.start(); R2.row(enter()); R2.run(1000); ok("a look-alike host is refused too", R2.reqs.length === 0);
+      const bad = ["http://127.0.0.1.evil.example:8787", "http://localhost:8787/x", "https://127.0.0.1:8787", "http://127.0.0.1", "http://evil.example/http://127.0.0.1:8787", "https://fapi.binance.com.local:8787"];
+      ok("only the demo host or a local http address with a port counts as the demo base; look-alikes and the live host do not", isDemoBase("http://127.0.0.1:8787") && isDemoBase("http://localhost:9000") && isDemoBase(DEMO_BASE) && bad.every(b => !isDemoBase(b)) && !isDemoBase(LIVE_BASE), bad.filter(b => isDemoBase(b)).join(" "));
+      const R3 = rig({}, { base: "http://127.0.0.1:8787" }); R3.now = 1000; R3.start(); R3.row(enter()); R3.run(1000); ok("through the local demo proxy the machine works as on the demo host", R3.X.pos === 1 && R3.M.state().state === "holding"); }
     // ----- entry blocks (the paper trade goes on, the note says why)
     const blocked = (name, g, setup, why) => { const R = rig(); R.now = 1000; R.start(); if (setup) setup(R); R.row(enter(), g); R.run(500); const m = R.rows.find(x => x.k === "mirror");
       ok("block: " + name, R.reqs.length === (setup && setup.keep ? R.reqs.length : 0) && m && m.status === "paper" && m.fill === "paper" && m.notes[0].includes(why), JSON.stringify(m)); };
@@ -436,5 +441,5 @@ const EXEC = (() => {
       ok("the paper trade closed as interrupted (disconnect or gap): the real position is closed, the row says interrupted", R.flat() && R.rows.some(x => x.k === "mirror" && x.status === "interrupted"), JSON.stringify(R.rows)); }
     return res;
   }
-  return { create, merge, selftest, DEMO_BASE, ALLOW_LIVE, C };
+  return { create, merge, selftest, isDemoBase, DEMO_BASE, ALLOW_LIVE, C };
 })();

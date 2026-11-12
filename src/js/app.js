@@ -586,7 +586,7 @@ function logout(){
 function renderAccount(){
   $("accActive").innerHTML = !ACC.mode ? "No account connected." :
     ACC.mode==="sim" ? `Connected: <b>simulated paper</b> · started with $${fmtK(SIM.start)}` :
-    ACC.mode==="demo" ? `Connected: <b>Binance demo</b> (paper)` :
+    ACC.mode==="demo" ? `Connected: <b>Binance demo</b> (paper)${ACC.base !== BASES.demo ? " via the local proxy" : ""}` :
     `Connected: <b style="color:var(--sell)">Binance LIVE — real money</b> · max order $${ACC.maxUsd}`;
   HOOKS.emit("renderAccount");
 }
@@ -601,8 +601,18 @@ async function loginBinance(mode){
   const key = $(mode+"Key").value.trim(), secret = $(mode+"Secret").value.trim();
   if (!key || !secret) return accMsg(mode, "Enter both the API key and the secret.");
   if (mode==="live" && !$("liveAck").checked) return accMsg(mode, "Tick the acknowledgment to connect a real-money account.");
+  let base = BASES[mode];
+  if (mode==="demo"){      // optional local proxy (demo-proxy.mjs): Binance's demo host refuses the CORS preflight of its order routes. It must say it forwards to the demo host, nothing else.
+    const px = $("demoProxy").value.trim().replace(/\/+$/, "");
+    if (px){
+      if (!/^http:\/\/(127\.0\.0\.1|localhost):\d{2,5}$/.test(px)) return accMsg(mode, "The proxy address must look like http://127.0.0.1:8787 (this PC only).");
+      try{ const j = await (await fetch(px+"/__proxy")).json(); if (j.target !== BASES.demo) throw new Error("wrong target"); }
+      catch{ return accMsg(mode, "No demo proxy answered at "+px+". Start it on this PC with:  node demo-proxy.mjs"); }
+      base = px; store.set("demoProxy", px);
+    }
+  }
   logout();
-  Object.assign(ACC, {mode, key, secret, base:BASES[mode], maxUsd: mode==="live" ? Math.max(1, +$("liveMax").value || 500) : Infinity});
+  Object.assign(ACC, {mode, key, secret, base, maxUsd: mode==="live" ? Math.max(1, +$("liveMax").value || 500) : Infinity});
   accMsg(mode, "Connecting…", true);
   await syncClock();
   try{
@@ -612,6 +622,7 @@ async function loginBinance(mode){
   }catch(e){ logout(); accMsg(mode, "Login failed: " + e.message); }
   renderAccount();
 }
+$("demoProxy").value = store.get("demoProxy", "");
 $("demoGo").onclick = () => loginBinance("demo");
 $("liveGo").onclick = () => loginBinance("live");
 $("logout").onclick = () => { logout(); for (const m of ["sim","demo","live"]) $(m+"Msg").textContent = ""; };

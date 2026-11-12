@@ -10,3 +10,5 @@ health_*.json
 .scratch/trade-system/cache-quotes/
 .scratch/trade-system/cache-snap/
 panel/
+
+.secrets/

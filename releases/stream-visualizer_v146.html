@@ -330,6 +330,7 @@ canvas.trchart{width:100%;height:280px;display:block;background:var(--canvas);bo
         <p>Binance's own paper-trading futures account (demo-fapi.binance.com). Use keys created in Binance Demo Trading.</p>
         <input id="demoKey" type="text" placeholder="API key" autocomplete="off" spellcheck="false">
         <input id="demoSecret" type="password" placeholder="Secret key" autocomplete="new-password">
+        <input id="demoProxy" type="text" placeholder="Proxy address (optional), e.g. http://127.0.0.1:8787" autocomplete="off" spellcheck="false" title="Binance's demo host refuses a browser's CORS preflight on its order routes. Run  node demo-proxy.mjs  on this PC and put its address here. It forwards only to the demo host.">
         <button id="demoGo" class="primary">Connect demo</button>
         <div class="acc-msg" id="demoMsg"></div>
         <p style="margin-top:10px">Demo execution (Trader): a system in the demo stage sends its trades here, with a stop resting on the exchange. It needs this check to pass first (valid 24 hours). The check places a minimum-size order and closes it again.</p>
@@ -2445,7 +2446,9 @@ const EXEC = (() => {
   const ALLOW_LIVE = false;      // the live path stays closed until step 9
   const C = { prefix: "svx_", capUsd: 5000, quoteMs: 3000, offsetMs: 1000, stopMs: 3000, unknownMs: 5000, reqMs: 8000, lateMs: 5000, exitTries: 3, retryMs: 1000 };
   const hash36 = s => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return (h >>> 0).toString(36); };
-  const allowedBase = b => b === DEMO_BASE || (ALLOW_LIVE && b === LIVE_BASE);
+  // the demo host itself, or this PC's demo proxy (demo-proxy.mjs: forwards only to the demo host; the page checks that with GET /__proxy before it logs in)
+  const isDemoBase = b => b === DEMO_BASE || /^http:\/\/(127\.0\.0\.1|localhost):\d{2,5}$/.test(String(b));
+  const allowedBase = b => isDemoBase(b) || (ALLOW_LIVE && b === LIVE_BASE);
   const decOf = x => { const s = Number(x).toString(); if (s.includes("e-")) return +s.split("e-")[1]; return (s.split(".")[1] || "").length; };
   const floorStep = (v, step) => Math.floor(v / step + 1e-9) * step;
   const toStr = (v, step) => v.toFixed(decOf(step));
@@ -2775,7 +2778,10 @@ const EXEC = (() => {
     // ----- never on a non-demo account
     { const R = rig({}, { base: "https://fapi.binance.com" }); R.now = 1000; R.start(); R.row(enter()); R.run(1000);
       ok("no request is ever produced when the account is not the demo one (live host, mode name irrelevant)", R.reqs.length === 0 && R.X.pos === 0 && R.M.state().state === "off");
-      const R2 = rig({}, { base: "https://demo-fapi.binance.com.evil.example" }); R2.now = 1000; R2.start(); R2.row(enter()); R2.run(1000); ok("a look-alike host is refused too", R2.reqs.length === 0); }
+      const R2 = rig({}, { base: "https://demo-fapi.binance.com.evil.example" }); R2.now = 1000; R2.start(); R2.row(enter()); R2.run(1000); ok("a look-alike host is refused too", R2.reqs.length === 0);
+      const bad = ["http://127.0.0.1.evil.example:8787", "http://localhost:8787/x", "https://127.0.0.1:8787", "http://127.0.0.1", "http://evil.example/http://127.0.0.1:8787", "https://fapi.binance.com.local:8787"];
+      ok("only the demo host or a local http address with a port counts as the demo base; look-alikes and the live host do not", isDemoBase("http://127.0.0.1:8787") && isDemoBase("http://localhost:9000") && isDemoBase(DEMO_BASE) && bad.every(b => !isDemoBase(b)) && !isDemoBase(LIVE_BASE), bad.filter(b => isDemoBase(b)).join(" "));
+      const R3 = rig({}, { base: "http://127.0.0.1:8787" }); R3.now = 1000; R3.start(); R3.row(enter()); R3.run(1000); ok("through the local demo proxy the machine works as on the demo host", R3.X.pos === 1 && R3.M.state().state === "holding"); }
     // ----- entry blocks (the paper trade goes on, the note says why)
     const blocked = (name, g, setup, why) => { const R = rig(); R.now = 1000; R.start(); if (setup) setup(R); R.row(enter(), g); R.run(500); const m = R.rows.find(x => x.k === "mirror");
       ok("block: " + name, R.reqs.length === (setup && setup.keep ? R.reqs.length : 0) && m && m.status === "paper" && m.fill === "paper" && m.notes[0].includes(why), JSON.stringify(m)); };
@@ -2866,7 +2872,7 @@ const EXEC = (() => {
       ok("the paper trade closed as interrupted (disconnect or gap): the real position is closed, the row says interrupted", R.flat() && R.rows.some(x => x.k === "mirror" && x.status === "interrupted"), JSON.stringify(R.rows)); }
     return res;
   }
-  return { create, merge, selftest, DEMO_BASE, ALLOW_LIVE, C };
+  return { create, merge, selftest, isDemoBase, DEMO_BASE, ALLOW_LIVE, C };
 })();
 
 </script>
@@ -5311,7 +5317,7 @@ function logout(){
 function renderAccount(){
   $("accActive").innerHTML = !ACC.mode ? "No account connected." :
     ACC.mode==="sim" ? `Connected: <b>simulated paper</b> · started with $${fmtK(SIM.start)}` :
-    ACC.mode==="demo" ? `Connected: <b>Binance demo</b> (paper)` :
+    ACC.mode==="demo" ? `Connected: <b>Binance demo</b> (paper)${ACC.base !== BASES.demo ? " via the local proxy" : ""}` :
     `Connected: <b style="color:var(--sell)">Binance LIVE — real money</b> · max order $${ACC.maxUsd}`;
   HOOKS.emit("renderAccount");
 }
@@ -5326,8 +5332,18 @@ async function loginBinance(mode){
   const key = $(mode+"Key").value.trim(), secret = $(mode+"Secret").value.trim();
   if (!key || !secret) return accMsg(mode, "Enter both the API key and the secret.");
   if (mode==="live" && !$("liveAck").checked) return accMsg(mode, "Tick the acknowledgment to connect a real-money account.");
+  let base = BASES[mode];
+  if (mode==="demo"){      // optional local proxy (demo-proxy.mjs): Binance's demo host refuses the CORS preflight of its order routes. It must say it forwards to the demo host, nothing else.
+    const px = $("demoProxy").value.trim().replace(/\/+$/, "");
+    if (px){
+      if (!/^http:\/\/(127\.0\.0\.1|localhost):\d{2,5}$/.test(px)) return accMsg(mode, "The proxy address must look like http://127.0.0.1:8787 (this PC only).");
+      try{ const j = await (await fetch(px+"/__proxy")).json(); if (j.target !== BASES.demo) throw new Error("wrong target"); }
+      catch{ return accMsg(mode, "No demo proxy answered at "+px+". Start it on this PC with:  node demo-proxy.mjs"); }
+      base = px; store.set("demoProxy", px);
+    }
+  }
   logout();
-  Object.assign(ACC, {mode, key, secret, base:BASES[mode], maxUsd: mode==="live" ? Math.max(1, +$("liveMax").value || 500) : Infinity});
+  Object.assign(ACC, {mode, key, secret, base, maxUsd: mode==="live" ? Math.max(1, +$("liveMax").value || 500) : Infinity});
   accMsg(mode, "Connecting…", true);
   await syncClock();
   try{
@@ -5337,6 +5353,7 @@ async function loginBinance(mode){
   }catch(e){ logout(); accMsg(mode, "Login failed: " + e.message); }
   renderAccount();
 }
+$("demoProxy").value = store.get("demoProxy", "");
 $("demoGo").onclick = () => loginBinance("demo");
 $("liveGo").onclick = () => loginBinance("live");
 $("logout").onclick = () => { logout(); for (const m of ["sim","demo","live"]) $(m+"Msg").textContent = ""; };
@@ -6242,7 +6259,7 @@ accBtnRender();
 const EXE = {m: null, filt: null, oneWay: null, oneWayAt: 0, quoteAt: 0, pollFails: 0, pollBusy: false, pollAt: 0, checking: false, err: "", starting: false, startAt: 0, openSaved: "", killed: store.get("exKill", false) === true, check: store.get("exCheck", null), lines: []};
 const exe$ = id => document.getElementById(id);
 const exeSleep = ms => new Promise(r => setTimeout(r, ms));
-const exeDemo = () => ACC.mode === "demo" && ACC.base === EXEC.DEMO_BASE && !!ACC.key;
+const exeDemo = () => ACC.mode === "demo" && EXEC.isDemoBase(ACC.base) && !!ACC.key;      // the demo host, or the local demo proxy the page verified at login (app.js loginBinance)
 const exeCheckRecent = () => !!(EXE.check && EXE.check.ok && Date.now() - EXE.check.t < 86400000);
 const exeEnabled = () => exeDemo() && exeCheckRecent();
 
@@ -7534,7 +7551,7 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden && FS
 "use strict";
 // Header status (view): live chips next to Connect/Pause and the BN/HL pills (STATUS.chips, status-core.js), and the "newer version" bar.
 // Read-only: it only looks at the app's state once a second and never changes a feed, a recording or a detection. Loaded last.
-const APP_VERSION = "v145";            // "vNNN" in a release build, "dev" otherwise (build.mjs stamps it)
+const APP_VERSION = "v146";            // "vNNN" in a release build, "dev" otherwise (build.mjs stamps it)
 const SB = {latest:null, sure:false, timer:null};
 const sb$ = id => document.getElementById(id);
 sb$("ver").textContent = APP_VERSION;           // tiny version tag next to the title

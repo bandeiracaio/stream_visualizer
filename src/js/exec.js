@@ -6,7 +6,7 @@
 const EXE = {m: null, filt: null, oneWay: null, oneWayAt: 0, quoteAt: 0, pollFails: 0, pollBusy: false, pollAt: 0, checking: false, err: "", starting: false, startAt: 0, openSaved: "", killed: store.get("exKill", false) === true, check: store.get("exCheck", null), lines: []};
 const exe$ = id => document.getElementById(id);
 const exeSleep = ms => new Promise(r => setTimeout(r, ms));
-const exeDemo = () => ACC.mode === "demo" && ACC.base === EXEC.DEMO_BASE && !!ACC.key;
+const exeDemo = () => ACC.mode === "demo" && EXEC.isDemoBase(ACC.base) && !!ACC.key;      // the demo host, or the local demo proxy the page verified at login (app.js loginBinance)
 const exeCheckRecent = () => !!(EXE.check && EXE.check.ok && Date.now() - EXE.check.t < 86400000);
 const exeEnabled = () => exeDemo() && exeCheckRecent();
 
