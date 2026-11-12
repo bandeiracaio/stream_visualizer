@@ -94,6 +94,24 @@
 </header>
 
 <main id="main">
+  <section data-tab="overview" class="full" id="trHome">
+    <h2>Trader <span class="ctl"><label class="ctl"><input type="checkbox" id="trOn"> run</label><button id="trExport">Export</button><button id="trReset">Reset</button></span></h2>
+    <div id="trStat" class="note" style="margin-top:0"></div>
+    <div id="trRows"></div>
+    <div id="trDetail" hidden></div>
+  </section>
+
+  <section data-tab="overview" class="full">
+    <h2>Price and trades <span class="ctl"><span id="trChartFor" class="stat"></span><label class="ctl">window <select id="trWin" title="Chart window"><option value="5">5 min</option><option value="30" selected>30 min</option><option value="120">120 min</option></select></label></span></h2>
+    <canvas id="trChart" class="trchart" role="img" aria-label="Binance price with each trade, exit reason, stop, target and skipped trigger"></canvas>
+    <div id="trTip" class="note" aria-live="polite"></div>
+  </section>
+
+  <section data-tab="overview" class="full">
+    <h2>Journal <span class="ctl"><label class="ctl">system <select id="trJSys" title="Filter by system"></select></label><label class="ctl"><input type="checkbox" id="trJSkips"> skips</label></span></h2>
+    <div id="trJournal"></div>
+  </section>
+
   <section data-tab="overview" class="full ovhero">
     <div class="ovtop"><span class="venue v-bn">BN</span><b id="ovSym">BTC perp</b><span id="ovStatus" class="stat"></span>
       <label class="ctl">window <select id="ovWin"><option value="60000">1m</option><option value="300000" selected>5m</option><option value="900000">15m</option></select></label></div>
@@ -119,12 +137,6 @@
   <section data-tab="overview">
     <h2>Reader: right now <span class="ctl"><button id="ovOpenReader">open</button></span></h2>
     <div id="ovReader"></div>
-  </section>
-
-  <section data-tab="overview" class="full">
-    <h2>Paper systems <span class="ctl"><label class="ctl"><input type="checkbox" id="trOn"> run</label><button id="trExport">export journal</button><button id="trReset">reset</button></span></h2>
-    <div id="trStat" class="note" style="margin-top:0"></div>
-    <div id="trTable" style="overflow-x:auto"></div>
   </section>
 
   <section data-tab="overview">
@@ -390,6 +402,9 @@
 <script id="runner-core">
 <!--@include js/runner-core.js-->
 </script>
+<script id="trader-core">
+<!--@include js/trader-core.js-->
+</script>
 <script id="auto-record-core">
 <!--@include js/auto-record-core.js-->
 </script>
@@ -440,6 +455,9 @@
 </script>
 <script>
 <!--@include js/runner.js-->
+</script>
+<script>
+<!--@include js/trader-view.js-->
 </script>
 <script>
 <!--@include js/account-info.js-->

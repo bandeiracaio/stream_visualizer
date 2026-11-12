@@ -264,6 +264,36 @@ td.up{color:var(--buy)}td.dn{color:var(--sell)}
 .am-sub{color:var(--dim);font-size:11.5px;margin:8px 0 3px}.am-chip{display:inline-block;margin:2px 10px 2px 0;font-size:12px;color:var(--text)}
 .am-ep{font-size:12px;padding:3px 0;color:var(--text);border-bottom:1px solid var(--line)}.am-ep b{color:var(--accent)}
 #stChips{display:flex;flex-wrap:wrap;gap:5px}
+/* Trader home (view "overview"): a card per system, the seven parts as labelled lines; seven columns on a wide screen */
+.up{color:var(--buy)}.dn{color:var(--sell)}
+.trsys{background:var(--panel2);border:1px solid var(--line);border-radius:var(--r);padding:6px 8px;margin-bottom:6px;cursor:pointer}
+.trsys.sel{border-color:var(--accent)}
+.trhead{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+.trname{font-weight:600;border-color:transparent;padding:2px 4px;text-align:left}.trsys.sel .trname{color:var(--accent)}
+.trbadge{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;border:1px solid var(--edge);border-radius:var(--r);padding:0 6px;color:var(--text)}
+.trpos{color:var(--dim);font-size:11.5px;margin-left:auto}
+.trcells{display:grid;grid-template-columns:minmax(0,1fr);gap:3px}
+.trcell{display:grid;grid-template-columns:82px minmax(0,1fr);gap:6px;font-size:12px;border-top:1px solid var(--line);padding-top:3px;overflow-wrap:anywhere}
+.trlab{color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+.sg{font-weight:700;margin-right:4px;white-space:nowrap}
+.st-on .sg{color:var(--buy)}.st-wait .sg{color:var(--accent)}.st-off .sg{color:var(--dim)}
+.twsvg{display:block;width:100%;max-width:260px;height:24px;margin-top:3px}.twcap{display:block;color:var(--dim);font-size:10.5px}
+.twb{stroke:var(--edge);stroke-width:1}.twt{stroke:var(--text);stroke-width:1.4}.tw0{stroke:var(--dim);stroke-width:1;stroke-dasharray:2 2}.twm{fill:var(--accent);stroke:var(--hi);stroke-width:1}
+@media(min-width:1400px){
+  .trcells{grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
+  .trcell{display:block;border-top:0;border-left:1px solid var(--line);padding:0 0 0 6px}.trlab{display:block;margin-bottom:2px}
+}
+#trDetail{margin-top:8px;border-top:1px solid var(--line);padding-top:8px}
+#trDetail h3{font-size:12px;margin:0 0 6px;color:var(--accent);display:flex;gap:8px;align-items:center;justify-content:space-between}
+.trdl{display:grid;grid-template-columns:96px minmax(0,1fr);gap:2px 8px;margin:0 0 8px}.trdl dt{color:var(--dim)}.trdl dd{margin:0}
+.trchips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}.trchips span{border:1px solid var(--edge);border-radius:var(--r);padding:1px 7px;font-size:11.5px}
+.trbars{display:block;width:100%;max-width:640px;height:auto;margin-bottom:8px}.trbars text{fill:var(--text);font:10px var(--mono)}.trbars .dimt{fill:var(--dim)}.trbars line{stroke:var(--edge)}
+.trbars .bp{fill:var(--buy)}.trbars .bn{fill:var(--sell)}.trbars .b0{fill:var(--dim)}
+canvas.trchart{width:100%;height:280px;display:block;background:var(--canvas);border-radius:var(--r);touch-action:pan-y}
+@media(max-width:700px){canvas.trchart{height:230px}.jx{display:none}.trdl{grid-template-columns:76px minmax(0,1fr)}}
+.trj{width:100%}.trj td,.trj th{white-space:nowrap}.trj td.rs{white-space:normal}
+.trj td:nth-child(2),.trj td:nth-child(8){text-align:left}
+@media(max-width:700px){.trj td,.trj th{white-space:normal;padding:3px 3px;font-size:11px}.trj td:nth-child(1){white-space:nowrap}}
 
 </style>
 </head>
@@ -352,6 +382,24 @@ td.up{color:var(--buy)}td.dn{color:var(--sell)}
 </header>
 
 <main id="main">
+  <section data-tab="overview" class="full" id="trHome">
+    <h2>Trader <span class="ctl"><label class="ctl"><input type="checkbox" id="trOn"> run</label><button id="trExport">Export</button><button id="trReset">Reset</button></span></h2>
+    <div id="trStat" class="note" style="margin-top:0"></div>
+    <div id="trRows"></div>
+    <div id="trDetail" hidden></div>
+  </section>
+
+  <section data-tab="overview" class="full">
+    <h2>Price and trades <span class="ctl"><span id="trChartFor" class="stat"></span><label class="ctl">window <select id="trWin" title="Chart window"><option value="5">5 min</option><option value="30" selected>30 min</option><option value="120">120 min</option></select></label></span></h2>
+    <canvas id="trChart" class="trchart" role="img" aria-label="Binance price with each trade, exit reason, stop, target and skipped trigger"></canvas>
+    <div id="trTip" class="note" aria-live="polite"></div>
+  </section>
+
+  <section data-tab="overview" class="full">
+    <h2>Journal <span class="ctl"><label class="ctl">system <select id="trJSys" title="Filter by system"></select></label><label class="ctl"><input type="checkbox" id="trJSkips"> skips</label></span></h2>
+    <div id="trJournal"></div>
+  </section>
+
   <section data-tab="overview" class="full ovhero">
     <div class="ovtop"><span class="venue v-bn">BN</span><b id="ovSym">BTC perp</b><span id="ovStatus" class="stat"></span>
       <label class="ctl">window <select id="ovWin"><option value="60000">1m</option><option value="300000" selected>5m</option><option value="900000">15m</option></select></label></div>
@@ -377,12 +425,6 @@ td.up{color:var(--buy)}td.dn{color:var(--sell)}
   <section data-tab="overview">
     <h2>Reader: right now <span class="ctl"><button id="ovOpenReader">open</button></span></h2>
     <div id="ovReader"></div>
-  </section>
-
-  <section data-tab="overview" class="full">
-    <h2>Paper systems <span class="ctl"><label class="ctl"><input type="checkbox" id="trOn"> run</label><button id="trExport">export journal</button><button id="trReset">reset</button></span></h2>
-    <div id="trStat" class="note" style="margin-top:0"></div>
-    <div id="trTable" style="overflow-x:auto"></div>
   </section>
 
   <section data-tab="overview">
@@ -1804,7 +1846,10 @@ const RUNNER = (() => {
         return out;
       },
       state: () => S.map(s => ({ id: s.id, name: s.def.name, equity: s.led.eq, triggers: s.trig, secs: s.secs, twinForced: s.twins.length ? s.twins.reduce((a, w) => a + w.forced, 0) / s.twins.length : 0,
-        open: s.led.pos ? { dir: s.led.pos.dir, px: s.led.pos.px, tIn: s.led.pos.tIn, notional: s.led.pos.notional, exiting: s.led.pend } : null })),
+        open: s.led.pos ? { dir: s.led.pos.dir, px: s.led.pos.px, tIn: s.led.pos.tIn, notional: s.led.pos.notional, exiting: s.led.pend } : null,
+        inst: s.inst.state() })),      // the instance's own state (context, region, trigger reading, thesis, position with stop and target): read-only, for the Trader home; twins are not included
+      // the open risk of the systems against the cap (twins not counted), as fractions of equity
+      risk: () => ({ open: openRisk(), cap }),
     };
     return api;
   }
@@ -1906,6 +1951,284 @@ const RUNNER = (() => {
   }
 
   return { create, evaluate, selftest };
+})();
+
+</script>
+<script id="trader-core">
+// Trader core (Trader step 5a): turns system definitions, the runner's state, RUNNER.evaluate, journal rows and a price history into what the Trader home draws:
+// the seven cells of a system's row, the chart's marker list, the journal lines, plain-word descriptions of a definition, the status line. Pure: no DOM, timers, storage or clock
+// (the caller passes the time). Display only: it reads, it decides nothing. The view file (trader-view.js) only puts this on the page.
+// Spec: .scratch/trader/spec.md section 8 step 5, prompt prompts/05-trader-home.md.
+const TRADER = (() => {
+  "use strict";
+  const MIN_TRADES = 20, MIN_TWINS = 15, DAY = 86400000;
+  const num = x => typeof x === "number" && isFinite(x);
+  const fx = (x, d) => !num(x) ? "–" : (x >= 0 ? "+" : "-") + Math.abs(x).toFixed(d);      // signed, so a result is never only a colour
+  const fa = (x, d) => num(x) ? x.toFixed(d) : "–";
+  const pxs = p => !num(p) ? "–" : p.toFixed(p >= 1000 ? 2 : p >= 1 ? 4 : 6);
+  const dur = s => { s = Math.max(0, Math.round(s)); if (s < 60) return s + " s"; if (s < 3600) { const m = Math.floor(s / 60), r = s % 60; return m + " min" + (r ? " " + r + " s" : ""); } const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return h + " h" + (m ? " " + m + " min" : ""); };
+  const usd = x => { if (!num(x)) return "–"; const a = Math.abs(x), s = x < 0 ? "-" : ""; return s + "$" + (a >= 1e6 ? (a / 1e6).toFixed(2) + "M" : a >= 1e3 ? (a / 1e3).toFixed(1) + "k" : a.toFixed(0)); };
+  const venueName = v => v === "bn" ? "Binance" : v === "hl" ? "Hyperliquid" : "either venue";
+  const up = s => s > 0 ? "up" : "down";
+  const EXIT_SHORT = { time: "time", stop: "stop", target: "target", trail: "trail", norm: "norm", flow: "flow", invalidate: "inv", gap: "gap", end: "end", interrupted: "int" };
+  const SKIP_WORDS = { "context off": "the system's context was off", "risk cap": "taking it would put open risk above the cap", "in position": "the system already had a position", "no quote": "no fresh Binance quote to fill at",
+    "not calibrated": "the Reader was still calibrating", "stale price": "the price was too old", "no region yet": "the range box was not ready", "no size": "the size came to zero", "no room": "no room left to the range level" };
+
+  // ---------- plain words ----------
+  function describe(def) {
+    const c = def.context, r = def.region, t = def.trigger, th = def.thesis, x = def.exit, k = def.risk, inv = (th.invalidation || { type: "none" });
+    const context = c.type === "always" ? "always on" : c.type === "sigmaBand" ? "sigma between " + c.min + " and " + c.max + " bps" : c.type === "hours" ? "UTC hours " + c.hours.join(", ") : "market state is " + c.states.join(" or ");
+    const region = r.type === "rangeBox" ? "the high and low of the last " + dur(r.windowSec) : "none";
+    let trigger;
+    switch (t.type) {
+      case "episode": trigger = "the Reader sees " + t.families.join(" or ") + " on " + venueName(def.venue === "bn" || def.venue === "hl" ? def.venue : "any"); break;
+      case "priceMove": trigger = "price moves " + t.m + " sigma or more in " + dur(t.lookSec); break;
+      case "premium": trigger = "Hyperliquid trades at least " + t.minBps + " bp above or below Binance, compared with its own last " + dur(t.baseSec); break;
+      case "tradeFlow": trigger = "net taker flow over " + dur(t.lookSec) + " is at least " + Math.round(t.share * 100) + "% one way and " + t.m + " times its usual size"; break;
+      case "bookDepth": trigger = "book depth within " + t.edge + " bps at least " + t.thr + " one way for " + t.sustainSec + " s"; break;
+      case "rangeBreak": trigger = "price leaves the range by at least " + t.brkBps + " bp"; break;
+      default: trigger = "price touches the range edge (within " + t.tolBps + " bp) and turns back " + t.rejBps + " bps within " + dur(t.lookSec); break;
+    }
+    const cool = num(t.coolSec) && t.coolSec > 0 ? "waits " + dur(t.coolSec) + " before the next one" : "";
+    const dirWords = th.dir === "fade" ? "against it (fade)" : "with it (continuation)";
+    const invalidation = inv.type === "none" ? "none besides the stop and the exit" : inv.type === "triggerReverses" ? "the trigger's reading reverses" : inv.type === "episodeAgainst" ? "a Reader episode appears or ends against the trade"
+      : t.type === "rangeBreak" ? "price falls back inside the range" : "price breaks out of the range";
+    const holdTxt = dur(x.holdSec);
+    const exit = x.type === "timed" ? "closes after " + holdTxt : x.type === "flowEpisode" ? "closes on an opposing " + x.families.join(" or ") + " episode, at most " + holdTxt : x.type === "target" ? "target " + x.tpK + " sigma, at most " + holdTxt
+      : x.type === "trailing" ? "trails " + x.trailK + " sigma from the best, at most " + holdTxt : x.type === "rangeLevel" ? "target at the " + (x.frac === 1 ? "far edge" : "middle") + " of the range, at most " + holdTxt : "closes when the reading normalises, at most " + holdTxt;
+    const risk = "stop at " + k.stopK + " sigma over the hold; risks " + +(k.riskFrac * 100).toFixed(3) + "% of equity per trade";
+    return { name: def.name, stage: def.stage, venue: venueName(def.venue), context, region, trigger, cool, direction: dirWords, thesis: th.text, invalidation, exit, risk,
+      lines: [["Context", context], ["Region", region], ["Trigger", trigger + (cool ? "; " + cool : "")], ["Thesis", dirWords + ". " + th.text], ["Invalidation", invalidation], ["Exit", exit], ["Risk", risk]] };
+  }
+
+  // ---------- the seven cells ----------
+  // in: {def, inst (SYSTEM instance state() or null when the runner is not running), led (RUNNER.state() entry or null), ev (RUNNER.evaluate result for this system or null), twins (the twins' mean R, only those with 20 trades), t (now, ms)}
+  // out: seven {key, label, st: "on" | "wait" | "off", text, ...}. on = doing something now, wait = armed or building, off = blocked or not applicable. The words say it too, colour is never the only cue.
+  const LABELS = [["context", "Context"], ["region", "Region"], ["trigger", "Trigger"], ["thesis", "Thesis"], ["exit", "Exit"], ["risk", "Risk"], ["evaluation", "Evaluation"]];
+  function cells(i) {
+    const def = i.def, d = describe(def), I = i.inst, L = i.led, P = I && I.position, O = L && L.open, t = i.t, out = {};
+    const run = !!I;
+    // context
+    out.context = !run ? { st: "off", text: "not running · " + d.context } : I.context.on ? { st: "on", text: d.context } : { st: "off", text: "off: " + (I.context.why || "no reason given") };
+    // region
+    if (def.region.type === "none") out.region = { st: "off", text: "none" };
+    else if (!run) out.region = { st: "off", text: "not running · " + d.region };
+    else { const R = I.region; if (R.ready && num(R.hi) && num(R.lo)) out.region = { st: "on", text: "low " + pxs(R.lo) + " · high " + pxs(R.hi) + " · " + fa((R.hi / R.lo - 1) * 1e4, 1) + " bps wide", lo: R.lo, hi: R.hi };
+      else { const left = Math.max(0, def.region.windowSec - ((L && L.secs) || 0)); out.region = { st: "wait", text: "building, about " + dur(left) + " left" }; } }
+    // trigger
+    out.trigger = !run ? { st: "off", text: "not running · " + d.trigger } : triggerCell(def, I, t);
+    // thesis
+    const invTxt = d.invalidation === "none besides the stop and the exit" ? "no invalidation" : "wrong if " + d.invalidation;
+    out.thesis = P ? { st: "on", text: (P.dir > 0 ? "long" : "short") + ", " + (def.thesis.dir === "fade" ? "against" : "with") + " the move: " + def.thesis.text }
+      : { st: run ? "wait" : "off", text: (def.thesis.dir === "fade" ? "fade" : "with it") + " · " + invTxt };
+    // exit
+    if (!P) out.exit = { st: "off", text: "flat · " + d.exit };
+    else if (P.pending) out.exit = { st: "wait", text: "entering, waiting for the fill" };
+    else if (O && O.exiting) out.exit = { st: "on", text: "closing: " + (EXIT_SHORT[O.exiting] || O.exiting) };
+    else {
+      const bits = [num(P.tEnd) ? dur((P.tEnd - t) / 1000) + " left" : "open"];
+      if (num(P.targetPx)) bits.push("target " + pxs(P.targetPx));
+      if (num(P.trailBps)) bits.push("trail " + fa(P.trailBps, 1) + " bps from the best (best " + fx(P.best, 1) + ")");
+      if (def.exit.type === "flowEpisode") bits.push("or an opposing " + def.exit.families.join(" / ") + " episode");
+      out.exit = { st: "on", text: bits.join(" · ") };
+    }
+    // risk
+    const rf = def.risk.riskFrac, eq = L && num(L.equity) ? L.equity : null;
+    if (P && !P.pending && O) { const risk = O.notional * P.stopBps / 1e4; out.risk = { st: "on", text: "stop " + fa(P.stopBps, 1) + " bps (" + pxs(P.stopPx) + ") · size " + usd(O.notional) + " · $" + fa(risk, 2) + " at risk" }; }
+    else out.risk = { st: run ? "wait" : "off", text: "risks " + +(rf * 100).toFixed(3) + "% of equity" + (eq != null ? " ($" + fa(eq * rf, 2) + ")" : "") + " per trade · stop " + def.risk.stopK + " sigma over the hold" };
+    // evaluation
+    out.evaluation = evaluationCell(i);
+    return LABELS.map(([key, label]) => Object.assign({ key, label }, out[key]));
+  }
+  function triggerCell(def, I, t) {
+    const T = I.trigger, ty = def.trigger.type, rd = T.reading, thr = T.threshold, side = T.side, p = def.trigger;
+    const last = Math.max(T.lastEnter ? T.lastEnter.t : -Infinity, T.lastSkip ? T.lastSkip.t : -Infinity);
+    const since = isFinite(last) ? "last fired " + dur((t - last) / 1000) + " ago" : "none fired yet";
+    if (ty === "episode" || ty === "levelRejection") return { st: "wait", text: since };
+    const met = side !== 0, sd = met ? " · " + up(side) : "";
+    let txt;
+    if (ty === "priceMove") txt = !num(rd) ? "no reading yet" : "move " + fx(rd, 1) + " bps, needs " + fa(thr, 1) + " either way" + sd;
+    else if (ty === "premium") txt = !num(rd) ? "no reading yet (needs " + dur(p.baseSec) + " of history)" : "premium " + fx(rd, 2) + " bps against its last " + dur(p.baseSec) + ", needs " + fa(p.minBps, 1) + sd;
+    else if (ty === "tradeFlow") txt = !num(rd) ? "no reading yet" : thr == null ? "net flow " + usd(rd) + ", learning the usual size" : "net flow " + usd(rd) + ", needs " + usd(thr) + " and " + Math.round(p.share * 100) + "% one way" + sd;
+    else if (ty === "bookDepth") txt = !num(rd) ? "no book reading" : "depth " + fx(rd, 2) + " within " + p.edge + " bps, needs " + fa(p.thr, 2) + sd;
+    else txt = rd == null ? "waiting for the box" : met ? "outside the box by " + fa(Math.abs(rd), 1) + " bps, needs " + fa(p.brkBps, 1) + sd : "inside the box, or less than " + fa(p.brkBps, 1) + " bps out";
+    return { st: met ? "on" : "wait", text: txt, met };
+  }
+  function evaluationCell(i) {
+    const e = i.ev || { trades: 0, days: 0, meanNetBps: null, meanR: null, twinPercentile: null, twinsWithEnough: 0 }, tw = (i.twins || []).slice().sort((a, b) => a - b);
+    if (e.trades < MIN_TRADES) return { st: "off", ready: false, trades: e.trades, text: "too few trades (" + e.trades + " of " + MIN_TRADES + ")" + (e.trades ? " · " + e.days + " day" + (e.days === 1 ? "" : "s") + " · mean " + fx(e.meanNetBps, 2) + " bps" : ""), twins: tw, system: null, pct: null };
+    const place = e.twinPercentile != null ? "p" + Math.round(e.twinPercentile) + " among its twins" : "twins: " + tw.length + " of " + MIN_TWINS + " have " + MIN_TRADES + " trades";
+    return { st: "on", ready: true, trades: e.trades, days: e.days, meanNetBps: e.meanNetBps, meanR: e.meanR, cls: e.meanNetBps > 0 ? "up" : e.meanNetBps < 0 ? "dn" : "", twins: tw, system: e.meanR, pct: e.twinPercentile, place,
+      text: e.trades + " trades · " + e.days + " day" + (e.days === 1 ? "" : "s") + " · mean " + fx(e.meanNetBps, 2) + " bps · mean R " + fx(e.meanR, 3) + " · " + place };
+  }
+
+  // the twins' mean R per system, only twins with 20 trades (the ticks on the line)
+  function twinMeans(rows) {
+    const by = new Map();
+    for (const r of rows) if (r.k === "twin") { let s = by.get(r.sys); if (!s) { s = new Map(); by.set(r.sys, s); } let a = s.get(r.n); if (!a) { a = []; s.set(r.n, a); } a.push(r.R); }
+    const res = {};
+    for (const [id, s] of by) { const m = []; for (const a of s.values()) if (a.length >= MIN_TRADES) m.push(a.reduce((x, y) => x + y, 0) / a.length); res[id] = m; }
+    return res;
+  }
+
+  // ---------- chart: markers ----------
+  // rows: the journal; id: a system id or null for all; [t0, t1]: the window; priceAt(t): optional price lookup for an invalidation whose trade has not closed.
+  // items: {kind: "line", pid, sys, t0, px0, t1 (null = still open), px1, dir, netBps, R, open, interrupted, reason}, {kind: "entry", ...}, {kind: "exit", ...}, {kind: "invalidate", t, px, why, pid}, {kind: "skip", t, reason, sys} (only for one system)
+  function markers(rows, id, t0, t1, priceAt) {
+    const enters = new Map(), trades = new Map(), inv = [], skips = [];
+    for (const r of rows) {
+      if (id != null && r.sys !== id) continue;
+      if (r.k === "enter") enters.set(r.pid, r);
+      else if (r.k === "trade") trades.set(r.pid, r);
+      else if (r.k === "invalidate") inv.push(r);
+      else if (r.k === "skip" && id != null && r.t >= t0 && r.t <= t1) skips.push({ kind: "skip", t: r.t, reason: r.reason, sys: r.sys });
+    }
+    const items = [];
+    for (const [pid, e] of enters) {
+      const tr = trades.get(pid), tIn = e.t, tOut = tr && !tr.interrupted ? tr.tOut : null;
+      if (tIn > t1 || (tOut != null && tOut < t0)) continue;
+      const open = !tr || !!tr.interrupted, interrupted = !!(tr && tr.interrupted);
+      items.push({ kind: "line", pid, sys: e.sys, t0: tIn, px0: e.px, t1: tOut, px1: tr && !interrupted ? tr.exitPx : null, dir: e.dir, netBps: tr && !interrupted ? tr.netBps : null, R: tr && !interrupted ? tr.R : null, open, interrupted, reason: tr ? tr.reason : null });
+      items.push({ kind: "entry", pid, sys: e.sys, t: tIn, px: e.px, dir: e.dir, thesis: e.thesis, stopBps: e.stopBps });
+      if (tr && !interrupted && tOut != null) items.push({ kind: "exit", pid, sys: e.sys, t: tOut, px: tr.exitPx, reason: tr.reason, label: EXIT_SHORT[tr.reason] || tr.reason, netBps: tr.netBps, R: tr.R, dir: e.dir });
+    }
+    for (const r of inv) {
+      if (r.t < t0 || r.t > t1) continue;
+      const tr = trades.get(r.pid), px = tr && num(tr.exitPx) ? tr.exitPx : priceAt ? priceAt(r.t) : null;
+      items.push({ kind: "invalidate", pid: r.pid, sys: r.sys, t: r.t, px: px == null ? null : px, why: r.why || "" });
+    }
+    for (const s of skips) items.push(s);
+    return items;
+  }
+  // the range box as it was at each price point: the high and low of the points in the windowSec before it (the point itself not yet in), like the system core. ph = [[t, px]] in time order.
+  function boxSeries(ph, windowSec, t0, t1) {
+    const W = windowSec * 1000, out = [], hiT = [], hiP = [], loT = [], loP = []; let hh = 0, lh = 0;
+    for (const [t, p] of ph) {
+      const cut = t - W; while (hh < hiT.length && hiT[hh] < cut) hh++; while (lh < loT.length && loT[lh] < cut) lh++;
+      if (t >= t0 && t <= t1 && hh < hiT.length && lh < loT.length) out.push({ t, hi: hiP[hh], lo: loP[lh] });
+      while (hiT.length > hh && hiP[hiP.length - 1] <= p) { hiT.pop(); hiP.pop(); } hiT.push(t); hiP.push(p);
+      while (loT.length > lh && loP[loP.length - 1] >= p) { loT.pop(); loP.pop(); } loT.push(t); loP.push(p);
+    }
+    return out;
+  }
+
+  // ---------- detail and journal ----------
+  function dayBars(rows, id, maxDays) {
+    const by = new Map();
+    for (const r of rows) if (r.k === "trade" && r.sys === id && !r.interrupted) { const d = Math.floor(r.tIn / DAY); let s = by.get(d); if (!s) { s = { day: new Date(d * DAY).toISOString().slice(0, 10), netBps: 0, trades: 0 }; by.set(d, s); } s.netBps += r.netBps; s.trades++; }
+    const a = Array.from(by.entries()).sort((x, y) => x[0] - y[0]).map(e => e[1]); return a.slice(-(maxDays || 14));
+  }
+  function skipSummary(rows, id, max) {
+    const by = new Map();
+    for (const r of rows) if (r.k === "skip" && r.sys === id) { let s = by.get(r.reason); if (!s) { s = { reason: r.reason, n: 0, last: 0, words: SKIP_WORDS[r.reason] || "" }; by.set(r.reason, s); } s.n++; if (r.t > s.last) s.last = r.t; }
+    return Array.from(by.values()).sort((a, b) => b.last - a.last).slice(0, max || 6);
+  }
+  // the latest lines, newest first: closed trades (an interrupted one has no figures), positions still open, and with skips: skipped triggers
+  function journal(rows, o) {
+    o = o || {}; const limit = o.limit || 200, names = o.names || {}, id = o.sys == null ? null : o.sys, closed = new Set(), lines = [];
+    for (let k = rows.length - 1; k >= 0 && lines.length < limit; k--) {
+      const r = rows[k]; if (id != null && r.sys !== id) continue;
+      if (r.k === "trade") { closed.add(r.pid); lines.push(r.interrupted ? { t: r.t, sys: r.sys, name: names[r.sys] || r.sys, kind: "trade", dir: r.dir, entryPx: r.entryPx, exitPx: null, netBps: null, R: null, reason: "interrupted" }
+        : { t: r.t, sys: r.sys, name: names[r.sys] || r.sys, kind: "trade", dir: r.dir, entryPx: r.entryPx, exitPx: r.exitPx, netBps: r.netBps, R: r.R, reason: r.reason }); }
+      else if (r.k === "enter" && !closed.has(r.pid)) lines.push({ t: r.t, sys: r.sys, name: names[r.sys] || r.sys, kind: "open", dir: r.dir, entryPx: r.px, exitPx: null, netBps: null, R: null, reason: "open" });
+      else if (r.k === "skip" && o.skips) lines.push({ t: r.t, sys: r.sys, name: names[r.sys] || r.sys, kind: "skip", dir: 0, entryPx: null, exitPx: null, netBps: null, R: null, reason: r.reason });
+    }
+    return lines.sort((a, b) => b.t - a.t);
+  }
+  // the status line. in: {loaded, on, connected, asset, running, ageSec, twins, feeBps, openRisk, riskCap, interrupted, err}
+  function status(s) {
+    let t;
+    if (!s.loaded) t = "loading the journal"; else if (!s.on) t = "off: the run switch is off"; else if (!s.connected) t = "not running: not connected"; else if (s.asset !== "BTC") t = "off: the runner trades BTC only (the asset is " + s.asset + ")";
+    else if (!s.running) t = "waiting for the first second of data";
+    else t = "running · paper, " + s.feeBps + " bps a side · open risk " + fa(s.openRisk * 100, 2) + "% of a " + fa(s.riskCap * 100, 2) + "% cap · last snapshot " + dur(s.ageSec || 0) + " ago";
+    if (s.interrupted) t += " · " + s.interrupted + " position" + (s.interrupted > 1 ? "s" : "") + " interrupted by a reload or a gap (left out of the figures)";
+    if (s.err) t += " · " + s.err;
+    return t;
+  }
+
+  // ---------- self-test: scenarios named trader:* ----------
+  function selftest() {
+    const res = [], ok = (name, c, detail) => res.push({ name: "trader:" + name, ok: !!c, detail: c ? "" : String(detail || "") });
+    const D = typeof SYSTEMS_DEFAULT !== "undefined" ? SYSTEMS_DEFAULT : [], T = 1.7e12;
+    const mk = (over, o2) => Object.assign({ name: "t", stage: "paper", venue: "bn", context: { type: "always" }, region: { type: "none" }, trigger: { type: "priceMove", lookSec: 10, m: 2 }, thesis: { dir: "continuation", text: "x", invalidation: { type: "none" } }, exit: { type: "timed", holdSec: 30 }, risk: { stopK: 2, riskFrac: 0.005 } }, over, o2);
+    const inst = (o) => Object.assign({ id: "S1", context: { type: "always", on: true, why: "" }, region: { type: "none" }, trigger: { type: "priceMove", reading: null, threshold: null, side: 0, lastSkip: null, lastEnter: null }, position: null, counts: {} }, o);
+    const led = (o) => Object.assign({ id: "S1", equity: 10000, triggers: 0, secs: 100, open: null }, o);
+    const C = (def, I, L, ev, twins) => { const c = cells({ def, inst: I, led: L, ev, twins, t: T }); return Object.fromEntries(c.map(x => [x.key, x])); };
+    // ----- plain words
+    const words = D.map(describe), allText = words.map(w => w.lines.map(l => l.join(" ")).join(" ")).join(" ");
+    ok("plain words: every default describes all seven parts, with no gaps", D.length === 7 && words.every(w => w.lines.length === 7 && w.lines.every(l => l[1] && l[1].length > 2)) && !/undefined|NaN|\[object/.test(allText), allText.slice(0, 300));
+    ok("plain words: book depth in the owner's words", words[0].trigger === "book depth within 5 bps at least 0.6 one way for 3 s" && words[0].cool === "waits 30 s before the next one" && words[0].invalidation === "the trigger's reading reverses", JSON.stringify(words[0]));
+    ok("plain words: premium, episode, range break, level rejection, priceMove each name their numbers", /1 bp.*5 min/.test(words[1].trigger) && /absorption or exhaustion/.test(words[2].trigger) && /1 bp/.test(words[3].trigger) && words[3].region === "the high and low of the last 15 min" && /1 bps within 30 s/.test(words[4].trigger) === false && /turns back 2 bps within 30 s/.test(words[4].trigger) && /2 sigma or more in 5 min/.test(words[5].trigger), JSON.stringify([words[1].trigger, words[3].trigger, words[4].trigger, words[5].trigger]));
+    ok("plain words: the other triggers, exits, contexts and invalidations", [mk({ trigger: { type: "tradeFlow", lookSec: 20, share: 0.7, m: 3, coolSec: 0 } }), mk({ context: { type: "sigmaBand", min: 0.2, max: 1 } }), mk({ context: { type: "hours", hours: [1, 2] } }), mk({ context: { type: "marketState", states: ["calm"] } }),
+      mk({ exit: { type: "target", holdSec: 60, tpK: 2 } }), mk({ exit: { type: "trailing", holdSec: 60, trailK: 1 } }), mk({ exit: { type: "flowEpisode", holdSec: 60, families: ["burst"] } }), mk({ exit: { type: "normalisation", holdSec: 90 } }), mk({ region: { type: "rangeBox", windowSec: 600 }, exit: { type: "rangeLevel", holdSec: 60, frac: 0.5 }, trigger: { type: "rangeBreak", brkBps: 1, coolSec: 5 }, thesis: { dir: "fade", text: "y", invalidation: { type: "region" } } })]
+      .map(d => describe(d)).every(w => w.lines.every(l => l[1].length > 2) && !/undefined|NaN/.test(JSON.stringify(w))));
+    // ----- cells: order, labels
+    const base = C(mk(), inst(), led(), null, []);
+    ok("cells: seven, in the fixed order with their labels", Object.keys(base).join() === "context,region,trigger,thesis,exit,risk,evaluation" && cells({ def: mk(), inst: inst(), led: led(), ev: null, twins: [], t: T }).map(x => x.label).join() === "Context,Region,Trigger,Thesis,Exit,Risk,Evaluation");
+    // context
+    ok("context cell: on, off with its reason, not running", base.context.st === "on" && C(mk(), inst({ context: { type: "marketState", on: false, why: "market state wild not allowed" } }), led(), null, []).context.text === "off: market state wild not allowed" && C(mk(), inst({ context: { type: "marketState", on: false, why: "market state wild not allowed" } }), led(), null, []).context.st === "off" && /^not running/.test(C(mk(), null, null, null, []).context.text) && C(mk(), null, null, null, []).context.st === "off");
+    // region
+    const rb = mk({ region: { type: "rangeBox", windowSec: 900 }, trigger: { type: "rangeBreak", brkBps: 1, coolSec: 60 } });
+    ok("region cell: none; building with the seconds left; ready with the box's low and high", C(mk(), inst(), led(), null, []).region.text === "none" && C(rb, inst({ region: { type: "rangeBox", windowSec: 900, ready: false } }), led({ secs: 300 }), null, []).region.text === "building, about 10 min left" && C(rb, inst({ region: { type: "rangeBox", windowSec: 900, ready: false } }), led({ secs: 300 }), null, []).region.st === "wait"
+      && (x => x.st === "on" && /low 99900\.00 · high 100100\.00 · 20\.0 bps wide/.test(x.text))(C(rb, inst({ region: { type: "rangeBox", windowSec: 900, hi: 100100, lo: 99900, ready: true } }), led(), null, []).region), JSON.stringify(C(rb, inst({ region: { type: "rangeBox", windowSec: 900, hi: 100100, lo: 99900, ready: true } }), led(), null, []).region));
+    // trigger
+    const trg = (def, o) => C(def, inst({ trigger: Object.assign({ type: def.trigger.type, reading: null, threshold: null, side: 0, lastSkip: null, lastEnter: null }, o) }), led(), null, []).trigger;
+    ok("trigger cell, priceMove: no reading, below, across the threshold with its side", trg(mk(), {}).text === "no reading yet" && trg(mk(), { reading: 1.2, threshold: 3.4 }).st === "wait" && /move \+1\.2 bps, needs 3\.4 either way/.test(trg(mk(), { reading: 1.2, threshold: 3.4 }).text) && trg(mk(), { reading: -4, threshold: 3.4, side: -1 }).st === "on" && /· down$/.test(trg(mk(), { reading: -4, threshold: 3.4, side: -1 }).text));
+    ok("trigger cell, bookDepth against its threshold, premium, tradeFlow", /depth \+0\.42 within 5 bps, needs 0\.60$/.test(trg(D[0], { reading: 0.42, threshold: 0.6 }).text) && /depth \+0\.70.*· up$/.test(trg(D[0], { reading: 0.7, threshold: 0.6, side: 1 }).text) && /premium \+0\.80 bps against its last 5 min, needs 1\.0/.test(trg(D[1], { reading: 0.8, threshold: 1 }).text)
+      && /needs \$2\.0k and 70% one way/.test(trg(mk({ trigger: { type: "tradeFlow", lookSec: 20, share: 0.7, m: 3, coolSec: 0 } }), { reading: 1500, threshold: 2000 }).text) && /learning the usual size/.test(trg(mk({ trigger: { type: "tradeFlow", lookSec: 20, share: 0.7, m: 3, coolSec: 0 } }), { reading: 1500, threshold: null }).text));
+    ok("trigger cell, rangeBreak: waiting for the box, inside, outside with its side", trg(rb, {}).text === "waiting for the box" && /inside the box/.test(trg(rb, { reading: 0, threshold: 1 }).text) && /outside the box by 1\.5 bps, needs 1\.0 · up/.test(trg(rb, { reading: 1.5, threshold: 1, side: 1 }).text) && trg(rb, { reading: 1.5, threshold: 1, side: 1 }).st === "on");
+    ok("trigger cell, no continuous reading (episode, level rejection): time since the last one fired, or none yet", trg(D[2], {}).text === "none fired yet" && trg(D[2], { lastEnter: { t: T - 95000 } }).text === "last fired 1 min 35 s ago" && trg(D[4], { lastSkip: { t: T - 20000, reason: "x" }, lastEnter: { t: T - 400000 } }).text === "last fired 20 s ago" && trg(D[2], {}).st === "wait");
+    // thesis
+    ok("thesis cell: with it or fade and the invalidation rule; in a position the sentence of the thesis", C(D[0], inst(), led(), null, []).thesis.text === "with it · wrong if the trigger's reading reverses" && C(D[1], inst(), led(), null, []).thesis.text === "fade · no invalidation" && C(rb, inst(), led(), null, []).thesis.st === "wait"
+      && (x => x.st === "on" && /^long, with the move: x$/.test(x.text))(C(mk(), inst({ position: { pending: false, dir: 1, tIn: T, tEnd: T + 30000, stopBps: 10, stopPx: 99.9, entryPx: 100 } }), led({ open: { dir: 1, px: 100, tIn: T, notional: 5000, exiting: null } }), null, []).thesis));
+    // exit
+    const pos = o => Object.assign({ pending: false, dir: 1, venue: "bn", entryPx: 100, tIn: T - 8000, tEnd: T + 22000, stopBps: 12.4, stopPx: 99.876, targetPx: null, trailBps: null, best: 0 }, o), lopen = o => led({ open: Object.assign({ dir: 1, px: 100, tIn: T - 8000, notional: 4032.26, exiting: null }, o) });
+    ok("exit cell: flat, entering, time left with target / trail, closing", C(mk(), inst(), led(), null, []).exit.text === "flat · closes after 30 s" && C(mk(), inst({ position: pos({ pending: true }) }), led(), null, []).exit.text === "entering, waiting for the fill" && C(mk(), inst({ position: pos() }), lopen(), null, []).exit.text === "22 s left"
+      && /22 s left · target 100\.50/.test(C(mk(), inst({ position: pos({ targetPx: 100.5 }) }), lopen(), null, []).exit.text) && /trail 8\.0 bps from the best \(best \+3\.5\)/.test(C(mk(), inst({ position: pos({ trailBps: 8, best: 3.5 }) }), lopen(), null, []).exit.text) && C(mk(), inst({ position: pos() }), lopen({ exiting: "stop" }), null, []).exit.text === "closing: stop" && C(mk(), inst({ position: pos() }), lopen(), null, []).exit.st === "on" && C(mk(), inst(), led(), null, []).exit.st === "off");
+    // risk
+    ok("risk cell: flat shows the rule and the dollars; in a position the stop in bps and price, the size and the dollars at risk", C(mk(), inst(), led(), null, []).risk.text === "risks 0.5% of equity ($50.00) per trade · stop 2 sigma over the hold" && C(mk(), inst({ position: pos() }), lopen(), null, []).risk.text === "stop 12.4 bps (99.8760) · size $4.0k · $5.00 at risk", C(mk(), inst({ position: pos() }), lopen(), null, []).risk.text);
+    // evaluation
+    const ev = (n, o) => Object.assign({ trades: n, days: 3, meanNetBps: -1.5, meanR: -0.1, twinPercentile: null, twinsWithEnough: 4 }, o);
+    const e19 = C(mk(), inst(), led(), ev(19), [0.1, 0.2]).evaluation, e20 = C(mk(), inst(), led(), ev(20, { twinPercentile: 72.5 }), [0.1, 0.2, -0.3]).evaluation, e20b = C(mk(), inst(), led(), ev(20), Array.from({ length: 4 }, (_, k) => k / 10)).evaluation;
+    ok("evaluation cell, under 20 trades: the words, no mean R, no percentile, no system marker, no colour", /^too few trades \(19 of 20\)/.test(e19.text) && !/mean R|p\d/.test(e19.text) && e19.ready === false && e19.twins.join() === "0.1,0.2" && e19.system === null && e19.pct === null && !e19.cls && C(mk(), inst(), led(), null, []).evaluation.text === "too few trades (0 of 20)", JSON.stringify(e19));
+    ok("evaluation cell, 20 trades: mean R and place among twins; with fewer than 15 twins ready it says how many; the twins' ticks are handed over sorted", e20.ready && /20 trades · 3 days · mean -1\.50 bps · mean R -0\.100 · p73 among its twins/.test(e20.text) && e20.cls === "dn" && e20.twins.join() === "-0.3,0.1,0.2" && e20.system === -0.1 && /twins: 4 of 15 have 20 trades/.test(e20b.text) && e20b.pct === null, e20.text + " | " + e20b.text);
+    // twin means
+    { const rows = []; for (let n = 0; n < 3; n++) for (let k = 0; k < (n === 2 ? 19 : 20); k++) rows.push({ k: "twin", sys: "A", n, R: n }); const m = twinMeans(rows); ok("twin means: a mean R per twin with 20 trades, a twin with 19 is left out", m.A && m.A.join() === "0,1"); }
+    // ----- the runner's journal drives the rest: a small synthetic one
+    const A = "SA", B = "SB", rows = [
+      { k: "enter", sys: A, t: T + 1000, pid: "p1", dir: 1, px: 100, stopBps: 10, thesis: "x" }, { k: "exit", sys: A, t: T + 31000, pid: "p1", reason: "time" },
+      { k: "trade", sys: A, t: T + 31000, pid: "p1", tIn: T + 1000, tOut: T + 31000, dir: 1, entryPx: 100, exitPx: 100.1, netBps: 5, R: 0.5, reason: "time" },
+      { k: "skip", sys: A, t: T + 40000, reason: "context off" }, { k: "skip", sys: A, t: T + 50000, reason: "in position" }, { k: "skip", sys: B, t: T + 51000, reason: "risk cap" },
+      { k: "enter", sys: A, t: T + 60000, pid: "p2", dir: -1, px: 100.2, stopBps: 10, thesis: "x" }, { k: "invalidate", sys: A, t: T + 70000, pid: "p2", reason: "invalidate", why: "triggerReverses" },
+      { k: "trade", sys: A, t: T + 70000, pid: "p2", tIn: T + 60000, tOut: T + 70000, dir: -1, entryPx: 100.2, exitPx: 100.3, netBps: -11, R: -1.1, reason: "invalidate" },
+      { k: "enter", sys: B, t: T + 80000, pid: "p3", dir: 1, px: 100.3, stopBps: 10, thesis: "y" }, { k: "trade", sys: B, t: T + 80000, pid: "p3", tIn: T + 80000, tOut: null, dir: 1, entryPx: 100.3, reason: "interrupted", interrupted: true },
+      { k: "enter", sys: A, t: T + 100000, pid: "p4", dir: 1, px: 100.4, stopBps: 10, thesis: "x" }, { k: "twin", sys: A, t: T + 100000, n: 0, tIn: T, netBps: 1, R: 0.1, usd: 1, reason: "time" }];
+    const kinds = a => a.map(x => x.kind + (x.reason ? ":" + x.reason : "")).join();
+    const mA = markers(rows, A, T, T + 200000, null), lines = mA.filter(x => x.kind === "line");
+    ok("markers: entry, exit with its reason, a line joining them with the result, per trade", mA.filter(x => x.kind === "entry").length === 3 && mA.filter(x => x.kind === "exit").map(x => x.label).join() === "time,inv" && lines.length === 3 && lines[0].netBps === 5 && lines[0].t1 === T + 31000 && lines[0].open === false && lines[1].netBps === -11, kinds(mA));
+    ok("markers: an invalidation is its own marker, apart from the exit, at the trade's exit price", mA.filter(x => x.kind === "invalidate").length === 1 && mA.find(x => x.kind === "invalidate").px === 100.3 && mA.find(x => x.kind === "invalidate").why === "triggerReverses" && mA.filter(x => x.kind === "exit" && x.reason === "invalidate").length === 1);
+    ok("markers: skips as marks with their reasons for one system, and none for all systems", mA.filter(x => x.kind === "skip").map(x => x.reason).join() === "context off,in position" && markers(rows, null, T, T + 200000, null).every(x => x.kind !== "skip") && markers(rows, null, T, T + 200000, null).filter(x => x.kind === "entry").length === 4);
+    ok("markers: a position still open is drawn open-ended", lines[2].open === true && lines[2].t1 === null && lines[2].px1 === null && lines[2].interrupted === false && mA.filter(x => x.kind === "exit").length === 2);
+    { const mB = markers(rows, B, T, T + 200000, null), ln = mB.find(x => x.kind === "line"); ok("markers: an interrupted trade is drawn open-ended, with no exit and no result", ln.open && ln.interrupted && ln.t1 === null && ln.netBps === null && !mB.some(x => x.kind === "exit")); }
+    ok("markers: only what is inside the window; an invalidation priced from the history when its trade has not closed", markers(rows, A, T + 35000, T + 65000, null).filter(x => x.kind === "entry").map(x => x.pid).join() === "p2" && (x => x.length === 1 && x[0].px === 7)(markers(rows.filter(r => r.k !== "trade"), A, T, T + 200000, () => 7).filter(x => x.kind === "invalidate")));
+    // box series
+    { const ph = []; for (let s = 0; s < 100; s++) ph.push([T + s * 1000, s < 50 ? 100 : 110]); const b = boxSeries(ph, 10, T + 40000, T + 99000), at = t => b.find(x => x.t === T + t * 1000);
+      ok("box series: the high and low of the window before each point, the point itself not yet in", at(45).hi === 100 && at(45).lo === 100 && at(50).hi === 100 && at(51).hi === 110 && at(51).lo === 100 && at(61).lo === 110 && at(61).hi === 110 && b.length === 60, JSON.stringify([at(50), at(51), at(61)])); }
+    // detail and journal
+    { const bars = dayBars(rows, A), sk = skipSummary(rows, A);
+      ok("day bars: net result per UTC day of the entry, interrupted ones left out", bars.length === 1 && bars[0].netBps === -6 && bars[0].trades === 2 && dayBars(rows, B).length === 0, JSON.stringify(bars));
+      ok("skip summary: reasons with their counts, latest first", sk.map(x => x.reason + ":" + x.n).join() === "in position:1,context off:1" && skipSummary(rows, B)[0].reason === "risk cap" && skipSummary(rows, B)[0].words.length > 10); }
+    { const j = journal(rows, { names: { SA: "Alpha", SB: "Beta" } }), js = journal(rows, { skips: true }), jb = journal(rows, { sys: B });
+      ok("journal: newest first; closed trades, positions still open, an interrupted one without figures; skips only when asked", j.map(x => x.kind + ":" + x.reason).join() === "open:open,trade:interrupted,trade:invalidate,trade:time" && j[0].name === "Alpha" && j[1].netBps === null && j[1].exitPx === null && js.length === 7 && js.filter(x => x.kind === "skip").length === 3 && jb.length === 1 && jb.every(x => x.sys === B), j.map(x => x.kind + ":" + x.reason).join());
+      const many = []; for (let k = 0; k < 500; k++) many.push({ k: "trade", sys: A, t: T + k, pid: "q" + k, tIn: T + k, tOut: T + k, dir: 1, entryPx: 1, exitPx: 1, netBps: 1, R: 1, reason: "time" });
+      ok("journal: at most the latest 200 lines", journal(many).length === 200 && journal(many)[0].t === T + 499 && journal(many)[199].t === T + 300); }
+    // status
+    { const s = o => status(Object.assign({ loaded: true, on: true, connected: true, asset: "BTC", running: true, ageSec: 2, feeBps: 5, openRisk: 0.005, riskCap: 0.02, interrupted: 0, err: "" }, o));
+      ok("status line: running with open risk against the cap; each reason it is not running; interrupted positions", s({}) === "running · paper, 5 bps a side · open risk 0.50% of a 2.00% cap · last snapshot 2 s ago" && /loading/.test(s({ loaded: false })) && /switch is off/.test(s({ on: false })) && /not connected/.test(s({ connected: false })) && /BTC only.*ETH/.test(s({ asset: "ETH" })) && /first second/.test(s({ running: false })) && /2 positions interrupted/.test(s({ interrupted: 2 })), s({})); }
+    return res;
+  }
+
+  return { describe, cells, twinMeans, markers, boxSeries, dayBars, skipSummary, journal, status, selftest, LABELS, EXIT_SHORT, SKIP_WORDS, MIN_TRADES, MIN_TWINS, fx, fa, pxs, dur, usd };
 })();
 
 </script>
@@ -2821,7 +3144,6 @@ function renderOverview(){
       + `<div class="metric"><span>unrealized PnL</span><b class="${ovCls(up)}">${ovSigned(up, a=>"$"+fmt(a,2))}</b></div></div>`
       + (pos.length ? `<table class="tt" style="margin-top:6px">${pos.map(p=>`<tr><td>${p.symbol}</td><td>${p.qty>0?"long":"short"} ${Math.abs(p.qty)}</td><td class="${ovCls(p.upnl)}">${ovSigned(p.upnl, a=>"$"+fmt(a,2))}</td></tr>`).join("")}</table>` : `<div class="note">No open positions.</div>`);
   }
-  HOOKS.emit("renderOverview");      // the paper systems table (runner.js) draws itself here
 }
 ov$("ovWin").onchange = () => { if (typeof visible==="function" && visible("overview")) renderOverview(); };
 ov$("ovOpenReader").onclick = () => setTab("reader");
@@ -4039,7 +4361,7 @@ $("swMin").oninput = renderSweeps;
 // the navigation, and (render + minIntervalMs) how the frame loop draws it. Views of one slot (reader) share one render and one throttle.
 for (const [id, l, icon] of [["now","Now","M3 12h4l3-8 4 16 3-8h4"],["setups","Setups","M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"],["reader","Reader","M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 9a3 3 0 100 6 3 3 0 000-6z"],["review","Review","M4 6l2 2 3-3M4 14l2 2 3-3M13 7h8M13 15h8"],["rec","Recordings","M12 4a8 8 0 100 16 8 8 0 000-16zM12 9a3 3 0 100 6 3 3 0 000-6z"],["trade","Trade","M7 4v16M7 4L4 7M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3"],["system","System","M4 7h8M18 7h2M4 17h2M10 17h10M14 4v6M8 14v6"]]) VIEWS.area(id, l, icon);
 const READER_SLOT = {slot:"reader", render:()=>renderReader(), minIntervalMs:250};   // renderReader draws all of these views
-VIEWS.register({id:"overview", label:"Overview", area:"now", minIntervalMs:250, render:()=>{ try{ renderOverview(); }catch(e){ console.error("overview", e); } }});
+VIEWS.register({id:"overview", label:"Trader", area:"now", minIntervalMs:250, render:()=>{ if (typeof renderTrader==="function") renderTrader(); try{ renderOverview(); }catch(e){ console.error("overview", e); } }});
 VIEWS.register({id:"armmode", label:"Arm mode", area:"now"});
 VIEWS.register({id:"market", label:"Market and tape", area:"now"});
 VIEWS.register({id:"micro", label:"Microstructure", area:"setups", minIntervalMs:250, render:()=>renderMicro()});
@@ -4578,9 +4900,9 @@ function rdToolsRender(s){
 <script>
 "use strict";
 // Paper runner (Trader step 4, page side, thin): feeds the one-snapshot-a-second series from feeds.js (trSink) to RUNNER (runner-core.js), keeps the journal in its own IndexedDB database (sv-trader),
-// and draws a read-only table in the Overview. Nothing here sends an order anywhere: the brokers, placeOrder, the Trading view and the hand-operated paper account (SIM) are not touched.
+// and exposes what the Trader home (trader-view.js) draws. Nothing here sends an order anywhere: the brokers, placeOrder, the Trading view and the hand-operated paper account (SIM) are not touched.
 // Decisions come only from snapshots (made from input times), never from a timer here, so a hidden tab that delivers late gives the same rows. Runs while the page is connected and the asset is BTC.
-const TRN = {on: store.get("trOn", true) !== false, runner: null, journal: [], loaded: false, db: null, lastT: 0, err: "", ev: null, evAt: 0, saved: 0};
+const TRN = {on: store.get("trOn", true) !== false, runner: null, journal: [], loaded: false, db: null, lastT: 0, err: "", ev: null, evAt: 0, saved: 0};      // ev, evAt: unused since step 5 (the view keeps its own cache)
 const TR_CFG = {twins: 20, equity: 10000, feeBps: 5, riskCap: 0.02, seed: 1, gapMs: 30000};
 const tr$ = id => document.getElementById(id);
 
@@ -4633,51 +4955,228 @@ trSink = snaps => {
 };
 trLoad();
 
-// ----- the table
-const trEsc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-function trStatus(){
-  if (!TRN.loaded) return "loading the journal";
-  if (!TRN.on) return "off (the run box is unticked)";
-  if (!connected) return "not running: not connected";
-  if (trAsset() !== "BTC") return "off: the runner trades BTC only (the asset is " + trAsset() + ")";
-  if (!TRN.runner) return "waiting for the first second of data";
-  const age = Math.max(0, Math.round((nowEx() - TRN.lastT) / 1000));
-  return "running on paper, " + SYSTEMS_DEFAULT.length + " systems with " + TR_CFG.twins + " random-entry twins each, " + TR_CFG.feeBps + " bps fee a side · last snapshot " + age + " s ago";
-}
-function trRender(){
-  const stat = tr$("trStat"), box = tr$("trOn"); if (!stat) return;
-  box.checked = TRN.on;
-  const rows = TRN.runner ? TRN.runner.rows() : TRN.journal, now = Date.now();
-  if (!TRN.ev || now - TRN.evAt > 2000 || TRN.evRows !== rows.length){ TRN.ev = RUNNER.evaluate(rows); TRN.evAt = now; TRN.evRows = rows.length; }
-  const st = TRN.runner ? TRN.runner.state() : [], byId = {}; for (const s of st) byId[s.id] = s;
-  const f = (x, d) => x == null ? "–" : (x >= 0 ? "+" : "-") + Math.abs(x).toFixed(d), cls = x => x == null || x === 0 ? "" : x > 0 ? "up" : "dn";
-  let interrupted = 0; for (const k in TRN.ev) interrupted += TRN.ev[k].interrupted;
-  stat.textContent = trStatus() + (TRN.err ? " · " + TRN.err : "") + (interrupted ? " · " + interrupted + " position" + (interrupted > 1 ? "s" : "") + " interrupted by a reload or a gap (left out of the figures)" : "");
-  tr$("trTable").innerHTML = `<table class="tt"><tr><th>system</th><th>position</th><th>trades</th><th>days</th><th>mean net bps</th><th>mean R</th><th>vs twins</th><th>last skip</th></tr>`
-    + SYSTEMS_DEFAULT.map(d => {
-      const id = SYSTEM.id(d), e = TRN.ev[id] || {trades:0, days:0, meanNetBps:null, meanR:null, twinPercentile:null, twinsWithEnough:0, lastSkip:null}, s = byId[id], o = s && s.open;
-      const pos = o ? (o.exiting ? "closing" : (o.dir > 0 ? "long" : "short") + " @ " + fmt(o.px, 2) + " · " + Math.max(0, Math.round((nowEx() - o.tIn) / 1000)) + " s") : "flat";
-      const vs = e.twinPercentile != null ? "p" + Math.round(e.twinPercentile) : "too few trades (" + e.trades + " of 20, " + e.twinsWithEnough + " of 15 twins)";
-      const sk = e.lastSkip ? trEsc(e.lastSkip.reason) + " · " + Math.max(0, Math.round((nowEx() - e.lastSkip.t) / 1000)) + " s ago" : "–";
-      return `<tr title="${trEsc(d.thesis.text)}"><td>${trEsc(d.name)}</td><td>${pos}</td><td>${e.trades}</td><td>${e.days}</td><td class="${cls(e.meanNetBps)}">${f(e.meanNetBps, 2)}</td><td class="${cls(e.meanR)}">${f(e.meanR, 3)}</td><td>${vs}</td><td>${sk}</td></tr>`;
-    }).join("") + `</table>`;
-}
-HOOKS.on("renderOverview", trRender);
-
-// ----- controls
-tr$("trOn").onchange = () => { TRN.on = tr$("trOn").checked; store.set("trOn", TRN.on); if (!TRN.on) trStop(); trRender(); };
-tr$("trExport").onclick = () => {
-  const rows = TRN.runner ? TRN.runner.rows() : TRN.journal;
+// ----- what the Trader home (trader-view.js) uses
+const trRows = () => TRN.runner ? TRN.runner.rows() : TRN.journal;
+function trSetOn(on){ TRN.on = !!on; store.set("trOn", TRN.on); if (!TRN.on) trStop(); }
+function trExportJournal(){
+  const rows = trRows();
   const blob = new Blob([JSON.stringify({exported: new Date().toISOString(), config: TR_CFG, systems: SYSTEMS_DEFAULT.map(d => Object.assign({id: SYSTEM.id(d)}, d)), rows})], {type:"application/json"});
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "trader-journal_" + new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-") + ".json";
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-};
-tr$("trReset").onclick = async () => {
-  if (!confirm("Delete the whole paper-systems journal (every trade, skip and twin trade) on this device? This cannot be undone.")) return;
+}
+async function trResetJournal(){
+  if (!confirm("Delete the whole paper-systems journal (every trade, skip and twin trade) on this device? This cannot be undone.")) return false;
   TRN.runner = null; TRN.journal = []; TRN.ev = null; TRN.saved = 0;
   try{ if (TRN.db) await trReq(TRN.db.transaction("rows", "readwrite").objectStore("rows").clear()); }catch(e){ TRN.err = "reset failed"; console.error("trader", e); }
-  trRender();
-};
+  return true;
+}
+
+</script>
+<script>
+"use strict";
+// Trader home (Trader step 5a, page side, thin): draws what trader-core.js (TRADER) works out, in the first view ("overview", shown as "Trader"): the status line, one card per system with its seven parts,
+// the detail of the selected system, the price chart with the trades and skipped triggers, and the journal. Display only: it reads the runner (runner.js) and the engine's price history and changes nothing in them.
+// Cheap: the view model is rebuilt at most twice a second and only while the view is open (VIEWS.tick calls renderTrader only then); the chart redraws only when its data changed.
+const TV = {sel: store.get("trSel", null), win: +store.get("trWin", 30) || 30, at: 0, evLen: -1, evAt: 0, ev: {}, tw: {}, drawKey: "", hits: [], jSys: store.get("trJSys", ""), jHtml: "", rowsHtml: "", detHtml: "", tipDefault: "Hover or tap a mark for its reason. Triangles are entries (up long, down short), squares are exits with their reason, diamonds are invalidations, ticks along the bottom are skipped triggers."};
+const TV_SYS = SYSTEMS_DEFAULT.map(d => ({d, id: SYSTEM.id(d)})), TV_NAMES = Object.fromEntries(TV_SYS.map(x => [x.id, x.d.name]));
+const tv$ = id => document.getElementById(id);
+const tvEsc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const TV_GLYPH = {on: "●", wait: "◐", off: "○"}, TV_WORD = {on: "on", wait: "waiting", off: "off"};
+if (!TV_NAMES[TV.sel]) TV.sel = null;
+if (TV.jSys && !TV_NAMES[TV.jSys]) TV.jSys = "";
+if (![5, 30, 120].includes(TV.win)) TV.win = 30;
+tv$("trWin").value = String(TV.win);
+
+// ----- the view model (heavy parts cached: the figures over the whole journal change slowly)
+function tvEval(rows){
+  const now = performance.now();
+  if (rows.length < TV.evLen || (rows.length !== TV.evLen && now - TV.evAt > 2000)){ TV.ev = RUNNER.evaluate(rows); TV.tw = TRADER.twinMeans(rows); TV.evLen = rows.length; TV.evAt = now; }
+}
+function tvTime(t, full){
+  const d = new Date(t), p = n => String(n).padStart(2, "0"), hm = p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds());
+  return full ? p(d.getMonth() + 1) + "-" + p(d.getDate()) + " " + hm : hm;
+}
+
+// ----- one system
+function tvTwinSvg(c){
+  const tw = c.twins; if (!tw.length) return "";
+  const vals = tw.concat(c.system != null ? [c.system] : [], [0]); let lo = Math.min(...vals), hi = Math.max(...vals); if (hi - lo < 1e-9){ hi += .05; lo -= .05; }
+  const pad = (hi - lo) * .06; lo -= pad; hi += pad; const X = v => (4 + (v - lo) / (hi - lo) * 192).toFixed(1);
+  const ticks = tw.map(v => `<line class="twt" x1="${X(v)}" x2="${X(v)}" y1="8" y2="17"/>`).join(""), mk = c.system != null ? `<path class="twm" d="M${+X(c.system) - 5} 1L${+X(c.system) + 5} 1L${X(c.system)} 10Z"/>` : "";
+  const label = `${tw.length} twin${tw.length === 1 ? "" : "s"} with ${TRADER.MIN_TRADES} trades: mean R from ${TRADER.fx(Math.min(...tw), 3)} to ${TRADER.fx(Math.max(...tw), 3)}` + (c.system != null ? `; the system ${TRADER.fx(c.system, 3)}` : "");
+  return `<svg class="twsvg" viewBox="0 0 200 24" role="img" aria-label="${tvEsc(label)}"><title>${tvEsc(label)}</title><line class="twb" x1="2" x2="198" y1="12.5" y2="12.5"/><line class="tw0" x1="${X(0)}" x2="${X(0)}" y1="3" y2="22"/>${ticks}${mk}</svg><span class="twcap">ticks: its ${tw.length} twins' mean R${c.system != null ? " · ▼ the system" : ""} · dashed: zero</span>`;
+}
+function tvCellHtml(c){
+  let body;
+  if (c.key === "evaluation" && c.ready) body = `${c.trades} trades · ${c.days} day${c.days === 1 ? "" : "s"} · mean <span class="${c.cls}">${TRADER.fx(c.meanNetBps, 2)} bps</span> · mean R <span class="${c.cls}">${TRADER.fx(c.meanR, 3)}</span> · ${tvEsc(c.place)}`;
+  else body = tvEsc(c.text);
+  return `<div class="trcell st-${c.st}" data-k="${c.key}"><span class="trlab">${c.label}</span><span class="trbody"><b class="sg">${TV_GLYPH[c.st]} ${TV_WORD[c.st]}</b> ${body}${c.key === "evaluation" ? tvTwinSvg(c) : ""}</span></div>`;
+}
+function tvSystemHtml(x, st, cells){
+  const sel = TV.sel === x.id, o = st && st.open, pos = o ? (o.exiting ? "closing" : (o.dir > 0 ? "long" : "short") + " @ " + TRADER.pxs(o.px)) : "flat";
+  return `<article class="trsys${sel ? " sel" : ""}" data-sys="${x.id}"><div class="trhead"><button class="trname" data-sys="${x.id}" aria-pressed="${sel}" title="Show this system on the chart and its detail">${tvEsc(x.d.name)}</button><span class="trbadge" title="stage">${tvEsc(x.d.stage)}</span><span class="trpos">${pos}</span></div><div class="trcells">${cells.map(tvCellHtml).join("")}</div></article>`;
+}
+
+// ----- the detail of the selected system
+function tvBars(bars, colour){
+  if (!bars.length) return `<div class="note">No closed trades yet, so no days.</div>`;
+  const w = Math.max(bars.length * 44, 120), mid = 46, mx = Math.max(1e-9, ...bars.map(b => Math.abs(b.netBps)));
+  const g = bars.map((b, i) => { const x = i * 44 + 8, hgt = Math.abs(b.netBps) / mx * 34, y = b.netBps >= 0 ? mid - hgt : mid, cls = !colour ? "b0" : b.netBps > 0 ? "bp" : b.netBps < 0 ? "bn" : "b0", ty = b.netBps >= 0 ? y - 3 : y + hgt + 10;
+    return `<rect class="${cls}" x="${x}" y="${y.toFixed(1)}" width="28" height="${Math.max(1, hgt).toFixed(1)}"/><text x="${x + 14}" y="${ty.toFixed(1)}" text-anchor="middle">${TRADER.fx(b.netBps, 1)}</text><text class="dimt" x="${x + 14}" y="104" text-anchor="middle">${b.day.slice(5)}</text><text class="dimt" x="${x + 14}" y="114" text-anchor="middle">${b.trades} tr</text>`; }).join("");
+  return `<svg class="trbars" viewBox="0 0 ${w} 118" role="img" aria-label="Net result per UTC day in bps, summed over the day's trades"><line x1="0" x2="${w}" y1="${mid}" y2="${mid}"/>${g}</svg>`;
+}
+function tvDetailHtml(x, ev, rows){
+  const d = TRADER.describe(x.d), e = ev[x.id], order = ["time", "stop", "invalidate", "target", "trail", "norm", "flow", "gap", "end"];
+  const by = e ? e.byReason : {}, reasons = order.filter(k => by[k]).concat(Object.keys(by).filter(k => !order.includes(k)));
+  const chips = reasons.map(k => `<span>${tvEsc(k)} ${by[k]}</span>`).join("") + (e && e.interrupted ? `<span>interrupted ${e.interrupted} (not counted)</span>` : "");
+  const sk = TRADER.skipSummary(rows, x.id), now = nowEx();
+  return `<h3><span>${tvEsc(x.d.name)}: detail</span><button data-close="1" aria-label="Close the detail">✕</button></h3>`
+    + `<dl class="trdl">${d.lines.map(l => `<dt>${l[0]}</dt><dd>${tvEsc(l[1])}</dd>`).join("")}<dt>Venue</dt><dd>${tvEsc(d.venue)}, stage ${tvEsc(d.stage)}</dd></dl>`
+    + `<div class="note" style="margin-top:0">Closed trades by how they ended (an invalidation is counted apart from a stop)</div><div class="trchips">${chips || "<span>no closed trades yet</span>"}</div>`
+    + `<div class="note" style="margin-top:0">Net result per day (bps, UTC day of the entry)${e && e.trades < TRADER.MIN_TRADES ? ": no colour until 20 trades" : ""}</div>${tvBars(TRADER.dayBars(rows, x.id), !!(e && e.trades >= TRADER.MIN_TRADES))}`
+    + `<div class="note" style="margin-top:0">Skipped triggers, latest first</div>` + (sk.length ? `<table class="tt"><tr><th>reason</th><th>count</th><th>last</th><th>what it means</th></tr>${sk.map(s => `<tr><td>${tvEsc(s.reason)}</td><td>${s.n}</td><td>${TRADER.dur((now - s.last) / 1000)} ago</td><td style="white-space:normal">${tvEsc(s.words)}</td></tr>`).join("")}</table>` : `<div class="note">No trigger has been skipped yet.</div>`);
+}
+
+// ----- the journal
+function tvJournalHtml(rows){
+  const lines = TRADER.journal(rows, {sys: TV.jSys || null, skips: tv$("trJSkips").checked, names: TV_NAMES, limit: 200}), day = Math.floor(nowEx() / 86400000);
+  if (!lines.length) return `<div class="note" style="margin-top:0">No trades yet. A trade appears here when a system closes one; tick "skips" to see the triggers a system did not take.</div>`;
+  const f = (x, d) => x == null ? "–" : TRADER.fx(x, d), cls = x => x == null || x === 0 ? "" : x > 0 ? "up" : "dn";
+  return `<div style="overflow-x:auto"><table class="tt trj"><tr><th>time</th><th>system</th><th>side</th><th class="jx">entry</th><th class="jx">exit</th><th>net bps</th><th>R</th><th>reason</th></tr>` + lines.map(l =>
+    `<tr><td>${tvTime(l.t, Math.floor(l.t / 86400000) !== day)}</td><td>${tvEsc(l.name)}</td><td>${l.dir > 0 ? "long" : l.dir < 0 ? "short" : "–"}</td><td class="jx">${l.entryPx == null ? "–" : TRADER.pxs(l.entryPx)}</td><td class="jx">${l.exitPx == null ? "–" : TRADER.pxs(l.exitPx)}</td><td class="${cls(l.netBps)}">${f(l.netBps, 2)}</td><td class="${cls(l.R)}">${f(l.R, 2)}</td><td class="rs">${l.kind === "skip" ? "skipped: " : ""}${tvEsc(l.reason)}</td></tr>`).join("") + `</table></div>`;
+}
+
+// ----- the chart
+function tvPrices(){ try{ return READER.priceHistory("bn") || []; }catch{ return []; } }
+function tvIdxAt(ph, t){ let lo = 0, hi = ph.length; while (lo < hi){ const m = (lo + hi) >> 1; if (ph[m][0] < t) lo = m + 1; else hi = m; } return lo; }
+function tvChartData(rows, st){
+  const ph = tvPrices(), win = TV.win * 60000, last = ph.length ? ph[ph.length - 1][0] : nowEx(), t1 = last, t0 = t1 - win, i0 = tvIdxAt(ph, t0), pts = ph.slice(i0);
+  const x = TV.sel ? TV_SYS.find(s => s.id === TV.sel) : null, priceAt = t => { const i = tvIdxAt(ph, t); return i < ph.length ? ph[i][1] : null; };
+  const items = TRADER.markers(rows, x ? x.id : null, t0, t1, priceAt);
+  let box = [], pos = null;
+  if (x && x.d.region.type === "rangeBox"){ const W = x.d.region.windowSec * 1000; box = TRADER.boxSeries(ph.slice(tvIdxAt(ph, t0 - W)), x.d.region.windowSec, t0, t1); }
+  const s = x && st ? st.find(q => q.id === x.id) : null; if (s && s.inst && s.inst.position && !s.inst.position.pending) pos = s.inst.position;
+  return {x, t0, t1, pts, items, box, pos, lastPx: pts.length ? pts[pts.length - 1][1] : null};
+}
+function tvDrawChart(m){
+  const cv = tv$("trChart"), {ctx, w, h} = prep(cv); TV.hits = [];
+  if (w < 30 || h < 30) return;
+  const L = 6, R = 64, T = 8, B = 34, pw = w - L - R, ph = h - T - B, span = m.t1 - m.t0;
+  if (!m.pts.length && !m.items.some(i => i.px != null || i.px0 != null)){ emptyMsg(ctx, w, h, "no price yet: press Connect"); return; }
+  let lo = Infinity, hi = -Infinity; const see = p => { if (typeof p === "number" && isFinite(p)){ if (p < lo) lo = p; if (p > hi) hi = p; } };
+  for (const p of m.pts) see(p[1]);
+  for (const i of m.items){ see(i.px); see(i.px0); see(i.px1); } for (const b of m.box){ see(b.hi); see(b.lo); } if (m.pos){ see(m.pos.stopPx); see(m.pos.targetPx); }
+  if (!(hi > lo)){ hi += 1; lo -= 1; } const pad = (hi - lo) * .06; lo -= pad; hi += pad;
+  const X = t => L + (t - m.t0) / span * pw, Y = p => T + (1 - (p - lo) / (hi - lo)) * ph, dec = hi - lo > 50 ? 1 : hi - lo > 5 ? 2 : 3;
+  // grid and axes
+  ctx.lineWidth = 1; ctx.textAlign = "left"; ctx.fillStyle = TH.dim; ctx.strokeStyle = TH.line;
+  const step = niceStep((hi - lo) / 4);
+  for (let p = Math.ceil(lo / step) * step; p <= hi; p += step){ const y = Math.round(Y(p)) + .5; ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(L + pw, y); ctx.stroke(); ctx.fillText(p.toFixed(dec), L + pw + 4, y + 3.5); }
+  const tick = TV.win <= 5 ? 60000 : TV.win <= 30 ? 300000 : 1200000; ctx.textAlign = "center";
+  for (let t = Math.ceil(m.t0 / tick) * tick; t <= m.t1; t += tick){ const x = Math.round(X(t)) + .5; ctx.beginPath(); ctx.moveTo(x, T); ctx.lineTo(x, T + ph); ctx.stroke(); ctx.fillText(tvTime(t).slice(0, 5), x, h - 5); }
+  // the range box
+  if (m.box.length > 1){
+    ctx.beginPath(); m.box.forEach((b, i) => i ? ctx.lineTo(X(b.t), Y(b.hi)) : ctx.moveTo(X(b.t), Y(b.hi))); for (let i = m.box.length - 1; i >= 0; i--) ctx.lineTo(X(m.box[i].t), Y(m.box[i].lo)); ctx.closePath();
+    ctx.fillStyle = TH.a("accent", .10); ctx.fill(); ctx.strokeStyle = TH.accent; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
+    for (const k of ["hi", "lo"]){ ctx.beginPath(); m.box.forEach((b, i) => i ? ctx.lineTo(X(b.t), Y(b[k])) : ctx.moveTo(X(b.t), Y(b[k]))); ctx.stroke(); } ctx.setLineDash([]);
+    ctx.fillStyle = TH.accent; ctx.textAlign = "left"; ctx.fillText("range box", L + 4, Y(m.box[0].hi) - 4 < T + 8 ? T + 10 : Y(m.box[0].hi) - 4);
+  }
+  // the price
+  if (m.pts.length > 1){ ctx.beginPath(); m.pts.forEach((p, i) => i ? ctx.lineTo(X(p[0]), Y(p[1])) : ctx.moveTo(X(p[0]), Y(p[1]))); ctx.strokeStyle = TH.text; ctx.lineWidth = 1.2; ctx.stroke(); }
+  // the stop and target of the open position
+  if (m.pos){
+    ctx.lineWidth = 1; ctx.setLineDash([6, 4]); ctx.textAlign = "left";
+    if (typeof m.pos.stopPx === "number"){ ctx.strokeStyle = TH.sell; ctx.fillStyle = TH.sell; ctx.beginPath(); ctx.moveTo(L, Y(m.pos.stopPx)); ctx.lineTo(L + pw, Y(m.pos.stopPx)); ctx.stroke(); ctx.fillText("stop " + m.pos.stopPx.toFixed(dec), L + 4, Y(m.pos.stopPx) - 3); }
+    if (typeof m.pos.targetPx === "number"){ ctx.strokeStyle = TH.buy; ctx.fillStyle = TH.buy; ctx.beginPath(); ctx.moveTo(L, Y(m.pos.targetPx)); ctx.lineTo(L + pw, Y(m.pos.targetPx)); ctx.stroke(); ctx.fillText("target " + m.pos.targetPx.toFixed(dec), L + 4, Y(m.pos.targetPx) - 3); }
+    ctx.setLineDash([]);
+  }
+  // trades: a line from entry to exit coloured by the result (dashed while open: warn if interrupted), entries as triangles, exits as squares with their reason
+  const res = n => n == null ? TH.hi : n > 0 ? TH.buy : n < 0 ? TH.sell : TH.hi, hit = (x, y, text) => TV.hits.push({x, y, text});
+  for (const i of m.items) if (i.kind === "line"){
+    const x0 = X(i.t0), y0 = Y(i.px0), end = i.t1 == null, x1 = end ? L + pw : X(i.t1), y1 = end ? (m.lastPx != null ? Y(m.lastPx) : y0) : Y(i.px1);
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.strokeStyle = i.interrupted ? TH.warn : res(i.netBps); ctx.lineWidth = 2; ctx.setLineDash(end ? [5, 4] : []); ctx.stroke(); ctx.setLineDash([]);
+    if (end){ ctx.fillStyle = i.interrupted ? TH.warn : TH.hi; ctx.textAlign = "right"; ctx.fillText(i.interrupted ? "interrupted" : "open", L + pw - 3, y1 - 5); }
+  }
+  ctx.textAlign = "left";
+  for (const i of m.items){
+    if (i.kind === "entry"){
+      const ln = m.items.find(q => q.kind === "line" && q.pid === i.pid), col = ln && ln.interrupted ? TH.warn : res(ln ? ln.netBps : null), x = X(i.t), y = Y(i.px), up = i.dir > 0;
+      ctx.beginPath(); ctx.moveTo(x, y + (up ? -7 : 7)); ctx.lineTo(x - 5, y + (up ? 3 : -3)); ctx.lineTo(x + 5, y + (up ? 3 : -3)); ctx.closePath(); ctx.fillStyle = col; ctx.fill(); ctx.strokeStyle = TH.canvas; ctx.lineWidth = 1; ctx.stroke();
+      hit(x, y, `Entry ${up ? "long" : "short"}${m.x ? "" : " (" + (TV_NAMES[i.sys] || "") + ")"} ${tvTime(i.t)} at ${TRADER.pxs(i.px)}, stop ${TRADER.fa(i.stopBps, 1)} bps. ${i.thesis || ""}`);
+    } else if (i.kind === "exit"){
+      const x = X(i.t), y = Y(i.px), col = res(i.netBps);
+      ctx.fillStyle = col; ctx.fillRect(x - 3.5, y - 3.5, 7, 7); ctx.strokeStyle = TH.canvas; ctx.strokeRect(x - 3.5, y - 3.5, 7, 7);
+      ctx.fillStyle = TH.text; ctx.textAlign = x > L + pw - 40 ? "right" : "left"; ctx.fillText(i.label, x + (x > L + pw - 40 ? -6 : 6), y - 6);
+      hit(x, y, `Exit by ${i.reason}${m.x ? "" : " (" + (TV_NAMES[i.sys] || "") + ")"} ${tvTime(i.t)} at ${TRADER.pxs(i.px)}: net ${TRADER.fx(i.netBps, 2)} bps, R ${TRADER.fx(i.R, 2)}.`);
+    } else if (i.kind === "invalidate" && i.px != null){
+      const x = X(i.t), y = Y(i.px);
+      ctx.beginPath(); ctx.moveTo(x, y - 8); ctx.lineTo(x + 6, y); ctx.lineTo(x, y + 8); ctx.lineTo(x - 6, y); ctx.closePath(); ctx.strokeStyle = TH.warn; ctx.lineWidth = 2; ctx.stroke();
+      hit(x, y, `Invalidated ${tvTime(i.t)}: ${i.why || "the thesis no longer held"}. The trade was closed at market (counted apart from a stop).`);
+    }
+  }
+  ctx.textAlign = "left";
+  // skipped triggers along the time axis
+  const sy = h - B + 4; ctx.strokeStyle = TH.accent; ctx.lineWidth = 2; ctx.fillStyle = TH.dim;
+  const sk = m.items.filter(i => i.kind === "skip");
+  for (const i of sk){ const x = Math.round(X(i.t)) + .5; ctx.beginPath(); ctx.moveTo(x, sy); ctx.lineTo(x, sy + 9); ctx.stroke(); TV.hits.push({x, y: sy + 4, skip: true, t: i.t, reason: i.reason}); }
+  ctx.lineWidth = 1;
+}
+function tvTip(ev){
+  const cv = tv$("trChart"), r = cv.getBoundingClientRect(), x = ev.clientX - r.left, y = ev.clientY - r.top; let best = null, bd = 1e9, near = [];
+  for (const q of TV.hits){
+    if (q.skip){ if (Math.abs(q.x - x) <= 6 && Math.abs(q.y - y) <= 14){ near.push(q); } continue; }
+    const d = Math.hypot(q.x - x, q.y - y); if (d < 11 && d < bd){ bd = d; best = q; }
+  }
+  const tip = tv$("trTip");
+  if (best) tip.textContent = best.text;
+  else if (near.length){ const c = {}; for (const q of near) c[q.reason] = (c[q.reason] || 0) + 1; tip.textContent = "Skipped trigger" + (near.length > 1 ? "s" : "") + " around " + tvTime(near[0].t) + ": " + Object.entries(c).map(([k, n]) => k + (n > 1 ? " ×" + n : "") + (TRADER.SKIP_WORDS[k] ? " (" + TRADER.SKIP_WORDS[k] + ")" : "")).join("; ") + "."; }
+  else if (ev.type !== "click" && ev.pointerType === "mouse") tip.textContent = TV.tipDefault;
+}
+tv$("trChart").addEventListener("pointermove", e => { if (e.pointerType === "mouse") tvTip(e); });
+tv$("trChart").addEventListener("click", tvTip);
+
+// ----- render (the view's slot render calls this; it throttles itself)
+function renderTrader(force){
+  const now = performance.now(); if (!force && now - TV.at < 450) return; TV.at = now;
+  try{
+    const rows = trRows(), run = TRN.runner, st = run ? run.state() : [], byId = Object.fromEntries(st.map(s => [s.id, s])), rk = run ? run.risk() : null;
+    tvEval(rows);
+    let interrupted = 0; for (const k in TV.ev) interrupted += TV.ev[k].interrupted;
+    tv$("trOn").checked = TRN.on;
+    tv$("trStat").textContent = TRADER.status({loaded: TRN.loaded, on: TRN.on, connected, asset: trAsset(), running: !!run, ageSec: Math.max(0, Math.round((nowEx() - TRN.lastT) / 1000)), feeBps: TR_CFG.feeBps, openRisk: rk ? rk.open : 0, riskCap: TR_CFG.riskCap, interrupted, err: TRN.err});
+    // one card per system
+    const t = nowEx(), html = TV_SYS.map(x => { const s = byId[x.id]; return tvSystemHtml(x, s, TRADER.cells({def: x.d, inst: s ? s.inst : null, led: s || null, ev: TV.ev[x.id] || null, twins: TV.tw[x.id] || [], t})); }).join("");
+    if (html !== TV.rowsHtml){
+      const keep = document.activeElement && document.activeElement.classList && document.activeElement.classList.contains("trname") ? document.activeElement.dataset.sys : null;
+      TV.rowsHtml = html; tv$("trRows").innerHTML = html; if (keep){ const b = tv$("trRows").querySelector(`.trname[data-sys="${keep}"]`); if (b) b.focus(); }
+    }
+    // the detail of the selected system
+    const det = tv$("trDetail"), x = TV.sel ? TV_SYS.find(q => q.id === TV.sel) : null;
+    if (!x){ det.hidden = true; TV.detHtml = ""; }
+    else { const dh = tvDetailHtml(x, TV.ev, rows); if (dh !== TV.detHtml){ TV.detHtml = dh; det.innerHTML = dh; } det.hidden = false; }
+    // the chart: redraws only when its data changed
+    tv$("trChartFor").textContent = x ? x.d.name : "all seven systems";
+    const m = tvChartData(rows, st), cv = tv$("trChart"), p = m.pos, key = [TV.sel, TV.win, m.t1, rows.length, cv.clientWidth, cv.clientHeight, p ? p.entryPx + ":" + p.stopPx + ":" + p.targetPx : "", TH.canvas].join("|");
+    if (key !== TV.drawKey){ TV.drawKey = key; tvDrawChart(m); }
+    if (!tv$("trTip").textContent) tv$("trTip").textContent = TV.tipDefault;
+    // the journal
+    const sel = tv$("trJSys"); if (!sel.options.length){ sel.innerHTML = `<option value="">all systems</option>` + TV_SYS.map(q => `<option value="${q.id}">${tvEsc(q.d.name)}</option>`).join(""); }
+    sel.value = TV.jSys;
+    const jh = tvJournalHtml(rows); if (jh !== TV.jHtml){ TV.jHtml = jh; tv$("trJournal").innerHTML = jh; }
+  }catch(e){ console.error("trader view", e); }
+}
+
+// ----- controls
+function tvSelect(id){ TV.sel = id; store.set("trSel", id); TV.drawKey = ""; renderTrader(true); }
+tv$("trRows").addEventListener("click", e => { const a = e.target.closest(".trsys"); if (!a) return; tvSelect(a.dataset.sys === TV.sel ? null : a.dataset.sys); });
+tv$("trDetail").addEventListener("click", e => { if (e.target.closest("[data-close]")) tvSelect(null); });
+tv$("trWin").onchange = () => { TV.win = +tv$("trWin").value; store.set("trWin", TV.win); TV.drawKey = ""; renderTrader(true); };
+tv$("trJSys").onchange = () => { TV.jSys = tv$("trJSys").value; store.set("trJSys", TV.jSys); renderTrader(true); };
+tv$("trJSkips").onchange = () => renderTrader(true);
+tv$("trOn").onchange = () => { trSetOn(tv$("trOn").checked); renderTrader(true); };
+tv$("trExport").onclick = trExportJournal;
+tv$("trReset").onclick = async () => { if (await trResetJournal()){ TV.evLen = -1; renderTrader(true); } };
+VIEWS.onOpen("overview", () => { TV.drawKey = ""; renderTrader(true); });
 
 </script>
 <script>
@@ -6667,7 +7166,7 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden && FS
 "use strict";
 // Header status (view): live chips next to Connect/Pause and the BN/HL pills (STATUS.chips, status-core.js), and the "newer version" bar.
 // Read-only: it only looks at the app's state once a second and never changes a feed, a recording or a detection. Loaded last.
-const APP_VERSION = "v138";            // "vNNN" in a release build, "dev" otherwise (build.mjs stamps it)
+const APP_VERSION = "v139";            // "vNNN" in a release build, "dev" otherwise (build.mjs stamps it)
 const SB = {latest:null, sure:false, timer:null};
 const sb$ = id => document.getElementById(id);
 sb$("ver").textContent = APP_VERSION;           // tiny version tag next to the title

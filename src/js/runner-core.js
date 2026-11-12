@@ -103,7 +103,10 @@ const RUNNER = (() => {
         return out;
       },
       state: () => S.map(s => ({ id: s.id, name: s.def.name, equity: s.led.eq, triggers: s.trig, secs: s.secs, twinForced: s.twins.length ? s.twins.reduce((a, w) => a + w.forced, 0) / s.twins.length : 0,
-        open: s.led.pos ? { dir: s.led.pos.dir, px: s.led.pos.px, tIn: s.led.pos.tIn, notional: s.led.pos.notional, exiting: s.led.pend } : null })),
+        open: s.led.pos ? { dir: s.led.pos.dir, px: s.led.pos.px, tIn: s.led.pos.tIn, notional: s.led.pos.notional, exiting: s.led.pend } : null,
+        inst: s.inst.state() })),      // the instance's own state (context, region, trigger reading, thesis, position with stop and target): read-only, for the Trader home; twins are not included
+      // the open risk of the systems against the cap (twins not counted), as fractions of equity
+      risk: () => ({ open: openRisk(), cap }),
     };
     return api;
   }

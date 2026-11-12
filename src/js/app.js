@@ -459,7 +459,7 @@ $("swMin").oninput = renderSweeps;
 // the navigation, and (render + minIntervalMs) how the frame loop draws it. Views of one slot (reader) share one render and one throttle.
 for (const [id, l, icon] of [["now","Now","M3 12h4l3-8 4 16 3-8h4"],["setups","Setups","M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"],["reader","Reader","M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 9a3 3 0 100 6 3 3 0 000-6z"],["review","Review","M4 6l2 2 3-3M4 14l2 2 3-3M13 7h8M13 15h8"],["rec","Recordings","M12 4a8 8 0 100 16 8 8 0 000-16zM12 9a3 3 0 100 6 3 3 0 000-6z"],["trade","Trade","M7 4v16M7 4L4 7M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3"],["system","System","M4 7h8M18 7h2M4 17h2M10 17h10M14 4v6M8 14v6"]]) VIEWS.area(id, l, icon);
 const READER_SLOT = {slot:"reader", render:()=>renderReader(), minIntervalMs:250};   // renderReader draws all of these views
-VIEWS.register({id:"overview", label:"Overview", area:"now", minIntervalMs:250, render:()=>{ try{ renderOverview(); }catch(e){ console.error("overview", e); } }});
+VIEWS.register({id:"overview", label:"Trader", area:"now", minIntervalMs:250, render:()=>{ if (typeof renderTrader==="function") renderTrader(); try{ renderOverview(); }catch(e){ console.error("overview", e); } }});
 VIEWS.register({id:"armmode", label:"Arm mode", area:"now"});
 VIEWS.register({id:"market", label:"Market and tape", area:"now"});
 VIEWS.register({id:"micro", label:"Microstructure", area:"setups", minIntervalMs:250, render:()=>renderMicro()});
