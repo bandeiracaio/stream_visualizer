@@ -2477,8 +2477,8 @@ const EXEC = (() => {
     }
     function sendExit(p, now) {
       p.tries = (p.tries || 0) + 1;
-      if (p.tries > 1) note(p, "exit retried");
-      const cid = mkCid(p, "x"); send({ op: "market", role: "x", side: (p.closeSide || (p.dir > 0 ? "SELL" : "BUY")), qty: p.qty, qtyStr: p.qtyStr || String(p.qty), reduce: true, cid }, now);
+      if (p.tries === 2) { note(p, "exit retried"); fault2(p, "exit needed more than one attempt", "the first exit order got no answer or was refused", now); }      // rule 12: any exit that needed a second attempt
+      const cid = mkCid(p, "x"); (p.exitCids = p.exitCids || []).push(cid); send({ op: "market", role: "x", side: (p.closeSide || (p.dir > 0 ? "SELL" : "BUY")), qty: p.qty, qtyStr: p.qtyStr || String(p.qty), reduce: true, cid }, now);
     }
     function failEntry(p, why, now) {      // nothing is held: the trade stays a paper trade
       note(p, why); writeRow(p, now, "failed"); pos = null; st = "idle";
@@ -2576,7 +2576,11 @@ const EXEC = (() => {
         if (res.ok) return gotExit(pos, res.data, now);
         // the exchange said no: with no position left (reduce-only refused) the stop probably fired; the next poll tells. Otherwise try again, up to the limit.
         if (pos.tries >= C.exitTries) { pos.exitFailed = true; st = "stuck"; return fault("exit failed", res.err, now); }
-        if (pos.tries === 1) { fault2(pos, "exit needed more than one attempt", res.err, now); }
+        if (/-2022/.test(String(res.err)) && pos.tries > 1 && !pos.prevChecked) {      // refused as reduce-only with nothing to reduce: an earlier attempt probably did fill, its answer was lost. Look each one up by client id.
+          pos.prevChecked = true; pos.prevMiss = 0; const prev = pos.exitCids.slice(0, -1); pos.prevN = prev.length;
+          for (const c of prev) send({ op: "lookup", role: "x", of: c, algo: false, orig: { role: "x" }, since: now, prev: true }, now);
+          return;
+        }
         return sendExit(pos, now);
       }
       if (role === "c") {
@@ -2611,6 +2615,7 @@ const EXEC = (() => {
       if (role === "x") {
         if (!pos || pos.exit) return;
         if (d.found && d.qty > 0) return gotExit(pos, d, now);
+        if (q.prev) { if (++pos.prevMiss >= pos.prevN) { fault2(pos, "unknown order state", "the exit was refused as reduce-only and no earlier exit order was found", now); pos.paperDone = pos.paperDone === undefined ? "none" : pos.paperDone; writeRow(pos, now, "failed"); pos = null; st = "idle"; } return; }
         return sendExit(pos, now);      // never reached the exchange
       }
     }
@@ -2618,7 +2623,7 @@ const EXEC = (() => {
       for (const [id, p] of Array.from(pend)) if (p.due <= now) { pend.delete(id); late.set(id, p); unknown(p, now); }
       for (let i = retry.length - 1; i >= 0; i--) {
         const x = retry[i]; if (x.at > now) continue; retry.splice(i, 1);
-        if (now - x.q.since > C.unknownMs) { if (pos) { fault2(pos, "unknown order state", "order " + x.q.of + " still unknown after 5 s", now); closeAfterUnknown(now); } continue; }
+        if (now - x.q.since > C.unknownMs) { if (pos) { fault2(pos, "unknown order state", "order " + x.q.of + " still unknown after 5 s", now); if (x.q.role === "x" && !x.q.prev && !pos.exit && !pos.resent && pos.tries < C.exitTries) { pos.resent = true; sendExit(pos, now); } else closeAfterUnknown(now); } continue; }      // an exit that stayed unknown is sent again once (reduce-only: it cannot double-close)
         send(Object.assign({}, x.q), now);
       }
       if (pos && st === "stopping" && !pos.stopDone && now >= pos.stopDue) { pos.stopDone = false; stopLate(pos, now); }
@@ -2726,6 +2731,7 @@ const EXEC = (() => {
         S.now = now; S.sent.push(r); const k = r.op + ":" + r.role, n = S.count[k] = (S.count[k] || 0) + 1, b = S.beh[k + "#" + n] || S.beh[k];
         const answer = (a, delay) => S.queue.push({ at: now + (delay || 50), id: r.id, a });
         if (b === "lost") return;
+        if (r.op === "lookup" && S.downUntil > now) return answer({ ok: false, unknown: true, err: "timeout" });
         let a;
         if (r.op === "market") {
           if (r.reduce && (S.pos === 0 || Math.sign(S.pos) === (r.side === "BUY" ? 1 : -1))) a = { ok: false, code: -2022, err: "-2022 ReduceOnly rejected" };
@@ -2821,6 +2827,10 @@ const EXEC = (() => {
     const hold = (over) => { const o = happy(over); return o; };
     { const { R, e } = hold({ beh: { "market:x#1": "reject" } }); R.run(500); R.row(exitRow(e, R.now)); R.run(2000); R.row(tradeRow(e, R.now)); R.run(500);
       ok("an exit that needed a second attempt succeeds, is a fault, and ends flat", R.flat() && R.faults.some(f => f.kind === "exit needed more than one attempt") && R.rows.some(x => x.k === "mirror" && x.fill === "demo"), JSON.stringify([R.faults, R.X.sent.map(r => r.op + r.role)])); }
+    { const { R, e } = hold({ beh: { "market:x#1": "lost" } }); R.run(500); R.row(exitRow(e, R.now)); R.run(9000); R.row(tradeRow(e, R.now)); R.run(500);
+      ok("an exit that got no answer and never reached the exchange is looked up, sent again, and is a fault (needed more than one attempt)", R.flat() && R.faults.some(f => f.kind === "exit needed more than one attempt") && R.rows.some(x => x.k === "mirror" && x.fill === "demo" && x.notes.includes("exit retried")), JSON.stringify([R.faults, R.rows])); }
+    { const { R, e } = hold({ beh: { "market:x#1": "silent" } }); R.run(500); R.X.downUntil = R.now + 16000; R.row(exitRow(e, R.now)); R.run(26000); R.row(tradeRow(e, R.now)); R.run(500);
+      ok("an exit that DID fill but whose answer was lost, with the lookup down for 16 s: still unknown 5 s after the 8 s request timeout (fault), sent again, refused as reduce-only, the earlier exit is found by its client id, the row has its real fill, flat", R.flat() && R.faults.some(f => f.kind === "unknown order state") && R.rows.some(x => x.k === "mirror" && x.status === "filled" && x.exitPx > 0), JSON.stringify([R.faults.map(f => f.kind), R.rows, R.X.pos])); }
     { const { R, e } = hold({ beh: { "market:x": "reject" } }); R.run(500); R.row(exitRow(e, R.now)); R.run(3000);
       ok("an exit that always fails stops after three tries, raises a fault, keeps the stop on the exchange and waits for the user (no endless loop)", R.X.sent.filter(r => r.op === "market" && r.role === "x").length === 3 && R.faults.some(f => f.kind === "exit failed") && R.X.stops.length === 1 && R.X.pos === 1 && R.M.state().state === "fault", JSON.stringify(R.M.state())); }
     { const { R, e } = hold(); R.run(500); R.X.setPx(99.0, R.now); R.run(3200);
@@ -7551,7 +7561,7 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden && FS
 "use strict";
 // Header status (view): live chips next to Connect/Pause and the BN/HL pills (STATUS.chips, status-core.js), and the "newer version" bar.
 // Read-only: it only looks at the app's state once a second and never changes a feed, a recording or a detection. Loaded last.
-const APP_VERSION = "v146";            // "vNNN" in a release build, "dev" otherwise (build.mjs stamps it)
+const APP_VERSION = "v147";            // "vNNN" in a release build, "dev" otherwise (build.mjs stamps it)
 const SB = {latest:null, sure:false, timer:null};
 const sb$ = id => document.getElementById(id);
 sb$("ver").textContent = APP_VERSION;           // tiny version tag next to the title
