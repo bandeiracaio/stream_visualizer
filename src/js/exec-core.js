@@ -162,7 +162,8 @@ const EXEC = (() => {
     function fault2(p, kind, text, now) { const f = { t: now, kind, text: String(text || "") }; faults.push(f); newFaults.push(f); faultWhy = kind; }
     // no answer (timeout, dropped): ask the exchange by client id; a state still unknown after 5 s is a fault
     function unknown(p, now) {
-      const r = p.r; if (r.role === "c") { if (pos) { fault2(pos, "unknown order state", "cancel of the stop timed out", now); pos.exitCancelPending = false; tryFinalize(now); } return; }
+      const r = p.r; if (r.op === "lookup") { retry.push({ q: r, at: now }); return; }      // a lookup that got no answer continues the same 5 s clock (its own since), it does not start a new one
+      if (r.role === "c") { if (pos) { fault2(pos, "unknown order state", "cancel of the stop timed out", now); pos.exitCancelPending = false; tryFinalize(now); } return; }
       const q = { op: "lookup", role: r.role, of: r.cid, algo: r.role === "s", orig: r, since: p.since || now };
       send(q, now);
     }
@@ -197,6 +198,7 @@ const EXEC = (() => {
       }
       if (pos && st === "stopping" && !pos.stopDone && now >= pos.stopDue) { pos.stopDone = false; stopLate(pos, now); }
     }
+    const exitBusy = () => { for (const q of pend.values()) if (q.r.role === "x") return true; return retry.some(x => x.q.role === "x"); };
     function closeAfterUnknown(now) { if (pos && pos.entry && !pos.closing) closeNow("unknown order state", now); else if (pos && !pos.entry) { pos.closeFromPoll = true; pos.why = "unknown order state"; } }      // no fill is known: the next poll says what is held
     function stopLate(p, now) {
       if (p.closing) return;
@@ -231,6 +233,11 @@ const EXEC = (() => {
         p.closeFromPoll = false; for (const k of own) send({ op: "cancel", role: "c", cid: k.cid, algo: !!k.algo, recon: true }, now);
         if (Math.abs(net) < 1e-12) { writeRow(p, now, "failed"); pos = null; st = "idle"; return; }
         p.dir = net > 0 ? 1 : -1; p.qty = Math.abs(net); p.qtyStr = toStr(p.qty, p.step || 0.001); p.closing = true; p.entryDone = true; p.stopDone = true; p.paperDone = p.paperDone === undefined ? "none" : p.paperDone; st = "exiting"; sendExit(p, now); return;
+      }
+      if (p.closing && !p.exit && !p.exitFailed && (st === "exiting" || st === "stuck") && !exitBusy()) {      // an exit that stalled (the exchange or the network was down for longer than the retries): the poll takes it up again
+        if (Math.abs(net) > 1e-12) { if (p.tries < 6) { p.resent = false; sendExit(p, now); } else { p.exitFailed = true; st = "stuck"; fault2(p, "exit failed", "six exit attempts, the position is still open", now); } }
+        else if (p.exitCids && p.exitCids.length && !p.prevChecked) { p.prevChecked = true; p.prevMiss = 0; p.prevN = p.exitCids.length; for (const c of p.exitCids) send({ op: "lookup", role: "x", of: c, algo: false, orig: { role: "x" }, since: now, prev: true }, now); }
+        return;
       }
       if (st === "holding") {
         if (Math.abs(net) < 1e-12) {      // flat: the exchange stop fired before the paper exit
@@ -300,6 +307,7 @@ const EXEC = (() => {
         S.now = now; S.sent.push(r); const k = r.op + ":" + r.role, n = S.count[k] = (S.count[k] || 0) + 1, b = S.beh[k + "#" + n] || S.beh[k];
         const answer = (a, delay) => S.queue.push({ at: now + (delay || 50), id: r.id, a });
         if (b === "lost") return;
+        if (S.netDown > now) return;      // the network is down: nothing reaches the exchange, nothing comes back
         if (r.op === "lookup" && S.downUntil > now) return answer({ ok: false, unknown: true, err: "timeout" });
         let a;
         if (r.op === "market") {
@@ -400,6 +408,10 @@ const EXEC = (() => {
       ok("an exit that got no answer and never reached the exchange is looked up, sent again, and is a fault (needed more than one attempt)", R.flat() && R.faults.some(f => f.kind === "exit needed more than one attempt") && R.rows.some(x => x.k === "mirror" && x.fill === "demo" && x.notes.includes("exit retried")), JSON.stringify([R.faults, R.rows])); }
     { const { R, e } = hold({ beh: { "market:x#1": "silent" } }); R.run(500); R.X.downUntil = R.now + 16000; R.row(exitRow(e, R.now)); R.run(26000); R.row(tradeRow(e, R.now)); R.run(500);
       ok("an exit that DID fill but whose answer was lost, with the lookup down for 16 s: still unknown 5 s after the 8 s request timeout (fault), sent again, refused as reduce-only, the earlier exit is found by its client id, the row has its real fill, flat", R.flat() && R.faults.some(f => f.kind === "unknown order state") && R.rows.some(x => x.k === "mirror" && x.status === "filled" && x.exitPx > 0), JSON.stringify([R.faults.map(f => f.kind), R.rows, R.X.pos])); }
+    { const { R, e } = hold(); R.run(500); R.X.netDown = R.now + 45000; R.row(exitRow(e, R.now)); R.run(30000); const during = { pos: R.X.pos, state: R.M.state().state }; R.run(30000); R.row(tradeRow(e, R.now)); R.run(1000);
+      ok("a network drop of 45 s across the exit: the position stays (the stop holds it), faults are raised, and once the network is back the poll sends the exit again; flat, one mirror row with the real exit", during.pos === 1 && R.flat() && R.faults.some(f => f.kind === "unknown order state") && R.rows.filter(x => x.k === "mirror" && x.status === "filled").length === 1 && R.M.state().phase === "idle", JSON.stringify([during, R.faults.map(f => f.kind), R.rows.map(x => x.status), R.X.pos, R.M.state()])); }
+    { const { R, e } = hold({ beh: { "market:x#1": "silent" } }); R.run(500); R.X.netDown = R.now + 40000; R.row(exitRow(e, R.now)); R.run(70000); R.row(tradeRow(e, R.now)); R.run(1000);
+      ok("an exit that DID fill, then a 40 s drop: flat on the exchange and nothing left to reduce; the poll looks up the earlier exit by client id and the row has its real fill", R.flat() && R.rows.some(x => x.k === "mirror" && x.status === "filled" && x.exitPx > 0) && R.M.state().phase === "idle", JSON.stringify([R.faults.map(f => f.kind), R.rows, R.M.state()])); }
     { const { R, e } = hold({ beh: { "market:x": "reject" } }); R.run(500); R.row(exitRow(e, R.now)); R.run(3000);
       ok("an exit that always fails stops after three tries, raises a fault, keeps the stop on the exchange and waits for the user (no endless loop)", R.X.sent.filter(r => r.op === "market" && r.role === "x").length === 3 && R.faults.some(f => f.kind === "exit failed") && R.X.stops.length === 1 && R.X.pos === 1 && R.M.state().state === "fault", JSON.stringify(R.M.state())); }
     { const { R, e } = hold(); R.run(500); R.X.setPx(99.0, R.now); R.run(3200);
