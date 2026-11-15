@@ -54,7 +54,8 @@ After each finished step, so the user always has an up-to-date single file. Anot
 ## Pre-registered studies
 
 - A registered plan lives in `.scratch/<study>/plan.md`; a change to it is an amendment in that file.
-- The studies that were registered before v135 are archived and closed (`archive/README.md`); none is open.
+- The studies that were registered before v135 are archived and closed (`archive/README.md`).
+- Open: `.scratch/episode-outcomes/plan.md` (registered 2026-11-15). Its test set is every recording from 2026-11-16T00:00Z on: until the plan's one test run, look at nothing in those recordings but hours recorded, runs and episode counts.
 
 ## Where to look
 
