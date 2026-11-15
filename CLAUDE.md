@@ -24,8 +24,8 @@ The app ships as ONE self-contained HTML file (offline-capable from a phone or P
 - `node build.mjs` runs the Reader self-test, compiles every included `.js` file (a syntax error in a page file aborts the build; the self-test alone does not parse them), then writes `dist/stream-visualizer.html` (dev build).
 - `node build.mjs --release` writes the next `stream-visualizer_vNNN.html` into `releases/` (never overwrites an existing version; the number is the highest in `releases/` or the repo root, plus one).
 - Folders: `releases/` holds only the newest released page (older ones are GitHub Releases assets: tag `archive-v001-vNNN`, then one `vNNN` each); `sessions/` holds the saved recordings (`session_*.json.gz`, gitignored; point the app's save folder at it: Recordings, Saved recordings, Choose folder); `prompt-builder.html` (repo root) is a single-file page for building prompts to give other Claudes, read from `docs/agents/matt-pocock-skills.md` and regenerated from it.
-- Line endings are mixed: `app.js`, `reader-episodes.js`, `reader-register.js`, `reader-tools.js` are CRLF, `reader-selftest.js` is CRLF with some LF lines, the rest LF. Edit without converting (Python `open(..., newline="")`), then check `git diff --stat`: a whole-file diff means the endings changed.
-- `hooks/pre-commit` (tracked) fails a commit that changes a file's line-ending style or breaks `node build.mjs`. Enable it once per clone: `git config core.hooksPath hooks`. Bypass: `git commit --no-verify`.
+- Line endings: every text file is LF (`.gitattributes`); git converts on commit, so there is nothing to keep by hand.
+- `hooks/pre-commit` (tracked) fails a commit that breaks `node build.mjs`. Enable it once per clone: `git config core.hooksPath hooks`. Bypass: `git commit --no-verify`.
 - Scope: each piece of work is its own step and its own release. UX steps leave the Reader engine, trading / paper-broker and feed logic alone; note anything else spotted instead of changing it. Feature steps (Overview, then the Reader redesign) may touch the engine, which stays pure, with a self-test scenario for each new behaviour.
 
 ## Release
@@ -34,7 +34,7 @@ After each finished step, so the user always has an up-to-date single file. Anot
 
 1. `git fetch`; if `origin/main` is ahead, rebase on it first. Done when `git status -sb` shows you are not behind.
 2. `node build.mjs` exits 0.
-3. `git diff --stat` shows no whole-file diff (line endings kept).
+3. `git diff --stat` shows only the files you meant to change.
 4. `node build.mjs --release` prints the new `releases/stream-visualizer_vNNN.html` and deletes the previous file from `releases/`.
 5. `node build.mjs --verify` exits 0 (the release file equals a build of `src/`; CI runs the same check).
 6. Commit and push to `main`. The repo is public and `.github/workflows/pages.yml` serves the newest release at https://bandeiracaio.github.io/stream_visualizer/ on every push to `main`; unreleased `src/` work never goes live. CI deploys only a release that passes the self-test and matches `src/`, and attaches it to a GitHub Release `vNNN`. A failed Actions run means the site was NOT updated: check `gh run list --limit 3`. Pages caches about 10 minutes, so a phone may need a reload.

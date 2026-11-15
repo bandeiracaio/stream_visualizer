@@ -37,7 +37,7 @@ Stream Visualizer tries to do both jobs honestly:
 | **Recording quality** | Every saved session records how complete it is (minutes with data, longest silence, clock rate) and the Saved recordings list shows it, so a hollow file is obvious before you replay it. |
 | **Health log** | A black box under Saved recordings that survives a reload: when the tab was hidden or frozen, timers stalled or the computer slept, a venue went silent, the price stream dropped, the screen lock was lost, or learning started over. Download it next to a recording that has holes, to see why. |
 | **Knows when it is out of date** | The hosted page checks for a newer release and offers a Reload bar. It never reloads by itself, and asks twice while the page is recording. |
-| **Pure, tested engine** | The Reader engine has no DOM and no timers, and 100+ simulator scenarios run on every build; a failing one aborts the build. |
+| **Pure, tested engine** | The Reader engine has no DOM and no timers, and 370+ self-test scenarios run on every build; a failing one aborts the build. |
 | **Trading built in** | A simulated paper broker filled against live prices, Binance's own demo account, or a real-money Binance account behind an explicit acknowledgement. |
 
 ## Quick start
@@ -97,21 +97,21 @@ cd dist && python -m http.server 8765    # then open http://localhost:8765/strea
 
 ### Commit hook
 
-A tracked pre-commit hook (`hooks/pre-commit`) refuses a commit that changes a file's line-ending style (several files are deliberately CRLF or mixed) or that breaks `node build.mjs`. Enable it once per clone:
+A tracked pre-commit hook (`hooks/pre-commit`) refuses a commit that breaks `node build.mjs`. Enable it once per clone:
 
 ```bash
 git config core.hooksPath hooks
 ```
 
-Bypass it for one commit with `git commit --no-verify`. `.gitattributes` keeps the hook itself LF.
+Bypass it for one commit with `git commit --no-verify`. `.gitattributes` keeps every text file LF.
 
 ## Publishing
 
-The repository is public and serves GitHub Pages. `.github/workflows/pages.yml` runs on every push to `main`: it runs the self-test, rebuilds the newest `releases/stream-visualizer_vNNN.html` from `src/` and compares it byte for byte with the committed file. Only if they match is that file published as the site (plus a `version.json` the page reads to offer updates) and attached to a GitHub Release tagged `vNNN`; otherwise the run fails and the site keeps the previous page. So the flow is: `node build.mjs --release`, `node build.mjs --verify`, commit, push. Unreleased work in `src/` never goes live. `releases/` holds only the newest file; every older version is a GitHub Release asset. GitHub caches the page for about ten minutes, so a phone may need a reload. GitHub caches the page for about ten minutes, so a phone may need a reload.
+The repository is public and serves GitHub Pages. `.github/workflows/pages.yml` runs on every push to `main`: it runs the self-test, rebuilds the newest `releases/stream-visualizer_vNNN.html` from `src/` and compares it byte for byte with the committed file. Only if they match is that file published as the site (plus a `version.json` the page reads to offer updates) and attached to a GitHub Release tagged `vNNN`; otherwise the run fails and the site keeps the previous page. So the flow is: `node build.mjs --release`, `node build.mjs --verify`, commit, push. Unreleased work in `src/` never goes live. `releases/` holds only the newest file; every older version is a GitHub Release asset. GitHub caches the page for about ten minutes, so a phone may need a reload.
 
 ## Testing
 
-`node build.mjs` runs 100+ simulator scenarios in a sandbox before writing anything and aborts on the first failure. They cover each detector and episode family, the episode layer, the broker and the collectors.
+`node build.mjs` runs 370+ self-test scenarios in a sandbox before writing anything and aborts if any fails. They cover the pure files: the Reader engine and episode layer, the trade systems, the paper runner, recording chunks, promotion, demo execution, the brokers and the collectors. The files that touch the page are only compiled, not run.
 
 Rule of thumb in this repo: any new engine behaviour ships with a scenario, and any change to evidence cut-offs is byte-compared on simulated and recorded data before and after.
 
@@ -120,24 +120,34 @@ Rule of thumb in this repo: any new engine behaviour ships with a scenario, and 
 ```
 src/
   index.html            page skeleton, with <!--@include path--> markers
-  styles.css
+  styles.css            every colour is a token in :root
   js/
-    app.js              feeds, charts, navigation, Reader cards
-    trader-core.js      Trader home: cells, chart markers, journal lines (pure)
-    trader-view.js      Trader home view
-    overview.js         market / account / recording cards under the Trader home
-    reader-engine.js    pure order-flow engine + one-off detectors (replayable)
+    *-core.js           pure logic (no DOM, timers or storage), self-tested by the build:
+                        system, runner, chunk, promotion, exec, trader, paper-broker,
+                        market, micro, history, collectors, status, disk
+    reader-engine.js    pure order-flow engine and one-off detectors (replayable)
     reader-episodes.js  pure episode state machines and evidence checklists
-    reader-tools.js     record / save / load / replay, timeline
-    recordings.js       saved recordings: IndexedDB copies with Share / Download / Open / Delete
-    status-core.js      pure header status chips and the version comparison
-    status-bar.js       its view: chips next to Connect/Pause, the "newer version" bar
     reader-selftest.js  simulator scenarios (run by the build)
-.github/workflows/     test, verify release == src/, Pages deploy, GitHub Release
-build.mjs               self-test + single-file assembler
+    systems-default.js  the seven default paper systems (data only)
+    hooks.js, views.js  the seams: late extension points and the view registry
+    feeds.js            Binance and Hyperliquid sockets, books, the input pipeline
+    app.js              charts, navigation, account state, order placement, timers
+    runner.js, exec.js  page side of the paper runner and of demo execution
+    run-record.js       continuous recording; recordings.js, folder-save.js: saved copies
+    collectors*.js      the collectors, their worker and the 24 h tape
+    *-view.js, overview.js, reader-cards.js, reader-tools.js, order-history.js,
+    account-*.js, status-*.js, health-log.js   the views
+build.mjs               self-test + single-file assembler (--release, --verify)
+design-harness.mjs      replays recordings through the same cores (--replay-run)
+compare-detections.mjs  byte-compares detections between two revisions
+demo-proxy.mjs          local CORS proxy for the Binance demo host
+releases/               the newest released page (older ones are GitHub Releases)
+sessions/               saved recordings (gitignored)
+.github/workflows/      test, verify release == src/, Pages deploy, GitHub Release
 docs/adr/               architecture decision records
-docs/data-collection-checklist.md   what to do before, during and after collecting data
-.scratch/               local specs and issues (one folder per feature)
+docs/agents/            reference for coding agents (source-map.md is the file-by-file map)
+.scratch/               local specs and study results (one folder per feature)
+archive/                closed studies and their scripts
 CONTEXT.md              the domain language
 ```
 
