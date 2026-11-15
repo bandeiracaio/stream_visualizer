@@ -103,3 +103,42 @@ The day and episode counts may be raised by an amendment, using only the explora
 - The Binance mid is the price; spread and fees enter only through the 11 bps bar.
 - The preceding-move match uses one window (60 s); a different window could give a different control.
 - The Reader's thresholds were tuned earlier from the user's labels on part of the exploration period, not on outcomes.
+
+## Amendment 1 (2026-11-15, before the test set exists): how the script measures, and the registered command
+
+Written after building `episode-outcomes.mjs` and running it on the exploration set only. Nothing in sections 1 to 7 changes; these are the points the plan left open.
+
+1. **Prices** are read from the one-a-second snapshots the page's own accumulator makes (the engine's Binance mid): the first snapshot at or after the wanted time, at most 5 s late, otherwise there is no price. Three episodes were checked by hand against the raw Binance quotes and matched to the third decimal.
+2. **Sigma** is the engine's Binance sigma at the start; an episode that starts before the engine is calibrated is dropped and counted.
+3. **A control is at least 60 s from its own episode's start**, so an episode is never compared with itself.
+4. **A result at a horizon needs at least 5 of the episode's controls to have a result at that horizon.**
+5. **Size and venue** (splits 1 and 3) are taken as the group is first seen, about 1 s after detection and before the start price. Size for a burst is `facts.notional`.
+6. **A run that crosses the cut** is replayed whole (the engine needs its warm-up), and an episode or control belongs to the set its start falls in.
+7. **Recorded hours** are seconds that have a Binance price, counted per UTC day. A silence inside a run is not recorded time.
+8. **A cell with fewer than 10 UTC days gets no verdict.** A bootstrap over a handful of days says nothing (four recordings gave "alive" on two days). At the fallback date this can only push a verdict toward "underpowered".
+9. **Detections use the default configuration**, not the settings the page had while recording.
+10. **Controls** are drawn by a generator seeded from the run, the episode and the fixed seed 20261115, so a rerun gives the same numbers.
+
+### Registered commands
+
+- Before the run, as often as wanted: `node episode-outcomes.mjs sessions --count`
+- The run, once: `node episode-outcomes.mjs sessions --confirm-test --out .scratch/episode-outcomes/test.json`
+
+The script is the one committed together with this amendment. A fix to it after that is a new amendment that says what changed and why, written before the run.
+
+### Power, from the exploration set (142 recorded hours, 15 days with an episode, 11,841 episodes measured)
+
+- Episodes are frequent: about 80 an hour across the three families. The 300-per-family condition is met within a day; the 21-day condition is the one that decides when the test runs.
+- Half-width of the 95% interval at 5 min on the exploration set: about 0.5 bps (absorption) and 0.8 bps (exhaustion), with 3,400 to 4,400 episodes over 14 to 15 days. The "closed" bar of 3 bps is well within reach, so "underpowered" is unlikely for the horizons up to 15 min.
+- The 60 min horizon had results on 2 to 3 days only (one long run). It is the horizon the test set adds.
+- The day and episode counts of section 7 are left as they are.
+
+### What the exploration set showed (exploratory, not evidence, disclosed so the test cannot be read as a discovery)
+
+Against the matched control, in bps, positive = with the aggressor:
+
+- Absorption: within 0.3 of 0 at every horizon from 10 s to 15 min.
+- Exhaustion: -0.9 at 5 min and -2.0 at 15 min (99.5% interval -3.1 to -1.3 at 15 min): the price went against the side that had been dominant. Under the "alive" bar of 3 bps.
+- Bursts: +0.3 at 30 s and 1 min, -1.4 at 15 min.
+
+These periods overlap the data the Reader's thresholds were tuned on and the earlier study's sessions, many of them started by a volatility trigger.

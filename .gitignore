@@ -12,3 +12,4 @@ health_*.json
 panel/
 
 .secrets/
+.scratch/episode-outcomes/*.json
