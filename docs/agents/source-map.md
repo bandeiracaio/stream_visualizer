@@ -4,6 +4,8 @@ Reference, read when you touch that area. Specs are in `.scratch/<feature>/`, de
 
 Pure files (checked: no DOM, storage or socket use): every `*-core.js`, `hooks.js`, `views.js`, `session-quality.js`, and the Reader engine files `reader-episodes`, `reader-engine`, `reader-selftest`, and `broker.js` (it fetches and signs only through injected functions). Every other file touches the page.
 
+Page files are checked by the build's boot check (`lib/page-boot.mjs`): the assembled page's scripts run in page order in a stub browser, each timer's first callback runs once, the worker source runs in a stub worker, and every name read as `typeof name === "function"` must be a function at the end. A new global used across files needs nothing more; a new browser API the page calls at load time may need a line in the stub's list.
+
 ## Seams
 
 - `src/js/hooks.js` (`HOOKS.on(name, fn)` / `HOOKS.emit(name, ...args)`): the way a late-loaded module extends an owner's function. Names: `renderReader` (end of `renderReader`), `renderAccount` (end of `renderAccount`), `logout` (end of `logout`), `bnDepth` (start of `bnDepth`, before the book applies it; no subscriber since the book collector moved to the worker). Subscribers run in script-load order; an error in one is logged and contained.

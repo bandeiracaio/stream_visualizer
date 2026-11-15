@@ -111,7 +111,7 @@ The repository is public and serves GitHub Pages. `.github/workflows/pages.yml` 
 
 ## Testing
 
-`node build.mjs` runs 370+ self-test scenarios in a sandbox before writing anything and aborts if any fails. They cover the pure files: the Reader engine and episode layer, the trade systems, the paper runner, recording chunks, promotion, demo execution, the brokers and the collectors. The files that touch the page are only compiled, not run.
+`node build.mjs` runs 370+ self-test scenarios in a sandbox before writing anything and aborts if any fails. They cover the pure files: the Reader engine and episode layer, the trade systems, the paper runner, recording chunks, promotion, demo execution, the brokers and the collectors. The files that touch the page have no scenarios; instead the build loads the assembled page in a stub browser (`lib/page-boot.mjs`) and aborts if a script fails to load in page order, a first timer callback throws, or a function the page looks up by name is missing.
 
 Rule of thumb in this repo: any new engine behaviour ships with a scenario, and any change to evidence cut-offs is byte-compared on simulated and recorded data before and after.
 

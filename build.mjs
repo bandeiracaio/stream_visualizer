@@ -6,10 +6,12 @@
 //   node build.mjs --verify   -> rebuilds the newest releases/ file from src/ and compares it byte for byte; exit 1 on a difference
 // --release deletes the previous release file from releases/ (older ones live in GitHub Releases).
 // The Reader self-test runs first; a failing scenario aborts the build. Every included .js file must also compile (a syntax error aborts it).
+// Then the assembled page is booted in a stub browser (lib/page-boot.mjs): a script that fails to load, or a first timer callback that throws, aborts the build.
 import fs from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
+import { pageBoot } from "./lib/page-boot.mjs";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const src = p => path.join(root, "src", p);
@@ -29,15 +31,23 @@ function syntaxCheck(name, body) {
   catch (e) { console.error("\nsyntax error in src/" + name + ": " + e.message + "\n" + (e.stack || "").split("\n").slice(0, 4).join("\n") + "\nbuild aborted."); process.exit(1); }
 }
 
+const included = [];      // [file, body] of every included script, so the boot check can name a script by its file
 function assemble() {
   return read("index.html").split("\n").map(line => {
     const m = line.match(/^<!--@include (\S+)-->$/);
     if (!m) return line;
     const body = read(m[1]);
     if (/<\/script/i.test(body)) throw new Error(`${m[1]} contains "</script", which would end the inline script early`);
-    if (m[1].endsWith(".js")) syntaxCheck(m[1], body);
+    if (m[1].endsWith(".js")) { syntaxCheck(m[1], body); included.push([m[1], body]); }
     return body;
   }).join("\n");
+}
+
+// The files that touch the page are not in the self-test; this loads the assembled page the way a browser would (same scripts, same order) in a stub browser.
+async function bootCheck(html) {
+  const results = await pageBoot(html, body => (included.find(([, b]) => body.startsWith(b.slice(0, 300))) || [])[0]);
+  for (const r of results) console.log((r.ok ? "  pass  " : "  FAIL  ") + r.name + (r.ok ? "" : "\n        " + r.detail));
+  if (results.some(r => !r.ok)) { console.error("\nthe built page does not start cleanly; build aborted."); process.exit(1); }
 }
 
 const releaseDir = path.join(root, "releases");      // every stream-visualizer_vNNN.html lives here (until v098 they sat in the repo root)
@@ -58,7 +68,9 @@ if (args.includes("--verify")) {
   if (!files.length) { console.error("verify: no release file in releases/"); process.exit(1); }
   const name = files[files.length - 1], committed = fs.readFileSync(path.join(releaseDir, name));
   await selfTest();
-  const rebuilt = Buffer.from(stamp(assemble(), name.match(/_(v\d+)\.html$/)[1]));
+  const page = stamp(assemble(), name.match(/_(v\d+)\.html$/)[1]);
+  await bootCheck(page);
+  const rebuilt = Buffer.from(page);
   if (rebuilt.equals(committed)) { console.log(`\nverify: releases/${name} matches src/ (${committed.length} bytes)`); process.exit(0); }
   let i = 0; while (i < rebuilt.length && i < committed.length && rebuilt[i] === committed[i]) i++;
   const hex = b => b.subarray(i, i + 16).toString("hex") + "  " + JSON.stringify(b.subarray(i, i + 16).toString("latin1"));
@@ -73,6 +85,7 @@ const out = args.includes("--out") ? path.resolve(argVal("--out"))
 const version = args.includes("--version") ? "v" + String(argVal("--version")).padStart(3, "0")
               : (path.basename(out).match(/^stream-visualizer_(v\d+)\.html$/) || [, "dev"])[1];     // stamped into the page so it can tell when a newer release is published
 const html = stamp(assemble(), version);
+await bootCheck(html);
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, html);
 if (args.includes("--release") && fs.existsSync(releaseDir))      // only the newest release stays in git; the new file is written first, so a failure never leaves releases/ empty
