@@ -533,7 +533,7 @@ canvas.trchart{width:100%;height:280px;display:block;background:var(--canvas);bo
 
   <section data-tab="record" class="full">
     <h2>Replay a file</h2>
-    <div class="note">Recordings are made by the continuous recording above. Here you load a file (a chunk or a session saved earlier) to replay it under Review, Replay and labels.</div>
+    <div class="note">Recordings are made by the continuous recording above. Here you load a file (a chunk or a session saved earlier) to replay it under Recordings, Replay.</div>
     <div class="row" style="margin-top:8px">
       <button id="rtSave" disabled>Save session</button><button id="rtLoadBtn">Load session</button><input id="rtLoad" type="file" accept=".json,.gz,application/json,application/gzip" hidden>
     </div>
@@ -7460,7 +7460,7 @@ rc$("rcList").onclick = async e => {
   try {
     if (act === "share") { const f = rcShareable(r); if (f) await navigator.share({files:[f], title:r.name}); }
     else if (act === "dl") rtDownload(r.blob, r.name);
-    else if (act === "open") { rtSetSession(await rtReadSessionFile(rcFile(r))); rtMsg(`Loaded ${r.name}. Replay it under Review, Replay and labels.`); }
+    else if (act === "open") { rtSetSession(await rtReadSessionFile(rcFile(r))); rtMsg(`Loaded ${r.name}. Replay it under Recordings, Replay.`); }
     else if (act === "del") { await rcTx("readwrite", st => st.delete(name)); rcRender(); }
   } catch (err) { if (!err || err.name !== "AbortError") rtMsg("Could not do that: " + (err && err.message || err)); }      // AbortError = the share sheet was closed
 };
@@ -7582,7 +7582,7 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden && FS
 "use strict";
 // Header status (view): live chips next to Connect/Pause and the BN/HL pills (STATUS.chips, status-core.js), and the "newer version" bar.
 // Read-only: it only looks at the app's state once a second and never changes a feed, a recording or a detection. Loaded last.
-const APP_VERSION = "v150";            // "vNNN" in a release build, "dev" otherwise (build.mjs stamps it)
+const APP_VERSION = "v151";            // "vNNN" in a release build, "dev" otherwise (build.mjs stamps it)
 const SB = {latest:null, sure:false, timer:null};
 const sb$ = id => document.getElementById(id);
 sb$("ver").textContent = APP_VERSION;           // tiny version tag next to the title
