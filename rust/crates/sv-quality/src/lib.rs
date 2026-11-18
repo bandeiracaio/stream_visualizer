@@ -57,14 +57,14 @@ pub fn op_of(i: OfIn) -> Result<Quality, String> {
     let slot = |t: f64| ((t - first) / 60000.0).floor().min((n - 1) as f64) as usize;
     for &t in &ts { data[slot(t)] += 1.0; }
     for &t in &ticks { tk[slot(t)] += 1.0; }
-    ts.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    sv_core::sort_by(&mut ts, |a, b| a.partial_cmp(b).unwrap());
     let mut gap = f64::max(0.0, if !ts.is_empty() { ts[0] - first } else { last - first });
     for w in ts.windows(2) { gap = gap.max(w[1] - w[0]); }
     gap = gap.max(if !ts.is_empty() { last - ts[ts.len() - 1] } else { 0.0 });
     let tail = f64::min(1.0, ((last - first) - (n as f64 - 1.0) * 60000.0) / 60000.0);
     let data_minutes = data.iter().enumerate().filter(|(i, c)| **c >= MIN_PER_MINUTE * if *i == n - 1 { tail } else { 1.0 }).count() as f64;
     let mut sorted = tk.clone();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    sv_core::sort_by(&mut sorted, |a, b| a.partial_cmp(b).unwrap());
     let ticks_per_min = sorted[sorted.len() >> 1];
     let nf = n as f64;
     let verdict = if data_minutes < nf * 0.5 { "hollow" } else if data_minutes < nf || gap > 60000.0 { "holes" } else { "complete" };
@@ -132,7 +132,7 @@ pub fn op_collectors(i: ColIn) -> Result<Option<Vec<(String, ColOut)>>, String> 
         let key = to_string(Some(c.id.as_ref().unwrap_or(&Value::Null)));
         let key = if c.id.is_none() { "undefined".to_string() } else { key };
         let mut a: Vec<f64> = times.iter().find(|(k, _)| *k == key).map(|(_, v)| v.clone()).unwrap_or_default();
-        a.sort_by(|x, y| x.partial_cmp(y).unwrap());
+        sv_core::sort_by(&mut a, |x, y| x.partial_cmp(y).unwrap());
         let mut mins: Vec<f64> = a.iter().map(|t| f64::min(total - 1.0, ((t - from) / 60000.0).floor())).collect();
         mins.dedup();      // a is sorted, so equal minutes are adjacent
         let mut gap = if !a.is_empty() { a[0] - from } else { to - from };
@@ -235,7 +235,7 @@ pub fn op_coverage(i: CovIn) -> Result<Coverage, String> {
         // `a && b > a`: a is the raw t0 (truthy) when both are set, else the computed number
         if (both || truthy_num(a_raw)) && b > a_raw { iv.push([a_raw, b]); }
     }
-    iv.sort_by(|x, y| x[0].partial_cmp(&y[0]).unwrap_or(std::cmp::Ordering::Equal));
+    sv_core::sort_by(&mut iv, |x, y| x[0].partial_cmp(&y[0]).unwrap_or(std::cmp::Ordering::Equal));
     let mut un: Vec<[f64; 2]> = vec![];
     for [a, b] in iv {
         match un.last_mut() { Some(l) if a <= l[1] => l[1] = js::max(l[1], b), _ => un.push([a, b]) }

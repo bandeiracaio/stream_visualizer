@@ -7,18 +7,25 @@ fn is_ws(c: char) -> bool {
     matches!(c, '\t' | '\n' | '\u{b}' | '\u{c}' | '\r' | ' ' | '\u{a0}' | '\u{1680}' | '\u{2000}'..='\u{200a}' | '\u{2028}' | '\u{2029}' | '\u{202f}' | '\u{205f}' | '\u{3000}' | '\u{feff}')
 }
 
+/// The shortest digits that read back as `x` (finite, above 0) and the position of the point: x = 0.DIGITS * 10^n, DIGITS without leading or trailing zeros. They come from serde_json's own float writer,
+/// which is in the module anyway (core's `{:e}` would bring a second shortest-float printer).
+fn shortest(x: f64) -> (String, i32) {
+    let s = serde_json::to_string(&x).unwrap_or_default();
+    let (m, e) = match s.split_once('e') { Some((m, e)) => (m, e.parse::<i32>().unwrap_or(0)), None => (s.as_str(), 0) };
+    let (ip, fp) = m.split_once('.').unwrap_or((m, ""));
+    let all = format!("{ip}{fp}");
+    let lead = all.len() - all.trim_start_matches('0').len();
+    (all.trim_matches('0').to_string(), ip.len() as i32 + e - lead as i32)
+}
+
 /// Number#toString (radix 10).
 pub fn num_str(x: f64) -> String {
     if x.is_nan() { return "NaN".into(); }
     if x == 0.0 { return "0".into(); }
     if x.is_infinite() { return if x > 0.0 { "Infinity".into() } else { "-Infinity".into() }; }
     let sign = if x < 0.0 { "-" } else { "" };
-    let s = format!("{:e}", x.abs());
-    let (mant, exp) = s.split_once('e').unwrap();
-    let exp: i32 = exp.parse().unwrap();
-    let digits: String = mant.replace('.', "");
+    let (digits, n) = shortest(x.abs());
     let k = digits.len() as i32;
-    let n = exp + 1;
     let body = if k <= n && n <= 21 {
         format!("{}{}", digits, "0".repeat((n - k) as usize))
     } else if 0 < n && n <= 21 {
@@ -70,6 +77,20 @@ fn decimal_len(s: &str) -> Option<usize> {
     Some(i)
 }
 
+/// A decimal literal (digits, optional point, optional exponent: what `decimal_len` accepted) as the nearest double, through serde_json's exact parser (it is in the module anyway; core's own `f64::from_str` brings a second parser and its tables).
+/// JSON is stricter than JS (no leading zeros, a digit on each side of the point), so the pieces are rebuilt; a number beyond the range is Infinity (or 0 below it), as in JS.
+fn dec(neg: bool, s: &str) -> f64 {
+    let (m, e) = match s.find(|c| c == 'e' || c == 'E') { Some(i) => (&s[..i], &s[i + 1..]), None => (s, "0") };
+    let (ip, fp) = match m.find('.') { Some(i) => (&m[..i], &m[i + 1..]), None => (m, "") };
+    let ip = ip.trim_start_matches('0');
+    let text = format!("{}.{}e{}", if ip.is_empty() { "0" } else { ip }, if fp.is_empty() { "0" } else { fp }, if e.starts_with('+') { &e[1..] } else { e });
+    let v = match serde_json::from_str::<f64>(&text) {
+        Ok(v) => v,
+        Err(_) => if ip.bytes().chain(fp.bytes()).all(|c| c == b'0') || e.starts_with('-') { 0.0 } else { f64::INFINITY },
+    };
+    if neg { -v } else { v }
+}
+
 fn str_to_number(s: &str) -> f64 {
     let t = s.trim_matches(is_ws);
     if t.is_empty() { return 0.0; }
@@ -84,7 +105,7 @@ fn str_to_number(s: &str) -> f64 {
     }
     let (neg, rest) = match b[0] { b'+' => (false, &t[1..]), b'-' => (true, &t[1..]), _ => (false, t) };
     if rest == "Infinity" { return if neg { f64::NEG_INFINITY } else { f64::INFINITY }; }
-    if decimal_len(rest) == Some(rest.len()) { return t.parse::<f64>().unwrap_or(f64::NAN); }
+    if decimal_len(rest) == Some(rest.len()) { return dec(neg, rest); }
     f64::NAN
 }
 
@@ -109,7 +130,7 @@ pub fn parse_float(v: Option<&Value>) -> f64 {
     let (neg, rest) = match t.as_bytes().first() { Some(b'+') => (false, &t[1..]), Some(b'-') => (true, &t[1..]), _ => (false, t) };
     if rest.starts_with("Infinity") { return if neg { f64::NEG_INFINITY } else { f64::INFINITY }; }
     match decimal_len(rest) {
-        Some(n) => format!("{}{}", if neg { "-" } else { "" }, &rest[..n]).parse::<f64>().unwrap_or(f64::NAN),
+        Some(n) => dec(neg, &rest[..n]),
         None => f64::NAN,
     }
 }
@@ -187,7 +208,7 @@ pub fn to_fixed10(x: f64) -> f64 {
         }
         String::from_utf8(d).unwrap()
     } else { format!("{:.10}", a) };
-    let v: f64 = s.parse().unwrap();
+    let v = dec(false, &s);
     if x < 0.0 { -v } else { v }
 }
 
@@ -216,6 +237,16 @@ pub fn cmp_utf16(a: &str, b: &str) -> Ordering { a.encode_utf16().cmp(b.encode_u
 #[cfg(test)]
 mod tests {
     use super::*;
+    /// Number#toString against V8: a file of lines "<16 hex digits of the double> <String(x)>" (made with node), named by SV_NUMSTR_FIXTURE
+    #[test]
+    #[ignore]
+    fn num_str_matches_v8() {
+        let Ok(path) = std::env::var("SV_NUMSTR_FIXTURE") else { return };
+        let text = std::fs::read_to_string(path).unwrap();
+        let mut n = 0;
+        for line in text.lines() { let (h, want) = line.split_once(' ').unwrap(); let x = f64::from_bits(u64::from_str_radix(h, 16).unwrap()); assert_eq!(num_str(x), want, "{h}"); n += 1; }
+        println!("{n} numbers equal V8");
+    }
     #[test]
     fn nums() {
         assert_eq!(num_str(1e21), "1e+21");

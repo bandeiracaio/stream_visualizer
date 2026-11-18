@@ -2,129 +2,28 @@
 // SYSTEM.create(def).step(snapshot) answers with intents (enter / exit / invalidate / skip). The core never fills: the caller reports fills (filled / closed).
 // Pure: no DOM, timers, storage, Date.now() or Math.random(). Causal: at second t it reads only what was known at t. The work per step does not grow with the length of the run.
 // Loaded by the page (live) and by design-harness.mjs (replay), so one file decides the trades. Spec: .scratch/trader/spec.md section 3, prompt .scratch/trader/prompts/03-system-core.md.
+// Since R2 the system itself (validate, id, size, and one running system: step, filled, closed, cancelled, end, force, state) runs in WebAssembly (rust/crates/sv-system, loaded by wasm-loader.js as SVWASM);
+// the signatures, results and thrown messages are the ones the JS version had (that version is src/js/js-cores/system-core.js, SYSTEM_JS, and `node parity.mjs system` compares the two).
+// facts() stays here: it drives the Reader engine (READER_ENGINE, JS) and reads its sigma, price history and episode groups, so it moves with the engine (R6). A system instance lives inside the module and is
+// addressed by a handle; create() returns the same object as before (def, id, step, ...) plus dispose(), which frees the instance at once (it is also freed when the object is collected). A Rust runner (R3) owns the instances itself.
+// Inputs go in as JSON: a non-finite number or undefined in a snapshot reads as absent (null); the self-test and the real recordings never have one.
 const SYSTEM = (() => {
   "use strict";
   const FACTS_VERSION = 2;      // bump when the snapshot a second changes shape or meaning (the harness caches snapshots under it)
-  const V = ["bn", "hl"], EP_FAMILIES = ["absorption", "exhaustion", "burst", "wall"];
-  const OPT = { latencyMs: 0, staleMs: 3000, maxGapMs: 30000, flowWindowSec: 1800, minFlowReadings: 30, minRoomBps: 0.2 };
+  const V = ["bn", "hl"];
+  const OPT = { latencyMs: 0, staleMs: 3000, maxGapMs: 30000, flowWindowSec: 1800, minFlowReadings: 30, minRoomBps: 0.2 };      // the figures live in the Rust crate; this copy is for callers (RUNNER reads staleMs)
   const sideDir = s => s === "buy" || s === "bid" ? 1 : s === "sell" || s === "ask" ? -1 : 0;
-  const sgn = x => x > 0 ? 1 : x < 0 ? -1 : 0;
-  const num = x => typeof x === "number" && isFinite(x);
   const EMPTY = Object.freeze([]);
-
-  // ---------- small structures ----------
-  // rolling high / low of the points in the last windowMs; query(t) drops older points and sets hi / lo (NaN when empty); push(t, p) adds a point. Amortised O(1).
-  function RollExt(windowMs) {
-    const ht = [], hp = [], lt = [], lp = []; let hh = 0, lh = 0;
-    return {
-      hi: NaN, lo: NaN,
-      query(t) {
-        const cut = t - windowMs;
-        while (hh < ht.length && ht[hh] < cut) hh++; while (lh < lt.length && lt[lh] < cut) lh++;
-        this.hi = hh < ht.length ? hp[hh] : NaN; this.lo = lh < lt.length ? lp[lh] : NaN;
-        if (hh > 512) { ht.splice(0, hh); hp.splice(0, hh); hh = 0; } if (lh > 512) { lt.splice(0, lh); lp.splice(0, lh); lh = 0; }
-      },
-      push(t, p) {
-        while (ht.length > hh && hp[hp.length - 1] <= p) { ht.pop(); hp.pop(); } ht.push(t); hp.push(p);
-        while (lt.length > lh && lp[lp.length - 1] >= p) { lt.pop(); lp.pop(); } lt.push(t); lp.push(p);
-      },
-    };
-  }
-  // points (t, p) in time order; at(t, within) is the newest point at or before t that is at most `within` ms older (the engine's own price rule); trim(t) forgets what no lookup at or after t needs
-  function PtBuf() {
-    const ts = [], ps = []; let h = 0;
-    return {
-      push(t, p) { ts.push(t); ps.push(p); },
-      at(t, within) {
-        let lo = h, hi = ts.length - 1, r = -1; while (lo <= hi) { const m = (lo + hi) >> 1; if (ts[m] <= t) { r = m; lo = m + 1; } else hi = m - 1; }
-        return r >= 0 && t - ts[r] <= within ? ps[r] : null;
-      },
-      trim(t) { while (h + 1 < ts.length && ts[h + 1] <= t) h++; if (h > 1024) { ts.splice(0, h); ps.splice(0, h); h = 0; } },
-    };
-  }
-  // sorted multiset of numbers with a time queue: add(t, x), expire(minT), median() = the upper median (the harness's own rule), n
-  function MedWin() {
-    const qt = [], qx = [], sorted = []; let h = 0;
-    const find = x => { let lo = 0, hi = sorted.length; while (lo < hi) { const m = (lo + hi) >> 1; if (sorted[m] < x) lo = m + 1; else hi = m; } return lo; };
-    return {
-      get n() { return sorted.length; },
-      add(t, x) { qt.push(t); qx.push(x); sorted.splice(find(x), 0, x); },
-      expire(minT) { while (h < qt.length && qt[h] < minT) { sorted.splice(find(qx[h]), 1); h++; } if (h > 512) { qt.splice(0, h); qx.splice(0, h); h = 0; } },
-      median() { return sorted.length ? sorted[sorted.length >> 1] : null; },
-    };
-  }
-  const hash = str => { let a = 0x811c9dc5, b = 0x01000193 ^ 0x5bd1e995; for (let i = 0; i < str.length; i++) { const c = str.charCodeAt(i); a = Math.imul(a ^ c, 0x01000193) >>> 0; b = Math.imul(b + c, 0x85ebca6b) >>> 0; b = (b ^ (b >>> 13)) >>> 0; } return (a.toString(16).padStart(8, "0") + b.toString(16).padStart(8, "0")).slice(0, 12); };
-  const canon = x => Array.isArray(x) ? "[" + x.map(canon).join(",") + "]" : x && typeof x === "object" ? "{" + Object.keys(x).sort().map(k => JSON.stringify(k) + ":" + canon(x[k])).join(",") + "}" : JSON.stringify(x);
+  const wasm = (fn, o) => SVWASM.call("system_" + fn, o);
+  const en = x => typeof x === "number" ? (Object.is(x, -0) ? "-0" : isFinite(x) ? x : String(x)) : x;      // JSON has no NaN, Infinity or -0: those travel as their text
 
   // ---------- definition: validate and id ----------
-  const need = (o, keys, pred) => keys.filter(k => !pred(o[k]));
-  const pos = x => num(x) && x > 0, nonneg = x => num(x) && x >= 0;
-  const TRIG_SPEC = {
-    episode: { keys: { families: x => Array.isArray(x) && x.length > 0 && x.every(f => EP_FAMILIES.includes(f)) }, venues: ["any", "bn", "hl"] },
-    priceMove: { keys: { lookSec: pos, m: pos } },
-    premium: { keys: { baseSec: pos, minBps: pos, coolSec: nonneg } },
-    tradeFlow: { keys: { lookSec: pos, share: x => num(x) && x > 0 && x <= 1, m: pos } },
-    bookDepth: { keys: { edge: x => x === 5 || x === 20, thr: x => num(x) && x > 0 && x <= 1, sustainSec: pos, coolSec: nonneg } },
-    rangeBreak: { keys: { brkBps: nonneg, coolSec: nonneg }, region: true },
-    levelRejection: { keys: { tolBps: pos, rejBps: pos, lookSec: pos, coolSec: nonneg }, region: true },
-  };
-  const READING = ["priceMove", "premium", "tradeFlow", "bookDepth"];      // triggers with a reading that can normalise (the other two readings: see readSide)
-  const EXIT_SPEC = {
-    timed: {}, flowEpisode: { families: x => Array.isArray(x) && x.length > 0 && x.every(f => EP_FAMILIES.includes(f)) },
-    target: { tpK: pos }, trailing: { trailK: pos }, rangeLevel: { frac: x => x === 0.5 || x === 1 }, normalisation: {},
-  };
-  function validate(def) {
-    const bad = [], add = s => bad.push(s);
-    if (!def || typeof def !== "object") return ["the system is not an object"];
-    const ctx = def.context, reg = def.region, trg = def.trigger, th = def.thesis, ex = def.exit, rk = def.risk;
-    if (!def.name || typeof def.name !== "string") add("name is missing");
-    if (!["paper", "demo", "live"].includes(def.stage)) add("stage must be paper, demo or live");
-    const trigType = trg && trg.type;
-    if (!ctx || !["always", "sigmaBand", "hours", "marketState"].includes(ctx.type)) add("unknown context type: " + (ctx && ctx.type));
-    else if (ctx.type === "sigmaBand") { if (!nonneg(ctx.min) || !pos(ctx.max) || !(ctx.max > ctx.min)) add("context sigmaBand needs min and max with max above min"); }
-    else if (ctx.type === "hours") { if (!Array.isArray(ctx.hours) || !ctx.hours.length || !ctx.hours.every(h => Number.isInteger(h) && h >= 0 && h <= 23)) add("context hours needs a list of UTC hours 0 to 23"); }
-    else if (ctx.type === "marketState") { if (!Array.isArray(ctx.states) || !ctx.states.length) add("context marketState needs a list of allowed states"); }
-    if (!reg || !["none", "rangeBox"].includes(reg.type)) add("unknown region type: " + (reg && reg.type));
-    else if (reg.type === "rangeBox" && !pos(reg.windowSec)) add("region rangeBox needs windowSec above 0");
-    const spec = TRIG_SPEC[trigType];
-    if (!spec) add("unknown trigger type: " + trigType);
-    else {
-      for (const k of Object.keys(spec.keys)) if (!spec.keys[k](trg[k])) add("trigger " + trigType + " needs a valid " + k);
-      if (spec.region && !(reg && reg.type === "rangeBox")) add("trigger " + trigType + " needs a region (rangeBox) and the system has none");
-    }
-    const venues = spec && spec.venues || ["bn", "hl"];
-    if (!venues.includes(def.venue)) add("venue must be " + venues.join(" or ") + (trigType === "episode" ? "" : " for trigger " + trigType));
-    if (!th || !["continuation", "fade"].includes(th.dir)) add("thesis dir must be continuation or fade");
-    else {
-      if (typeof th.text !== "string") add("thesis text is missing");
-      const inv = th.invalidation || { type: "none" };
-      if (!["none", "triggerReverses", "episodeAgainst", "region"].includes(inv.type)) add("unknown invalidation type: " + inv.type);
-      else if (inv.type === "triggerReverses" && !READING.includes(trigType) && trigType !== "rangeBreak") add("invalidation triggerReverses needs a trigger with a reading (not " + trigType + ")");
-      else if (inv.type === "region" && !["rangeBreak", "levelRejection"].includes(trigType)) add("invalidation region needs a rangeBreak or levelRejection trigger");
-    }
-    const xs = EXIT_SPEC[ex && ex.type];
-    if (!xs) add("unknown exit type: " + (ex && ex.type));
-    else {
-      if (!pos(ex.holdSec)) add("exit " + ex.type + " needs holdSec above 0");
-      for (const k of Object.keys(xs)) if (!xs[k](ex[k])) add("exit " + ex.type + " needs a valid " + k);
-      if (ex.type === "rangeLevel" && !(reg && reg.type === "rangeBox")) add("exit rangeLevel needs a region (rangeBox) and the system has none");
-      if (ex.type === "normalisation" && !READING.includes(trigType)) add("exit normalisation needs a trigger with a reading (premium, tradeFlow, bookDepth or priceMove), not " + trigType);
-    }
-    if (!rk || !pos(rk.stopK)) add("risk stopK must be above 0");
-    if (!rk || !(num(rk.riskFrac) && rk.riskFrac > 0 && rk.riskFrac <= 1)) add("risk riskFrac must be above 0 and at most 1");
-    return bad;
-  }
+  const validate = def => wasm("validate", def);
   // short hash of venue, context, region, trigger, thesis (dir and invalidation), exit and risk: not name, stage or thesis text
-  function id(def) {
-    const th = def.thesis || {};
-    return "S" + hash(canon({ venue: def.venue, context: def.context, region: def.region, trigger: def.trigger, thesis: { dir: th.dir, invalidation: th.invalidation || { type: "none" } }, exit: def.exit, risk: def.risk }));
-  }
+  const id = def => wasm("id", def);
   // position size for a fixed risk per trade: the loss at the stop equals equity x riskFrac
-  function size(equity, riskFrac, stopBps, price) {
-    if (!(equity > 0 && riskFrac > 0 && stopBps > 0 && price > 0)) return { qty: 0, notional: 0, risk: 0 };
-    const risk = equity * riskFrac, notional = risk / (stopBps / 1e4);
-    return { qty: notional / price, notional, risk };
-  }
+  const de = x => typeof x === "string" ? (x === "-0" ? -0 : Number(x)) : x;
+  const size = (equity, riskFrac, stopBps, price) => { const r = wasm("size", { equity: en(+equity), riskFrac: en(+riskFrac), stopBps: en(+stopBps), price: en(+price) }); return { qty: de(r.qty), notional: de(r.notional), risk: de(r.risk) }; };
 
   // ---------- facts: the engine's inputs to one snapshot a second ----------
   // A snapshot: {t, px:{bn,hl}, sigma:{bn,hl}, age:{bn,hl} (ms since that venue's last quote), q:{bn,hl} (that quote as {bid, ask}, null when none; added in FACTS_VERSION 2, the runner fills at it), calibrated, flow:{bn:{buy,sell,liqBuy,liqSell},hl:..} (taker notional in (t-1 s, t]),
@@ -139,7 +38,7 @@ const SYSTEM = (() => {
     let bb = -Infinity, ba = Infinity; for (const l of bids) if (l[0] > bb) bb = l[0]; for (const l of asks) if (l[0] < ba) ba = l[0];
     if (!(bb > 0) || !(ba < Infinity)) return null; const mid = (bb + ba) / 2; let sb = 0, sa = 0;
     for (const l of bids) if (l[0] >= mid * (1 - X / 1e4)) sb += l[1]; for (const l of asks) if (l[0] <= mid * (1 + X / 1e4)) sa += l[1];
-    return sb + sa > 0 ? Math.round(1000 * (sb - sa) / (sb + sa)) / 1000 : null;
+    return sb + sa > 0 ? Math.round(1000 * (sb - sa) / (sb + sa)) / 1000 + 0 : null;      // + 0: a small negative rounds to -0, which JSON (the module takes JSON) and the saved snapshots write as 0; the snapshot says 0 in both
   }
   function facts(o) {
     const engine = o.engine, marketState = o.marketState || null, L = o.lateMs == null ? 1000 : o.lateMs;
@@ -221,251 +120,34 @@ const SYSTEM = (() => {
   }
 
   // ---------- one system running ----------
+  // the region's hi / lo are NaN until the box has a point; JSON carries that as null
+  const fixState = s => { const r = s.region; if (r && "hi" in r) { if (r.hi === null) r.hi = NaN; if (r.lo === null) r.lo = NaN; } return s; };
+  const reg = typeof FinalizationRegistry === "function" ? new FinalizationRegistry(h => { try { if (SVWASM.loaded) wasm("drop", { h }); } catch (e) { /* the module is gone */ } }) : null;
+  // every instance of a runner takes the same snapshot object in the same second: its JSON text is written once (a snapshot is not changed after it is made)
+  const texts = new WeakMap();
+  const snapText = snap => { if (snap === null || typeof snap !== "object") return JSON.stringify(snap); let t = texts.get(snap); if (t === undefined) { t = JSON.stringify(snap); texts.set(snap, t); } return t; };
   function create(def, opt) {
-    const bad = validate(def); if (bad.length) throw new Error("invalid system: " + bad.join("; "));
-    const O = Object.assign({}, OPT, opt || {}), forced = O.signals ? O.signals.slice().sort((a, b) => a.t - b.t) : O.forced ? [] : null;      // O.forced: forced signals are given at step time with force()
-    const ctx = def.context, reg = def.region, trg = def.trigger, ex = def.exit, risk = def.risk, th = def.thesis, inv = (th.invalidation || { type: "none" }).type;
-    const dirSign = th.dir === "fade" ? -1 : 1, anyVenue = def.venue === "any";
-    const used = anyVenue ? V.slice() : trg.type === "premium" ? V.slice() : [def.venue];
-    const W = reg.type === "rangeBox" ? reg.windowSec * 1000 : 0;
-    const lookMs = trg.type === "priceMove" ? trg.lookSec * 1000 : 0;
-    // per venue: count of points, first / last point time, price lookback, region extremes
-    const vt = {}; for (const v of used) vt[v] = { n: 0, t0: null, lastT: null, prevT: null, p: null, buf: lookMs ? PtBuf() : null, ext: W ? RollExt(W) : null, box: null, prevBox: null };
-    let sigmaNow = 0;      // sigma of the venue of the current step, for readings
-    // ----- trigger: eval(snap, pt) -> signals; read() -> {value, threshold, side}; norm() -> bool|null
-    const trig = makeTrigger();
-    function makeTrigger() {
-      const T = trg, v0 = def.venue;
-      if (T.type === "episode") {
-        return { eval(snap) { const out = []; for (const g of snap.episodes.new) if (T.families.includes(g.family) && (anyVenue || g.venue === v0) && g.side !== 0) out.push({ t: g.tDetected, venue: g.venue, side: g.side, group: g.id }); return out; }, read: () => null, norm: () => null };
-      }
-      if (T.type === "priceMove") {
-        let lastSig = -Infinity, rd = { value: null, threshold: null, side: 0 };
-        return {
-          eval(snap, pt) {
-            const t = snap.t, b = pt.buf.at(t - T.lookSec * 1000, 2000), thr = T.m * sigmaNow * Math.sqrt(T.lookSec); rd = { value: null, threshold: thr, side: 0 };
-            pt.buf.push(t, pt.p); pt.buf.trim(t - T.lookSec * 1000);
-            if (!(b > 0)) return EMPTY; const mv = (pt.p / b - 1) * 1e4; rd = { value: mv, threshold: thr, side: Math.abs(mv) >= thr ? sgn(mv) : 0 };
-            if (t < lastSig + T.lookSec * 1000 || Math.abs(mv) < thr) return EMPTY; lastSig = t; return [{ t, venue: v0, side: mv > 0 ? 1 : -1 }];
-          },
-          read: () => rd, norm: () => null,
-        };
-      }
-      if (T.type === "premium") {
-        const dqT = [], dqV = []; let h = 0, sum = 0, cnt = 0, lastSig = -Infinity, bn = null, dev = null, rd = { value: null, threshold: T.minBps, side: 0 };
-        const f = v0 === "hl" ? 1 : -1;
-        return {
-          eval(snap) {
-            const t = snap.t; if (snap.px.bn > 0) bn = { t, p: snap.px.bn };
-            if (!(snap.px.hl > 0)) return EMPTY;
-            const v = bn && bn.p > 0 && t - bn.t <= 2000 ? (snap.px.hl / bn.p - 1) * 1e4 : null;
-            dqT.push(t); dqV.push(v); if (v != null) { sum += v; cnt++; }
-            while (h < dqT.length && dqT[h] < t - T.baseSec * 1000) { if (dqV[h] != null) { sum -= dqV[h]; cnt--; } h++; }
-            if (h > 512) { dqT.splice(0, h); dqV.splice(0, h); h = 0; }
-            const n = cnt - (dqV[h] != null ? 1 : 0); dev = { t, v: null };
-            if (v == null || n < 20) { rd = { value: null, threshold: T.minBps, side: 0 }; return EMPTY; }
-            const d = v - (sum - (dqV[h] != null ? dqV[h] : 0)) / n; dev.v = d; rd = { value: d, threshold: T.minBps, side: Math.abs(d) >= T.minBps ? sgn(d) * f : 0 };
-            if (t < lastSig + T.coolSec * 1000 || Math.abs(d) < T.minBps) return EMPTY; lastSig = t; return [{ t, venue: v0, side: sgn(d) * f }];
-          },
-          read: () => rd, norm: snap => !!(dev && dev.v != null && snap.t - dev.t <= 2000 && Math.abs(dev.v) <= 0.3 * T.minBps),
-        };
-      }
-      if (T.type === "tradeFlow") {
-        const L = T.lookSec, rb = new Array(L).fill(0), rs = new Array(L).fill(0), mw = MedWin(); let k = 0, npts = 0, lastSig = -Infinity, rd = { value: null, threshold: null, side: 0 }, tot = 0, net = 0;
-        return {
-          eval(snap) {
-            const t = snap.t, f = snap.flow[v0]; rb[k] = f.buy; rs[k] = f.sell; k = (k + 1) % L; npts++;
-            if (npts <= L) return EMPTY;      // the harness starts at the point with L points behind it
-            let b = 0, s = 0; for (let i = 0; i < L; i++) { b += rb[i]; s += rs[i]; } net = b - s; tot = b + s;
-            mw.expire(t - O.flowWindowSec * 1000); const med = mw.n >= O.minFlowReadings ? mw.median() : null, thr = med > 0 ? T.m * med : null;
-            if (tot > 0) mw.add(t, Math.abs(net));
-            const share = tot > 0 ? Math.abs(net) / tot : 0, hit = tot > 0 && thr != null && share >= T.share && Math.abs(net) >= thr;
-            rd = { value: net, threshold: thr, share, side: hit ? sgn(net) : 0 };
-            if (!hit || t < lastSig + L * 1000) return EMPTY; lastSig = t; return [{ t, venue: v0, side: net > 0 ? 1 : -1 }];
-          },
-          read: () => rd, norm: () => npts > L ? (tot > 0 ? Math.abs(net) / tot < 0.2 : true) : false,
-        };
-      }
-      if (T.type === "bookDepth") {
-        let run = 0, sg = 0, lastSig = -Infinity, x = null, rd = { value: null, threshold: T.thr, side: 0 };
-        return {
-          eval(snap) {
-            const t = snap.t; x = snap.imb[v0][T.edge]; rd = { value: x, threshold: T.thr, side: x != null && Math.abs(x) >= T.thr ? (x > 0 ? 1 : -1) : 0 };
-            if (x == null || Math.abs(x) < T.thr) { run = 0; sg = 0; return EMPTY; }
-            const s = x > 0 ? 1 : -1; if (s === sg) run++; else { sg = s; run = 1; }
-            if (run >= T.sustainSec && t >= lastSig + T.coolSec * 1000) { lastSig = t; return [{ t, venue: v0, side: s }]; } return EMPTY;
-          },
-          read: () => rd, norm: () => x != null && Math.abs(x) < T.thr / 2,
-        };
-      }
-      if (T.type === "rangeBreak") {
-        let lastSig = -Infinity, rd = { value: null, threshold: T.brkBps, side: 0 };
-        return {
-          eval(snap, pt) {
-            const t = snap.t, b = pt.box, px = pt.p; rd = { value: null, threshold: T.brkBps, side: 0 };
-            if (t - pt.t0 < W) return EMPTY;
-            const up = px > b.hi * (1 + T.brkBps / 1e4), dn = px < b.lo * (1 - T.brkBps / 1e4); rd.side = up ? 1 : dn ? -1 : 0; rd.value = up ? (px / b.hi - 1) * 1e4 : dn ? (px / b.lo - 1) * 1e4 : 0;
-            if (t < lastSig + T.coolSec * 1000 || !(up || dn)) return EMPTY; lastSig = t; return [{ t, venue: v0, side: up ? 1 : -1 }];
-          },
-          read: () => rd, norm: () => null,
-        };
-      }
-      // levelRejection: touched the box's high (low) within the last lookSec seconds and pulled back; side = the direction of the approach
-      const Lp = T.lookSec, R = RollExt(Lp * 1000), ringHi = new Array(Lp + 1).fill(NaN), ringLo = new Array(Lp + 1).fill(NaN); let i = -1, lastSig = -Infinity;
-      return {
-        eval(snap, pt) {
-          const t = snap.t, px = pt.p; i++; R.query(t); const rHi = R.hi, rLo = R.lo; R.push(t, px);
-          const levHi = i >= Lp ? ringHi[(i - Lp) % (Lp + 1)] : NaN, levLo = i >= Lp ? ringLo[(i - Lp) % (Lp + 1)] : NaN; ringHi[i % (Lp + 1)] = pt.box.hi; ringLo[i % (Lp + 1)] = pt.box.lo;
-          if (i < Lp || t - pt.t0 < (W + Lp * 1000) || t < lastSig + T.coolSec * 1000) return EMPTY;
-          const maxLp = Math.max(rHi, px), minLp = Math.min(rLo, px), tol = T.tolBps / 1e4;
-          if (levHi > 0 && maxLp >= levHi * (1 - tol) && maxLp <= levHi * (1 + tol) && px <= maxLp * (1 - T.rejBps / 1e4)) { lastSig = t; return [{ t, venue: v0, side: 1 }]; }
-          if (levLo > 0 && minLp <= levLo * (1 + tol) && minLp >= levLo * (1 - tol) && px >= minLp * (1 + T.rejBps / 1e4)) { lastSig = t; return [{ t, venue: v0, side: -1 }]; }
-          return EMPTY;
-        },
-        read: () => null, norm: () => null,
-      };
-    }
-
-    // ----- state
-    let position = null, busyUntil = -Infinity, prevBusy = -Infinity, lastSnapT = null, lastCtx = { on: true, why: "" }, lastSkip = null, lastEnter = null;
-    const counts = { enter: 0, skip: {}, exit: {}, invalidate: 0 };
-    let sigmaForStop = 0;
-
-    function contextAt(snap, venue) {
-      if (ctx.type === "always") return { on: true, why: "" };
-      if (ctx.type === "sigmaBand") { const s = snap.sigma[venue]; return s >= ctx.min && s <= ctx.max ? { on: true, why: "" } : { on: false, why: "sigma " + (s == null ? "?" : s.toFixed(2)) + " outside " + ctx.min + " to " + ctx.max }; }
-      if (ctx.type === "hours") { const h = new Date(snap.t).getUTCHours(); return ctx.hours.includes(h) ? { on: true, why: "" } : { on: false, why: "hour " + h + " UTC not in the list" }; }
-      if (snap.state == null) return { on: false, why: "no market state" };
-      return ctx.states.includes(snap.state) ? { on: true, why: "" } : { on: false, why: "market state " + snap.state + " not allowed" };
-    }
-    function boxFor(venue, tSig) {      // the region's box as of the price point at the signal time (newest point at or before it, at most 2 s older)
-      const x = vt[venue]; if (!x || !x.box) return null;
-      const c = x.box, p = x.prevBox; if (c.t <= tSig && tSig - c.t <= 2000) return c; if (p && p.t <= tSig && tSig - p.t <= 2000) return p; return null;
-    }
-    const skip = (reason, sig, snap, out) => { counts.skip[reason] = (counts.skip[reason] || 0) + 1; lastSkip = { reason, t: snap.t }; out.push({ type: "skip", reason, t: snap.t, tSig: sig.t, venue: sig.venue, side: sig.side }); };
-    function leave(reason, snap, tAt, out, extra) {
-      const p = position; busyUntil = tAt; position = null; p.exitReason = reason; lastClosedPos = p;
-      if (reason === "invalidate") counts.invalidate++; else counts.exit[reason] = (counts.exit[reason] || 0) + 1;
-      out.push(Object.assign({ type: reason === "invalidate" ? "invalidate" : "exit", reason, t: snap.t, tAt, venue: p.venue, dir: p.dir }, extra || {}));
-    }
-    let lastClosedPos = null;
-
-    // ----- one second
-    function step(snap) {
-      const t = snap.t, out = [];
-      // 1. venue points: box (before the point is added), counters
-      for (const v of used) {
-        const x = vt[v], p = snap.px[v]; x.cur = null; if (!(p > 0)) continue;
-        x.cur = true; x.p = p; x.n++; if (x.t0 == null) x.t0 = t; x.prevT = x.lastT;
-        if (x.ext) { x.ext.query(t); x.prevBox = x.box; x.box = { t, hi: x.ext.hi, lo: x.ext.lo }; }
-      }
-      const pv = anyVenue ? null : vt[def.venue];
-      sigmaNow = anyVenue ? 0 : snap.sigma[def.venue];
-      // 2. the trigger reads this second first (an exit that watches its reading must see this second's, not the last one's); what it fires is acted on after the position
-      let sigs = EMPTY;
-      if (!forced || ex.type === "normalisation" || inv === "triggerReverses") {      // a forced (random-entry) run still needs the reading when an exit or an invalidation uses it
-        let r = EMPTY;
-        if (trg.type === "episode" || trg.type === "premium") r = trig.eval(snap); else if (pv && pv.cur) r = trig.eval(snap, pv);
-        if (!forced) sigs = r;
-      }
-      if (forced) { sigs = []; while (forced.length && forced[0].t <= t) { const f = forced.shift(); if (!anyVenue && f.venue != null && f.venue !== def.venue) continue; sigs.push({ t: f.t, venue: f.venue || def.venue, side: f.side }); } if (pv && !pv.cur) sigs = []; }
-      // 3. the position
-      if (position && position.filled && t > position.tIn) managePosition(snap, out);
-      // 4. the signals
-      lastCtx = contextAt(snap, anyVenue ? "bn" : def.venue);
-      for (const sig of sigs) takeSignal(sig, snap, out);
-      for (const v of used) { const x = vt[v]; if (x.cur) { if (x.ext) x.ext.push(t, x.p); x.lastT = t; } }
-      lastSnapT = t;
-      return out.length ? out : EMPTY;
-    }
-    function takeSignal(sig, snap, out) {
-      const v = sig.venue, c = contextAt(snap, v); lastCtx = c;
-      if (!c.on) return skip("context off", Object.assign({ why: c.why }, sig), snap, out);
-      if (!snap.calibrated) return skip("not calibrated", sig, snap, out);
-      if (!(snap.px[v] > 0) || snap.age[v] == null || snap.age[v] > O.staleMs) return skip("stale price", sig, snap, out);
-      if (position || sig.t < busyUntil) return skip("in position", sig, snap, out);
-      let levelPx = null, box = null;
-      if (reg.type === "rangeBox") { box = boxFor(v, sig.t); if (ex.type === "rangeLevel" || inv === "region") { if (!box || !(box.hi > box.lo)) return skip("no region yet", sig, snap, out); } }
-      const dir = sig.side * dirSign, sigma = snap.sigma[v], sg = sigma * Math.sqrt(ex.holdSec), stopBps = risk.stopK * sg;
-      if (ex.type === "rangeLevel") levelPx = dir > 0 ? (ex.frac === 1 ? box.hi : (box.hi + box.lo) / 2) : (ex.frac === 1 ? box.lo : (box.hi + box.lo) / 2);
-      const reading = trig.read();
-      position = { dir, venue: v, tSig: sig.t, side: sig.side, filled: false, tIn: null, p0: null, tEnd: null, best: 0, stopBps, tpBps: ex.type === "target" ? ex.tpK * sg : null, trailBps: ex.type === "trailing" ? ex.trailK * sg : null, levelPx, flowAt: null,
-        box: box ? { hi: box.hi, lo: box.lo } : null, support: new Set(snap.episodes.active.filter(g => g.venue === v && g.side === dir).map(g => g.id)), group: sig.group, thesis: th.text, reading: reading ? Object.assign({}, reading) : null };
-      prevBusy = busyUntil;
-      if (ex.type === "flowEpisode") for (const g of snap.episodes.new) flowCandidate(g);      // an opposing episode first seen in this same second, detected after the signal
-      counts.enter++;
-      const info = { type: "enter", t: snap.t, tSig: sig.t, venue: v, dir, stopBps, exit: { type: ex.type, holdSec: ex.holdSec, tpBps: position.tpBps, trailBps: position.trailBps, levelPx, families: ex.families || null }, reading: position.reading, thesis: th.text, trigger: trg.type, region: box ? { hi: box.hi, lo: box.lo } : null };
-      lastEnter = info; out.push(info);
-    }
-    function flowCandidate(g) {
-      const p = position; if (!p || p.flowAt != null || g.venue !== p.venue || !ex.families.includes(g.family) || g.side !== -p.dir || !(g.tDetected > p.tSig)) return;
-      p.flowAt = g.tDetected;
-    }
-    function managePosition(snap, out) {
-      const p = position, t = snap.t, x = vt[p.venue];
-      if (ex.type === "flowEpisode") for (const g of snap.episodes.new) flowCandidate(g);
-      if (snap.age[p.venue] != null && snap.age[p.venue] > O.maxGapMs) return leave("gap", snap, t, out);
-      if (!x.cur) return;
-      if (x.prevT != null && t - x.prevT > O.maxGapMs) return leave("gap", snap, t, out);
-      if (t > p.tEnd) return leave("time", snap, p.tEnd, out);
-      const px = x.p, move = p.dir * (px / p.p0 - 1) * 1e4;
-      if (move <= -p.stopBps) return leave("stop", snap, t, out, { px });
-      if (move > p.best) p.best = move;
-      if (p.trailBps != null && p.best - move >= p.trailBps && p.best > 0) return leave("trail", snap, t, out, { px });
-      if (p.tpBps != null && move >= p.tpBps) return leave("target", snap, t, out, { bps: p.tpBps });
-      if (ex.type === "normalisation" && trigNorm(snap)) return leave("norm", snap, t, out, { px });
-      if (p.flowAt != null && p.flowAt + O.latencyMs < p.tEnd && t >= p.flowAt + O.latencyMs) return leave("flow", snap, t, out, { px });
-      if (inv !== "none" && invalidated(snap, p, px)) return leave("invalidate", snap, t, out, { px, why: inv });
-      if (t >= p.tEnd) return leave("time", snap, p.tEnd, out);
-    }
-    function trigNorm(snap) { return trg.type === "premium" ? trig.norm(snap) : trig.norm(); }
-    function invalidated(snap, p, px) {
-      if (inv === "triggerReverses") { const r = trig.read(); return !!(r && r.side !== 0 && r.side === -p.side); }
-      if (inv === "episodeAgainst") {
-        for (const g of snap.episodes.new) if (g.venue === p.venue && g.side === -p.dir) return true;
-        for (const g of snap.episodes.ended) if (p.support.has(g.id)) return true; return false;
-      }
-      if (inv === "region" && p.box) {
-        if (trg.type === "rangeBreak") return p.side > 0 ? px <= p.box.hi : px >= p.box.lo;
-        const tol = trg.tolBps / 1e4; return px > p.box.hi * (1 + tol) || px < p.box.lo * (1 - tol);
-      }
-      return false;
-    }
+    let made;
+    try { made = wasm("create", { def, opt: opt === undefined ? null : opt }); } catch (e) { throw new Error(String(e && e.message).replace(/^wasm core system: /, "")); }      // "invalid system: ..." as before
+    const h = made.h; let live = true;
     const api = {
-      def, id: id(def), step,
+      def, id: made.id,
+      step: snap => SVWASM.callText("system_step", '{"h":' + h + ',"snap":' + snapText(snap) + '}'),
       // a forced (random-entry) signal for the next step, {t, side, venue?}; only an instance made with opt.forced or opt.signals takes it
-      force(sig) { if (forced) forced.push(sig); },
+      force: sig => { wasm("force", { h, sig }); },
       // the caller's fill of the entry: price and time. May answer with an exit (a range-level target with no room left is void: the entry is closed at once).
-      filled(px, t) {
-        const p = position; if (!p || p.filled) return EMPTY; p.filled = true; p.p0 = px; p.tIn = t; p.tEnd = t + ex.holdSec * 1000;
-        if (p.levelPx != null) { const lb = p.dir * (p.levelPx / px - 1) * 1e4; if (!(lb > O.minRoomBps)) { position = null; busyUntil = prevBusy; counts.enter--; return [{ type: "exit", reason: "no room", t, tAt: t, venue: p.venue, dir: p.dir, void: true }]; } p.tpBps = p.tpBps == null ? lb : Math.min(p.tpBps, lb); }
-        return EMPTY;
-      },
+      filled: (px, t) => wasm("filled", { h, px: en(px), t: en(t) }),
       // the entry was not filled (no price, order refused): back to flat as if the signal had not been taken
-      cancelled() { if (position && !position.filled) { position = null; busyUntil = prevBusy; counts.enter--; } },
+      cancelled: () => { wasm("cancelled", { h }); },
       // the caller's fill of an exit: returns the finished trade
-      closed(px, t) {
-        const p = lastClosedPos; if (!p) return null; lastClosedPos = null;
-        const gross = p.dir * (px / p.p0 - 1) * 1e4; return { dir: p.dir, venue: p.venue, tIn: p.tIn, tOut: t, entryPx: p.p0, exitPx: px, grossBps: gross, stopBps: p.stopBps, reason: p.exitReason, thesis: p.thesis };
-      },
+      closed: (px, t) => wasm("closed", { h, px: en(px), t: en(t) }),
       // the data ended (or the caller is shutting down): close what is open
-      end(snap) {
-        if (position && !position.filled) { api.cancelled(); return EMPTY; } if (!position) return EMPTY;
-        const out = []; leave("end", snap, snap.t, out); return out;
-      },
-      state() {
-        const p = position, rd = trig.read();
-        return {
-          id: api.id, name: def.name, stage: def.stage,
-          context: { type: ctx.type, on: lastCtx.on, why: lastCtx.why },
-          region: reg.type === "rangeBox" ? Object.assign({ type: "rangeBox", windowSec: reg.windowSec }, vt[anyVenue ? "bn" : def.venue].box ? { hi: vt[anyVenue ? "bn" : def.venue].box.hi, lo: vt[anyVenue ? "bn" : def.venue].box.lo, ready: !!(vt[anyVenue ? "bn" : def.venue].t0 != null && lastSnapT - vt[anyVenue ? "bn" : def.venue].t0 >= W) } : { ready: false }) : { type: "none" },
-          trigger: { type: trg.type, reading: rd ? rd.value : null, threshold: rd ? rd.threshold : null, side: rd ? rd.side : 0, lastSkip, lastEnter },
-          thesis: { dir: th.dir, text: th.text, invalidation: inv },
-          position: p ? { pending: !p.filled, dir: p.dir, venue: p.venue, entryPx: p.p0, tIn: p.tIn, tEnd: p.tEnd, stopBps: p.stopBps, stopPx: p.p0 == null ? null : p.p0 * (1 - p.dir * p.stopBps / 1e4), targetPx: p.p0 == null || p.tpBps == null ? null : p.p0 * (1 + p.dir * p.tpBps / 1e4), trailBps: p.trailBps, best: p.best, flowAt: p.flowAt } : null,
-          counts: JSON.parse(JSON.stringify(counts)),
-        };
-      },
+      end: snap => wasm("end", { h, t: en(snap.t) }),
+      state: () => fixState(wasm("state", { h })),
+      // free the instance now (it is freed anyway when this object is collected); no call may follow
+      dispose: () => { if (live) { live = false; if (reg) reg.unregister(api); wasm("drop", { h }); } },
     };
+    if (reg) reg.register(api, h, api);
     return api;
   }
 

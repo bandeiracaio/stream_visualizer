@@ -4,7 +4,8 @@
 // Decisions come only from snapshots (made from input times), never from a timer here, so a hidden tab that delivers late gives the same rows. Runs while the page is connected and the asset is BTC.
 const TRN = {on: store.get("trOn", true) !== false, driver: null, journal: [], stageLog: [], mirror: [], faults: [], loaded: false, db: null, lastT: 0, err: "", ev: null, evAt: 0, saved: 0, ready: null};      // ev, evAt: unused since step 5 (the view keeps its own cache)
 Object.defineProperty(TRN, "runner", {get: () => TRN.driver ? TRN.driver.runner() : null});      // the runner now running (the Trader home reads its state and risk), null between runs and after a gap until the next snapshot
-const TR_DEF = Object.fromEntries(SYSTEMS_DEFAULT.map(d => [SYSTEM.id(d), d]));
+let TR_DEF = {};      // id -> definition; the ids come from SYSTEM.id (WebAssembly), so it is filled when the module is ready (a moment after the scripts ran; nothing reads it before: the runner starts on a connection, the views render after it)
+SVWASM.ready.then(() => { TR_DEF = Object.fromEntries(SYSTEMS_DEFAULT.map(d => [SYSTEM.id(d), d])); }, () => {});
 const TR_CFG = {twins: 20, equity: 10000, feeBps: 5, riskCap: 0.02, seed: 1, gapMs: 30000};
 const tr$ = id => document.getElementById(id);
 

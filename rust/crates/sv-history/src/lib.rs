@@ -229,7 +229,7 @@ pub fn op_totals(i: TotalsIn) -> Result<Totals, String> {
         by[idx].1.n += 1.0; by[idx].1.amount += amount; total += amount; n += 1.0;
         if truthy(get(r, "asset")) { let a = to_string(get(r, "asset")); if !assets.contains(&a) { assets.push(a); } }
     }
-    assets.sort_by(|a, b| cmp_utf16(a, b));
+    sv_core::sort_by(&mut assets, |a, b| cmp_utf16(a, b));
     Ok(Totals { by_type: by, total: num_v(total), n, assets })
 }
 
@@ -269,7 +269,7 @@ pub fn op_symbols(vals: Vec<Option<Value>>) -> Result<Vec<usize>, String> {
         let same = |w: &Value| match (v, w) { (Value::Array(_) | Value::Object(_), _) | (_, Value::Array(_) | Value::Object(_)) => false, _ => v == w };
         if !first.iter().any(|&j| same(vals[j].as_ref().unwrap())) { first.push(i); }
     }
-    first.sort_by(|&a, &b| cmp_utf16(&to_string(vals[a].as_ref()), &to_string(vals[b].as_ref())));
+    sv_core::sort_by(&mut first, |&a, &b| cmp_utf16(&to_string(vals[a].as_ref()), &to_string(vals[b].as_ref())));
     Ok(first)
 }
 

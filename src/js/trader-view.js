@@ -3,12 +3,15 @@
 // the detail of the selected system, the price chart with the trades and skipped triggers, and the journal. Display only: it reads the runner (runner.js) and the engine's price history and changes nothing in them.
 // Cheap: the view model is rebuilt at most twice a second and only while the view is open (VIEWS.tick calls renderTrader only then); the chart redraws only when its data changed.
 const TV = {el: {}, elLog: -1, elRows: -1, promoHtml: "", conf: null, sel: store.get("trSel", null), win: +store.get("trWin", 30) || 30, at: 0, evLen: -1, evAt: 0, ev: {}, tw: {}, drawKey: "", hits: [], jSys: store.get("trJSys", ""), jHtml: "", rowsHtml: "", detHtml: "", tipDefault: "Hover or tap a mark for its reason. Triangles are entries (up long, down short), squares are exits with their reason, diamonds are invalidations, ticks along the bottom are skipped triggers."};
-const TV_SYS = SYSTEMS_DEFAULT.map(d => ({d, id: SYSTEM.id(d)})), TV_NAMES = Object.fromEntries(TV_SYS.map(x => [x.id, x.d.name]));
+let TV_SYS = [], TV_NAMES = {};      // the ids come from SYSTEM.id (WebAssembly): filled when the module is ready; the views render only after it is (VIEWS.tick waits for SVWASM.loaded), and this runs first
 const tv$ = id => document.getElementById(id);
 const tvEsc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const TV_GLYPH = {on: "●", wait: "◐", off: "○"}, TV_WORD = {on: "on", wait: "waiting", off: "off"};
-if (!TV_NAMES[TV.sel]) TV.sel = null;
-if (TV.jSys && !TV_NAMES[TV.jSys]) TV.jSys = "";
+SVWASM.ready.then(() => {
+  TV_SYS = SYSTEMS_DEFAULT.map(d => ({d, id: SYSTEM.id(d)})); TV_NAMES = Object.fromEntries(TV_SYS.map(x => [x.id, x.d.name]));
+  if (!TV_NAMES[TV.sel]) TV.sel = null;
+  if (TV.jSys && !TV_NAMES[TV.jSys]) TV.jSys = "";
+}, () => {});
 if (![5, 30, 120].includes(TV.win)) TV.win = 30;
 tv$("trWin").value = String(TV.win);
 

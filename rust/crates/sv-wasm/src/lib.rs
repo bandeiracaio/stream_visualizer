@@ -51,3 +51,17 @@ export! {
     sv_sq_line => sv_quality::op_line,
     sv_sq_coverage => sv_quality::op_coverage,
 }
+export! {
+    sv_system_validate => sv_system::ops::op_validate,
+    sv_system_id => sv_system::ops::op_id,
+    sv_system_size => sv_system::ops::op_size,
+    sv_system_create => sv_system::ops::op_create,
+    sv_system_step => sv_system::ops::op_step,
+    sv_system_filled => sv_system::ops::op_filled,
+    sv_system_closed => sv_system::ops::op_closed,
+    sv_system_cancelled => sv_system::ops::op_cancelled,
+    sv_system_end => sv_system::ops::op_end,
+    sv_system_state => sv_system::ops::op_state,
+    sv_system_force => sv_system::ops::op_force,
+    sv_system_drop => sv_system::ops::op_drop,
+}

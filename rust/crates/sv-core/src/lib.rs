@@ -183,3 +183,31 @@ mod tests {
         assert_eq!(f1(None), "\u{2013}");
     }
 }
+
+/// Stable merge sort by a comparator, written once for every core: the standard `sort_by` is compiled again for each element type and closure (about 3 KB each), this one sorts
+/// indices through a `dyn` comparator, so the sort itself exists once and only the small permutation step is per type. Same result as any stable sort for a consistent comparator.
+pub fn sort_by<T>(v: &mut Vec<T>, mut cmp: impl FnMut(&T, &T) -> std::cmp::Ordering) {
+    if v.len() < 2 { return; }
+    let order = sorted_order(v.len(), &mut |a, b| cmp(&v[a], &v[b]));
+    let mut old: Vec<Option<T>> = v.drain(..).map(Some).collect();
+    for i in order { if let Some(x) = old[i].take() { v.push(x); } }
+}
+fn sorted_order(n: usize, cmp: &mut dyn FnMut(usize, usize) -> std::cmp::Ordering) -> Vec<usize> {
+    let mut a: Vec<usize> = (0..n).collect();
+    let mut b: Vec<usize> = a.clone();
+    let mut w = 1;
+    while w < n {
+        let mut i = 0;
+        while i < n {
+            let (mid, hi) = ((i + w).min(n), (i + 2 * w).min(n));
+            let (mut l, mut r, mut k) = (i, mid, i);
+            while l < mid && r < hi { if cmp(a[r], a[l]) == std::cmp::Ordering::Less { b[k] = a[r]; r += 1; } else { b[k] = a[l]; l += 1; } k += 1; }
+            while l < mid { b[k] = a[l]; l += 1; k += 1; }
+            while r < hi { b[k] = a[r]; r += 1; k += 1; }
+            i += 2 * w;
+        }
+        std::mem::swap(&mut a, &mut b);
+        w *= 2;
+    }
+    a
+}

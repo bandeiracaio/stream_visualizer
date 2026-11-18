@@ -23,13 +23,21 @@ import { loadEngine } from "./compare-detections.mjs";
 import { readInput } from "./lib/session-io.mjs";
 import { sigmaOf } from "./lib/sigma.mjs";
 import { rng, generate, loadPool } from "./sample-designs.mjs";
+import { buildWasm } from "./lib/wasm-build.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SNAPDIR = path.join(HERE, ".scratch", "trade-system", "cache-snap"), OLDCACHE = path.join(HERE, ".scratch", "trade-system", "cache");
 export const EXEC = { latencyMs: 1000, costBps: 8, maxGapMs: 30000, holdoutShare: 0.3 };
-export const SYSTEM = vm.runInNewContext(fs.readFileSync(path.join(HERE, "src/js/system-core.js"), "utf8") + "\n;SYSTEM", {});
+// The cores that run in WebAssembly (SYSTEM, PROMO) need the module: every context here gets js/wasm-loader.js first, instantiated at once (__SV_SYNC), with the bytes of rust/sv.wasm (compiled only if rust/ changed).
+const WASM = buildWasm(HERE, { quiet: true });
+const coreContext = () => {
+  const ctx = vm.createContext({ atob, TextEncoder, TextDecoder, __SV_SYNC: true });
+  vm.runInContext(fs.readFileSync(path.join(HERE, "src/js/wasm-loader.js"), "utf8").replace("__SV_WASM_B64__", () => WASM.toString("base64")), ctx, { filename: "wasm-loader.js" });
+  return ctx;
+};
+export const SYSTEM = vm.runInContext(fs.readFileSync(path.join(HERE, "src/js/system-core.js"), "utf8") + "\n;SYSTEM", coreContext());
 // the paper runner (Trader step 4) and the seven default systems: the same files the page includes, in one context with their own SYSTEM
-export const { RUNNER, SYSTEMS_DEFAULT, PROMO } = vm.runInNewContext(["system-core", "systems-default", "runner-core", "promotion-core"].map(f => fs.readFileSync(path.join(HERE, "src/js", f + ".js"), "utf8")).join("\n") + "\n;({ RUNNER, SYSTEMS_DEFAULT, PROMO })", {});
+export const { RUNNER, SYSTEMS_DEFAULT, PROMO } = vm.runInContext(["system-core", "systems-default", "runner-core", "promotion-core"].map(f => fs.readFileSync(path.join(HERE, "src/js", f + ".js"), "utf8")).join("\n") + "\n;({ RUNNER, SYSTEMS_DEFAULT, PROMO })", coreContext());
 
 // ---------- price helpers (history = [[t_ms, price]], one point a second) ----------
 export function priceAt(h, t, within = 2000) {
@@ -177,6 +185,7 @@ export function runSystem(def, s, ex = EXEC, o = {}) {
   };
   for (const x of snaps) { const a = inst.step(x); if (a.length) handle(a); }
   const last = snaps[snaps.length - 1]; handle(inst.end(last));
+  inst.dispose();      // free the instance in the WebAssembly module now (a run makes many)
   return trades;
 }
 

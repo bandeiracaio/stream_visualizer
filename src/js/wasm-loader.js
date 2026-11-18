@@ -1,5 +1,6 @@
 // WebAssembly loader: the Rust cores (rust/, built into the page by build.mjs as base64) behind one global, SVWASM.
 //   SVWASM.call("promo_eligibility", obj) -> the result object (JSON in, JSON out; export sv_promo_eligibility). Throws Error("wasm core promo: ...") on a bad input, a trap or a panic.
+//   SVWASM.callText(name, jsonText) -> the same with the input already as JSON text.
 //   SVWASM.ready  -> a promise that resolves when the module is instantiated (rejects if it cannot be).
 // Why async in the page: Chrome refuses a synchronous new WebAssembly.Module(bytes) on the main thread above a small size, so the page compiles with WebAssembly.instantiate (this file is the
 // FIRST script, so compiling starts at once). A call before it resolves throws; nothing calls a core while the page loads (a user action, a connect or a view render comes first), and the boot check
@@ -27,12 +28,14 @@ const SVWASM = (() => {
     ready.catch(() => {});      // a failed load is reported by the first call (and by whoever awaits ready), not as an unhandled rejection
   }
 
-  function call(name, obj) {
+  // callText takes the JSON text itself (a caller that sends the same big object to many calls writes it once); call writes it from an object
+  function call(name, obj) { return callText(name, JSON.stringify(obj === undefined ? null : obj)); }
+  function callText(name, json) {
     const core = String(name).split("_")[0], fail = m => new Error("wasm core " + core + ": " + m);
     if (!inst) throw fail(failure ? "WebAssembly failed to load: " + failure.message : "WebAssembly is not ready yet (await SVWASM.ready)");
     const ex = inst.exports, fn = ex["sv_" + name];
     if (!fn) throw fail("no export sv_" + name);
-    const input = enc.encode(JSON.stringify(obj === undefined ? null : obj)), p = ex.sv_alloc(input.length);
+    const input = enc.encode(json), p = ex.sv_alloc(input.length);
     let r = 0, n = 0;
     try {
       new Uint8Array(ex.memory.buffer, p, input.length).set(input);      // read memory.buffer after sv_alloc: the allocation may have grown the memory
@@ -48,5 +51,5 @@ const SVWASM = (() => {
     return JSON.parse(text);
   }
 
-  return { call, ready, get loaded() { return !!inst; } };
+  return { call, callText, ready, get loaded() { return !!inst; } };
 })();
