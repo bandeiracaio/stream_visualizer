@@ -2,31 +2,42 @@
 // Simulated paper broker (pure, no DOM, timers or storage): state, quotes, symbol and clock are passed in, never read from the page.
 // Display only: the Reader engine, feeds and the Binance broker are untouched. Rows go to the history log through HIST.push.
 // ctx = {sym, now, q:{bid, ask, mark}}; functions change the state they are given in place (same SIM shape as before) and return results.
+// Since R1 the arithmetic and decisions run in WebAssembly (rust/crates/sv-paper, loaded by wasm-loader.js as SVWASM); the signatures, results, thrown messages and the state left behind are the ones the JS version had
+// (that version is src/js/js-cores/paper-broker-core.js, PAPER_JS, and `node parity.mjs paper` compares the two). A call sends the numbers of the state (cash, positions in key order, nextId, logSeq) and gets the new ones
+// back, plus the rows to add; this wrapper writes them into the same SIM objects (positions are updated in place, never replaced, S.fills is the same array) and does the container bookkeeping: the 50-row fills list,
+// the order log through HIST.push (5000 cap), logEnd's scan, the resting-order objects, reset and pos. Numbers go through JSON: NaN, Infinity and -0 are carried across as text. Quantities and prices are numbers.
 const PAPER = (() => {
-  const MAKER = 0.0002, TAKER = 0.0005;
+  const MAKER = 0.0002, TAKER = 0.0005, FILLS_KEEP = 50;
+  const wasm = (fn, o) => SVWASM.call("paper_" + fn, o);
   const reset = start => ({start, cash:start, positions:{}, orders:[], fills:[], nextId:1, log:{orders:[], fills:[], income:[]}, logSeq:100000});   // orders filled at once and the fills and income rows take ids from logSeq so the ids of resting orders do not change
   // one position per asset: the header lets you switch asset while the paper account is live
   const pos = (S, sym) => (S.positions[sym] ||= {symbol:sym, qty:0, entry:0, mark:null});
-  function fill(S, ctx, side, qty, price, maker, oid) {
-    const fee = qty*price*(maker ? MAKER : TAKER), p = pos(S, ctx.sym), signed = side==="BUY" ? qty : -qty; let pnl = 0;
-    S.cash -= fee;
-    if (p.qty===0 || Math.sign(p.qty)===Math.sign(signed)) { p.entry = (p.entry*Math.abs(p.qty) + price*qty)/(Math.abs(p.qty)+qty); p.qty += signed; }
-    else {
-      const close = Math.min(Math.abs(p.qty), qty); pnl = close*(price-p.entry)*Math.sign(p.qty); S.cash += pnl;
-      const wasSign = Math.sign(p.qty); p.qty += signed;
-      if (Math.abs(p.qty) < 1e-12) { p.qty = 0; p.entry = 0; } else if (Math.sign(p.qty)!==wasSign) p.entry = price;
+  // JSON has no NaN, Infinity or -0: those travel as their text ("NaN", "Infinity", "-Infinity", "-0") in both directions
+  const en = x => typeof x === "number" ? (Object.is(x, -0) ? "-0" : isFinite(x) ? x : String(x)) : x;
+  const de = x => typeof x === "string" ? (x === "-0" ? -0 : Number(x)) : x;
+  const fix = (r, keys) => { for (const k of keys) r[k] = de(r[k]); return r; };
+  const numState = S => ({cash:en(S.cash), positions:Object.keys(S.positions).map(k => { const p = S.positions[k]; return [k, {symbol:p.symbol, qty:en(p.qty), entry:en(p.entry), mark:en(p.mark)}]; }), nextId:en(S.nextId), logSeq:en(S.logSeq)});
+  function commit(S, out) {
+    const st = out.state;
+    S.cash = de(st.cash); S.nextId = de(st.nextId); S.logSeq = de(st.logSeq);
+    for (const [k, p] of st.positions) {
+      const e = S.positions[k];
+      if (e) { e.qty = de(p.qty); e.entry = de(p.entry); e.mark = de(p.mark); } else S.positions[k] = {symbol:p.symbol, qty:de(p.qty), entry:de(p.entry), mark:de(p.mark)};
     }
-    p.qty = +p.qty.toFixed(10);                                // drop float dust (0.12 - 0.05 = 0.06999999999999999)
-    S.fills.unshift({t:ctx.now, side, qty, price, fee, pnl, symbol:p.symbol}); if (S.fills.length > 50) S.fills.pop();
-    const lg = S.log, now = ctx.now;
-    HIST.push(lg.fills, {id:S.logSeq++, orderId:oid, t:now, symbol:p.symbol, side, price, qty, fee, feeAsset:"USDT", pnl, maker});
-    HIST.push(lg.income, {id:S.logSeq++, t:now, symbol:p.symbol, type:"COMMISSION", amount:-fee, asset:"USDT", info:""});
-    if (pnl) HIST.push(lg.income, {id:S.logSeq++, t:now, symbol:p.symbol, type:"REALIZED_PNL", amount:pnl, asset:"USDT", info:""});
+    for (const r of out.newFills || []) { S.fills.unshift(fix(r, ["t", "qty", "price", "fee", "pnl"])); if (S.fills.length > FILLS_KEEP) S.fills.pop(); }
+    if (out.log) {
+      for (const r of out.log.fills) HIST.push(S.log.fills, fix(r, ["id", "orderId", "t", "price", "qty", "fee", "pnl"]));
+      for (const r of out.log.income) HIST.push(S.log.income, fix(r, ["id", "t", "amount"]));
+      for (const r of out.log.orders) HIST.push(S.log.orders, fix(r, ["t", "upd", "id", "price", "qty", "filled", "avg"]));
+    }
+  }
+  const cx = (ctx, q) => ({sym:ctx.sym, now:en(ctx.now), bid:q && en(q.bid), ask:q && en(q.ask), mark:q && en(q.mark)});
+  function fill(S, ctx, side, qty, price, maker, oid) {
+    commit(S, wasm("fill", {state:numState(S), ctx:cx(ctx), side, qty:en(+qty), price:en(+price), maker:!!maker, oid:en(+oid)}));
   }
   // reduce-only: never grow or flip the position
   function capReduce(S, ctx, o) {
-    const p = pos(S, ctx.sym).qty, opp = (o.side==="SELL" && p>0) || (o.side==="BUY" && p<0);
-    if (!opp) return 0; return Math.min(o.qty, Math.abs(p));
+    const out = wasm("cap_reduce", {state:numState(S), ctx:cx(ctx), side:o.side, qty:en(+o.qty)}); commit(S, out); return de(out.q);
   }
   // the order log: a row when an order is placed, updated when it fills or ends
   const logNew = (S, ctx, row) => HIST.push(S.log.orders, Object.assign({t:ctx.now, upd:ctx.now, symbol:ctx.sym, tif:""}, row));
@@ -35,42 +46,32 @@ const PAPER = (() => {
   }
   // returns {kind:"filled", qty, px, crossed} or {kind:"resting", price}; the caller words the message. Throws the same errors as before.
   function place(S, ctx, o) {
-    const bid = ctx.q.bid, ask = ctx.q.ask;
-    if (o.type==="MARKET") {
-      const px = o.side==="BUY" ? ask : bid; if (!px) throw new Error("no Binance prices yet; press Connect");
-      const q = o.reduce ? capReduce(S, ctx, o) : o.qty; if (!q) throw new Error("reduce-only: no position to reduce");
-      const id = S.logSeq++; fill(S, ctx, o.side, q, px, false, id); logNew(S, ctx, {id, side:o.side, type:"MARKET", price:0, qty:q, filled:q, avg:px, status:"FILLED", reduce:!!o.reduce});
-      return {kind:"filled", qty:q, px, crossed:false};
+    const q = ctx.q, bid = q.bid, ask = q.ask;      // a missing ctx.q throws here, as it did
+    const out = wasm("place", {state:numState(S), ctx:cx(ctx, q), type:o.type, side:o.side, qty:en(+o.qty), price:en(+o.price), reduce:!!o.reduce});
+    commit(S, out);      // also when it throws: a reduce-only check creates the position first
+    if (out.err) throw new Error(out.err);
+    if (out.restId != null) {
+      S.orders.push({id:out.restId, symbol:ctx.sym, side:o.side, type:"LIMIT", qty:o.qty, filled:0, price:+o.price, reduce:o.reduce, t:ctx.now});
+      return {kind:"resting", price:o.price};
     }
-    const cross = o.side==="BUY" ? (ask && o.price >= ask) : (bid && o.price <= bid);
-    if (cross) {
-      const px = o.side==="BUY" ? ask : bid, q = o.reduce ? capReduce(S, ctx, o) : o.qty; if (!q) throw new Error("reduce-only: no position to reduce");
-      const id = S.logSeq++; fill(S, ctx, o.side, q, px, false, id); logNew(S, ctx, {id, side:o.side, type:"LIMIT", price:+o.price, qty:q, filled:q, avg:px, status:"FILLED", reduce:!!o.reduce, tif:"GTC"});
-      return {kind:"filled", qty:q, px, crossed:true};
-    }
-    const rest = {id:S.nextId++, symbol:ctx.sym, side:o.side, type:"LIMIT", qty:o.qty, filled:0, price:+o.price, reduce:o.reduce, t:ctx.now};
-    S.orders.push(rest); logNew(S, ctx, {id:rest.id, side:o.side, type:"LIMIT", price:+o.price, qty:o.qty, filled:0, avg:0, status:"NEW", reduce:!!o.reduce, tif:"GTC"});
-    return {kind:"resting", price:o.price};
+    return fix(out.result, ["qty", "px"]);
   }
   function onTrade(S, ctx, t) {
     if (!S || !S.orders.length) return;
-    S.orders = S.orders.filter(o => {
-      if (o.symbol !== ctx.sym) return true;                   // trades on this feed only touch this asset's orders
-      const hit = (o.side==="BUY" && t.px <= o.price) || (o.side==="SELL" && t.px >= o.price);
-      if (!hit) return true;
-      const q = o.reduce ? capReduce(S, ctx, o) : o.qty; if (q) fill(S, ctx, o.side, q, o.price, true, o.id);
-      logEnd(S, ctx, o.id, q ? "FILLED" : "EXPIRED", q, q ? o.price : 0);   // a reduce-only order with nothing left to reduce ends without a fill
-      return false;
-    });
+    const sym = ctx.sym, px = t.px;
+    // trades are frequent and almost never touch a resting order: only a hit goes to WebAssembly (a miss leaves a fresh array, as the filter did)
+    if (!S.orders.some(o => o.symbol === sym && ((o.side === "BUY" && px <= o.price) || (o.side === "SELL" && px >= o.price)))) { S.orders = S.orders.slice(); return; }
+    const out = wasm("on_trade", {state:numState(S), ctx:cx(ctx), orders:S.orders.map(o => ({id:en(o.id), symbol:o.symbol, side:o.side, qty:en(o.qty), price:en(o.price), reduce:o.reduce})), px:en(px)});
+    commit(S, out);
+    S.orders = S.orders.filter((o, i) => out.keep[i]);
+    for (const e of out.logEnds) logEnd(S, ctx, de(e.id), e.status, de(e.filled), de(e.avg));   // a reduce-only order with nothing left to reduce ends without a fill
   }
   function snapshot(S, ctx) {
-    const sym = ctx.sym, cur = pos(S, sym), q = ctx.q;
-    cur.mark = q.mark || (q.bid && q.ask ? (q.bid+q.ask)/2 : cur.mark || cur.entry);   // other assets keep their last known mark
-    const open = Object.values(S.positions).filter(p=>p.qty).map(p => { const mark = p.mark || p.entry;
-      return {symbol:p.symbol, qty:p.qty, entry:p.entry, mark, upnl:p.qty*(mark-p.entry), liq:null, lev:"10 (sim)"}; });
-    const upnl = open.reduce((a,p)=>a+p.upnl, 0), margin = open.reduce((a,p)=>a+Math.abs(p.qty)*p.mark/10, 0);
-    return {balance:{wallet:S.cash, available:S.cash+upnl-margin, upnl}, positions:open,
-      orders: S.orders.filter(o=>o.symbol===sym).map(o=>({...o})), fills: S.fills};
+    pos(S, ctx.sym);      // created before the quotes are read, as it was (a missing ctx.q throws after it)
+    const q = ctx.q, mark = q.mark;
+    const out = wasm("snapshot", {state:numState(S), ctx:cx(ctx, q), orders:S.orders.map(o => o.symbol)});
+    commit(S, out);
+    return {balance:fix(out.balance, ["wallet", "available", "upnl"]), positions:out.positions.map(p => fix(p, ["qty", "entry", "mark", "upnl"])), orders:out.orderIdx.map(i => ({...S.orders[i]})), fills:S.fills};
   }
 
   function selftest() {

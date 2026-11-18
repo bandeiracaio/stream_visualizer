@@ -2,51 +2,44 @@
 // Order history and account info (pure, no DOM): one row shape for orders, fills and income whether they come from Binance futures
 // or from the simulated broker, plus totals, 7-day request pieces and CSV. Spec: .scratch/order-history/spec.md.
 // Display only: nothing here feeds a detection. Binance field names checked against the USD-M futures docs on 2026-10-24.
+// Since R1 the row building, totals, paging, merge and CSV run in WebAssembly (rust/crates/sv-history, loaded by wasm-loader.js as SVWASM); the signatures and results are the ones the JS version had
+// (that version is src/js/js-cores/history-core.js, HIST_JS, and `node parity.mjs hist` compares the two). Values go in as JSON with JS semantics (+x, String(x), parseFloat(x) are done in Rust).
+// Here: `push` (it mutates an array in place), the constants and COLUMNS, the pass-through ids (`id: o.orderId` is the raw value), and the objects whose key order JS decides (byType, statusCounts).
+// A non-finite number travels as its text ("NaN", "Infinity") and comes back as a number. Known edges: a lone surrogate in a CSV cell is refused by the JSON boundary; a null row inside `assets` / `positions` throws
+// the TypeError JS throws, but always says "null" (JSON has no undefined inside an array); totals / fillTotals add numbers (the rows these functions make): a text amount, fee or pnl would be concatenated by the JS version and is added here; merge assumes every `t` is a number (the order of rows without one is not defined).
 const HIST = (() => {
   const DAY = 86400000, WINDOW = 7 * DAY - 1000;          // allOrders / userTrades / income reject a window of 7 days or more
-  const num = x => { const n = parseFloat(x); return Number.isFinite(n) ? n : 0; };
-  const str = x => x == null ? "" : String(x);
+  const wasm = (fn, o) => {
+    try { return SVWASM.call("hist_" + fn, o); }
+    catch (e) { const m = /^wasm core hist: (TypeError|RangeError): ([\s\S]*)$/.exec(e && e.message); if (m) throw new (m[1] === "TypeError" ? TypeError : RangeError)(m[2]); throw e; }
+  };
+  const enc = x => typeof x === "number" && !isFinite(x) ? String(x) : x;      // a non-finite number goes as its text
+  const enc2 = x => x === undefined ? "NaN" : enc(x);      // for arithmetic arguments: undefined is NaN, null stays 0 (as in JS)
+  const dec = x => typeof x === "string" ? Number(x) : x;
+  const decT = (r, ...keys) => { for (const k of keys) r[k] = dec(r[k]); return r; };      // a time can be Infinity ("Infinity" in an API field)
 
   // ---- Binance -> common rows
-  const order = o => ({id:o.orderId, t:+o.time || 0, upd:+o.updateTime || +o.time || 0, symbol:str(o.symbol), side:str(o.side), type:str(o.type), price:num(o.price), qty:num(o.origQty), filled:num(o.executedQty), avg:num(o.avgPrice), status:str(o.status), reduce:!!o.reduceOnly, tif:str(o.timeInForce)});
-  const fill = f => ({id:f.id, orderId:f.orderId, t:+f.time || 0, symbol:str(f.symbol), side:str(f.side), price:num(f.price), qty:num(f.qty), fee:num(f.commission), feeAsset:str(f.commissionAsset), pnl:num(f.realizedPnl), maker:!!f.maker});
-  const income = i => ({id:str(i.incomeType) + ":" + str(i.tranId), t:+i.time || 0, symbol:str(i.symbol), type:str(i.incomeType), amount:num(i.income), asset:str(i.asset), info:str(i.info)});
+  const order = o => ({id:o.orderId, ...decT(wasm("order", o), "t", "upd")});
+  const fill = f => ({id:f.id, orderId:f.orderId, ...decT(wasm("fill", f), "t")});
+  const income = i => decT(wasm("income", i), "t");
 
   // raw: {account:/fapi/v2/account, positions:/fapi/v2/positionRisk, dual:/fapi/v1/positionSide/dual, rate:/fapi/v1/commissionRate} (each may be missing: a failed call must not hide the rest)
   function account(raw) {
-    raw = raw || {}; const a = raw.account || {};
-    const assets = (Array.isArray(a.assets) ? a.assets : []).map(x => ({asset:str(x.asset), wallet:num(x.walletBalance), available:num(x.availableBalance), upnl:num(x.unrealizedProfit), margin:num(x.marginBalance)}))
-      .filter(x => x.wallet || x.upnl || x.available || x.margin);
-    const positions = (Array.isArray(raw.positions) ? raw.positions : []).filter(p => num(p.positionAmt) !== 0)
-      .map(p => ({symbol:str(p.symbol), qty:num(p.positionAmt), entry:num(p.entryPrice), mark:num(p.markPrice), upnl:num(p.unRealizedProfit), lev:num(p.leverage), marginType:str(p.marginType), liq:num(p.liquidationPrice) || null, side:str(p.positionSide)}));
-    const rate = raw.rate || {};
-    return {assets, positions,
-      mode:{hedge:raw.dual ? !!raw.dual.dualSidePosition : null, multiAssets:a.multiAssetsMargin == null ? null : !!a.multiAssetsMargin},
-      canTrade:a.canTrade == null ? null : !!a.canTrade, feeTier:a.feeTier == null ? null : +a.feeTier,
-      fees:rate.makerCommissionRate == null ? null : {maker:num(rate.makerCommissionRate), taker:num(rate.takerCommissionRate)}};
+    const r = wasm("account", raw === undefined ? null : raw); r.feeTier = dec(r.feeTier); return r;
   }
 
   // the simulated account (simSnapshot() in app.js) in the same shape; its fees are the broker's own (maker 0.02%, taker 0.05%)
-  function simAccount(snap, fees) {
-    const b = (snap && snap.balance) || {};
-    return {assets:[{asset:"USDT", wallet:num(b.wallet), available:num(b.available), upnl:num(b.upnl), margin:num(b.wallet) + num(b.upnl)}],
-      positions:((snap && snap.positions) || []).map(p => ({symbol:str(p.symbol), qty:num(p.qty), entry:num(p.entry), mark:num(p.mark), upnl:num(p.upnl), lev:num(p.lev), marginType:"simulated", liq:null, side:"BOTH"})),
-      mode:{hedge:false, multiAssets:false}, canTrade:true, feeTier:null, fees:fees ? {maker:num(fees.maker), taker:num(fees.taker)} : null};
-  }
+  const simAccount = (snap, fees) => wasm("sim_account", {snap, fees});
 
   // ---- totals
   // income inside [from, to): per type {n, amount}, the sum of all, and the assets seen (amounts of different assets must not be read as one number)
   function totals(rows, from, to) {
-    const byType = {}, assets = new Set(); let total = 0, n = 0;
-    for (const r of rows || []) {
-      if ((from != null && r.t < from) || (to != null && r.t >= to)) continue;
-      const k = byType[r.type] || (byType[r.type] = {n:0, amount:0});
-      k.n++; k.amount += r.amount; total += r.amount; n++; if (r.asset) assets.add(r.asset);
-    }
-    return {byType, total, n, assets:[...assets].sort()};
+    const r = wasm("totals", {rows:rows && Array.isArray(rows) ? rows.map(x => ({t:enc2(x.t), type:x.type, amount:enc2(x.amount), asset:x.asset})) : rows, from:enc(from), to:enc(to)}), byType = {};
+    for (const [k, v] of r.byType) byType[k] = v;
+    return {byType, total:dec(r.total), n:r.n, assets:r.assets};
   }
-  const fillTotals = rows => { let fee = 0, pnl = 0, volume = 0, n = 0; for (const f of rows || []) { fee += f.fee; pnl += f.pnl; volume += f.qty * f.price; n++; } return {n, fee, pnl, volume}; };
-  const statusCounts = rows => { const o = {}; for (const r of rows || []) o[r.status] = (o[r.status] || 0) + 1; return o; };
+  function fillTotals(rows) { const r = wasm("fill_totals", Array.isArray(rows) ? rows.map(x => ({fee:enc2(x.fee), pnl:enc2(x.pnl), qty:enc2(x.qty), price:enc2(x.price)})) : rows === undefined ? null : rows); return {n:r.n, fee:dec(r.fee), pnl:dec(r.pnl), volume:dec(r.volume)}; }
+  function statusCounts(rows) { const o = {}; for (const [k, n] of wasm("status_counts", rows === undefined ? null : rows)) o[k] = n; return o; }
 
   // ---- columns shared by the History table and its CSV ("iso" is added by csvRows)
   const COLUMNS = {
@@ -54,32 +47,17 @@ const HIST = (() => {
     fills:[["iso", "time (UTC)"], ["symbol", "symbol"], ["side", "side"], ["price", "price"], ["qty", "qty"], ["fee", "fee"], ["feeAsset", "fee asset"], ["pnl", "realised PnL"], ["maker", "maker"], ["orderId", "order id"], ["id", "trade id"]],
     income:[["iso", "time (UTC)"], ["symbol", "symbol"], ["type", "type"], ["amount", "amount"], ["asset", "asset"], ["info", "info"]],
   };
-  const csvRows = rows => (rows || []).map(r => Object.assign({iso:new Date(r.t).toISOString()}, r));
-  const symbols = rows => [...new Set((rows || []).map(r => r.symbol).filter(Boolean))].sort();
-  const period = (days, now) => ({from:now - Math.min(days * DAY, days <= 7 ? WINDOW : Infinity), to:now});   // "7 days" is cut to the 6 days 23 h 59 min 59 s the API accepts, so it is one request, not two
+  const csvRows = rows => { const r = rows || [], iso = wasm("iso", r.map(x => typeof x.t === "number" ? x.t : new Date(x.t).getTime())); return r.map((x, i) => Object.assign({iso:iso[i]}, x)); };
+  const symbols = rows => { const r = rows || [], vals = r.map(x => x.symbol); return wasm("symbols", vals).map(i => vals[i]); };
+  const period = (days, now) => ({from:dec(wasm("period", {days:enc2(days), now:enc2(now)})), to:now});   // "7 days" is cut to the 6 days 23 h 59 min 59 s the API accepts, so it is one request, not two
 
   // ---- paging: [start, end] pieces no longer than the API accepts, newest first
-  function pieces(from, to) {
-    const out = []; let end = to;
-    while (end > from) { const start = Math.max(from, end - WINDOW); out.push([start, end]); end = start - 1; }
-    return out;
-  }
+  const pieces = (from, to) => wasm("pieces", {from:enc2(from), to:enc2(to)});
   // rows from overlapping pieces: each id once, newest first
-  function merge(rows, key = "id") {
-    const seen = new Set(), out = [];
-    for (const r of rows || []) { const k = r[key]; if (k != null && seen.has(k)) continue; if (k != null) seen.add(k); out.push(r); }
-    return out.sort((a, b) => b.t - a.t);
-  }
+  function merge(rows, key = "id") { const r = rows || []; return wasm("merge", r.map(x => ({k:x[key], t:enc2(x.t)}))).map(i => r[i]); }
 
   // ---- CSV: columns are [key, label]; a text cell that a spreadsheet would read as a formula is quoted with a leading apostrophe
-  function toCsv(rows, columns) {
-    const cell = v => {
-      let s = v == null ? "" : typeof v === "number" ? String(v) : String(v);
-      if (typeof v === "string" && /^[=+@\t\r]/.test(s)) s = "'" + s;
-      return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-    };
-    return [columns.map(c => cell(c[1])).join(",")].concat((rows || []).map(r => columns.map(c => cell(r[c[0]])).join(","))).join("\r\n") + "\r\n";
-  }
+  const toCsv = (rows, columns) => wasm("to_csv", {header:columns.map(c => enc(c[1])), rows:(rows || []).map(r => columns.map(c => enc(r[c[0]])))});
 
   // ---- simulated broker log: bounded, so a long session cannot grow without limit
   const LOG_CAP = 5000;

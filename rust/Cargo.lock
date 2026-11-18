@@ -84,7 +84,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "sv-history"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sv-core",
+]
+
+[[package]]
+name = "sv-paper"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sv-core",
+]
+
+[[package]]
 name = "sv-promotion"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sv-core",
+]
+
+[[package]]
+name = "sv-quality"
 version = "0.1.0"
 dependencies = [
  "serde",
@@ -97,7 +124,10 @@ name = "sv-wasm"
 version = "0.1.0"
 dependencies = [
  "sv-core",
+ "sv-history",
+ "sv-paper",
  "sv-promotion",
+ "sv-quality",
 ]
 
 [[package]]

@@ -14,6 +14,7 @@
 //!   in a `Handles<T>` registry; a stale or unknown handle is an error result, never a panic.
 //! * Math: use `math::exp`, `math::log`, `math::pow`, ... (imports of the host's Math.*), never f64::exp and the like, so results equal
 //!   V8's bit for bit. sqrt, floor, ceil, abs, min, max and arithmetic are exact and may be native.
+pub mod js;
 use serde::{de::DeserializeOwned, Serialize};
 
 pub mod math {

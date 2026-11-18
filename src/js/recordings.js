@@ -85,4 +85,4 @@ rc$("rcList").onclick = async e => {
     else if (act === "del") { await rcTx("readwrite", st => st.delete(name)); rcRender(); }
   } catch (err) { if (!err || err.name !== "AbortError") rtMsg("Could not do that: " + (err && err.message || err)); }      // AbortError = the share sheet was closed
 };
-rcRender();
+SVWASM.ready.then(rcRender, rcRender);      // not at load: rcRender calls SQ (WebAssembly), which is ready a moment after the scripts ran
