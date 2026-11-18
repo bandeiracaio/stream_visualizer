@@ -1,6 +1,6 @@
 # Release gate. A page reaches the Pages site only if CI itself ran the self-test and proved that the newest
 # release file (releases/stream-visualizer_vNNN.html) is byte-identical to a build of src/ (`node build.mjs --verify`).
-#   test                 every push to main and every pull request: `node build.mjs` (compiles rust/ to WebAssembly with the pinned toolchain, self-test, syntax check, boot check).
+#   test                 every push to main and every pull request: `node build.mjs` (self-test on the committed rust/sv.wasm, which must be built from the current rust/ sources; syntax check, boot check). CI never runs cargo: compiles differ by host.
 #   verify-and-deploy    pushes to main: verify, then publish the committed file as index.html. A mismatch fails the job and the site keeps the previous page.
 #   release              attaches the deployed file to a GitHub Release tagged vNNN (older versions stay downloadable).
 # A push that changes src/ or build.mjs without touching releases/ is unreleased work: no verify, no deploy.
@@ -27,17 +27,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Install the pinned Rust toolchain (rust/rust-toolchain.toml) and the wasm target
-        run: |
-          v=$(grep -o '"[0-9][0-9.]*"' rust/rust-toolchain.toml | head -1 | tr -d '"')
-          rustup toolchain install "$v" --profile minimal --target wasm32-unknown-unknown
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            rust/target
-          key: rust-${{ runner.os }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
       - run: node build.mjs
 
   verify-and-deploy:
@@ -59,17 +48,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Install the pinned Rust toolchain (rust/rust-toolchain.toml) and the wasm target
-        run: |
-          v=$(grep -o '"[0-9][0-9.]*"' rust/rust-toolchain.toml | head -1 | tr -d '"')
-          rustup toolchain install "$v" --profile minimal --target wasm32-unknown-unknown
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            rust/target
-          key: rust-${{ runner.os }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
       - name: Decide what this push needs
         id: plan
         env:

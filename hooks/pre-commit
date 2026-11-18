@@ -2,12 +2,6 @@
 # Pre-commit: fail if `node build.mjs` fails. Bypass once with: git commit --no-verify
 
 cd "$(git rev-parse --show-toplevel)" || exit 1
-if ! command -v cargo >/dev/null 2>&1; then
-  echo "pre-commit: cargo is not on PATH. node build.mjs compiles rust/ to WebAssembly, so it needs Rust:" >&2
-  echo "  install rustup (https://rustup.rs), open a new shell, then: rustup toolchain install \$(grep -o '\"[0-9][0-9.]*\"' rust/rust-toolchain.toml | head -1 | tr -d '\"') --profile minimal --target wasm32-unknown-unknown" >&2
-  echo "  (Windows without the MSVC build tools: add -x86_64-pc-windows-gnu to the toolchain name.) Bypass once with: git commit --no-verify" >&2
-  exit 1
-fi
 tmp=$(mktemp -d) || exit 1
 trap 'rm -rf "$tmp"' EXIT
 
