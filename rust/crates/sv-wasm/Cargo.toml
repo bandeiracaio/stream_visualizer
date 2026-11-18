@@ -1,0 +1,12 @@
+[package]
+name = "sv-wasm"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+sv-core = { path = "../sv-core" }
+sv-promotion = { path = "../sv-promotion" }

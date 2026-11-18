@@ -13,3 +13,7 @@ panel/
 
 .secrets/
 .scratch/episode-outcomes/*.json
+videos/
+
+# Rust
+rust/target/

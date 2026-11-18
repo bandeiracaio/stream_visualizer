@@ -9,104 +9,30 @@
 //   Never automatic upward. Promotion to live also needs a cap above 0 (dollars). A move down goes to paper and has no condition. A live system goes to paper by itself when its net loss in one UTC day reaches 3 times its risk per trade or its cap.
 // Rows read: {k:"trade", sys, tIn, t, netBps, R, usd, reason, interrupted?, stage?, fill?, paperNetBps?} and {k:"twin", sys, n, tIn, R}. A row without stage and fill is paper / paper (rows written before step 7).
 // Stage log entries (append-only, one per move): {sys, from, to, t, by: "user"|"auto", reason?, cap?, figures: {criteria: [{id, now, need, met}], edge?}}.
+// Since R0 the functions below run in WebAssembly (rust/crates/sv-promotion, loaded by wasm-loader.js as SVWASM); the signatures and results are the ones the JS version had
+// (the JS version is src/js/js-cores/promotion-core.js, PROMO_JS, and `node parity.mjs promo` compares the two). Inputs go in as JSON: a value that is not a number, NaN or Infinity reads as absent.
 const PROMO = (() => {
   "use strict";
   const DAY = 86400000, STAGES = ["paper", "demo", "live"];
-  const RULE = { paper: { trades: 300, days: 10, posDayShare: 0.6, twinsAhead: 19, twinsEnough: 19, twinTrades: 100, twinsTotal: 20 }, demo: { trades: 100, days: 5, halfEdge: 0.5 }, lossRisks: 3 };
-  const mean = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
-  const f1 = x => x == null ? "–" : (Math.round(x * 10) / 10).toFixed(1);
+  const RULE = { paper: { trades: 300, days: 10, posDayShare: 0.6, twinsAhead: 19, twinsEnough: 19, twinTrades: 100, twinsTotal: 20 }, demo: { trades: 100, days: 5, halfEdge: 0.5 }, lossRisks: 3 };      // the figures live in the Rust crate; this copy is for display and the self-test
+  const wasm = (fn, o) => SVWASM.call("promo_" + fn, o);
 
-  const lastEntry = (log, id) => { for (let i = (log || []).length - 1; i >= 0; i--) if (log[i].sys === id) return log[i]; return null; };
   // the stage of a system: the `to` of its last move, else `start` (the stage in systems-default.js)
-  const stageOf = (log, id, start) => { const e = lastEntry(log, id); return e ? e.to : (start || "paper"); };
+  const stageOf = (log, id, start) => wasm("stage_of", { log: log || [], id, start });
   // {sys id: stage} for the systems that have moved at least once
-  function stages(log) { const m = {}; for (const e of log || []) m[e.sys] = e.to; return m; }
+  function stages(log) { const m = {}; for (const [k, v] of wasm("stages", { log: log || [] })) m[k] = v; return m; }
   // time of the last move of the system into `to`; -Infinity when there is none (the count then begins with the journal)
-  function since(log, id, to) { let t = -Infinity; for (const e of log || []) if (e.sys === id && e.to === to) t = e.t; return t; }
-  const edgeOf = (log, id) => { let v = null; for (const e of log || []) if (e.sys === id && e.to === "demo" && e.figures && typeof e.figures.edge === "number") v = e.figures.edge; return v; };
-  const capOf = (log, id) => { let v = null; for (const e of log || []) if (e.sys === id && e.to === "live") v = typeof e.cap === "number" ? e.cap : null; return v; };
-
-  function crit(id, label, now, need, met, text, needText) { return { id, label, now, need, met: !!met, text, needText }; }
-  const daysOf = tr => { const d = new Map(); for (const r of tr) { const k = Math.floor(r.tIn / DAY); d.set(k, (d.get(k) || 0) + r.netBps); } return d; };
-
-  // The standing of one system against the rule for its next stage. start: its stage when the log has no move for it (default "paper").
-  // Returns {sys, stage, next, since, criteria: [{id, label, now, need, met, text, needText}], eligible, trades, meanNetBps, edge, waiting}; `waiting` is a short reason when nothing can be judged yet ("needs demo trades").
-  function eligibility(rows, stageLog, systemId, start) {
-    const stage = stageOf(stageLog, systemId, start), out = { sys: systemId, stage, next: null, since: null, criteria: [], eligible: false, trades: 0, meanNetBps: null, edge: null, waiting: "" };
-    if (stage === "live") return out;
-    out.next = stage === "paper" ? "demo" : "live";
-    const t0 = since(stageLog, systemId, stage), fill = stage;      // paper counts paper fills made under stage paper; demo counts demo fills made under stage demo
-    out.since = isFinite(t0) ? t0 : null;
-    const tr = [], tw = new Map();
-    for (const r of rows) {
-      if (r.sys !== systemId) continue;
-      if (r.k === "trade") { if (r.interrupted || !(r.tIn >= t0) || (r.stage || "paper") !== stage || (r.fill || "paper") !== fill || typeof r.netBps !== "number") continue; tr.push(r); }
-      else if (stage === "paper" && r.k === "twin" && r.tIn >= t0 && typeof r.R === "number") { let a = tw.get(r.n); if (!a) tw.set(r.n, a = []); a.push(r.R); }
-    }
-    const n = tr.length, days = daysOf(tr), nd = days.size, mNet = mean(tr.map(r => r.netBps)), mR = mean(tr.map(r => r.R));
-    out.trades = n; out.meanNetBps = mNet;
-    if (stage === "paper") {
-      const K = RULE.paper, pos = Array.from(days.values()).filter(x => x > 0).length, twinMeans = []; for (const a of tw.values()) if (a.length >= K.twinTrades) twinMeans.push(mean(a));
-      const ahead = mR == null ? 0 : twinMeans.filter(m => m < mR).length, enough = twinMeans.length;
-      out.criteria = [
-        crit("trades", "Trades", n, K.trades, n >= K.trades, `trades ${n} / ${K.trades}`, String(K.trades)),
-        crit("days", "Different UTC days", nd, K.days, nd >= K.days, `days ${nd} / ${K.days}`, String(K.days)),
-        crit("mean", "Mean net result per trade, fees included", mNet, 0, mNet != null && mNet > 0, `mean net ${f1(mNet)} bps / above 0`, "above 0"),
-        crit("twins", "Mean net R above its twins", ahead, K.twinsAhead, n > 0 && enough >= K.twinsEnough && ahead >= K.twinsAhead, `ahead of ${ahead} of ${K.twinsTotal} twins / ${K.twinsAhead}` + (enough < K.twinsEnough ? `, only ${enough} twins have ${K.twinTrades} trades (need ${K.twinsEnough})` : ""), String(K.twinsAhead)),
-        crit("posdays", "Days with a positive net sum", nd ? pos / nd : null, K.posDayShare, nd > 0 && pos * 5 >= nd * 3, `positive days ${nd ? Math.floor(100 * pos / nd + 1e-9) : 0}% / ${Math.round(K.posDayShare * 100)}%`, Math.round(K.posDayShare * 100) + "%"),
-      ];
-      out.edge = mNet;
-    } else {
-      const K = RULE.demo, edge = edgeOf(stageLog, systemId), costs = tr.filter(r => typeof r.paperNetBps === "number").map(r => r.paperNetBps - r.netBps), worse = mean(costs), half = edge == null ? null : K.halfEdge * edge;
-      out.edge = edge;
-      out.criteria = [
-        crit("trades", "Demo trades", n, K.trades, n >= K.trades, `demo trades ${n} / ${K.trades}`, String(K.trades)),
-        crit("days", "Different UTC days", nd, K.days, nd >= K.days, `days ${nd} / ${K.days}`, String(K.days)),
-        crit("cost", "Demo fill worse than the paper fill, at most half the paper edge", worse, half, worse != null && half != null && worse <= half, `demo fill worse by ${f1(worse)} bps / at most ${f1(half)}` + (edge == null ? " (no stored paper edge)" : ""), "at most half the paper edge"),
-      ];
-      if (n === 0) out.waiting = "needs demo trades";
-    }
-    out.eligible = out.criteria.every(c => c.met);
-    return out;
-  }
-
-  // The automatic move down. system: {id, riskFrac, equity0}; cap: dollars or null; day: UTC day number (Math.floor(ms / 86400000)). Trades entered under stage live and closed that day count (by their closing time, row.t).
-  // Risk per trade = riskFrac times the equity at the start of that day (equity0 plus every closed result before it). hit when the day's net loss reaches 3 times that, or the cap if the cap is lower.
-  function lossLimit(rows, system, cap, day) {
-    let before = 0, today = 0;
-    for (const r of rows) {
-      if (r.k !== "trade" || r.sys !== system.id || r.interrupted || typeof r.usd !== "number") continue;
-      const d = Math.floor(r.t / DAY);
-      if (d < day) before += r.usd; else if (d === day && r.stage === "live") today += r.usd;
-    }
-    const risk = (system.equity0 + before) * system.riskFrac;
-    let limit = RULE.lossRisks * risk, which = "risk"; if (typeof cap === "number" && cap > 0 && cap < limit) { limit = cap; which = "cap"; }
-    const loss = today < 0 ? -today : 0;
-    return { hit: loss > 0 && loss >= limit * (1 - 1e-12), loss, limit, which, riskUsd: risk, day };
-  }
-
-  // Validates one move and returns {ok: true, log: the new log (the old one is not changed), entry} or {ok: false, reason}. move: {sys, to, t, by: "user"|"auto", reason?, cap?, start?}.
-  // rows are the journal (the criteria are read from it). Up: one stage at a time, only when eligible, live needs cap > 0. Down: to paper only, always allowed. Auto: only a move down.
+  function since(log, id, to) { const t = wasm("since", { log: log || [], id, to }); return t == null ? -Infinity : t; }
+  const edgeOf = (log, id) => wasm("edge_of", { log: log || [], id });
+  const capOf = (log, id) => wasm("cap_of", { log: log || [], id });
+  // The standing of one system against the rule for its next stage (see promotion-core.js in js-cores for the full description).
+  const eligibility = (rows, stageLog, systemId, start) => wasm("eligibility", { rows, log: stageLog || [], sys: systemId, start });
+  // The automatic move down. system: {id, riskFrac, equity0}; cap: dollars or null; day: UTC day number.
+  const lossLimit = (rows, system, cap, day) => wasm("loss_limit", { rows, system, cap, day });
+  // Validates one move: {ok: true, log: the new log (the old one is not changed), entry} or {ok: false, reason}. The WASM returns the entry; the log is joined here, so entries already stored are never rewritten.
   function apply(stageLog, move, rows) {
-    const log = stageLog || [], bad = reason => ({ ok: false, reason });
-    if (!move || typeof move.sys !== "string" || !move.sys) return bad("no system named");
-    if (!STAGES.includes(move.to)) return bad("unknown stage " + move.to);
-    if (move.by !== "user" && move.by !== "auto") return bad("a move is made by the user or automatically");
-    if (typeof move.t !== "number" || !isFinite(move.t)) return bad("a move needs its time");
-    const from = stageOf(log, move.sys, move.start), up = STAGES.indexOf(move.to) - STAGES.indexOf(from);
-    if (up === 0) return bad("already at stage " + from);
-    const el = eligibility(rows || [], log, move.sys, move.start), figures = { criteria: el.criteria.map(c => ({ id: c.id, now: c.now, need: c.need, met: c.met })) };
-    if (up > 0) {
-      if (move.by === "auto") return bad("an automatic move only goes down");
-      if (up > 1) return bad("a system moves up one stage at a time");
-      if (!el.eligible) return bad("not eligible for " + move.to + ": " + (el.waiting || el.criteria.filter(c => !c.met).map(c => c.text).join("; ")));
-      if (move.to === "live" && !(typeof move.cap === "number" && isFinite(move.cap) && move.cap > 0)) return bad("live needs a dollar cap above 0");
-      if (move.to === "demo" && el.meanNetBps != null) figures.edge = el.meanNetBps;
-    } else if (move.to !== "paper") return bad("a move down goes to paper");
-    const entry = { sys: move.sys, from, to: move.to, t: move.t, by: move.by, figures };
-    if (move.reason) entry.reason = String(move.reason);
-    if (move.to === "live") entry.cap = move.cap;
-    return { ok: true, log: log.concat([entry]), entry };
+    const log = stageLog || [], r = wasm("apply", { log, move, rows: rows || [] });
+    return r.ok ? { ok: true, log: log.concat([r.entry]), entry: r.entry } : { ok: false, reason: r.reason };
   }
 
   // ---------- self-test: scenarios named promo:* ----------
@@ -189,6 +115,7 @@ const PROMO = (() => {
       ok("stageOf, stages and since read the log; a system with no move keeps its starting stage", stageOf(l, "A") === "paper" && stageOf(l, "B") === "demo" && stageOf(l, "C") === "paper" && stageOf(l, "C", "demo") === "demo" && stages(l).A === "paper" && stages(l).B === "demo" && since(l, "A", "paper") === 3 && since(l, "A", "demo") === 1 && since(l, "C", "paper") === -Infinity); }
     return res;
   }
+
 
   return { RULE, DAY, STAGES, stageOf, stages, since, edgeOf, capOf, eligibility, lossLimit, apply, selftest };
 })();

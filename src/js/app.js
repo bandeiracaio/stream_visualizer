@@ -657,7 +657,7 @@ setInterval(()=>{
 }, 1000);
 let lastFast = 0;
 (function frame(ts){
-  VIEWS.tick(ts, visible);   // overview, futures, micro, the reader views, trading: registered above
+  if (SVWASM.loaded) VIEWS.tick(ts, visible);   // views call WASM cores (PROMO), so none renders before the module is instantiated (a few ms after load); overview, futures, micro, the reader views, trading: registered above
   if (dirty && ts - lastFast > 150){
     dirty = false; lastFast = ts;
     if (visible("market")){ renderMetrics(); renderBooks(); renderTape(); }

@@ -202,4 +202,5 @@ async function exeRunCheck(){
   exeRender();
 }
 exe$("exCheckGo").onclick = () => { if (EXE.checking) return; exe$("exCheckMsg").textContent = "Running…"; exeRunCheck(); };
-exeRender();
+SVWASM.ready.then(exeRender, exeRender);      // not at load: exeRender reads the stage of each system (PROMO, WebAssembly), which is ready a moment after the page's scripts ran; the 1 s timer above repeats it
+

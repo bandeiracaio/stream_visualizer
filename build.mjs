@@ -5,6 +5,7 @@
 //   node build.mjs --version NNN --out FILE -> FILE stamped as vNNN (rebuilds a release from src/)
 //   node build.mjs --verify   -> rebuilds the newest releases/ file from src/ and compares it byte for byte; exit 1 on a difference
 // --release deletes the previous release file from releases/ (older ones live in GitHub Releases).
+// rust/ is compiled to WebAssembly first (lib/wasm-build.mjs; needs cargo) and inlined into the page; the self-tests run against it.
 // The Reader self-test runs first; a failing scenario aborts the build. Every included .js file must also compile (a syntax error aborts it).
 // Then the assembled page is booted in a stub browser (lib/page-boot.mjs): a script that fails to load, or a first timer callback that throws, aborts the build.
 import fs from "node:fs";
@@ -12,14 +13,16 @@ import path from "node:path";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
 import { pageBoot } from "./lib/page-boot.mjs";
+import { buildWasm } from "./lib/wasm-build.mjs";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const src = p => path.join(root, "src", p);
-const read = p => fs.readFileSync(src(p), "utf8");
+let WASM_B64 = "";      // the Rust cores (rust/, lib/wasm-build.mjs) as base64; js/wasm-loader.js carries it
+const read = p => { const s = fs.readFileSync(src(p), "utf8"); return p === "js/wasm-loader.js" ? s.replace("__SV_WASM_B64__", () => WASM_B64) : s; };
 
 async function selfTest() {
-  const code = read("js/reader-episodes.js") + "\n" + read("js/reader-engine.js") + "\n" + read("js/system-core.js") + "\n" + read("js/systems-default.js") + "\n" + read("js/runner-core.js") + "\n" + read("js/chunk-core.js") + "\n" + read("js/promotion-core.js") + "\n" + read("js/exec-core.js") + "\n" + read("js/trader-core.js") + "\n" + read("js/status-core.js") + "\n" + read("js/session-quality.js") + "\n" + read("js/history-core.js") + "\n" + read("js/collectors-core.js") + "\n" + read("js/disk-core.js") + "\n" + read("js/paper-broker-core.js") + "\n" + read("js/broker.js") + "\n" + read("js/market-core.js") + "\n" + read("js/micro-core.js") + "\n" + read("js/hooks.js") + "\n" + read("js/views.js") + "\n" +read("js/reader-selftest.js") + "\n;BROKER.selftest().then(bk => READER_SELFTEST.run(READER_ENGINE).concat(SYSTEM.selftest(READER_ENGINE), RUNNER.selftest(), CHUNK.selftest(), PROMO.selftest(), EXEC.selftest(), TRADER.selftest(),PAPER.selftest(), SQ.selftest(), MICRO.selftest(), MARKET.selftest(), bk));";
-  const results = await vm.runInNewContext(code, {}, { timeout: 120000 });
+  const code = read("js/wasm-loader.js") + "\n" + read("js/reader-episodes.js") + "\n" + read("js/reader-engine.js") + "\n" + read("js/system-core.js") + "\n" + read("js/systems-default.js") + "\n" + read("js/runner-core.js") + "\n" + read("js/chunk-core.js") + "\n" + read("js/promotion-core.js") + "\n" + read("js/exec-core.js") + "\n" + read("js/trader-core.js") + "\n" + read("js/status-core.js") + "\n" + read("js/session-quality.js") + "\n" + read("js/history-core.js") + "\n" + read("js/collectors-core.js") + "\n" + read("js/disk-core.js") + "\n" + read("js/paper-broker-core.js") + "\n" + read("js/broker.js") + "\n" + read("js/market-core.js") + "\n" + read("js/micro-core.js") + "\n" + read("js/hooks.js") + "\n" + read("js/views.js") + "\n" +read("js/reader-selftest.js") + "\n;BROKER.selftest().then(bk => READER_SELFTEST.run(READER_ENGINE).concat(SYSTEM.selftest(READER_ENGINE), RUNNER.selftest(), CHUNK.selftest(), PROMO.selftest(), EXEC.selftest(), TRADER.selftest(),PAPER.selftest(), SQ.selftest(), MICRO.selftest(), MARKET.selftest(), bk));";
+  const results = await vm.runInNewContext(code, { atob, TextEncoder, TextDecoder, __SV_SYNC: true }, { timeout: 120000 });
   const bad = results.filter(r => !r.ok);
   for (const r of results) console.log((r.ok ? "  pass  " : "  FAIL  ") + r.name + (r.ok ? "" : "\n        " + r.detail));
   if (bad.length) { console.error(`\n${bad.length}/${results.length} self-test scenarios failed; build aborted.`); process.exit(1); }
@@ -62,6 +65,8 @@ const argVal = f => args[args.indexOf(f) + 1];
 if (args.includes("--out") && !argVal("--out")) { console.error("--out needs a file path"); process.exit(1); }
 if (args.includes("--version") && !/^\d+$/.test(argVal("--version") || "")) { console.error("--version needs a number, e.g. --version 132"); process.exit(1); }
 const stamp = (html, version) => html.replace("__APP_VERSION__", version);
+
+WASM_B64 = buildWasm(root).toString("base64");
 
 if (args.includes("--verify")) {
   const files = fs.existsSync(releaseDir) ? fs.readdirSync(releaseDir).filter(f => /^stream-visualizer_v\d+\.html$/.test(f)).sort() : [];
