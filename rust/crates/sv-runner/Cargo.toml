@@ -1,0 +1,11 @@
+[package]
+name = "sv-runner"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+sv-core = { path = "../sv-core" }
+sv-system = { path = "../sv-system" }

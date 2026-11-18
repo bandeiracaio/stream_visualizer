@@ -65,3 +65,12 @@ export! {
     sv_system_force => sv_system::ops::op_force,
     sv_system_drop => sv_system::ops::op_drop,
 }
+export! {
+    sv_runner_create => sv_runner::ops::op_create,
+    sv_runner_step => sv_runner::ops::op_step,
+    sv_runner_interrupt => sv_runner::ops::op_interrupt,
+    sv_runner_move => sv_runner::ops::op_move,
+    sv_runner_state => sv_runner::ops::op_state,
+    sv_runner_risk => sv_runner::ops::op_risk,
+    sv_runner_drop => sv_runner::ops::op_drop,
+}

@@ -63,7 +63,7 @@ trSink = snaps => {
   for (const s of snaps){ trEmit(TRN.driver.step(s)); TRN.lastT = s.t; }
   if (TRN.driver){ const mv = TRN.driver.drain(); if (mv.length) PIPE.addMoves(mv); }      // the moves that took effect at these snapshots go into the chunk being recorded (a replay is handed them)
 };
-TRN.ready = trLoad();      // the journal is read before a run can begin (the page waits for this before it reconnects after a reload)
+TRN.ready = trLoad().then(() => SVWASM.ready);      // the journal is read, and the WebAssembly module (the runner lives in it since R3) is up, before a run can begin (the page waits for this before it reconnects after a reload)
 
 // ----- what the Trader home (trader-view.js) uses
 const trRows = () => TRN.journal;

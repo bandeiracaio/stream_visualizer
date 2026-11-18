@@ -4,6 +4,7 @@
 //   node parity.mjs promo --cases N  N generated cases per kind (default 1000)
 //   node parity.mjs paper | hist | sq | all   (R1: paper broker, order history, session quality; the R1 section below)
 //   node parity.mjs system [--designs N] [--all-sessions]   (R2: the system core, lib/parity-system.mjs: self-test, validate / id, random systems and streams, and the saved sessions before 2026-11-16)
+//   node parity.mjs runner [--all-sessions] [--only-real] [--sessions N]   (R3: the runner core, lib/parity-runner.mjs: self-test, random configurations, the saved sessions before 2026-11-16)
 //   node parity.mjs promo --seed S   another seed (default 1)
 // Inputs: (1) every call the core's own self-test makes, replayed on the JS version; (2) seeded random journals, stage logs and moves, with the boundary values of the rule
 // over-represented; (3) the real journal sessions/trader-journal_check4.json (recorded 2026-11-11, before the test set of the registered episode-outcomes study; no session recording is read).
@@ -13,6 +14,7 @@ import vm from "node:vm";
 import { fileURLToPath } from "node:url";
 import { buildWasm } from "./lib/wasm-build.mjs";
 import { system as systemParity } from "./lib/parity-system.mjs";
+import { runner as runnerParity } from "./lib/parity-runner.mjs";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2), which = args[0];
@@ -489,8 +491,8 @@ async function sq(wasmBytes, st, cases, seed) {
   } else console.log("skip  real recordings: sessions/ not found");
 }
 
-const known = ["promo", "paper", "hist", "sq", "system", "all"];
-if (!known.includes(which)) { console.error("usage: node parity.mjs promo|paper|hist|sq|system|all [--cases N] [--seed S] [--designs N] [--all-sessions] [--only-real] [--sessions N]"); process.exit(1); }
+const known = ["promo", "paper", "hist", "sq", "system", "runner", "all"];
+if (!known.includes(which)) { console.error("usage: node parity.mjs promo|paper|hist|sq|system|runner|all [--cases N] [--seed S] [--designs N] [--all-sessions] [--only-real] [--sessions N]"); process.exit(1); }
 let failed = 0;
 if (which === "promo" || which === "all") failed += await promo();
 if (which !== "promo") {
@@ -500,6 +502,7 @@ if (which !== "promo") {
   if (which === "hist" || which === "all") await hist(bytes, st, N, SEED);
   if (which === "sq" || which === "all") await sq(bytes, st, Math.min(N, 400), SEED);
   if (which === "system" || which === "all") await systemParity(root, bytes, st, N, SEED, { allSessions: args.includes("--all-sessions"), designs: argNum("--designs", 24), only: args.includes("--only-real") ? "real" : null, limit: argNum("--sessions", 0) });
+  if (which === "runner" || which === "all") await runnerParity(root, bytes, st, N, SEED, { allSessions: args.includes("--all-sessions"), only: args.includes("--only-real") ? "real" : null, limit: argNum("--sessions", 0) });
   console.log(`\n${st.bad ? "FAILED" : "OK"} ${which}: ${st.total} cases, ${st.bad} differences`);
   failed += st.bad;
 }

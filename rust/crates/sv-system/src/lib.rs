@@ -66,6 +66,14 @@ pub struct Episodes {
     #[serde(default)]
     pub active: Vec<Ep>,
 }
+/// A venue's quote (the runner fills at its far side; a system does not read it). A missing or non-numeric side is `None`.
+#[derive(Deserialize, Default, Clone, Copy)]
+pub struct Quote {
+    #[serde(default, deserialize_with = "sv_core::lenient::num")]
+    pub bid: Option<f64>,
+    #[serde(default, deserialize_with = "sv_core::lenient::num")]
+    pub ask: Option<f64>,
+}
 /// One second of facts. A venue's number that is `null` (no quote, no book) is `None`.
 #[derive(Deserialize)]
 pub struct Snap {
@@ -76,6 +84,8 @@ pub struct Snap {
     pub sigma: Pair<Option<f64>>,
     #[serde(default)]
     pub age: Pair<Option<f64>>,
+    #[serde(default)]
+    pub q: Pair<Option<Quote>>,
     #[serde(default)]
     pub calibrated: bool,
     #[serde(default)]

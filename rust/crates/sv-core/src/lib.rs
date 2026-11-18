@@ -211,3 +211,20 @@ fn sorted_order(n: usize, cmp: &mut dyn FnMut(usize, usize) -> std::cmp::Orderin
     }
     a
 }
+
+/// A flat JSON object built as data (keys in the order given) and serialized by one shared code path: a core that writes many row shapes uses this instead of a derived `Serialize` per shape
+/// (each derive is compiled separately). A `Num` that is NaN or infinite is written as `null`, like every number going out.
+pub mod obj {
+    use serde::ser::{Serialize, SerializeMap, Serializer};
+    pub enum J { S(&'static str), Own(String), Num(f64), Null, Bool(bool) }
+    pub struct Obj(pub Vec<(&'static str, J)>);
+    impl Serialize for Obj {
+        fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+            let mut m = s.serialize_map(Some(self.0.len()))?;
+            for (k, v) in &self.0 {
+                match v { J::S(x) => m.serialize_entry(k, x)?, J::Own(x) => m.serialize_entry(k, x)?, J::Num(x) => m.serialize_entry(k, x)?, J::Null => m.serialize_entry(k, &())?, J::Bool(x) => m.serialize_entry(k, x)? }
+            }
+            m.end()
+        }
+    }
+}

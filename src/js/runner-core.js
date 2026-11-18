@@ -8,16 +8,23 @@
 //   stage = the system's stage (paper / demo / live) when the trade was ENTERED, fill = where it was filled (always "paper" until step 8); rows written before step 7 have neither and read as paper / paper (promotion-core.js).
 //   A system's stage comes from o.stages ({system id: stage}, read from the stage log by the page), else from its definition; a move (move()) takes effect at the next snapshot, an open position finishes under the stage it was entered in.
 //   {k:"twin", n, tIn, netBps, R, usd, reason}                                                                              a closed twin trade (twins write nothing else)
+// Since R3 the runner itself (create / step / interrupt / move / state / risk) runs in WebAssembly (rust/crates/sv-runner, loaded by wasm-loader.js as SVWASM): the runner owns its systems and twins (seeded random entries,
+// fills at the far side of the quote, the risk cap, stages) inside the module, so one call takes one snapshot for all of them. The signatures, journal rows (same keys in the same order) and thrown messages are the ones the JS version had
+// (that version is src/js/js-cores/runner-core.js, RUNNER_JS, and `node parity.mjs runner` compares the two). What stays here is bookkeeping over JS row objects: reading the journal a runner begins with, carryOf, driver, evaluate, the self-test.
+// create() returns the same object as before plus dispose() (freed when collected too). Rows cross as JSON: a non-finite number comes back as null (no real session has one).
 const RUNNER = (() => {
   "use strict";
-  const hash32 = s => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h >>> 0; };
-  const mulberry = a => () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-  const MIN_TWIN_TRIGGERS = 5, MIN_TRADES = 20, MIN_TWINS = 15, DAY = 86400000;
+  const MIN_TRADES = 20, MIN_TWINS = 15, DAY = 86400000;
+  const wasm = (fn, o) => SVWASM.call("runner_" + fn, o);
+  const reg = typeof FinalizationRegistry === "function" ? new FinalizationRegistry(h => { try { if (SVWASM.loaded) wasm("drop", { h }); } catch (e) { /* the module is gone */ } }) : null;
+  // the region's hi / lo are NaN until the box has a point; JSON carries that as null (same as SYSTEM's state(), and the region of the trigger's last entry, which SYSTEM's state() leaves as null)
+  const nan = r => { if (r && "hi" in r) { if (r.hi === null) r.hi = NaN; if (r.lo === null) r.lo = NaN; } };
+  const fixState = s => { const i = s.inst; if (i) { nan(i.region); const e = i.trigger && i.trigger.lastEnter; if (e) nan(e.region); } return s; };
 
   // equity: the start plus the closed results of the rows already in the journal
   function create(o) {
     const defs = o.systems, N = o.twins == null ? 20 : o.twins, eq0 = o.equity == null ? 10000 : o.equity, fee = o.feeBps == null ? 5 : o.feeBps, cap = o.riskCap == null ? 0.02 : o.riskCap, seed = o.seed == null ? 1 : o.seed;
-    const staleMs = SYSTEM.OPTIONS.staleMs, rows = (o.journal || []).slice(), fresh = [], stagesIn = o.stages || {};
+    const rows = (o.journal || []).slice(), fresh = [], stagesIn = o.stages || {};
     // what the journal already says: results per system and per twin, and the positions that were open when it ended
     const usd = new Map(), openPos = new Map(), closedPid = new Set();
     for (const r of rows) {
@@ -28,92 +35,33 @@ const RUNNER = (() => {
     // a position open when the page closed cannot be filled honestly: it is closed as interrupted and left out of every figure
     for (const [pid, e] of openPos) if (!closedPid.has(pid)) { const r = { k: "trade", sys: e.sys, t: e.t, pid, tIn: e.t, tOut: null, dir: e.dir, entryPx: e.px, reason: "interrupted", interrupted: true, thesis: e.thesis, stage: e.stage || "paper", fill: e.fill || "paper" }; rows.push(r); fresh.push(r); }
 
-    const S = defs.map(def => {
-      const inst = SYSTEM.create(def), id = inst.id;
-      return { def, id, inst, stage: stagesIn[id] || def.stage, led: { eq: eq0 + (usd.get(id) || 0), pos: null, pend: null }, trig: 0, secs: 0, t0: null,
-        twins: Array.from({ length: N }, (_, n) => ({ n, inst: SYSTEM.create(def, { forced: true }), led: { eq: eq0 + (usd.get(id + "#" + n) || 0), pos: null, pend: null }, rng: null, forced: 0 })) };
-    });
-    if (new Set(S.map(s => s.id)).size !== S.length) throw new Error("two systems have the same id");
-
-    // close the open position of an entity at the quote q (the far side), or report that it cannot be done yet
-    function settle(s, e, isTwin, snap, q, out) {
-      const L = e.led; if (!L.pend || !q) return;
-      const p = L.pos, px = p.dir > 0 ? q.bid : q.ask; e.inst.closed(px, snap.t);
-      const grossBps = p.dir * (px / p.px - 1) * 1e4, feeOut = fee / 1e4 * p.qty * px, usdNet = p.dir * p.qty * (px - p.px) - p.feeIn - feeOut;
-      const netBps = usdNet / p.notional * 1e4, feesBps = (p.feeIn + feeOut) / p.notional * 1e4, R = netBps / p.stopBps;
-      L.eq += usdNet; L.pos = null; const reason = L.pend; L.pend = null;
-      const row = isTwin ? { k: "twin", sys: s.id, t: snap.t, n: e.n, tIn: p.tIn, netBps, R, usd: usdNet, reason }
-        : { k: "trade", sys: s.id, t: snap.t, pid: p.pid, tIn: p.tIn, tOut: snap.t, dir: p.dir, qty: p.qty, notional: p.notional, entryPx: p.px, exitPx: px, grossBps, feesBps, netBps, R, usd: usdNet, stopBps: p.stopBps, reason, thesis: p.thesis, stage: p.stage, fill: p.fill };
-      out.push(row);
-    }
-    // the open risk of the systems (not the twins)
-    const openRisk = () => { let r = 0; for (const s of S) if (s.led.pos) r += s.def.risk.riskFrac; return r; };
-
-    function handle(s, e, isTwin, intents, snap, q, out) {
-      for (const it of intents) {
-        const L = e.led;
-        if (it.type === "enter") {
-          if (!isTwin) s.trig++;
-          const rf = s.def.risk.riskFrac;
-          const refuse = why => { e.inst.cancelled(); if (!isTwin) out.push({ k: "skip", sys: s.id, t: snap.t, reason: why, tSig: it.tSig }); };
-          if (!q) { refuse("no quote"); continue; }
-          if (!isTwin && openRisk() + rf > cap + 1e-12) { refuse("risk cap"); continue; }
-          const px = it.dir > 0 ? q.ask : q.bid, sz = SYSTEM.size(L.eq, rf, it.stopBps, px);
-          if (!(sz.qty > 0)) { refuse("no size"); continue; }
-          if (e.inst.filled(px, snap.t).length) { if (!isTwin) out.push({ k: "skip", sys: s.id, t: snap.t, reason: "no room", tSig: it.tSig }); continue; }      // a level exit with no room behind the fill: void, nothing was bought
-          const p = { pid: s.id + ":" + snap.t, dir: it.dir, px, qty: sz.qty, notional: sz.notional, tIn: snap.t, stopBps: it.stopBps, thesis: it.thesis, feeIn: fee / 1e4 * sz.notional, stage: s.stage, fill: "paper" };
-          L.pos = p; L.pend = null;
-          if (!isTwin) out.push({ k: "enter", sys: s.id, t: snap.t, pid: p.pid, dir: p.dir, px, qty: p.qty, notional: p.notional, stopBps: p.stopBps, thesis: p.thesis, trigger: s.def.trigger.type, tSig: it.tSig, stage: p.stage, fill: p.fill });
-        } else if (it.type === "skip") {
-          if (!isTwin) { s.trig++; out.push({ k: "skip", sys: s.id, t: snap.t, reason: it.reason, tSig: it.tSig }); }
-        } else if (it.type === "exit" || it.type === "invalidate") {
-          if (!L.pos) continue;
-          L.pend = it.reason;
-          if (!isTwin) out.push(Object.assign({ k: it.type, sys: s.id, t: snap.t, pid: L.pos.pid, reason: it.reason }, it.why ? { why: it.why } : {}));
-          settle(s, e, isTwin, snap, q, out);
-        }
-      }
-    }
-
+    const usdIn = {}; for (const [k, v] of usd) usdIn[k] = v || 0;
+    let made;
+    try { made = wasm("create", { defs, twins: N, equity: eq0, feeBps: fee, riskCap: cap, seed: String(seed), staleMs: SYSTEM.OPTIONS.staleMs, usd: usdIn, stages: stagesIn }); } catch (e) { throw new Error(String(e && e.message).replace(/^wasm core runner: /, "")); }      // "invalid system: ..." / "two systems have the same id" as before
+    const h = made.h; let live = true;
     const api = {
       // one snapshot (SYSTEM.facts): every system and every twin takes it; returns the journal rows that second produced
       step(snap) {
-        const out = [], q0 = snap.q && snap.q.bn, ok = q0 && snap.age && snap.age.bn != null && snap.age.bn <= staleMs, q = ok ? q0 : null;
-        for (const s of S) {
-          s.secs++;
-          if (s.t0 == null) { s.t0 = snap.t; for (const w of s.twins) w.rng = mulberry(hash32(seed + "|" + s.id + "|" + w.n + "|" + snap.t)); }
-          settle(s, s, false, snap, q, out);
-          handle(s, s, false, s.inst.step(snap), snap, q, out);
-          // twins: the system's own trigger rate so far, none before its fifth trigger
-          const r = s.trig >= MIN_TWIN_TRIGGERS ? s.trig / s.secs : 0, venue = s.def.venue === "any" ? "bn" : s.def.venue;
-          for (const w of s.twins) {
-            const u = w.rng(); if (u < r) { w.inst.force({ t: snap.t, side: w.rng() < 0.5 ? 1 : -1, venue }); w.forced++; }
-            settle(s, w, true, snap, q, out);
-            handle(s, w, true, w.inst.step(snap), snap, q, out);
-          }
-        }
+        const out = SVWASM.callText("runner_step", '{"h":' + h + ',"snap":' + JSON.stringify(snap) + '}');
         for (const r of out) rows.push(r);
         return out;
       },
       rows: () => rows,
       fresh: () => fresh,      // the rows written when the runner was created (interrupted positions)
       // the page is stopping (disconnect): what is open stays unfinished, so it is closed as interrupted, as at a reload
-      interrupt(t) {
-        const out = [];
-        for (const s of S) if (s.led.pos) { const p = s.led.pos; s.led.pos = null; s.led.pend = null; out.push({ k: "trade", sys: s.id, t, pid: p.pid, tIn: p.tIn, tOut: null, dir: p.dir, entryPx: p.px, reason: "interrupted", interrupted: true, thesis: p.thesis, stage: p.stage, fill: p.fill }); }
-        for (const r of out) rows.push(r);
-        return out;
-      },
+      interrupt(t) { const out = wasm("interrupt", { h, t }); for (const r of out) rows.push(r); return out; },
       // a system's stage changes: new entries are stamped with it from the next snapshot on (the driver calls this just before it hands over that snapshot); a position already open keeps the stage it was entered in
-      move(id, to) { const s = S.find(q => q.id === id); if (!s) return false; s.stage = to; return true; },
-      state: () => S.map(s => ({ id: s.id, name: s.def.name, stage: s.stage, equity: s.led.eq, triggers: s.trig, secs: s.secs, twinForced: s.twins.length ? s.twins.reduce((a, w) => a + w.forced, 0) / s.twins.length : 0,
-        open: s.led.pos ? { dir: s.led.pos.dir, px: s.led.pos.px, tIn: s.led.pos.tIn, notional: s.led.pos.notional, exiting: s.led.pend } : null,
-        inst: s.inst.state() })),      // the instance's own state (context, region, trigger reading, thesis, position with stop and target): read-only, for the Trader home; twins are not included
+      move(id, to) { return wasm("move", { h, id, to }); },
+      state: () => wasm("state", { h }).map(fixState),      // the instance's own state (context, region, trigger reading, thesis, position with stop and target) is in .inst: read-only, for the Trader home; twins are not included
       // the open risk of the systems against the cap (twins not counted), as fractions of equity
-      risk: () => ({ open: openRisk(), cap }),
+      risk: () => wasm("risk", { h }),
+      // free the runner (and every system in it) now; no call may follow
+      dispose: () => { if (live) { live = false; if (reg) reg.unregister(api); wasm("drop", { h }); } },
     };
+    if (reg) reg.register(api, h, api);
     return api;
   }
+
 
   // What a journal leaves for the next runner, as a short list of rows: one per system and per twin with its summed result (equity carries over), and the enter rows still open (they come back as interrupted).
   // create({journal: carryOf(rows)}) is the same as create({journal: rows}) in everything the runner does; a chunk file stores this list so a replay can begin where the page began.
@@ -143,12 +91,12 @@ const RUNNER = (() => {
       carry: base,
       step(snap) {
         const out = [];
-        if (run && lastT && snap.t - lastT > gapMs) { take(run.interrupt(lastT), out); run = null; }
+        if (run && lastT && snap.t - lastT > gapMs) { take(run.interrupt(lastT), out); run.dispose(); run = null; }
         if (!run) { run = create(Object.assign({}, o, { journal: base.concat(own), stages: Object.assign({}, stages) })); take(run.fresh(), out); }
         for (const m of pending.splice(0)) { stages[m.sys] = m.to; run.move(m.sys, m.to); moved.push({ sys: m.sys, to: m.to, at: snap.t }); }
         take(run.step(snap), out); lastT = snap.t; return out;
       },
-      stop(t) { const out = []; if (run) { take(run.interrupt(t == null ? lastT : t), out); run = null; } return out; },
+      stop(t) { const out = []; if (run) { take(run.interrupt(t == null ? lastT : t), out); run.dispose(); run = null; } return out; },
       move(m) { pending.push({ sys: m.sys, to: m.to }); },
       drain: () => moved.splice(0),
       stages: () => Object.assign({}, stages),

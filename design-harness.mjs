@@ -366,7 +366,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       const r = RUNNER.create({ systems: SYSTEMS_DEFAULT, twins: 20, equity: 10000, feeBps: 5, riskCap: 0.02, seed: 1, journal });      // one runner a session (the page starts a new one after a gap); the journal and equity carry over
       console.error("[" + (sessions.indexOf(s) + 1) + "/" + sessions.length + "] " + s.file + ": " + s.snaps.length + " snapshots");
       for (const x of s.snaps) r.step(x);
-      r.interrupt(s.snaps[s.snaps.length - 1].t); journal = r.rows(); s.snaps = null; s.hist = null; s.legacy = null;
+      r.interrupt(s.snaps[s.snaps.length - 1].t); journal = r.rows(); r.dispose(); s.snaps = null; s.hist = null; s.legacy = null;
     }
     const ev = RUNNER.evaluate(journal), f = (x, d = 2) => x == null ? "-" : x.toFixed(d);
     console.error("runner done in " + ((Date.now() - t0) / 1000).toFixed(0) + " s, " + journal.length + " journal rows");

@@ -120,6 +120,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "sv-runner"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sv-core",
+ "sv-system",
+]
+
+[[package]]
 name = "sv-system"
 version = "0.1.0"
 dependencies = [
@@ -137,6 +147,7 @@ dependencies = [
  "sv-paper",
  "sv-promotion",
  "sv-quality",
+ "sv-runner",
  "sv-system",
 ]
 
