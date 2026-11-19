@@ -15,3 +15,4 @@ sv-history = { path = "../sv-history" }
 sv-quality = { path = "../sv-quality" }
 sv-system = { path = "../sv-system" }
 sv-runner = { path = "../sv-runner" }
+sv-exec = { path = "../sv-exec" }

@@ -121,7 +121,8 @@ const SYSTEM = (() => {
 
   // ---------- one system running ----------
   // the region's hi / lo are NaN until the box has a point; JSON carries that as null
-  const fixState = s => { const r = s.region; if (r && "hi" in r) { if (r.hi === null) r.hi = NaN; if (r.lo === null) r.lo = NaN; } return s; };
+  const nan = r => { if (r && "hi" in r) { if (r.hi === null) r.hi = NaN; if (r.lo === null) r.lo = NaN; } };
+  const fixState = s => { nan(s.region); const e = s.trigger && s.trigger.lastEnter; if (e) nan(e.region); return s; };      // also the region of the trigger's last entry
   const reg = typeof FinalizationRegistry === "function" ? new FinalizationRegistry(h => { try { if (SVWASM.loaded) wasm("drop", { h }); } catch (e) { /* the module is gone */ } }) : null;
   // every instance of a runner takes the same snapshot object in the same second: its JSON text is written once (a snapshot is not changed after it is made)
   const texts = new WeakMap();

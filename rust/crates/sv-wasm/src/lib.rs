@@ -74,3 +74,21 @@ export! {
     sv_runner_risk => sv_runner::ops::op_risk,
     sv_runner_drop => sv_runner::ops::op_drop,
 }
+export! {
+    sv_exec_is_demo_base => sv_exec::ops::op_is_demo_base,
+    sv_exec_create => sv_exec::ops::op_create,
+    sv_exec_on_row => sv_exec::ops::op_on_row,
+    sv_exec_reply => sv_exec::ops::op_reply,
+    sv_exec_tick => sv_exec::ops::op_tick,
+    sv_exec_kill => sv_exec::ops::op_kill,
+    sv_exec_start => sv_exec::ops::op_start,
+    sv_exec_poll => sv_exec::ops::op_poll,
+    sv_exec_unkill => sv_exec::ops::op_unkill,
+    sv_exec_clear_fault => sv_exec::ops::op_clear_fault,
+    sv_exec_drain => sv_exec::ops::op_drain,
+    sv_exec_state => sv_exec::ops::op_state,
+    sv_exec_snapshot => sv_exec::ops::op_snapshot,
+    sv_exec_faults => sv_exec::ops::op_faults,
+    sv_exec_debug => sv_exec::ops::op_debug,
+    sv_exec_drop => sv_exec::ops::op_drop,
+}

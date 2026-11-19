@@ -9,287 +9,52 @@
 // Guards handed in with an enter row: {quoteAgeMs, offsetMs, oneWay, readOk, step, tick, minQty, minNotional}.
 // Rows written: {k:"mirror", sys, pid, t, status: "filled"|"paper"|"failed"|"interrupted", fill: "demo"|"paper", dir, qty, entryPx, exitPx, fees, feesBps, netBps, paperNetBps, entrySlipBps, exitSlipBps (positive = worse than paper),
 //   entryDelayMs, exitDelayMs, exitReason, lateMs, notes: [...]}. A refused entry writes a mirror row at once (status "paper", the reason in notes): the trade stays a paper trade.
+// Since R4 the machine itself (create, onRow, reply, tick, start, poll, kill, unkill, clearFault, drain, state, snapshot, faults, debug) runs in WebAssembly (rust/crates/sv-exec, loaded by wasm-loader.js as SVWASM); the old JS is
+// src/js/js-cores/exec-core.js (EXEC_JS) and `node parity.mjs exec` compares the two. Signatures, request / row / fault shapes and key order are the old ones.
+// SAFETY: the rule that no request is produced unless the base URL is the demo host (or a local http address with a port) and ALLOW_LIVE is false is decided in Rust (is_demo_base / allowed_base; ALLOW_LIVE is a const there; `send` queues nothing
+// for a machine that is not allowed). This file keeps a second copy of the host test (jsDemo): create() refuses to make a machine when the two disagree, and drain() hands out no request from a machine that is not allowed.
+// isDemoBase asks the module, and answers false until it is loaded (fail closed).
+// merge() stays here in JS: it reshapes arbitrary journal row objects (key order of every field, untouched rows returned by reference, the same array when no mirror row exists) and the Trader view calls it with the whole journal, so a
+// round trip through JSON would lose the order and cost O(journal) per render. The self-test and its fake exchange (test only) stay here too; they drive the WebAssembly machine through the public calls only.
+// Edge differences from the JS version, all in inputs the page never sends: a number that is NaN / undefined in a handed-in object reads as absent (JSON), so a NaN guard value or reply field reads as 0 where it is null, and NaN in an output
+// number comes back as null; a string where a number is expected (price, quantity) is read as that number and echoed as a number; a successful exit answer with no data throws a plain Error (was a TypeError) with the state left as the JS leaves it;
+// a time stamp that is not a whole number gets a client id without the fraction digits; saved faults keep only t, kind and text; a tick size finer than 1e-100 is written with 100 decimals.
 const EXEC = (() => {
   "use strict";
   const DEMO_BASE = "https://demo-fapi.binance.com", LIVE_BASE = "https://fapi.binance.com";
-  const ALLOW_LIVE = false;      // the live path stays closed until step 9
-  const C = { prefix: "svx_", capUsd: 5000, quoteMs: 3000, offsetMs: 1000, stopMs: 3000, unknownMs: 5000, reqMs: 8000, lateMs: 5000, exitTries: 3, retryMs: 1000 };
-  const hash36 = s => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return (h >>> 0).toString(36); };
+  const ALLOW_LIVE = false;      // the live path stays closed until step 9 (a const in the Rust crate too)
+  const C = { prefix: "svx_", capUsd: 5000, quoteMs: 3000, offsetMs: 1000, stopMs: 3000, unknownMs: 5000, reqMs: 8000, lateMs: 5000, exitTries: 3, retryMs: 1000 };      // the figures live in the Rust crate; this copy is for callers
+  const wasm = (fn, o) => SVWASM.call("exec_" + fn, o);
+  const reg = typeof FinalizationRegistry === "function" ? new FinalizationRegistry(h => { try { if (SVWASM.loaded) wasm("drop", { h }); } catch (e) { /* the module is gone */ } }) : null;
+  // the second copy of the host test (see SAFETY above)
+  const jsDemo = b => b === DEMO_BASE || /^http:\/\/(127\.0\.0\.1|localhost):\d{2,5}$/.test(String(b));
   // the demo host itself, or this PC's demo proxy (demo-proxy.mjs: forwards only to the demo host; the page checks that with GET /__proxy before it logs in)
-  const isDemoBase = b => b === DEMO_BASE || /^http:\/\/(127\.0\.0\.1|localhost):\d{2,5}$/.test(String(b));
-  const allowedBase = b => isDemoBase(b) || (ALLOW_LIVE && b === LIVE_BASE);
-  const decOf = x => { const s = Number(x).toString(); if (s.includes("e-")) return +s.split("e-")[1]; return (s.split(".")[1] || "").length; };
-  const floorStep = (v, step) => Math.floor(v / step + 1e-9) * step;
-  const toStr = (v, step) => v.toFixed(decOf(step));
-  const gone = r => /-2011|-2013|unknown order|no such order/i.test(String(r.err || "") + String(r.code || ""));
+  const isDemoBase = b => SVWASM.loaded && wasm("is_demo_base", { s: String(b), isStr: typeof b === "string" });
 
   function create(o) {
-    const allowed = allowedBase(o.base), saved = o.saved || {};
-    let st = "idle", pos = null, started = false, blockWhy = "", faultWhy = "", killed = !!saved.killed, seq = 0, nCid = 0, now0 = 0;
-    const reqs = [], rows = [], newFaults = [], faults = (saved.faults || []).slice(), pend = new Map(), late = new Map(), retry = [], paperTr = new Map(), cidOf = {};
-    const send = (r, now, ms) => { if (!allowed) return 0; r.id = ++seq; reqs.push(r); const p = { r, due: now + (ms || C.reqMs) }; pend.set(r.id, p); return r.id; };
-    const mkCid = (p, role) => C.prefix + hash36(p.sys || "?") + "_" + (p.t0 || 0).toString(36) + "_" + role + (++nCid);
-    const note = (p, n) => { if (!p.notes.includes(n)) p.notes.push(n); };
-
-    function fault(kind, text, now) {
-      const f = { t: now, kind, text: String(text || "") }; faults.push(f); newFaults.push(f); faultWhy = kind;
-      closeNow("fault: " + kind, now);
-    }
-    // close what is the page's own at market, once; a position still being entered is closed as soon as its fill is known
-    function closeNow(why, now) {
-      const p = pos; if (!p) return;
-      if (p.closing) return;
-      if (st === "entering") { p.closeAsap = p.closeAsap || why; return; }
-      if (p.exitFailed || p.exit) return;
-      p.closing = true; p.why = p.why || why; if (st !== "settling") st = "exiting";
-      sendExit(p, now);
-    }
-    function sendExit(p, now) {
-      p.tries = (p.tries || 0) + 1;
-      if (p.tries === 2) { note(p, "exit retried"); fault2(p, "exit needed more than one attempt", "the first exit order got no answer or was refused", now); }      // rule 12: any exit that needed a second attempt
-      const cid = mkCid(p, "x"); (p.exitCids = p.exitCids || []).push(cid); send({ op: "market", role: "x", side: (p.closeSide || (p.dir > 0 ? "SELL" : "BUY")), qty: p.qty, qtyStr: p.qtyStr || String(p.qty), reduce: true, cid }, now);
-    }
-    function failEntry(p, why, now) {      // nothing is held: the trade stays a paper trade
-      note(p, why); writeRow(p, now, "failed"); pos = null; st = "idle";
-    }
-
-    // ---- the mirror row, written once the real exit is known and the paper trade row has been seen
-    function writeRow(p, now, status) {
-      const e = p.entry, x = p.exit, tr = p.paperDone && p.paperDone !== "none" ? p.paperDone : null;
-      const row = { k: "mirror", sys: p.sys, t: now, pid: p.pid, status, fill: "paper", dir: p.dir, notes: p.notes.slice() };
-      if (e) { row.qty = e.qty; row.entryPx = e.px; row.entryDelayMs = e.t - p.tPaper; if (p.paperPx) row.entrySlipBps = p.dir * (e.px / p.paperPx - 1) * 1e4; }
-      if (x) { row.exitPx = x.px; row.exitDelayMs = x.t - (p.tPaperExit || p.tPaper); if (tr) row.exitSlipBps = -p.dir * (x.px / tr.exitPx - 1) * 1e4; row.exitReason = p.why; }
-      if (e && x) {
-        const fees = (e.fee || 0) + (x.fee || 0), notional = e.px * e.qty;
-        row.fees = fees; row.feesBps = fees / notional * 1e4; row.netBps = p.dir * (x.px / e.px - 1) * 1e4 - row.feesBps; row.paperNetBps = tr ? tr.netBps : null;
-        if (status === "filled" && tr) row.fill = "demo";
-      }
-      if (p.lateMs) row.lateMs = p.lateMs;
-      rows.push(row);
-    }
-    function tryFinalize(now) {
-      const p = pos; if (!p || !p.exit || p.paperDone === undefined) return;
-      if (p.exitCancelPending) return;
-      const status = !p.entry && !p.leftover ? "failed" : p.leftover || p.interrupted || p.paperDone === "none" ? "interrupted" : "filled";
-      writeRow(p, now, status); pos = null; st = "idle";
-    }
-
-    // ---- entries
-    function onEnter(row, now, g) {
-      g = g || {};
-      const refuse = why => { rows.push({ k: "mirror", sys: row.sys, t: now, pid: row.pid, status: "paper", fill: "paper", dir: row.dir, notes: [why] }); };
-      if (!allowed) return refuse("not the demo account");
-      if (!started) return refuse("execution not started");
-      if (killed) return refuse("kill switch");
-      if (faultWhy) return refuse("fault not cleared");
-      if (blockWhy) return refuse("blocked: " + blockWhy);
-      if (g.readOk === false) return refuse("cannot read the exchange");
-      if (pos) return refuse("account busy");
-      if (!(g.quoteAgeMs != null && g.quoteAgeMs <= C.quoteMs)) return refuse("no Binance quote for 3 s");
-      if (!(g.offsetMs != null && Math.abs(g.offsetMs) <= C.offsetMs)) return refuse("clock offset over 1 s");
-      if (g.oneWay !== true) return refuse("not one-way position mode");
-      const raw = Math.min(row.qty, C.capUsd / row.px), capped = row.qty * row.px > C.capUsd, qty = floorStep(raw, g.step);
-      if (!(qty >= g.minQty) || (g.minNotional && qty * row.px < g.minNotional)) return refuse("below the exchange minimum");
-      const p = { sys: row.sys, pid: row.pid, dir: row.dir, qty, qtyStr: toStr(qty, g.step), tPaper: row.t, paperPx: row.px, t0: row.t, step: g.step, stopBps: row.stopBps, tick: g.tick, notes: [] };
-      if (capped) note(p, "capped");
-      pos = p; st = "entering";
-      p.entryCid = mkCid(p, "e"); send({ op: "market", role: "e", side: p.dir > 0 ? "BUY" : "SELL", qty, qtyStr: p.qtyStr, reduce: false, cid: p.entryCid }, now);
-    }
-    function gotEntry(p, d, now) {
-      if (p.entryDone) return; p.entryDone = true;
-      if (!(d && d.qty > 0)) return failEntry(p, "entry not filled", now);
-      if (d.qty < p.qty - 1e-12) note(p, "partial fill");
-      p.entry = { px: d.px, qty: d.qty, fee: d.fee || 0, t: d.t != null ? d.t : now }; p.qty = d.qty; p.qtyStr = toStr(d.qty, p.step);
-      if (p.closeAsap) { st = "holding"; p.closing = false; return closeNow(p.closeAsap, now); }
-      st = "stopping"; p.stopDue = now + C.stopMs;
-      const sp = p.dir > 0 ? p.entry.px * (1 - p.stopBps / 1e4) : p.entry.px * (1 + p.stopBps / 1e4), tick = p.tick || 0.01;
-      p.stopPx = Math.round(sp / tick) * tick; p.stopCid = mkCid(p, "s");
-      send({ op: "stop", role: "s", side: p.dir > 0 ? "SELL" : "BUY", qty: p.qty, qtyStr: p.qtyStr, stopPx: p.stopPx, stopStr: p.stopPx.toFixed(decOf(tick)), cid: p.stopCid }, now);
-    }
-    function gotStop(p, now) {
-      if (p.stopDone) return; p.stopDone = true; p.stopOk = true; p.stopAt = now;
-      if (st === "stopping") st = "holding";
-      if (p.closing || p.exit) { p.stopCancelled = false; cancelStop(p, now); }      // a stop that was confirmed late, after the position was already being closed
-    }
-    function stopFailed(p, text, now) {
-      if (p.stopDone) return; p.stopDone = true; note(p, "stop rejected");
-      fault("stop rejected", text, now);
-    }
-    function cancelStop(p, now) { if (!p.stopCid) return; p.exitCancelPending = true; send({ op: "cancel", role: "c", cid: p.stopCid, algo: true }, now); }
-    function gotExit(p, d, now) {
-      if (p.exit) return; p.exit = { px: d.px, qty: d.qty, fee: d.fee || 0, t: d.t != null ? d.t : now };
-      if (p.stopCid && !p.stopTriggered) cancelStop(p, now);      // also when the stop answer never came: the cancel of an order that is not there is tolerated (gone())
-      tryFinalize(now);
-    }
-
-    // ---- an answer
-    function reply(id, res, now) {
-      let p = pend.get(id), wasLate = false;
-      if (p) pend.delete(id); else { p = late.get(id); if (!p) return; wasLate = true; late.delete(id); }
-      const r = p.r, role = r.role;
-      if (r.op === "lookup") return lookupReply(p, res, now);
-      if (res.ok === false && res.unknown) { late.set(id, p); return unknown(p, now); }
-      if (wasLate && !pos) return;
-      if (role === "e") {
-        if (!pos || pos.entryDone) return;
-        if (res.ok) return gotEntry(pos, res.data, now);
-        return failEntry(pos, "entry rejected: " + (res.err || ""), now);
-      }
-      if (role === "s") {
-        if (!pos) { if (res.ok) send({ op: "cancel", role: "c", cid: r.cid, algo: true, recon: true }, now); return; }
-        if (res.ok) return gotStop(pos, now);
-        return stopFailed(pos, res.err, now);
-      }
-      if (role === "x") {
-        if (!pos) return;
-        if (res.ok) return gotExit(pos, res.data, now);
-        // the exchange said no: with no position left (reduce-only refused) the stop probably fired; the next poll tells. Otherwise try again, up to the limit.
-        if (pos.tries >= C.exitTries) { pos.exitFailed = true; st = "stuck"; return fault("exit failed", res.err, now); }
-        if (/-2022/.test(String(res.err)) && pos.tries > 1 && !pos.prevChecked) {      // refused as reduce-only with nothing to reduce: an earlier attempt probably did fill, its answer was lost. Look each one up by client id.
-          pos.prevChecked = true; pos.prevMiss = 0; const prev = pos.exitCids.slice(0, -1); pos.prevN = prev.length;
-          for (const c of prev) send({ op: "lookup", role: "x", of: c, algo: false, orig: { role: "x" }, since: now, prev: true }, now);
-          return;
-        }
-        return sendExit(pos, now);
-      }
-      if (role === "c") {
-        if (r.recon) return;
-        if (!pos) return;
-        if (!res.ok && !gone(res)) fault2(pos, "unknown order state", "cancel of the stop: " + (res.err || ""), now);
-        pos.exitCancelPending = false; tryFinalize(now);
-      }
-    }
-    function fault2(p, kind, text, now) { const f = { t: now, kind, text: String(text || "") }; faults.push(f); newFaults.push(f); faultWhy = kind; }
-    // no answer (timeout, dropped): ask the exchange by client id; a state still unknown after 5 s is a fault
-    function unknown(p, now) {
-      const r = p.r; if (r.op === "lookup") { retry.push({ q: r, at: now }); return; }      // a lookup that got no answer continues the same 5 s clock (its own since), it does not start a new one
-      if (r.role === "c") { if (pos) { fault2(pos, "unknown order state", "cancel of the stop timed out", now); pos.exitCancelPending = false; tryFinalize(now); } return; }
-      const q = { op: "lookup", role: r.role, of: r.cid, algo: r.role === "s", orig: r, since: p.since || now };
-      send(q, now);
-    }
-    function lookupReply(p, res, now) {
-      const q = p.r, role = q.role;
-      if (!res.ok || res.unknown) { retry.push({ q, at: now + C.retryMs }); return; }
-      const d = res.data || {};
-      if (role === "e") {
-        if (!pos || pos.entryDone) return;
-        if (d.found && d.qty > 0) return gotEntry(pos, d, now);
-        if (d.found && /NEW|PARTIAL/i.test(d.status || "") && !/EXPIRED|CANCEL|REJECT/i.test(d.status)) { retry.push({ q, at: now + C.retryMs }); return; }
-        return failEntry(pos, "entry not found on the exchange", now);
-      }
-      if (role === "s") {
-        if (!pos || pos.stopDone) return;
-        if (d.found && !/CANCEL|REJECT|EXPIRED/i.test(d.status || "")) return gotStop(pos, now);
-        return stopFailed(pos, "stop not found on the exchange", now);
-      }
-      if (role === "x") {
-        if (!pos || pos.exit) return;
-        if (d.found && d.qty > 0) return gotExit(pos, d, now);
-        if (q.prev) { if (++pos.prevMiss >= pos.prevN) { if (pos.stopCid && pos.stopOk && !pos.stopTriggered) { stopFired(pos, now); return; } fault2(pos, "unknown order state", "the exit was refused as reduce-only and no earlier exit order was found", now); pos.paperDone = pos.paperDone === undefined ? "none" : pos.paperDone; writeRow(pos, now, "failed"); pos = null; st = "idle"; } return; }
-        return sendExit(pos, now);      // never reached the exchange
-      }
-    }
-    function tick(now) {
-      for (const [id, p] of Array.from(pend)) if (p.due <= now) { pend.delete(id); late.set(id, p); unknown(p, now); }
-      for (let i = retry.length - 1; i >= 0; i--) {
-        const x = retry[i]; if (x.at > now) continue; retry.splice(i, 1);
-        if (now - x.q.since > C.unknownMs) { if (pos) { if (x.q.prev) pos.prevChecked = false; if (x.q.role === "k") pos.stopTriggered = false; fault2(pos, "unknown order state", "order " + x.q.of + " still unknown after 5 s", now); if (x.q.role === "x" && !x.q.prev && !pos.exit && !pos.resent && pos.tries < C.exitTries) { pos.resent = true; sendExit(pos, now); } else closeAfterUnknown(now); } continue; }      // an exit that stayed unknown is sent again once (reduce-only: it cannot double-close)
-        send(Object.assign({}, x.q), now);
-      }
-      if (pos && st === "stopping" && !pos.stopDone && now >= pos.stopDue) { pos.stopDone = false; stopLate(pos, now); }
-    }
-    function stopFired(p, now) {      // flat on the exchange and no exit order of ours found: the resting stop must have fired. Its fill is the real exit.
-      p.stopTriggered = true; p.why = p.why && /^(time|stop|invalidate|end|gap)/.test(p.why) ? p.why : (p.why || "stop (exchange)"); note(p, "stop fired on the exchange");
-      send({ op: "lookup", role: "k", of: p.stopCid, algo: true, orig: { role: "k" }, since: now }, now);
-    }
-    const exitBusy = () => { for (const q of pend.values()) if (q.r.role === "x") return true; return retry.some(x => x.q.role === "x"); };
-    function closeAfterUnknown(now) { if (pos && pos.entry && !pos.closing) closeNow("unknown order state", now); else if (pos && !pos.entry) { pos.closeFromPoll = true; pos.why = "unknown order state"; } }      // no fill is known: the next poll says what is held
-    function stopLate(p, now) {
-      if (p.closing) return;
-      note(p, "stop rejected"); fault("stop rejected or late", "no confirmation within 3 s", now);
-    }
-
-    // ---- the exchange as it is now (start: once; poll: every few seconds)
-    function start(x, now, extra) {
-      if (!allowed) return; started = true; reconcile(x, now, true, extra || {});
-    }
-    function reconcile(x, now, atStart, extra) {
-      const net = (x.positions || []).reduce((a, b) => a + b, 0), own = (x.orders || []).filter(k => k.cid && k.cid.startsWith(C.prefix)), foreign = (x.orders || []).filter(k => !(k.cid && k.cid.startsWith(C.prefix)));
-      if (atStart) {
-        if (Math.abs(net) > 0) {
-          const ownPos = own.length > 0 || !!extra.savedOpen;
-          if (!ownPos) { blockWhy = "a position on this asset that is not the page's own"; fault2({ notes: [] }, "foreign position found", blockWhy, now); return; }
-          for (const k of own) send({ op: "cancel", role: "c", cid: k.cid, algo: !!k.algo, recon: true }, now);
-          pos = { sys: extra.savedSys || "?", pid: "leftover:" + now, dir: net > 0 ? 1 : -1, qty: Math.abs(net), qtyStr: String(Math.abs(net)), tPaper: now, t0: now, notes: ["leftover own position"], leftover: true, interrupted: true, paperDone: "none", entry: null, why: "interrupted", entryDone: true, stopDone: true, closing: true, tries: 0 };
-          st = "exiting"; fault2(pos, "leftover own position found at start", "position " + net + " with " + own.length + " own order(s)", now); sendExit(pos, now); return;
-        }
-        for (const k of own) send({ op: "cancel", role: "c", cid: k.cid, algo: !!k.algo, recon: true }, now);
-      }
-      if (!pos) {      // nothing of ours is open: a foreign position or order blocks; it clears when it is gone
-        if (Math.abs(net) > 0 && !atStart) { if (!blockWhy) fault2({ notes: [] }, "foreign position found", "position " + net, now); blockWhy = "a position on this asset that is not the page's own"; }
-        else if (foreign.length) blockWhy = foreign.length + " open order(s) on this asset that are not the page's own";
-        else blockWhy = "";
-        return;
-      }
-      if (foreign.length) blockWhy = foreign.length + " open order(s) on this asset that are not the page's own"; else if (blockWhy && !/position/.test(blockWhy)) blockWhy = "";
-      const p = pos;
-      if (p.closeFromPoll) {      // an entry whose state stayed unknown: close what the exchange shows, cancel what is ours
-        p.closeFromPoll = false; for (const k of own) send({ op: "cancel", role: "c", cid: k.cid, algo: !!k.algo, recon: true }, now);
-        if (Math.abs(net) < 1e-12) { writeRow(p, now, "failed"); pos = null; st = "idle"; return; }
-        p.dir = net > 0 ? 1 : -1; p.qty = Math.abs(net); p.qtyStr = toStr(p.qty, p.step || 0.001); p.closing = true; p.entryDone = true; p.stopDone = true; p.paperDone = p.paperDone === undefined ? "none" : p.paperDone; st = "exiting"; sendExit(p, now); return;
-      }
-      if (p.closing && !p.exit && !p.exitFailed && (st === "exiting" || st === "stuck") && !exitBusy()) {      // an exit that stalled (the exchange or the network was down for longer than the retries): the poll takes it up again
-        if (Math.abs(net) > 1e-12) { if (p.tries < 6) { p.resent = false; sendExit(p, now); } else { p.exitFailed = true; st = "stuck"; fault2(p, "exit failed", "six exit attempts, the position is still open", now); } }
-        else if (p.stopCid && p.stopOk && !p.stopTriggered && !(p.exitCids && p.exitCids.length && !p.prevChecked)) stopFired(p, now);
-        else if (p.exitCids && p.exitCids.length && !p.prevChecked) { p.prevChecked = true; p.prevMiss = 0; p.prevN = p.exitCids.length; for (const c of p.exitCids) send({ op: "lookup", role: "x", of: c, algo: false, orig: { role: "x" }, since: now, prev: true }, now); }
-        return;
-      }
-      if (st === "holding") {
-        if (Math.abs(net) < 1e-12) {      // flat: the exchange stop fired before the paper exit
-          st = "settling"; p.stopTriggered = true; p.why = p.why || "stop (exchange)"; note(p, "stop fired on the exchange");
-          send({ op: "lookup", role: "k", of: p.stopCid, algo: true, orig: { role: "k" }, since: now }, now); return;
-        }
-        if (Math.sign(net) !== p.dir || Math.abs(Math.abs(net) - p.qty) > Math.max(1e-9, p.qty * 1e-6)) { const was = p.dir * p.qty; p.qty = Math.abs(net); p.qtyStr = toStr(p.qty, p.step || 0.001); p.closeSide = net > 0 ? "SELL" : "BUY"; fault("position differs from what the page believes", "page " + was + ", exchange " + net, now); return; }
-        if (p.stopOk && p.stopAt != null && x.t > p.stopAt + 1500 && !own.some(k => k.cid === p.stopCid)) { fault("position differs from what the page believes", "the stop order is not on the exchange", now); }
-      }
-    }
-    // lookup of the fired stop (role "k"): its fill is the real exit
-    function settleReply(p, res, now) {
-      if (!pos) return;
-      const d = res.data || {};
-      if (res.ok && d.found && d.qty > 0) { pos.stopOk = false; gotExit(pos, d, now); return; }
-      retry.push({ q: p.r, at: now + C.retryMs });
-    }
-
-    // ---- the journal rows of the runner
-    function onRow(row, now, g) {
-      if (row.k === "enter" && row.stage === "demo") return onEnter(row, now, g);
-      if (row.k === "trade") {
-        if (pos && row.pid === pos.pid) { pos.paperDone = row.interrupted ? "none" : row; if (row.interrupted) { pos.interrupted = true; closeNow("interrupted", now); } tryFinalize(now); }
-        return;
-      }
-      if ((row.k === "exit" || row.k === "invalidate") && pos && row.pid === pos.pid) {
-        pos.tPaperExit = row.t; const l = now - row.t; if (l > C.lateMs) { pos.lateMs = l; note(pos, "late exit"); }
-        pos.why = pos.why || row.reason; closeNow(row.reason, now);
-      }
-    }
-    function kill(now) { killed = true; if (pos) closeNow("kill switch", now); }
-    function unkill() { killed = false; }
-    function clearFault() { faultWhy = ""; }
-    function drain() { const r = { reqs: reqs.splice(0), rows: rows.splice(0), faults: newFaults.splice(0) }; return r; }
-    function state() {
-      const s = !allowed || !started ? "off" : killed ? "killed" : faultWhy ? "fault" : blockWhy ? "blocked" : pos ? "holding" : "ready";
-      return { state: s, why: !allowed ? "not the demo account" : !started ? "not started" : killed ? "kill switch on" : faultWhy || blockWhy, phase: st, faults: faults.length, pos: pos ? { sys: pos.sys, pid: pos.pid, dir: pos.dir, qty: pos.qty, phase: st } : null, killed };
-    }
-    // what to keep across a reload (the page stores it): the kill switch, the fault log, and whether a position was open
-    const snapshot = () => ({ killed, faults: faults.slice(), open: pos ? { sys: pos.sys, pid: pos.pid } : null });
-    // settle replies (role "k") go through the same door
-    const replyAll = (id, res, now) => {
-      const p = pend.get(id); if (p && p.r.op === "lookup" && p.r.role === "k") { pend.delete(id); return settleReply(p, res, now); }
-      return reply(id, res, now);
+    const made = wasm("create", { s: String(o.base), isStr: typeof o.base === "string", saved: o.saved || {} }), h = made.h, allowed = made.allowed;
+    if (allowed !== jsDemo(o.base)) { wasm("drop", { h }); throw new Error("exec: the base URL check of the page and of the module disagree; no machine was made"); }
+    let live = true;
+    const api = {
+      debug: () => wasm("debug", { h }),
+      onRow: (row, now, g) => { wasm("on_row", { h, row: { k: row.k, stage: row.stage, sys: row.sys, pid: row.pid, dir: row.dir, px: row.px, qty: row.qty, t: row.t, stopBps: row.stopBps, reason: row.reason, interrupted: row.interrupted, exitPx: row.exitPx, netBps: row.netBps }, now, g }); },
+      reply: (id, res, now) => { wasm("reply", { h, id, res, now }); },
+      tick: now => { wasm("tick", { h, now }); },
+      start: (x, now, extra) => { wasm("start", { h, x, now, extra: extra || {} }); },
+      poll: (x, now) => { wasm("poll", { h, x, now }); },
+      kill: now => { wasm("kill", { h, now }); },
+      unkill: () => { wasm("unkill", { h }); },
+      clearFault: () => { wasm("clear_fault", { h }); },
+      drain: () => { const d = wasm("drain", { h }); if (!allowed) d.reqs = []; return d; },
+      state: () => wasm("state", { h }),
+      snapshot: () => wasm("snapshot", { h }),
+      faults: () => wasm("faults", { h }),
+      allowed,
+      // free the machine now (it is freed anyway when this object is collected); no call may follow
+      dispose: () => { if (live) { live = false; if (reg) reg.unregister(api); wasm("drop", { h }); } },
     };
-    const debug = () => ({ pend: Array.from(pend.values()).map(q => q.r.op + ":" + q.r.role), retry: retry.map(x => x.q.op + ":" + x.q.role + (x.q.prev ? ":prev" : "")), pos: pos && { tries: pos.tries, prevChecked: pos.prevChecked, prevMiss: pos.prevMiss, prevN: pos.prevN, closing: pos.closing, exit: !!pos.exit, stopOk: pos.stopOk, stopTriggered: pos.stopTriggered, exitCids: pos.exitCids && pos.exitCids.length, resent: pos.resent, exitFailed: pos.exitFailed } });
-    return { debug, onRow, reply: replyAll, tick, start, poll: (x, now) => { if (started) reconcile(x, now, false, {}); }, kill, unkill, clearFault, drain, state, snapshot, faults: () => faults.slice(), allowed };
+    if (reg) reg.register(api, h, api);
+    return api;
   }
 
   // Trades of the journal as the promotion rule should read them: a paper trade that was also filled on the demo exchange (mirror row, fill "demo") reads as a demo trade with the real net result and the paper one beside it.
@@ -300,8 +65,10 @@ const EXEC = (() => {
     return rows.map(r => { if (r.k !== "trade" || r.interrupted) return r; const x = m.get(r.pid); if (!x) return r; return Object.assign({}, r, { fill: "demo", paperNetBps: r.netBps, netBps: x.netBps, R: x.netBps / r.stopBps, usd: x.netBps / 1e4 * r.notional }); });
   }
 
+
   // ---------- self-test: a fake exchange and the scenarios exec:* ----------
-  function selftest() {
+  function selftest(tap) {      // tap (parity only): wraps every machine the scenarios create, to record its calls
+    const mk = o => tap ? tap(create(o)) : create(o);
     const res = [], ok = (name, c, detail) => res.push({ name: "exec:" + name, ok: !!c, detail: c ? "" : String(detail || "") });
     const G = { quoteAgeMs: 100, offsetMs: 10, oneWay: true, step: 0.001, tick: 0.1, minQty: 0.001, minNotional: 5 };
     // The fake exchange. S.px is the market price; behaviours: S.beh[key] = "reject" | "lost" (not executed, no answer) | "silent" (executed, no answer) | {slow: ms} (executed, answered late)
@@ -344,7 +111,7 @@ const EXEC = (() => {
     const tradeRow = (e, t, o) => Object.assign({ k: "trade", sys: e.sys, t, pid: e.pid, tIn: e.t, tOut: t, dir: e.dir, qty: e.qty, notional: e.notional, entryPx: e.px, exitPx: 100.2, grossBps: 20, feesBps: 10, netBps: 10, R: 0.2, usd: 0.1, stopBps: e.stopBps, reason: "time", stage: "demo", fill: "paper" }, o);
     // the driver: advances time in 100 ms steps, ships requests to the fake exchange, hands answers back, polls every 3 s
     function rig(over, mopts) {
-      const X = fx(over), M = create(Object.assign({ base: DEMO_BASE }, mopts)), R = { X, M, now: 0, rows: [], faults: [], poll: true, reqs: [] };
+      const X = fx(over), M = mk(Object.assign({ base: DEMO_BASE }, mopts)), R = { X, M, now: 0, rows: [], faults: [], poll: true, reqs: [] };
       R.pump = now => { const d = M.drain(); for (const r of d.rows) R.rows.push(r); for (const f of d.faults) R.faults.push(f); for (const q of d.reqs) { R.reqs.push(q); X.exec(q, now); } return d; };
       R.run = ms => { const end = R.now + ms; while (R.now < end) { R.now += 100; R.pump(R.now); for (const q of X.queue.filter(z => z.at <= R.now)) { X.queue.splice(X.queue.indexOf(q), 1); M.reply(q.id, q.a, R.now); } M.tick(R.now); R.pump(R.now); if (R.poll && R.now % 3000 === 0) { M.poll(X.snap(R.now), R.now); R.pump(R.now); } } };
       R.start = (extra) => { M.start(X.snap(R.now), R.now, extra); R.pump(R.now); R.run(1000); };
@@ -455,7 +222,7 @@ const EXEC = (() => {
     { const R = rig({}, { saved: { killed: true } }); R.now = 1000; R.start(); R.row(enter()); R.run(300); ok("a kill switch saved by the page is still on after a reload", R.M.state().state === "killed" && R.X.sent.length === 0); }
     // ----- a reload in every state ends flat
     const reloadAt = (name, steps, over) => { const R = rig(over); R.now = 1000; R.start(); R.row(enter()); R.run(steps); const snap = R.M.snapshot(), X = R.X; X.queue.length = 0;
-      const R2 = rig(); R2.X = X; R2.M = create({ base: DEMO_BASE, saved: snap }); R2.pump = R.pump.bind({}); const M2 = R2.M; R2.now = R.now;
+      const R2 = rig(); R2.X = X; R2.M = mk({ base: DEMO_BASE, saved: snap }); R2.pump = R.pump.bind({}); const M2 = R2.M; R2.now = R.now;
       const pump2 = now => { const d = M2.drain(); for (const q of d.reqs) X.exec(q, now); return d; };
       M2.start(X.snap(R2.now), R2.now, { savedOpen: !!snap.open, savedSys: snap.open && snap.open.sys }); pump2(R2.now);
       for (let i = 0; i < 60; i++) { R2.now += 100; for (const q of X.queue.filter(z => z.at <= R2.now)) { X.queue.splice(X.queue.indexOf(q), 1); M2.reply(q.id, q.a, R2.now); } M2.tick(R2.now); pump2(R2.now); }

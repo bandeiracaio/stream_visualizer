@@ -84,6 +84,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "sv-exec"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sv-core",
+]
+
+[[package]]
 name = "sv-history"
 version = "0.1.0"
 dependencies = [
@@ -143,6 +152,7 @@ name = "sv-wasm"
 version = "0.1.0"
 dependencies = [
  "sv-core",
+ "sv-exec",
  "sv-history",
  "sv-paper",
  "sv-promotion",

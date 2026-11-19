@@ -102,7 +102,7 @@ async function exePoll(){
 }
 // the lifecycle: one machine per demo connection, dropped on logout or when the check goes stale
 function exeLife(){
-  const on = exeEnabled() && TRN.loaded;
+  const on = exeEnabled() && TRN.loaded && SVWASM.loaded;      // the machine is WebAssembly (R4): none before the module is ready
   if (!on){ if (EXE.m){ EXE.m = null; EXE.openSaved = ""; } return; }
   if (!EXE.m){ EXE.m = EXEC.create({base: ACC.base, saved: {killed: EXE.killed, faults: []}}); EXE.err = ""; }
   const m = EXE.m, s = m.state();
