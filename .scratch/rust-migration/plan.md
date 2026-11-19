@@ -112,3 +112,12 @@ R7 can go earlier if faster studies are the main need: it needs only the cores a
 1. Is the goal speed in the studies, type safety, or both? If only speed, the plan reduces to R0, R2, R3, R6 and R7.
 2. Native-only tools (R7) could also replace the Node scripts entirely. Keep Node as the driver, or move the scripts to Rust?
 3. Should the size budget (600 KB) be lower for the phone?
+
+## Amendment 1 (2026-11-19): what was learned in R0-R5
+
+- **Committed wasm (v153).** A compile is not byte-identical across hosts (Linux and Windows differed by 832 bytes at v152), so `rust/sv.wasm` is committed with `rust/sv.wasm.src` (the hash of the `rust/` sources). CI never compiles; it fails on a stale hash.
+- **Budget.** The 600 KB base64 budget does not hold; the new budget is about 1.1 MB base64 (about 825 KB of wasm), without `wasm-opt`.
+- **Boundary cost decides what moves.** A call across JS and wasm with JSON costs about 5 to 10 µs. A core gains only when much work happens per call (R3: the runner steps 147 instances in one call, 2.7x faster than JS). Cores whose functions are small and called per input lose.
+- **R5 not released.** MICRO, MARKET and CHUNK are per-input or trivial: every function measured was slower through wasm (for example `CHUNK.pipeline.input` 4 µs/s in JS against 186 µs/s; `MARKET.midRow` 0.2 against 31 µs/s). They stay in JS. The attempt (crate `sv-feed`, its parity and the benchmark) is kept in `.scratch/rust-migration/r5-attempt/` for reference.
+- **R7 deferred until after R6.** A native replay tool needs the facts accumulator and the Reader engine in Rust; until R6, `design-harness.mjs` already runs the systems and runner on wasm faster than the JS reference.
+- **R8 scope.** Delete the JS references only of the cores that moved (PROMO, PAPER, HIST, SQ, SYSTEM, RUNNER, EXEC).
