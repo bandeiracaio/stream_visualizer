@@ -1,0 +1,275 @@
+diff --git a/design-harness.mjs b/design-harness.mjs
+index 26c053c..f122a03 100644
+--- a/design-harness.mjs
++++ b/design-harness.mjs
+@@ -310,7 +310,7 @@ function selftest() {
+ // node design-harness.mjs --replay-run <chunk files or folders>: groups the chunks by run, checks the numbers, replays each run from its first chunk through the engine, the facts accumulator (with the page's own lateness)
+ // and the runner driver, and compares the journal rows with the rows stored in the chunks (equal = every row equal as JSON). Prints per run: chunks, rows, equal or the first row that differs. Exit 1 on any difference.
+ // A run whose first chunk is missing is "not checkable", not a failure; a run with a missing chunk in the middle is compared up to the hole.
+-export const CHUNK = vm.runInNewContext(fs.readFileSync(path.join(HERE, "src/js/chunk-core.js"), "utf8") + "\n;CHUNK", {});
++export const CHUNK = vm.runInNewContext(fs.readFileSync(path.join(HERE, "src/js/chunk-core.js"), "utf8") + "\n;CHUNK", coreContext());
+ export function readChunk(file) {
+   let buf = fs.readFileSync(file); if (buf[0] === 0x1f && buf[1] === 0x8b) buf = zlib.gunzipSync(buf);
+   const j = JSON.parse(buf.toString("utf8")); return j && j.kind === "sv-session" && j.run != null && Number.isInteger(j.seq) ? j : null;
+diff --git a/docs/agents/source-map.md b/docs/agents/source-map.md
+index 9c4e739..ba6fa38 100644
+--- a/docs/agents/source-map.md
++++ b/docs/agents/source-map.md
+@@ -20,6 +20,7 @@ Page files are checked by the build's boot check (`lib/page-boot.mjs`): the asse
+ - R2 (`system-core.js` `SYSTEM`; crate `sv-system`; reference `SYSTEM_JS`): the system itself (validate, id, size, one running system) is Rust; `SYSTEM.facts` and `selftest` stay in the JS wrapper because facts drives the Reader engine (`sigmaPeek`, `priceHistory`, `episodeGroups`, frozen until the episode-outcomes run) and moves with it in R6. `sv-system` is a plain API (`System::new(def, opt)`, `step(&Snap) -> Vec<Intent>`, `filled`, `closed`, `cancelled`, `end`, `force`, `state`; `Snap` is the snapshot a second), so the R3 runner can own instances inside Rust; `ops.rs` is the JSON layer with a `Handles<System>` registry (`system_create` returns a handle, every call takes it). `create()` returns the same object as before plus `dispose()` (the page frees by `FinalizationRegistry` too; the offline harness calls it). Load-time ids: `runner.js` (`TR_DEF`) and `trader-view.js` (`TV_SYS`) fill from `SYSTEM.id` in `SVWASM.ready.then`. Inputs cross as JSON, so `-0` in a snapshot arrives as 0 (sign of a zero in a reading only). Size work: `opt-level = "z"`, one shared `sv_core::sort_by` (the std sort was compiled per type). `design-harness.mjs` gives its vm contexts `SVWASM` (`coreContext`). `node parity.mjs system [--designs N] [--all-sessions]` (`lib/parity-system.mjs`: a dual system runs both versions and compares every call and every state; self-test, validate/id, random systems on random streams, the saved sessions before 2026-11-16 using the cached snapshots).
+ - R3 (`runner-core.js` `RUNNER`; crate `sv-runner`; reference `RUNNER_JS`, which runs `SYSTEM_JS`): the stepping runs in Rust. A `Runner` owns its 7 `System`s and their 20 twins each (sv-system's plain API, no JSON between them), so `step(snap)` is ONE call for every instance (R2 crossed the boundary per instance: about 1.4 ms per instance-second, the harness 28x slower than JS; now about 0.05 ms for all 147 instances, faster than the JS reference). The twins' mulberry32 / FNV-1a is ported bit for bit (u32 wrapping ops). Rows are built as `sv_core::obj::Obj` (a flat object with keys in the JS literal's order, one shared serializer) so journal rows keep their key order. `ops.rs`: `runner_create/step/interrupt/move/state/risk/drop` over a `Handles<Runner>`; `Snap` gained `q` (the quote the runner fills at). Stays in JS in the wrapper: reading the starting journal (equity per system and twin, interrupted positions: `fresh()`), `carryOf`, `driver` (gap rule, carry, stage moves; it disposes the runner it replaces), `evaluate` (folds over JS row objects; shipping all rows through JSON would cost more than it saves) and the `runner:*` self-test (runs on WASM). `create()` returns the same object plus `dispose()`. Rows come back as JSON, so a non-finite number is null. `TRN.ready` also waits for `SVWASM.ready` (a run begins only after it). `node parity.mjs runner [--all-sessions] [--only-real]` (`lib/parity-runner.mjs`): self-test on both, random configurations (systems, twins, fee, cap, seed, stages, a handed-over journal, moves, interrupts, driver gaps), the saved sessions before 2026-11-16 on the cached snapshots (defaults with the harness's carried journal, and a random configuration), comparing every row, state, risk, journal and evaluate. Known edge: `SYSTEM.state()` (R2) leaves `trigger.lastEnter.region.hi/lo` as null where the JS had NaN; `RUNNER.state()` restores the NaN.
+ - R4 (`exec-core.js` `EXEC`; crate `sv-exec`; reference `EXEC_JS`): the demo-execution machine (create / onRow / reply / tick / start / poll / kill / drain / state / snapshot, requests, mirror rows, faults) is Rust, one machine per handle. SAFETY: the base-URL rule (`is_demo_base`: the demo host or `http://127.0.0.1|localhost:<2-5 digits>`; `ALLOW_LIVE` a `const false`) is in Rust, `send` queues nothing for a machine that is not allowed, and the wrapper keeps a second copy of the host test (`jsDemo`): `create` throws if the two disagree and `drain` hands out no request from a machine that is not allowed; `isDemoBase` is false until the module is loaded; `exec.js` makes no machine before `SVWASM.loaded`. `merge`, the self-test and its fake exchange stay JS (merge reshapes arbitrary journal rows by reference and key order). `node parity.mjs exec`: self-test calls, the guard on look-alike and mutated hosts, random sequences on a fake exchange, real journals before 2026-11-16 (`lib/parity-exec.mjs`); the edge differences are listed at the top of `exec-core.js`. Rust unit tests: `cargo test -p sv-exec` (guard, no request when not allowed).
++- R5 (`market-core.js` `MARKET`, `chunk-core.js` `CHUNK`, `micro-core.js` `MICRO`; crate `sv-feed`; references `MARKET_JS`, `CHUNK_JS`): the rule here is per-call cost, because these sit on the per-input path and one JSON call across the boundary costs about 5 us (a 1000-level book about 350 us to send, more than the JS needs to process it). Measured on run 20261112041209 (`node parity.mjs bench`: 17 inputs/s of trades, 13 quotes, 3 books, 4 timer ticks): `MARKET.stampMid`/`bumpCvd` (per trade, 0.05 us in JS), `CHUNK.pipeline.input`/`thinner`/`timeOf` (per input, 0.1 us), `replay` and `firstDiff` (need the JS engine and row objects), `MARKET.prune` (moves arrays), `cvdRow` and the `fresh*` constants (no logic) and ALL of `MICRO` (`sample` 400 us, `bnTopN` 110 us, `bnSweepFeed` per trade) stay JS. Ported: `MARKET.midRow` (4/s: the rule runs in Rust, the wrapper builds `{t, bn, hl}`; falls back to the same rule in JS until the module is loaded), `CHUNK.check`, `fileName` (once per chunk, throws RangeError for an invalid time) and `leftRunning` (2 s timer; only the fields the rule reads cross, the wrapper builds the item objects in key order because `serde_json` without `preserve_order` sorts keys). Cost of the port: +31 us/s (midRow) and +7 us/s (leftRunning), nothing measurable on the page; wasm +11.7 KB (inputs and outputs are read as `serde_json::Value` by hand: derived structs cost 27 KB). No worker uses these cores. `run-record.js` `rrLeft` waits for `SVWASM.loaded`. `design-harness.mjs` gives `CHUNK` a wasm context. `node parity.mjs micro|market|chunk|bench` (`lib/parity-feed.mjs`: both self-tests, random calls, every recorded chunk name and run before 2026-11-16, and the three recorded runs replayed through both pipelines: identical cuts and chunk bytes, equal to the recording; `micro` only self-tests). Edge differences (inputs the page never sends): `midRow` with a string or `Infinity` quote reads as no quote; `leftRunning` with a non-string `disk.tone` or a missing `battery.level` differs; `fileName` reads `startedAt` as a number.
+ - `parity.mjs <core>` (root): replays the self-test's calls and seeded random inputs through both versions, plus real journals, comparing with `Object.is`; one line per batch.
+ 
+ ## Reader
+diff --git a/parity.mjs b/parity.mjs
+index 3697cd0..1d3e12f 100644
+--- a/parity.mjs
++++ b/parity.mjs
+@@ -6,6 +6,7 @@
+ //   node parity.mjs system [--designs N] [--all-sessions]   (R2: the system core, lib/parity-system.mjs: self-test, validate / id, random systems and streams, and the saved sessions before 2026-11-16)
+ //   node parity.mjs runner [--all-sessions] [--only-real] [--sessions N]   (R3: the runner core, lib/parity-runner.mjs: self-test, random configurations, the saved sessions before 2026-11-16)
+ //   node parity.mjs exec [--only-real] [--sessions N]   (R4: the execution core, lib/parity-exec.mjs: self-test calls, the base-URL guard, random event sequences on a fake exchange, real journals before 2026-11-16)
++//   node parity.mjs micro|market|chunk [--run ID] [--only-synthetic] [--sessions N]   (R5: lib/parity-feed.mjs; micro stays JS and only self-tests; `bench` prints the per-second cost table on a recorded run)
+ //   node parity.mjs promo --seed S   another seed (default 1)
+ // Inputs: (1) every call the core's own self-test makes, replayed on the JS version; (2) seeded random journals, stage logs and moves, with the boundary values of the rule
+ // over-represented; (3) the real journal sessions/trader-journal_check4.json (recorded 2026-11-11, before the test set of the registered episode-outcomes study; no session recording is read).
+@@ -17,6 +18,7 @@ import { buildWasm } from "./lib/wasm-build.mjs";
+ import { system as systemParity } from "./lib/parity-system.mjs";
+ import { runner as runnerParity } from "./lib/parity-runner.mjs";
+ import { exec as execParity } from "./lib/parity-exec.mjs";
++import { feed as feedParity, bench as feedBench } from "./lib/parity-feed.mjs";
+ 
+ const root = path.dirname(fileURLToPath(import.meta.url));
+ const args = process.argv.slice(2), which = args[0];
+@@ -493,19 +495,22 @@ async function sq(wasmBytes, st, cases, seed) {
+   } else console.log("skip  real recordings: sessions/ not found");
+ }
+ 
+-const known = ["promo", "paper", "hist", "sq", "system", "runner", "exec", "all"];
+-if (!known.includes(which)) { console.error("usage: node parity.mjs promo|paper|hist|sq|system|runner|exec|all [--cases N] [--seed S] [--designs N] [--all-sessions] [--only-real] [--sessions N]"); process.exit(1); }
++const known = ["promo", "paper", "hist", "sq", "system", "runner", "exec", "micro", "market", "chunk", "bench", "all"];
++if (!known.includes(which)) { console.error("usage: node parity.mjs promo|paper|hist|sq|system|runner|exec|micro|market|chunk|bench|all [--cases N] [--seed S] [--designs N] [--all-sessions] [--only-real] [--sessions N]"); process.exit(1); }
+ let failed = 0;
+ if (which === "promo" || which === "all") failed += await promo();
+ if (which !== "promo") {
+   const bytes = buildWasm(root, { quiet: true }), st = reporter();
+   console.log(`wasm: ${bytes.length} bytes`);
++  const runArg = args.includes("--run") ? args[args.indexOf("--run") + 1] : null;
++  if (which === "bench") { await feedBench(root, bytes, { run: runArg }); process.exit(0); }
+   if (which === "paper" || which === "all") await paper(bytes, st, N, SEED);
+   if (which === "hist" || which === "all") await hist(bytes, st, N, SEED);
+   if (which === "sq" || which === "all") await sq(bytes, st, Math.min(N, 400), SEED);
+   if (which === "system" || which === "all") await systemParity(root, bytes, st, N, SEED, { allSessions: args.includes("--all-sessions"), designs: argNum("--designs", 24), only: args.includes("--only-real") ? "real" : null, limit: argNum("--sessions", 0) });
+   if (which === "runner" || which === "all") await runnerParity(root, bytes, st, N, SEED, { allSessions: args.includes("--all-sessions"), only: args.includes("--only-real") ? "real" : null, limit: argNum("--sessions", 0) });
+   if (which === "exec" || which === "all") await execParity(root, bytes, st, N, SEED, { only: args.includes("--only-real") ? "real" : null, limit: argNum("--sessions", 0) });
++  if (["micro", "market", "chunk", "all"].includes(which)) for (const w of which === "all" ? ["micro", "market", "chunk"] : [which]) await feedParity(root, bytes, st, N, SEED, { which: w, only: args.includes("--only-synthetic") ? "synthetic" : null, limit: argNum("--sessions", 0), run: runArg });
+   console.log(`\n${st.bad ? "FAILED" : "OK"} ${which}: ${st.total} cases, ${st.bad} differences`);
+   failed += st.bad;
+ }
+diff --git a/rust/Cargo.lock b/rust/Cargo.lock
+index c379d5a..228f5b8 100644
+--- a/rust/Cargo.lock
++++ b/rust/Cargo.lock
+@@ -92,6 +92,15 @@ dependencies = [
+  "sv-core",
+ ]
+ 
++[[package]]
++name = "sv-feed"
++version = "0.1.0"
++dependencies = [
++ "serde",
++ "serde_json",
++ "sv-core",
++]
++
+ [[package]]
+ name = "sv-history"
+ version = "0.1.0"
+@@ -153,6 +162,7 @@ version = "0.1.0"
+ dependencies = [
+  "sv-core",
+  "sv-exec",
++ "sv-feed",
+  "sv-history",
+  "sv-paper",
+  "sv-promotion",
+diff --git a/rust/Cargo.toml b/rust/Cargo.toml
+index bfa64f6..49343fe 100644
+--- a/rust/Cargo.toml
++++ b/rust/Cargo.toml
+@@ -1,6 +1,6 @@
+ [workspace]
+ resolver = "2"
+-members = ["crates/sv-core", "crates/sv-promotion", "crates/sv-paper", "crates/sv-history", "crates/sv-quality", "crates/sv-system", "crates/sv-runner", "crates/sv-exec", "crates/sv-wasm"]
++members = ["crates/sv-core", "crates/sv-promotion", "crates/sv-paper", "crates/sv-history", "crates/sv-quality", "crates/sv-system", "crates/sv-runner", "crates/sv-exec", "crates/sv-feed", "crates/sv-wasm"]
+ 
+ [workspace.package]
+ version = "0.1.0"
+diff --git a/rust/crates/sv-wasm/Cargo.toml b/rust/crates/sv-wasm/Cargo.toml
+index 1ded4a6..91b823f 100644
+--- a/rust/crates/sv-wasm/Cargo.toml
++++ b/rust/crates/sv-wasm/Cargo.toml
+@@ -16,3 +16,4 @@ sv-quality = { path = "../sv-quality" }
+ sv-system = { path = "../sv-system" }
+ sv-runner = { path = "../sv-runner" }
+ sv-exec = { path = "../sv-exec" }
++sv-feed = { path = "../sv-feed" }
+diff --git a/rust/crates/sv-wasm/src/lib.rs b/rust/crates/sv-wasm/src/lib.rs
+index 47f826e..8b9672f 100644
+--- a/rust/crates/sv-wasm/src/lib.rs
++++ b/rust/crates/sv-wasm/src/lib.rs
+@@ -92,3 +92,9 @@ export! {
+     sv_exec_debug => sv_exec::ops::op_debug,
+     sv_exec_drop => sv_exec::ops::op_drop,
+ }
++export! {
++    sv_feed_mid_row => sv_feed::op_mid_row,
++    sv_feed_check => sv_feed::op_check,
++    sv_feed_file_name => sv_feed::op_file_name,
++    sv_feed_left_running => sv_feed::op_left_running,
++}
+diff --git a/rust/sv.wasm b/rust/sv.wasm
+index 9dd263e..e382bc3 100644
+Binary files a/rust/sv.wasm and b/rust/sv.wasm differ
+diff --git a/rust/sv.wasm.src b/rust/sv.wasm.src
+index 62c2303..d19d86a 100644
+--- a/rust/sv.wasm.src
++++ b/rust/sv.wasm.src
+@@ -1 +1 @@
+-b67b43b01932b3c3db32ccdeace54409ef83d4077fd8f7226afb9bc3dd77b314
++ae93856c5a56f4d4f0a703af32b7bfed6485c3d83c807a2de53b909dadaf5779
+diff --git a/src/js/chunk-core.js b/src/js/chunk-core.js
+index d33cea8..8027fe0 100644
+--- a/src/js/chunk-core.js
++++ b/src/js/chunk-core.js
+@@ -4,6 +4,7 @@
+ // A run: from an engine reset (connect, asset change, page load) to the next reset or the disconnect. A chunk: a cut of one run's stream, made when an input's OWN time is 30 minutes after the chunk's first
+ // input, or at 600,000 inputs, never by a timer. A chunk file is a session file (kind "sv-session", `inputs` as always) plus: run, seq, final, runner (configuration, carry-over, on), engineCfg, lateMs, thinMs, rows
+ // (the journal rows the page wrote during the chunk), moves (step 7: the stage moves applied to the runner during the chunk, [{sys, to, at}] with `at` the snapshot time they took effect; they are user actions, so a replay is handed them),
++// Since R5 check, fileName and leftRunning run in WebAssembly (rust/crates/sv-feed; the reference is js-cores/chunk-core.js, CHUNK_JS); the pipeline, thinner, timeOf, replay and firstDiff stay JS (per input / need the JS engine and row objects).
+ // changed (settings that moved during the chunk, which a replay cannot follow) and prevMissing. runner.stages (chunk 0) is {system id: stage} at the start of the run.
+ const CHUNK = (() => {
+   "use strict";
+@@ -77,11 +78,11 @@ const CHUNK = (() => {
+     }
+     return { rows: out, upto };
+   }
+-  // chunks of one run: complete (seq 0..n without a hole), whether it starts at 0, and the holes
++  // chunks of one run: complete (seq 0..n without a hole), whether it starts at 0, and the holes (since R5 in WebAssembly; called once per replayed run)
+   function check(chunks) {
+-    const seqs = chunks.map(c => c.seq).sort((a, b) => a - b), holes = []; let next = seqs[0] === 0 ? 0 : seqs[0];
+-    for (const s of seqs) { while (next < s) holes.push(next++); next = s + 1; }
+-    return { first: seqs[0], last: seqs[seqs.length - 1], startsAtZero: seqs[0] === 0, holes };
++    if (!chunks.length) return { first: undefined, last: undefined, startsAtZero: false, holes: [] };
++    const r = SVWASM.call("feed_check", { seqs: chunks.map(c => c.seq) });
++    return { first: r[0], last: r[1], startsAtZero: r[2], holes: r[3] };
+   }
+   // the first difference between the rows a chunk stored and the rows the replay made, as JSON; null when equal
+   // Rows a chunk stored before step 7 have no stage and fill on their enter and trade rows; they read as paper / paper (the page wrote paper fills under stage paper then), so an old chunk still replays equal.
+@@ -92,33 +93,20 @@ const CHUNK = (() => {
+     return null;
+   }
+   // chunk file name: session_<SYM>_<minute of the first input>_run<id>-c<seq>; it still matches the old session_*.json.gz pattern
+-  function fileName(c, gz) {
+-    const stamp = new Date(c.startedAt || 0).toISOString().slice(0, 16).replace(/[-:T]/g, "");
+-    return "session_" + (String(c.sym || "X").replace(/[^A-Za-z0-9_-]/g, "") || "X") + "_" + stamp + "_run" + c.run + "-c" + String(c.seq).padStart(3, "0") + (gz ? ".json.gz" : ".json");
++  function fileName(c, gz) {      // since R5 in WebAssembly (once per chunk); an invalid time throws like new Date(x).toISOString()
++    const r = SVWASM.call("feed_file_name", { sym: String(c.sym || "X"), at: +(c.startedAt || 0), run: String(c.run), seq: String(c.seq), gz: !!gz });
++    if (r === null) throw new RangeError("Invalid time value");
++    return r;
+   }
+ 
+   // The checks that still matter for a page left running for hours (they were the Arm mode checklist). env: {connected, recOn, folder:{supported, state:"ok"|"none"|"denied"|"failed", name}|null, disk:{tone, text}|null,
+   // battery:{charging, level 0..1}|null, wakeApi, wake (lock held), newer (a newer version string or null), hidden, persisted}. Items {id, tone:"ok"|"warn"|"bad"|"info", text, fix}; fix is empty when ok.
+-  function leftRunning(env) {
+-    const out = [], add = (id, tone, text, fix) => out.push({ id, tone, text, fix: tone === "ok" ? "" : fix || "" });
+-    if (!env.recOn) add("rec", "bad", "Recording is off", "Turn the switch on (Continuous recording): nothing is being kept.");
+-    else if (!env.connected) add("rec", "warn", "Not connected", "Press Connect: a run is recorded from connect to disconnect.");
+-    else add("rec", "ok", "Connected and recording");
+-    const f = env.folder;
+-    if (f && f.supported) {
+-      if (f.state === "ok") add("folder", "ok", "Save folder: " + (f.name || "chosen"));
+-      else if (f.state === "none") add("folder", "warn", "No save folder: chunks are kept in this browser for 24 hours only", "Choose a folder (Saved recordings, Choose folder).");
+-      else if (f.state === "denied") add("folder", "bad", "The browser took back access to the save folder", "Press Allow (Saved recordings).");
+-      else add("folder", "bad", "The last save into the folder failed", "Check the folder and the disk.");
+-    }
+-    if (env.disk) add("disk", env.disk.tone === "ok" ? "ok" : env.disk.tone, "Disk room: " + env.disk.text, "Free some space or choose another folder.");
+-    if (env.persisted === false) add("persist", "warn", "The browser may evict stored chunks", "Allow persistent storage for this site.");
+-    if (env.battery) add("power", env.battery.charging ? "ok" : env.battery.level < 0.5 ? "bad" : "warn", env.battery.charging ? "Power: charging" : "Power: on battery, " + Math.round(env.battery.level * 100) + "%", "Plug in the device.");
+-    if (env.connected && env.wakeApi === false) add("wake", "warn", "No screen wake lock in this browser: the device may sleep", "Turn off sleep in the system settings.");
+-    else if (env.connected && env.wakeApi && !env.wake) add("wake", "warn", "The screen wake lock is not held: the device may sleep", "Keep the tab visible; the lock is asked for again when it is.");
+-    else if (env.connected) add("wake", "ok", "Screen wake lock held");
+-    if (env.newer) add("version", "warn", "A newer version (" + env.newer + ") is out", "Reload when you can stop the run: the chunk being recorded is lost on a reload.");
+-    return { items: out, bad: out.filter(x => x.tone === "bad").length, warn: out.filter(x => x.tone === "warn").length };
++  function leftRunning(env) {      // since R5 in WebAssembly: only the fields the rule reads cross, and the rest of the environment is ignored
++    const f = env.folder, b = env.battery, d = env.disk;
++    const items = SVWASM.call("feed_left_running", { connected: !!env.connected, recOn: !!env.recOn, folder: f && f.supported ? { state: f.state, name: f.name ? String(f.name) : null } : null,
++      disk: d ? { tone: String(d.tone), text: String(d.text) } : null, battery: b ? { charging: !!b.charging, level: b.level } : null, wakeApi: env.wakeApi, wake: !!env.wake,
++      newer: env.newer ? String(env.newer) : null, persisted: env.persisted }).map(([id, tone, text, fix]) => ({ id, tone, text, fix }));
++    return { items, bad: items.filter(x => x.tone === "bad").length, warn: items.filter(x => x.tone === "warn").length };
+   }
+ 
+   // ---------- self-test: scenarios named chunk:* ----------
+diff --git a/src/js/market-core.js b/src/js/market-core.js
+index 2d76017..1ce4e8d 100644
+--- a/src/js/market-core.js
++++ b/src/js/market-core.js
+@@ -1,6 +1,7 @@
+ "use strict";
+ // Market history invariants (pure, no DOM, timers or storage): the 5-minute window, the 250 ms mid row, the 500 ms cvd row, the trade bookkeeping
+-// and the reset values. The page keeps the live objects (M, trades, cvd, cvdHist, midHist) and the timers; it calls through this door.
++// and the reset values. Since R5 midRow runs in WebAssembly (the reference is js-cores/market-core.js, MARKET_JS); the rest stays JS because it is called per trade (stampMid, bumpCvd: one JSON call would cost 6 us against 0.05 us) or moves arrays (prune).
++// The page keeps the live objects (M, trades, cvd, cvdHist, midHist) and the timers; it calls through this door.
+ // Display only: nothing here changes what the Reader hears. prune returns new arrays (as the old prune did), it never trims in place.
+ const MARKET = (() => {
+   const KEEP = 300000;               // 5 min of history for charts
+@@ -21,9 +22,12 @@ const MARKET = (() => {
+     if (!t.liq && !t.bf) cvd[t.v] += t.side==="buy" ? t.ntl : -t.ntl;
+     return cvd;
+   }
++  // the 250 ms mid row. Since R5 the rule (a venue needs a truthy bid and ask) runs in WebAssembly (rust/crates/sv-feed); until the module is loaded (the first few ms of a page) the same rule runs here.
+   function midRow(M, t){
+-    const bn = M.bnBid&&M.bnAsk ? (M.bnBid+M.bnAsk)/2 : null, hl = M.hlBid&&M.hlAsk ? (M.hlBid+M.hlAsk)/2 : null;
+-    return bn||hl ? {t, bn, hl} : null;
++    let r;
++    if (typeof SVWASM !== "undefined" && SVWASM.loaded) r = SVWASM.call("feed_mid_row", {bb:M.bnBid, ba:M.bnAsk, hb:M.hlBid, ha:M.hlAsk});
++    else { const bn = M.bnBid&&M.bnAsk ? (M.bnBid+M.bnAsk)/2 : null, hl = M.hlBid&&M.hlAsk ? (M.hlBid+M.hlAsk)/2 : null; r = bn||hl ? [bn, hl] : null; }
++    return r ? {t, bn:r[0], hl:r[1]} : null;
+   }
+   const cvdRow = (cvd, t) => ({t, bn:cvd.bn, hl:cvd.hl});
+   // sorts trades by time, then drops everything older than now-KEEP; returns the new arrays
+diff --git a/src/js/micro-core.js b/src/js/micro-core.js
+index 32fd92d..8c17ace 100644
+--- a/src/js/micro-core.js
++++ b/src/js/micro-core.js
+@@ -1,4 +1,5 @@
+ "use strict";
++// R5: stays JS whole (measured: every function is on the per-input or 250 ms path with large arguments; see source-map, Rust and WebAssembly).
+ // Microstructure data (pure, no DOM, timers or storage): book imbalance, microprice, heat snapshots, the 250 ms sample row and sweep grouping.
+ // Feed it books, quotes and trades; read hist / heatBn / heatHl / sweeps from the instance. Display only: nothing here feeds a detection
+ // (the Reader hears about a sweep only through the onSweep hook the page passes in). The page owns the timers and the drawing.
+diff --git a/src/js/run-record.js b/src/js/run-record.js
+index aad5161..65eea4b 100644
+--- a/src/js/run-record.js
++++ b/src/js/run-record.js
+@@ -122,7 +122,7 @@ RR.battery = null;
+ async function rrPower() { try { if (navigator.getBattery) { const b = await navigator.getBattery(); RR.battery = {charging: b.charging, level: b.level}; } } catch {} }
+ rrPower(); setInterval(rrPower, 60000);
+ function rrLeft() {
+-  const box = rr$("lrList"); if (!box) return;
++  const box = rr$("lrList"); if (!box || !SVWASM.loaded) return;      // the checks run in WebAssembly (CHUNK.leftRunning)
+   const f = typeof FS !== "undefined" && FS.supported ? {supported: true, state: !FS.dir ? "none" : FS.perm !== "granted" ? "denied" : RR.folderFail ? "failed" : "ok", name: FS.name} : null;
+   const d = typeof DW !== "undefined" ? DW.assess() : null;
+   const r = CHUNK.leftRunning({connected, recOn: RR.on, folder: f, disk: d, battery: RR.battery, wakeApi: !!navigator.wakeLock, wake: !!RR.wake, newer: typeof SB !== "undefined" ? SB.latest : null});
+@@ -130,7 +130,7 @@ function rrLeft() {
+   const html = r.items.map(x => `<div class="rv-row"><span style="color:${col[x.tone]};font-weight:700">${x.tone === "ok" ? "OK" : x.tone.toUpperCase()}</span><div class="grow">${esc(x.text)}${x.fix ? `<div class="stat">${esc(x.fix)}</div>` : ""}</div></div>`).join("");
+   if (box.dataset.h !== html) { box.dataset.h = html; box.innerHTML = html; }
+ }
+-setInterval(() => { try { rrRender(); rrLeft(); } catch {} }, 2000); rrLeft();
++setInterval(() => { try { rrRender(); rrLeft(); } catch {} }, 2000); SVWASM.ready.then(rrLeft, () => {});
+ rr$("rrOn").onchange = () => rrSetOn(rr$("rrOn").checked);
+ rrRender();
+ rrAfterLoad();
