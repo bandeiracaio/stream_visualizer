@@ -10,7 +10,7 @@
 //   {k:"twin", n, tIn, netBps, R, usd, reason}                                                                              a closed twin trade (twins write nothing else)
 // Since R3 the runner itself (create / step / interrupt / move / state / risk) runs in WebAssembly (rust/crates/sv-runner, loaded by wasm-loader.js as SVWASM): the runner owns its systems and twins (seeded random entries,
 // fills at the far side of the quote, the risk cap, stages) inside the module, so one call takes one snapshot for all of them. The signatures, journal rows (same keys in the same order) and thrown messages are the ones the JS version had
-// (that version is src/js/js-cores/runner-core.js, RUNNER_JS, and `node parity.mjs runner` compares the two). What stays here is bookkeeping over JS row objects: reading the journal a runner begins with, carryOf, driver, evaluate, the self-test.
+// What stays here is bookkeeping over JS row objects: reading the journal a runner begins with, carryOf, driver, evaluate, the self-test.
 // create() returns the same object as before plus dispose() (freed when collected too). Rows cross as JSON: a non-finite number comes back as null (no real session has one).
 const RUNNER = (() => {
   "use strict";

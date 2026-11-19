@@ -10,7 +10,7 @@
 // Rows read: {k:"trade", sys, tIn, t, netBps, R, usd, reason, interrupted?, stage?, fill?, paperNetBps?} and {k:"twin", sys, n, tIn, R}. A row without stage and fill is paper / paper (rows written before step 7).
 // Stage log entries (append-only, one per move): {sys, from, to, t, by: "user"|"auto", reason?, cap?, figures: {criteria: [{id, now, need, met}], edge?}}.
 // Since R0 the functions below run in WebAssembly (rust/crates/sv-promotion, loaded by wasm-loader.js as SVWASM); the signatures and results are the ones the JS version had
-// (the JS version is src/js/js-cores/promotion-core.js, PROMO_JS, and `node parity.mjs promo` compares the two). Inputs go in as JSON: a value that is not a number, NaN or Infinity reads as absent.
+// Inputs go in as JSON: a value that is not a number, NaN or Infinity reads as absent.
 const PROMO = (() => {
   "use strict";
   const DAY = 86400000, STAGES = ["paper", "demo", "live"];
@@ -25,7 +25,7 @@ const PROMO = (() => {
   function since(log, id, to) { const t = wasm("since", { log: log || [], id, to }); return t == null ? -Infinity : t; }
   const edgeOf = (log, id) => wasm("edge_of", { log: log || [], id });
   const capOf = (log, id) => wasm("cap_of", { log: log || [], id });
-  // The standing of one system against the rule for its next stage (see promotion-core.js in js-cores for the full description).
+  // The standing of one system against the rule for its next stage.
   const eligibility = (rows, stageLog, systemId, start) => wasm("eligibility", { rows, log: stageLog || [], sys: systemId, start });
   // The automatic move down. system: {id, riskFrac, equity0}; cap: dollars or null; day: UTC day number.
   const lossLimit = (rows, system, cap, day) => wasm("loss_limit", { rows, system, cap, day });

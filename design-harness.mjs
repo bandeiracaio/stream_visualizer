@@ -356,7 +356,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   }
   else if (args.includes("--run-defaults")) {
     const split = arg("split", "dev"); if (split !== "dev") { console.error("--run-defaults reads the dev split only (the hold-out and fresh data are never read here)"); process.exit(2); }
-    const one = arg("file", null);      // --file one.json.gz: that one session only, whatever its split (a code-parity test of the page's runner against its own journal; read once, no results are used)
+    const one = arg("file", null);      // --file one.json.gz: that one session only, whatever its split (a test of the page's runner against its own journal; read once, no results are used)
     const dir = path.resolve(HERE, arg("sessions", "sessions")), lim = Number(arg("limit", Infinity));
     const sessions = one ? [{ file: path.basename(one), dir: path.dirname(path.resolve(one)), size: fs.statSync(one).size }] : (a => splitSessions(a, "dev", false, holdoutCutoff(a)).slice(0, lim))(listSessions(dir));
     console.log("TEST OF THE CODE ONLY: the default systems on " + sessions.length + " saved dev sessions through the page's runner. These sessions were seen while the systems were designed; the numbers are not evidence and are not used for promotion.");

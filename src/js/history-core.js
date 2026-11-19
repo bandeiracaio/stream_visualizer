@@ -3,7 +3,7 @@
 // or from the simulated broker, plus totals, 7-day request pieces and CSV. Spec: .scratch/order-history/spec.md.
 // Display only: nothing here feeds a detection. Binance field names checked against the USD-M futures docs on 2026-10-24.
 // Since R1 the row building, totals, paging, merge and CSV run in WebAssembly (rust/crates/sv-history, loaded by wasm-loader.js as SVWASM); the signatures and results are the ones the JS version had
-// (that version is src/js/js-cores/history-core.js, HIST_JS, and `node parity.mjs hist` compares the two). Values go in as JSON with JS semantics (+x, String(x), parseFloat(x) are done in Rust).
+// Values go in as JSON with JS semantics (+x, String(x), parseFloat(x) are done in Rust).
 // Here: `push` (it mutates an array in place), the constants and COLUMNS, the pass-through ids (`id: o.orderId` is the raw value), and the objects whose key order JS decides (byType, statusCounts).
 // A non-finite number travels as its text ("NaN", "Infinity") and comes back as a number. Known edges: a lone surrogate in a CSV cell is refused by the JSON boundary; a null row inside `assets` / `positions` throws
 // the TypeError JS throws, but always says "null" (JSON has no undefined inside an array); totals / fillTotals add numbers (the rows these functions make): a text amount, fee or pnl would be concatenated by the JS version and is added here; merge assumes every `t` is a number (the order of rows without one is not defined).

@@ -1,0 +1,14 @@
+OK promo: 9190 cases, 0 differences
+OK all: 5957832 cases, 0 differences
+wasm: 556948 bytes
+OK promo: 9190 cases, 0 differences
+wasm: 556948 bytes
+real recordings: 233 of 233 session files are before 2026-11-16 (the rest are not opened)
+time: js 33237 ms, wasm 26291 ms over 233 files (138 s wall, including reading)
+real recordings: 233 session files are before 2026-11-16, 100 have cached snapshots; using 100 (--all-sessions also builds the rest); the later ones are not opened
+real recordings: 233 session files are before 2026-11-16, 100 have cached snapshots; using 100 (--all-sessions also builds the rest); the later ones are not opened
+time over the real runs: js reference 31123 ms, wasm wrapper 16302 ms (0.088 and 0.046 ms per runner-second of the random + defaults mix; 93 s wall)
+real recordings: 233 session files are before 2026-11-16, 100 have cached snapshots; running the paper runner on 4 of them for journals; the later ones are not opened
+OK all: 5957832 cases, 0 differences
+real	15m28.704s
+Run 2026-11-18, node parity.mjs all, every stage 'same' (0 differences).

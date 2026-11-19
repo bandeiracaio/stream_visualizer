@@ -3,7 +3,7 @@
 // when the tab was throttled or frozen, so every saved file carries this summary and the Saved recordings list shows it.
 // An input is ["q", venue, t, bid, ask] | ["t", {t, ...}] | ["a", t] (the 250 ms clock tick) | ["s"|"b", venue, t, ...].
 // Since R1 the figures run in WebAssembly (rust/crates/sv-quality, loaded by wasm-loader.js as SVWASM); the signatures and results are the ones the JS version had
-// (that version is src/js/js-cores/session-quality.js, SQ_JS, and `node parity.mjs sq` compares the two). Here: `of` reduces the inputs to (kind, time) pairs (a recording is millions of rows and only those are read),
+// Here: `of` reduces the inputs to (kind, time) pairs (a recording is millions of rows and only those are read),
 // `collectors` reduces the records to (name, time), objects whose key order JS decides are rebuilt from pairs and key lists, and the problem objects are built from the ids Rust returns.
 // The cost: `of` sends one number per input as JSON (about 14 bytes per row).
 const SQ = (() => {

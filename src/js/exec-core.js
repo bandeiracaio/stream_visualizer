@@ -9,8 +9,8 @@
 // Guards handed in with an enter row: {quoteAgeMs, offsetMs, oneWay, readOk, step, tick, minQty, minNotional}.
 // Rows written: {k:"mirror", sys, pid, t, status: "filled"|"paper"|"failed"|"interrupted", fill: "demo"|"paper", dir, qty, entryPx, exitPx, fees, feesBps, netBps, paperNetBps, entrySlipBps, exitSlipBps (positive = worse than paper),
 //   entryDelayMs, exitDelayMs, exitReason, lateMs, notes: [...]}. A refused entry writes a mirror row at once (status "paper", the reason in notes): the trade stays a paper trade.
-// Since R4 the machine itself (create, onRow, reply, tick, start, poll, kill, unkill, clearFault, drain, state, snapshot, faults, debug) runs in WebAssembly (rust/crates/sv-exec, loaded by wasm-loader.js as SVWASM); the old JS is
-// src/js/js-cores/exec-core.js (EXEC_JS) and `node parity.mjs exec` compares the two. Signatures, request / row / fault shapes and key order are the old ones.
+// Since R4 the machine itself (create, onRow, reply, tick, start, poll, kill, unkill, clearFault, drain, state, snapshot, faults, debug) runs in WebAssembly (rust/crates/sv-exec, loaded by wasm-loader.js as SVWASM).
+// Signatures, request / row / fault shapes and key order are the old ones.
 // SAFETY: the rule that no request is produced unless the base URL is the demo host (or a local http address with a port) and ALLOW_LIVE is false is decided in Rust (is_demo_base / allowed_base; ALLOW_LIVE is a const there; `send` queues nothing
 // for a machine that is not allowed). This file keeps a second copy of the host test (jsDemo): create() refuses to make a machine when the two disagree, and drain() hands out no request from a machine that is not allowed.
 // isDemoBase asks the module, and answers false until it is loaded (fail closed).
@@ -67,7 +67,7 @@ const EXEC = (() => {
 
 
   // ---------- self-test: a fake exchange and the scenarios exec:* ----------
-  function selftest(tap) {      // tap (parity only): wraps every machine the scenarios create, to record its calls
+  function selftest(tap) {      // tap (test only): wraps every machine the scenarios create, to record its calls
     const mk = o => tap ? tap(create(o)) : create(o);
     const res = [], ok = (name, c, detail) => res.push({ name: "exec:" + name, ok: !!c, detail: c ? "" : String(detail || "") });
     const G = { quoteAgeMs: 100, offsetMs: 10, oneWay: true, step: 0.001, tick: 0.1, minQty: 0.001, minNotional: 5 };

@@ -3,7 +3,7 @@
 // Display only: the Reader engine, feeds and the Binance broker are untouched. Rows go to the history log through HIST.push.
 // ctx = {sym, now, q:{bid, ask, mark}}; functions change the state they are given in place (same SIM shape as before) and return results.
 // Since R1 the arithmetic and decisions run in WebAssembly (rust/crates/sv-paper, loaded by wasm-loader.js as SVWASM); the signatures, results, thrown messages and the state left behind are the ones the JS version had
-// (that version is src/js/js-cores/paper-broker-core.js, PAPER_JS, and `node parity.mjs paper` compares the two). A call sends the numbers of the state (cash, positions in key order, nextId, logSeq) and gets the new ones
+// A call sends the numbers of the state (cash, positions in key order, nextId, logSeq) and gets the new ones
 // back, plus the rows to add; this wrapper writes them into the same SIM objects (positions are updated in place, never replaced, S.fills is the same array) and does the container bookkeeping: the 50-row fills list,
 // the order log through HIST.push (5000 cap), logEnd's scan, the resting-order objects, reset and pos. Numbers go through JSON: NaN, Infinity and -0 are carried across as text. Quantities and prices are numbers.
 const PAPER = (() => {

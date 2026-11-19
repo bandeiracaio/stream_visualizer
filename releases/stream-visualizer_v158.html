@@ -1173,7 +1173,7 @@ const READER_ENGINE = (() => {
 // Pure: no DOM, timers, storage, Date.now() or Math.random(). Causal: at second t it reads only what was known at t. The work per step does not grow with the length of the run.
 // Loaded by the page (live) and by design-harness.mjs (replay), so one file decides the trades. Spec: .scratch/trader/spec.md section 3, prompt .scratch/trader/prompts/03-system-core.md.
 // Since R2 the system itself (validate, id, size, and one running system: step, filled, closed, cancelled, end, force, state) runs in WebAssembly (rust/crates/sv-system, loaded by wasm-loader.js as SVWASM);
-// the signatures, results and thrown messages are the ones the JS version had (that version is src/js/js-cores/system-core.js, SYSTEM_JS, and `node parity.mjs system` compares the two).
+// the signatures, results and thrown messages are the ones the JS version had.
 // facts() stays here: it drives the Reader engine (READER_ENGINE, JS) and reads its sigma, price history and episode groups, so it moves with the engine (R6). A system instance lives inside the module and is
 // addressed by a handle; create() returns the same object as before (def, id, step, ...) plus dispose(), which frees the instance at once (it is also freed when the object is collected). A Rust runner (R3) owns the instances itself.
 // Inputs go in as JSON: a non-finite number or undefined in a snapshot reads as absent (null); the self-test and the real recordings never have one.
@@ -1487,7 +1487,7 @@ const SYSTEMS_DEFAULT = [
 //   {k:"twin", n, tIn, netBps, R, usd, reason}                                                                              a closed twin trade (twins write nothing else)
 // Since R3 the runner itself (create / step / interrupt / move / state / risk) runs in WebAssembly (rust/crates/sv-runner, loaded by wasm-loader.js as SVWASM): the runner owns its systems and twins (seeded random entries,
 // fills at the far side of the quote, the risk cap, stages) inside the module, so one call takes one snapshot for all of them. The signatures, journal rows (same keys in the same order) and thrown messages are the ones the JS version had
-// (that version is src/js/js-cores/runner-core.js, RUNNER_JS, and `node parity.mjs runner` compares the two). What stays here is bookkeeping over JS row objects: reading the journal a runner begins with, carryOf, driver, evaluate, the self-test.
+// What stays here is bookkeeping over JS row objects: reading the journal a runner begins with, carryOf, driver, evaluate, the self-test.
 // create() returns the same object as before plus dispose() (freed when collected too). Rows cross as JSON: a non-finite number comes back as null (no real session has one).
 const RUNNER = (() => {
   "use strict";
@@ -1933,7 +1933,7 @@ const CHUNK = (() => {
 // Rows read: {k:"trade", sys, tIn, t, netBps, R, usd, reason, interrupted?, stage?, fill?, paperNetBps?} and {k:"twin", sys, n, tIn, R}. A row without stage and fill is paper / paper (rows written before step 7).
 // Stage log entries (append-only, one per move): {sys, from, to, t, by: "user"|"auto", reason?, cap?, figures: {criteria: [{id, now, need, met}], edge?}}.
 // Since R0 the functions below run in WebAssembly (rust/crates/sv-promotion, loaded by wasm-loader.js as SVWASM); the signatures and results are the ones the JS version had
-// (the JS version is src/js/js-cores/promotion-core.js, PROMO_JS, and `node parity.mjs promo` compares the two). Inputs go in as JSON: a value that is not a number, NaN or Infinity reads as absent.
+// Inputs go in as JSON: a value that is not a number, NaN or Infinity reads as absent.
 const PROMO = (() => {
   "use strict";
   const DAY = 86400000, STAGES = ["paper", "demo", "live"];
@@ -1948,7 +1948,7 @@ const PROMO = (() => {
   function since(log, id, to) { const t = wasm("since", { log: log || [], id, to }); return t == null ? -Infinity : t; }
   const edgeOf = (log, id) => wasm("edge_of", { log: log || [], id });
   const capOf = (log, id) => wasm("cap_of", { log: log || [], id });
-  // The standing of one system against the rule for its next stage (see promotion-core.js in js-cores for the full description).
+  // The standing of one system against the rule for its next stage.
   const eligibility = (rows, stageLog, systemId, start) => wasm("eligibility", { rows, log: stageLog || [], sys: systemId, start });
   // The automatic move down. system: {id, riskFrac, equity0}; cap: dollars or null; day: UTC day number.
   const lossLimit = (rows, system, cap, day) => wasm("loss_limit", { rows, system, cap, day });
@@ -2056,8 +2056,8 @@ const PROMO = (() => {
 // Guards handed in with an enter row: {quoteAgeMs, offsetMs, oneWay, readOk, step, tick, minQty, minNotional}.
 // Rows written: {k:"mirror", sys, pid, t, status: "filled"|"paper"|"failed"|"interrupted", fill: "demo"|"paper", dir, qty, entryPx, exitPx, fees, feesBps, netBps, paperNetBps, entrySlipBps, exitSlipBps (positive = worse than paper),
 //   entryDelayMs, exitDelayMs, exitReason, lateMs, notes: [...]}. A refused entry writes a mirror row at once (status "paper", the reason in notes): the trade stays a paper trade.
-// Since R4 the machine itself (create, onRow, reply, tick, start, poll, kill, unkill, clearFault, drain, state, snapshot, faults, debug) runs in WebAssembly (rust/crates/sv-exec, loaded by wasm-loader.js as SVWASM); the old JS is
-// src/js/js-cores/exec-core.js (EXEC_JS) and `node parity.mjs exec` compares the two. Signatures, request / row / fault shapes and key order are the old ones.
+// Since R4 the machine itself (create, onRow, reply, tick, start, poll, kill, unkill, clearFault, drain, state, snapshot, faults, debug) runs in WebAssembly (rust/crates/sv-exec, loaded by wasm-loader.js as SVWASM).
+// Signatures, request / row / fault shapes and key order are the old ones.
 // SAFETY: the rule that no request is produced unless the base URL is the demo host (or a local http address with a port) and ALLOW_LIVE is false is decided in Rust (is_demo_base / allowed_base; ALLOW_LIVE is a const there; `send` queues nothing
 // for a machine that is not allowed). This file keeps a second copy of the host test (jsDemo): create() refuses to make a machine when the two disagree, and drain() hands out no request from a machine that is not allowed.
 // isDemoBase asks the module, and answers false until it is loaded (fail closed).
@@ -2114,7 +2114,7 @@ const EXEC = (() => {
 
 
   // ---------- self-test: a fake exchange and the scenarios exec:* ----------
-  function selftest(tap) {      // tap (parity only): wraps every machine the scenarios create, to record its calls
+  function selftest(tap) {      // tap (test only): wraps every machine the scenarios create, to record its calls
     const mk = o => tap ? tap(create(o)) : create(o);
     const res = [], ok = (name, c, detail) => res.push({ name: "exec:" + name, ok: !!c, detail: c ? "" : String(detail || "") });
     const G = { quoteAgeMs: 100, offsetMs: 10, oneWay: true, step: 0.001, tick: 0.1, minQty: 0.001, minNotional: 5 };
@@ -3547,7 +3547,7 @@ const MICRO = (() => {
 // or from the simulated broker, plus totals, 7-day request pieces and CSV. Spec: .scratch/order-history/spec.md.
 // Display only: nothing here feeds a detection. Binance field names checked against the USD-M futures docs on 2026-10-24.
 // Since R1 the row building, totals, paging, merge and CSV run in WebAssembly (rust/crates/sv-history, loaded by wasm-loader.js as SVWASM); the signatures and results are the ones the JS version had
-// (that version is src/js/js-cores/history-core.js, HIST_JS, and `node parity.mjs hist` compares the two). Values go in as JSON with JS semantics (+x, String(x), parseFloat(x) are done in Rust).
+// Values go in as JSON with JS semantics (+x, String(x), parseFloat(x) are done in Rust).
 // Here: `push` (it mutates an array in place), the constants and COLUMNS, the pass-through ids (`id: o.orderId` is the raw value), and the objects whose key order JS decides (byType, statusCounts).
 // A non-finite number travels as its text ("NaN", "Infinity") and comes back as a number. Known edges: a lone surrogate in a CSV cell is refused by the JSON boundary; a null row inside `assets` / `positions` throws
 // the TypeError JS throws, but always says "null" (JSON has no undefined inside an array); totals / fillTotals add numbers (the rows these functions make): a text amount, fee or pnl would be concatenated by the JS version and is added here; merge assumes every `t` is a number (the order of rows without one is not defined).
@@ -4881,7 +4881,7 @@ tab = TABS.some(t=>t[0]===savedView) ? savedView : "overview"; afterLayout();
 // when the tab was throttled or frozen, so every saved file carries this summary and the Saved recordings list shows it.
 // An input is ["q", venue, t, bid, ask] | ["t", {t, ...}] | ["a", t] (the 250 ms clock tick) | ["s"|"b", venue, t, ...].
 // Since R1 the figures run in WebAssembly (rust/crates/sv-quality, loaded by wasm-loader.js as SVWASM); the signatures and results are the ones the JS version had
-// (that version is src/js/js-cores/session-quality.js, SQ_JS, and `node parity.mjs sq` compares the two). Here: `of` reduces the inputs to (kind, time) pairs (a recording is millions of rows and only those are read),
+// Here: `of` reduces the inputs to (kind, time) pairs (a recording is millions of rows and only those are read),
 // `collectors` reduces the records to (name, time), objects whose key order JS decides are rebuilt from pairs and key lists, and the problem objects are built from the ids Rust returns.
 // The cost: `of` sends one number per input as JSON (about 14 bytes per row).
 const SQ = (() => {
@@ -6912,7 +6912,7 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden && FS
 "use strict";
 // Header status (view): live chips next to Connect/Pause and the BN/HL pills (STATUS.chips, status-core.js), and the "newer version" bar.
 // Read-only: it only looks at the app's state once a second and never changes a feed, a recording or a detection. Loaded last.
-const APP_VERSION = "v157";            // "vNNN" in a release build, "dev" otherwise (build.mjs stamps it)
+const APP_VERSION = "v158";            // "vNNN" in a release build, "dev" otherwise (build.mjs stamps it)
 const SB = {latest:null, sure:false, timer:null};
 const sb$ = id => document.getElementById(id);
 sb$("ver").textContent = APP_VERSION;           // tiny version tag next to the title
@@ -7951,7 +7951,7 @@ rrAfterLoad();
 // Display only: the Reader engine, feeds and the Binance broker are untouched. Rows go to the history log through HIST.push.
 // ctx = {sym, now, q:{bid, ask, mark}}; functions change the state they are given in place (same SIM shape as before) and return results.
 // Since R1 the arithmetic and decisions run in WebAssembly (rust/crates/sv-paper, loaded by wasm-loader.js as SVWASM); the signatures, results, thrown messages and the state left behind are the ones the JS version had
-// (that version is src/js/js-cores/paper-broker-core.js, PAPER_JS, and `node parity.mjs paper` compares the two). A call sends the numbers of the state (cash, positions in key order, nextId, logSeq) and gets the new ones
+// A call sends the numbers of the state (cash, positions in key order, nextId, logSeq) and gets the new ones
 // back, plus the rows to add; this wrapper writes them into the same SIM objects (positions are updated in place, never replaced, S.fills is the same array) and does the container bookkeeping: the 50-row fills list,
 // the order log through HIST.push (5000 cap), logEnd's scan, the resting-order objects, reset and pos. Numbers go through JSON: NaN, Infinity and -0 are carried across as text. Quantities and prices are numbers.
 const PAPER = (() => {

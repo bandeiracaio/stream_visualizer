@@ -3,7 +3,7 @@
 // Pure: no DOM, timers, storage, Date.now() or Math.random(). Causal: at second t it reads only what was known at t. The work per step does not grow with the length of the run.
 // Loaded by the page (live) and by design-harness.mjs (replay), so one file decides the trades. Spec: .scratch/trader/spec.md section 3, prompt .scratch/trader/prompts/03-system-core.md.
 // Since R2 the system itself (validate, id, size, and one running system: step, filled, closed, cancelled, end, force, state) runs in WebAssembly (rust/crates/sv-system, loaded by wasm-loader.js as SVWASM);
-// the signatures, results and thrown messages are the ones the JS version had (that version is src/js/js-cores/system-core.js, SYSTEM_JS, and `node parity.mjs system` compares the two).
+// the signatures, results and thrown messages are the ones the JS version had.
 // facts() stays here: it drives the Reader engine (READER_ENGINE, JS) and reads its sigma, price history and episode groups, so it moves with the engine (R6). A system instance lives inside the module and is
 // addressed by a handle; create() returns the same object as before (def, id, step, ...) plus dispose(), which frees the instance at once (it is also freed when the object is collected). A Rust runner (R3) owns the instances itself.
 // Inputs go in as JSON: a non-finite number or undefined in a snapshot reads as absent (null); the self-test and the real recordings never have one.
