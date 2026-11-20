@@ -1,0 +1,9 @@
+[package]
+name = "sv-reader"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde_json.workspace = true
+sv-core = { path = "../sv-core" }

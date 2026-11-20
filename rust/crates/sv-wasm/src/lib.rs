@@ -92,3 +92,13 @@ export! {
     sv_exec_debug => sv_exec::ops::op_debug,
     sv_exec_drop => sv_exec::ops::op_drop,
 }
+macro_rules! export_raw {
+    ($($name:ident => $f:path),* $(,)?) => {
+        $(#[no_mangle] pub extern "C" fn $name(ptr: *const u8, len: usize) -> *mut u8 { sv_core::call_raw(ptr, len, $f) })*
+    };
+}
+export_raw! {
+    sv_reader_create => sv_reader::ops::op_create,
+    sv_reader_run => sv_reader::ops::op_run,
+    sv_reader_drop => sv_reader::ops::op_drop,
+}

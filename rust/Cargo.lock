@@ -129,6 +129,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "sv-reader"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "sv-core",
+]
+
+[[package]]
 name = "sv-runner"
 version = "0.1.0"
 dependencies = [
@@ -157,6 +165,7 @@ dependencies = [
  "sv-paper",
  "sv-promotion",
  "sv-quality",
+ "sv-reader",
  "sv-runner",
  "sv-system",
 ]

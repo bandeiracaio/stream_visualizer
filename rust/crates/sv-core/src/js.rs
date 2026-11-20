@@ -212,6 +212,30 @@ pub fn to_fixed10(x: f64) -> f64 {
     if x < 0.0 { -v } else { v }
 }
 
+/// Number#toFixed(d) for 0 <= d <= 20: the exact value rounded to d decimals, an exact tie away from zero (JS takes the larger n); "-" when x < 0 (so -0.04 gives "-0.0" and -0 gives "0.0"),
+/// String(x) from 1e21 up and for NaN / Infinity. Rust's own precision formatting is exact but rounds a tie to even, so a tie (x * 2^(d+1) an odd integer) is rounded here.
+pub fn to_fixed(x: f64, d: usize) -> String {
+    if x.is_nan() { return "NaN".into(); }
+    if x.abs() >= 1e21 || x.is_infinite() { return num_str(x); }
+    let a = x.abs();
+    let t = a * (1u64 << (d + 1)) as f64;
+    let tie = t.fract() == 0.0 && t < 9.0e15 && (t as u64) % 2 == 1;
+    let s = if tie {
+        let f = format!("{:.*}", d + 1, a);
+        let mut b: Vec<u8> = f.bytes().take(f.len() - 1).collect();
+        if b.last() == Some(&b'.') { b.pop(); }
+        let mut i = b.len();
+        loop {
+            if i == 0 { b.insert(0, b'1'); break; }
+            i -= 1;
+            if b[i] == b'.' { continue; }
+            if b[i] == b'9' { b[i] = b'0'; } else { b[i] += 1; break; }
+        }
+        String::from_utf8(b).unwrap()
+    } else { format!("{:.*}", d, a) };
+    if x < 0.0 { format!("-{s}") } else { s }
+}
+
 /// new Date(ms).toISOString(); None when the date is invalid (the JS throws RangeError).
 pub fn iso(ms: f64) -> Option<String> {
     if !ms.is_finite() || ms.abs() > 8.64e15 { return None; }
@@ -247,6 +271,16 @@ mod tests {
         for line in text.lines() { let (h, want) = line.split_once(' ').unwrap(); let x = f64::from_bits(u64::from_str_radix(h, 16).unwrap()); assert_eq!(num_str(x), want, "{h}"); n += 1; }
         println!("{n} numbers equal V8");
     }
+    /// Number#toFixed against V8: lines "<16 hex digits of the double> <d> <x.toFixed(d)>" (made with node), named by SV_TOFIXED_FIXTURE
+    #[test]
+    #[ignore]
+    fn to_fixed_matches_v8() {
+        let Ok(path) = std::env::var("SV_TOFIXED_FIXTURE") else { return };
+        let text = std::fs::read_to_string(path).unwrap();
+        let mut n = 0;
+        for line in text.lines() { let mut it = line.splitn(3, ' '); let h = it.next().unwrap(); let d: usize = it.next().unwrap().parse().unwrap(); let want = it.next().unwrap(); let x = f64::from_bits(u64::from_str_radix(h, 16).unwrap()); assert_eq!(to_fixed(x, d), want, "{h} {d}"); n += 1; }
+        println!("{n} numbers equal V8");
+    }
     #[test]
     fn nums() {
         assert_eq!(num_str(1e21), "1e+21");
@@ -256,5 +290,14 @@ mod tests {
         assert_eq!(num_str(1.5e-7), "1.5e-7");
         assert_eq!(num_str(-0.5), "-0.5");
         assert_eq!(iso(1700000000000.0).unwrap(), "2023-11-14T22:13:20.000Z");
+        assert_eq!(to_fixed(2.25, 1), "2.3");
+        assert_eq!(to_fixed(2.5, 0), "3");
+        assert_eq!(to_fixed(9.5, 0), "10");
+        assert_eq!(to_fixed(0.15, 1), "0.1");
+        assert_eq!(to_fixed(-0.04, 1), "-0.0");
+        assert_eq!(to_fixed(-0.0, 1), "0.0");
+        assert_eq!(to_fixed(-2.25, 1), "-2.3");
+        assert_eq!(to_fixed(99.95, 1), "100.0");
+        assert_eq!(to_fixed(1e21, 2), "1e+21");
     }
 }

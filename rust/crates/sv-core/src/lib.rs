@@ -32,6 +32,8 @@ pub mod math {
         fn host_log1p(x: f64) -> f64;
         #[link_name = "expm1"]
         fn host_expm1(x: f64) -> f64;
+        #[link_name = "log2"]
+        fn host_log2(x: f64) -> f64;
     }
     #[cfg(target_arch = "wasm32")]
     pub fn exp(x: f64) -> f64 { unsafe { host_exp(x) } }
@@ -43,6 +45,8 @@ pub mod math {
     pub fn log1p(x: f64) -> f64 { unsafe { host_log1p(x) } }
     #[cfg(target_arch = "wasm32")]
     pub fn expm1(x: f64) -> f64 { unsafe { host_expm1(x) } }
+    #[cfg(target_arch = "wasm32")]
+    pub fn log2(x: f64) -> f64 { unsafe { host_log2(x) } }
     // Native builds (unit tests on the host) have no imports; they are never used for parity.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn exp(x: f64) -> f64 { x.exp() }
@@ -54,6 +58,8 @@ pub mod math {
     pub fn log1p(x: f64) -> f64 { x.ln_1p() }
     #[cfg(not(target_arch = "wasm32"))]
     pub fn expm1(x: f64) -> f64 { x.exp_m1() }
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn log2(x: f64) -> f64 { x.log2() }
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -108,6 +114,16 @@ pub fn call<I: DeserializeOwned, O: Serialize>(ptr: *const u8, len: usize, f: im
     };
     match run() {
         Ok(b) => pack(0, &b),
+        Err(m) => pack(1, m.as_bytes()),
+    }
+}
+
+/// The glue of a call whose result is JSON text written by the core itself (key order and number text under its own control, no serde shape per output): JSON in, `f`, the text out.
+pub fn call_raw(ptr: *const u8, len: usize, f: impl FnOnce(serde_json::Value) -> Result<String, String>) -> *mut u8 {
+    let input = unsafe { std::slice::from_raw_parts(ptr, len) };
+    let run = || -> Result<String, String> { f(serde_json::from_slice(input).map_err(|e| format!("bad input: {e}"))?) };
+    match run() {
+        Ok(b) => pack(0, b.as_bytes()),
         Err(m) => pack(1, m.as_bytes()),
     }
 }

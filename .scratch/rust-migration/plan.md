@@ -121,3 +121,26 @@ R7 can go earlier if faster studies are the main need: it needs only the cores a
 - **R5 not released.** MICRO, MARKET and CHUNK are per-input or trivial: every function measured was slower through wasm (for example `CHUNK.pipeline.input` 4 µs/s in JS against 186 µs/s; `MARKET.midRow` 0.2 against 31 µs/s). They stay in JS. The attempt (crate `sv-feed`, its parity and the benchmark) is kept in `.scratch/rust-migration/r5-attempt/` for reference.
 - **R7 deferred until after R6.** A native replay tool needs the facts accumulator and the Reader engine in Rust; until R6, `design-harness.mjs` already runs the systems and runner on wasm faster than the JS reference.
 - **R8 scope.** Delete the JS references only of the cores that moved (PROMO, PAPER, HIST, SQ, SYSTEM, RUNNER, EXEC).
+
+## Amendment 2 (2026-11-20): R6 in two parts, the page keeps the JS Reader until the episode-outcomes run
+
+Section 7 held R6 back until the episode-outcomes test run (about 2026-12-07). What that rule protects does not need the whole wait:
+
+- **The study is not affected by a port.** `episode-outcomes.mjs` replays the Reader frozen at commit `5c10923`, read with `git show` (`loadEngine` of `compare-detections.mjs`), never the working tree. A Reader in Rust changes none of its detections.
+- **The recordings are not affected.** They hold the inputs, not detections.
+- **What a port could still harm**: (1) the page during the test window (a crash or stall stops recording and loses test-set hours), and (2) the rule that nothing in the test set is looked at but hours, runs and episode counts (a parity run over those recordings shows detections).
+
+So R6 is split:
+
+| Step | What | Done when |
+|---|---|---|
+| R6a (now) | `rust/crates/sv-reader`: the engine and the episode layer ported line for line; `src/js/reader-wasm.js` (`READER_WASM`, the API of `READER_ENGINE`); `src/js/reader-parity.js` and `lib/reader-parity.mjs`; `compare-detections.mjs --wasm-a / --wasm-b`. **The page keeps the JS Reader**: `reader-wasm.js` is not included in it; the module carries the Reader's exports unused. | The build's parity check passes (every self-test scenario through the paired engine with every read equal, and random streams); a long run of `lib/reader-parity.mjs`; `compare-detections.mjs --selftest`; and, on the user's machine, `node compare-detections.mjs <every saved session before 2026-11-16> --wasm-b` exits 0. |
+| R6b (after the episode-outcomes run) | The page's `READER` runs on `READER_WASM`, if it is faster in the page with batched inputs; then the JS Reader is retired as in R8, keeping `reader-engine.js` / `reader-episodes.js` only where `git show` of an old commit needs them (the study's frozen commit). | `compare-detections.mjs --wasm-b` exits 0 on every saved session (test set included, after the run); the page measured. |
+
+Until R6b the JS Reader stays the reference and the live engine: a change to `reader-engine.js` or `reader-episodes.js` must be made in `sv-reader` too, and the build's parity check fails until it is.
+
+**Boundary.** An input does not cross on its own (amendment 1: a crossing costs 5 to 10 µs, the Reader is called per input). The wrapper queues inputs, copied at call time in the recording format, and sends them in one call with the reads that need them; a read flushes the queue and is cached until the next input. Measured in Node on one 744k-input stream (random two-venue streams joined): JS 24 to 31 s, WebAssembly 8 to 9 s for the replay and the groups, about 3x faster, groups and signals equal as JSON. What differs is only how it is driven: listeners are called when the queue is flushed, with the episode or signal as it was at the moment it happened; returned objects are copies; `debug()` gives the read functions and a summary of the venues; NaN in an input crosses as null (a recorded session already has null).
+
+**Exactness rules kept in the port.** Every call into the statistics cache (`stat`, `sigmaBps`, `robustZ`) is made where and when the JS makes it, skipped where the JS short-circuits; Math.exp / log / log2 are the host's (`log2` was added to the imports); readings and evidence text are written with an exact `Number#toFixed` (`sv_core::js::to_fixed`, a tie rounded away from zero; checked against V8 on 300k numbers including the ties) and `String(x)`; JSON is written by the core in the key order of the JS objects (two keys of an episode, `resolution` and `resolutionSigma`, are in the order they were first written); maps keep insertion order where the JS iterates them.
+
+**Size.** The wasm grows from 556,948 to 681,912 bytes (909,216 base64), inside amendment 1's budget of about 1.1 MB base64.

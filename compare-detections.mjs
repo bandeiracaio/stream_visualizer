@@ -1,7 +1,10 @@
 // Offline regression check: replay the same saved sessions through two versions of the Reader (or one version under two configs) and report every difference in what was detected.
 // Replaces the by-hand "byte-compare detections before and after" that every change to the episode layer is proven with. Reads the Reader exactly as the app runs it (src/js/*.js, loaded the way
 // build.mjs does), so there is nothing to build first. Compares the episode GROUPS (what the cards show) and the legacy one-off SIGNALS, as exact JSON, so any change in a number counts.
-// Usage:  node compare-detections.mjs SESSION... [--rev-a GITREV] [--rev-b GITREV] [--cfg-a a.json] [--cfg-b b.json] [--signals-only | --groups-only] [--json] [--limit N]      |      --selftest
+// Usage:  node compare-detections.mjs SESSION... [--rev-a GITREV] [--rev-b GITREV] [--wasm-a | --wasm-b] [--cfg-a a.json] [--cfg-b b.json] [--signals-only | --groups-only] [--json] [--limit N]      |      --selftest
+//   --wasm-a / --wasm-b: that side is the Reader in Rust/WebAssembly (rust/crates/sv-reader through src/js/reader-wasm.js, working tree; rust/ is rebuilt when it changed), e.g.
+//   `node compare-detections.mjs sessions/*.json.gz --wasm-b` checks the port against the JS Reader (R6). With a --wasm flag a session whose inputs reach the episode-outcomes test set
+//   (2026-11-16T00:00Z on, .scratch/episode-outcomes/plan.md) is refused until that study's run, unless --allow-test-set is given.
 //   A is the "before" side and B the "after" side. With no --rev the file is read from the working tree; --rev-a HEAD compares the working tree (B) with the last commit (A);
 //   --rev-a v091tag --rev-b HEAD compares two commits. --cfg-a / --cfg-b are JSON engine configs (the same file --cfg of analyze-episodes.mjs takes), default thresholds when omitted.
 //   SESSION is a session_*.json.gz or .json from the app. Exit code 0 when identical everywhere, 1 when anything differs, 2 on a usage error: usable in a script before a release.
@@ -11,6 +14,7 @@ import vm from "node:vm";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { readInput } from "./lib/session-io.mjs";
+import { loadReaders } from "./lib/reader-parity.mjs";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const ENGINE_FILES = ["reader-drift", "reader-proposals", "reader-register", "reader-episodes", "reader-engine"];
@@ -39,8 +43,15 @@ const J = x => JSON.stringify(x);
 // list of what each side detected for one session: groups and signals, as exact JSON per item
 export function detect(E, inputs, cfg) {
   const e = E.replayEngine(inputs, cfg || undefined);
-  return { groups:e.episodeGroups().map(g => ({ k:key(g), j:J(g), g })), signals:(e.events || []).map(s => ({ k:sigKey(s), j:J(s), g:s })) };
+  const out = { groups:e.episodeGroups().map(g => ({ k:key(g), j:J(g), g })), signals:(e.events || []).map(s => ({ k:sigKey(s), j:J(s), g:s })) };
+  if (e.dispose) e.dispose();      // the WASM engine frees its state
+  return out;
 }
+// the Reader in Rust/WebAssembly, with READER_ENGINE's module API
+export const loadWasmEngine = () => ({ E:loadReaders().W });
+// the episode-outcomes test set starts here; until its one run, a --wasm comparison does not look at it
+export const TEST_SET_FROM = Date.parse("2026-11-16T00:00:00Z");
+const lastInputT = inputs => { let m = -Infinity; for (const r of inputs) { const x = r[0] === "t" ? (r[1] && r[1].t) : r[0] === "a" ? r[1] : r[0] === "x" ? null : r[2]; if (typeof x === "number" && x > m) m = x; } return m; };
 // the fields that differ between two versions of one item (top level only, with the two values)
 function fieldDiff(a, b) {
   const out = {}, keys = new Set(Object.keys(a).concat(Object.keys(b)));
@@ -91,7 +102,7 @@ function print(results, limit) {
 
 // ---------- self-test: simulated sessions through the Reader's own simulator
 function selfTest() {
-  const { E, S } = loadEngine(null, ["auto-record-core", "status-core", "session-quality", "collectors-core", "reader-selftest"]);
+  const { E, S } = loadEngine(null, ["reader-selftest"]);      // only the simulator is used (the list named auto-record-core.js, removed in v142, so --selftest could not start)
   const burst = { rate:200, buyP:.1, driftBps:-6, liqSell:3, sweepSell:2, bidMult:.4 }, sessions = [];
   for (let k = 0; k < 3; k++) {
     const e = E.create(); e.startRecording();
@@ -105,6 +116,7 @@ function selfTest() {
   // HEAD is this very file's revision when committed; without git history the check is skipped rather than failed
   let gitOk = true; try { execFileSync("git", ["rev-parse", "--verify", "HEAD"], { cwd:root, stdio:"ignore" }); } catch { gitOk = false; }
   const viaGit = gitOk ? (() => { try { const EH = loadEngine("HEAD").E; return compareSession(EH, EH, sessions[0], null, null, all).identical; } catch { return false; } })() : true;
+  const EW = loadWasmEngine().E, wasm = sessions.map(inp => compareSession(E, EW, inp, null, null, all)), wasmDiff = sessions.map(inp => compareSession(E, EW, inp, null, { sens:0.1 }, all));
   // list comparison on hand-made items
   const mk = (k, v) => ({ k, j:J(v), g:v }), cl = compareLists([mk("a", { x:1 }), mk("a", { x:2 }), mk("b", { x:1 }), mk("c", { x:1 })], [mk("a", { x:1 }), mk("a", { x:3 }), mk("c", { x:1 }), mk("d", { x:1 })]);
   const checks = [
@@ -112,6 +124,8 @@ function selfTest() {
     ["the same engine and config on the same inputs is identical", same.every(r => r.identical)],
     ["a different config is reported as different, with what changed", diff.some(r => !r.identical && (r.groups.onlyA.length + r.groups.changed.length + r.signals.onlyA.length + r.signals.changed.length) > 0)],
     ["a git revision loads and replays identically to itself", viaGit],
+    ["the Reader in WebAssembly detects exactly what the JS Reader does (groups and signals, as JSON)", wasm.every(r => r.identical)],
+    ["... and a different config on the WebAssembly side is reported as different", wasmDiff.some(r => !r.identical)],
     ["lists: same, changed (same key, different content), only in A, only in B", cl.same === 2 && cl.changed.length === 1 && cl.changed[0].k === "a" && cl.onlyA.length === 1 && cl.onlyA[0].k === "b" && cl.onlyB.length === 1 && cl.onlyB[0].k === "d"],
     ["a changed field is named with both values", J(fieldDiff({ x:1, y:2 }, { x:1, y:3 })) === '{"y":[2,3]}'],
   ];
@@ -124,12 +138,17 @@ function selfTest() {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2), val = flag => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : null; };
   const valued = new Set(["--rev-a", "--rev-b", "--cfg-a", "--cfg-b", "--limit"]), files = args.filter((x, i) => !x.startsWith("--") && !valued.has(args[i - 1]));
+  const wasmA = args.includes("--wasm-a"), wasmB = args.includes("--wasm-b");
+  if ((wasmA && val("--rev-a")) || (wasmB && val("--rev-b"))) { console.error("--wasm-a / --wasm-b take the working tree's Reader in WebAssembly; they cannot be combined with --rev on the same side"); process.exit(2); }
   if (args.includes("--selftest")) selfTest();
   else if (!files.length) { console.error("usage: node compare-detections.mjs SESSION... [--rev-a GITREV] [--rev-b GITREV] [--cfg-a a.json] [--cfg-b b.json] [--signals-only | --groups-only] [--json] [--limit N]   |   --selftest"); process.exit(2); }
   else {
     const cfgOf = f => f ? JSON.parse(fs.readFileSync(f, "utf8")) : null, what = { groups:!args.includes("--signals-only"), signals:!args.includes("--groups-only") };
-    const { E:EA } = loadEngine(val("--rev-a")), { E:EB } = loadEngine(val("--rev-b")), cfgA = cfgOf(val("--cfg-a")), cfgB = cfgOf(val("--cfg-b")), limit = Number(val("--limit")) || 5;
-    const results = files.map((f, i) => { console.error("[" + (i + 1) + "/" + files.length + "] " + f); const s = readInput(f); if (s.kind !== "session") { console.error(f + ": not a session file"); process.exit(2); } return { file:f, cmp:compareSession(EA, EB, s.inputs, cfgA, cfgB, what) }; });
+    const { E:EA } = wasmA ? loadWasmEngine() : loadEngine(val("--rev-a")), { E:EB } = wasmB ? loadWasmEngine() : loadEngine(val("--rev-b")), cfgA = cfgOf(val("--cfg-a")), cfgB = cfgOf(val("--cfg-b")), limit = Number(val("--limit")) || 5;
+    const results = files.map((f, i) => { console.error("[" + (i + 1) + "/" + files.length + "] " + f); const s = readInput(f); if (s.kind !== "session") { console.error(f + ": not a session file"); process.exit(2); }
+      if ((wasmA || wasmB) && !args.includes("--allow-test-set") && lastInputT(s.inputs) >= TEST_SET_FROM) { console.error(f + ": its inputs reach the episode-outcomes test set (2026-11-16T00:00Z on); left out (--allow-test-set after that study's run)"); return null; }
+      return { file:f, cmp:compareSession(EA, EB, s.inputs, cfgA, cfgB, what) }; }).filter(Boolean);
+    if (!results.length) { console.error("no session left to compare"); process.exit(2); }
     if (args.includes("--json")) { console.log(J(results.map(r => ({ file:r.file, identical:r.cmp.identical, nA:r.cmp.nA, nB:r.cmp.nB, groups:r.cmp.groups && { same:r.cmp.groups.same, onlyA:r.cmp.groups.onlyA.map(x => x.k), onlyB:r.cmp.groups.onlyB.map(x => x.k), changed:r.cmp.groups.changed }, signals:r.cmp.signals && { same:r.cmp.signals.same, onlyA:r.cmp.signals.onlyA.map(x => x.k), onlyB:r.cmp.signals.onlyB.map(x => x.k), changed:r.cmp.signals.changed } })), null, 1)); process.exit(results.every(r => r.cmp.identical) ? 0 : 1); }
     process.exit(print(results, limit) ? 1 : 0);
   }

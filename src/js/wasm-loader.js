@@ -13,7 +13,7 @@ const SVWASM = (() => {
   let inst = null, panicText = "", failure = null;
   const imports = {
     env: {
-      exp: Math.exp, log: Math.log, pow: Math.pow, log1p: Math.log1p, expm1: Math.expm1,      // the host's own math, so results equal the JS cores bit for bit
+      exp: Math.exp, log: Math.log, pow: Math.pow, log1p: Math.log1p, expm1: Math.expm1, log2: Math.log2,      // the host's own math, so results equal the JS cores bit for bit
       sv_panic: (p, n) => { panicText = dec.decode(new Uint8Array(inst.exports.memory.buffer, p, n)); },
     },
   };

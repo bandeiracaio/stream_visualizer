@@ -128,6 +128,8 @@ src/
     reader-engine.js    pure order-flow engine and one-off detectors (replayable)
     reader-episodes.js  pure episode state machines and evidence checklists
     reader-selftest.js  simulator scenarios (run by the build)
+    reader-wasm.js      the same Reader in Rust/WebAssembly (offline scripts; not in the page yet)
+    reader-parity.js    the build's check that the two Readers give the same reads
     systems-default.js  the seven default paper systems (data only)
     hooks.js, views.js  the seams: late extension points and the view registry
     feeds.js            Binance and Hyperliquid sockets, books, the input pipeline
@@ -139,7 +141,8 @@ src/
     account-*.js, status-*.js, health-log.js   the views
 build.mjs               self-test + single-file assembler (--release, --verify)
 design-harness.mjs      replays recordings through the same cores (--replay-run)
-compare-detections.mjs  byte-compares detections between two revisions
+compare-detections.mjs  byte-compares detections between two revisions (or the JS and Rust Readers)
+rust/                   the pure cores in Rust, compiled to one .wasm inlined in the page
 demo-proxy.mjs          local CORS proxy for the Binance demo host
 releases/               the newest released page (older ones are GitHub Releases)
 sessions/               saved recordings (gitignored)
